@@ -44,6 +44,8 @@ postgres_data/
 postgres_data_prod/
 *.sql
 *.sql.gz
+# Allow Prisma migrations
+!apps/backend/prisma/migrations/**/*.sql
 
 # Backups
 backups/
