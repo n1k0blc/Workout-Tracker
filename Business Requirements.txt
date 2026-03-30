@@ -1,0 +1,295 @@
+PERSONAL WORKOUT TRACKING APPLICATION  
+BUSINESS REQUIREMENTS DOCUMENT
+
+---
+
+1. OVERVIEW
+
+This application allows users to create, manage, and track their workouts over time.  
+It is designed to support structured workout cycles while remaining flexible enough to reflect real-world training behavior (e.g. missed workouts, schedule changes, spontaneous workouts).
+
+The system should prioritize:
+- Flexibility over rigidity
+- Ease of use during workouts (mobile-first)
+- Accurate progress tracking despite deviations from the plan
+
+---
+
+2. CORE PRINCIPLES
+
+2.1 FLEXIBLE WORKOUT EXECUTION  
+Workout schedules are recommendations, not strict rules.  
+Users must be able to:
+- Skip workouts
+- Perform workouts on different days than scheduled
+- Perform completely unplanned ("free") workouts
+
+2.2 BLUEPRINT-DRIVEN PROGRESSION  
+Each workout cycle is based on a "blueprint" (template).  
+Users can update this blueprint during the cycle.  
+Changes apply only to future workouts and do not modify past logged workouts.
+
+2.3 PROGRESS TRACKING DESPITE IMPERFECTION  
+The system must track and visualize progress even when users:
+- Miss workouts
+- Change exercises
+- Adjust sets, reps, or weights
+- Deviate from the original plan
+
+---
+
+3. USER FEATURES
+
+3.1 AUTHENTICATION
+- User registration via email and password
+- Login and logout functionality
+- Secure password storage (hashed)
+- Profile management (basic user data)
+
+---
+
+3.2 WORKOUT CYCLE SETUP
+
+Users must create a workout cycle during onboarding.
+
+Setup flow:
+1. Name of workout cycle
+2. Duration in weeks
+3. Selection of workout days (e.g. Monday, Wednesday, Friday)
+4. Selection of cycle start day
+
+Scheduling logic:
+- Cycle starts on the first occurrence of the selected start day after setup
+- Workouts are assigned to selected weekdays for the duration of the cycle
+
+For each workout day:
+- User creates a workout
+- Each workout consists of exercises
+- Each exercise includes:
+  - Sets
+  - Reps
+  - Reps in reserve (RIR)
+  - Weight
+  - Rest time between sets
+  - Rest time between exercises
+
+---
+
+3.3 EXERCISE LIBRARY
+
+The application includes:
+- A predefined global exercise library (seeded)
+
+Users can:
+- Search exercises by name
+- Filter by:
+  - Muscle group (chest, back, abs, legs, shoulders, biceps, triceps, forearms)
+  - Equipment (barbell, dumbbell, machine, cable, Smith machine, SZ-bar, bodyweight)
+
+Users can also:
+- Create custom exercises with:
+  - Name
+  - Muscle group
+  - Equipment
+  - Optional description
+
+Important:
+- Custom exercises are private to the user
+- They are NOT shared globally
+
+---
+
+3.4 WORKOUT MODE
+
+Workout mode is the central feature of the application.
+
+3.4.1 STARTING A WORKOUT
+When entering workout mode:
+- The system suggests a workout based on:
+  - Current cycle
+  - Current day
+  - Blueprint
+
+Users can choose to:
+- Start the suggested workout
+- Select a different workout from the cycle
+- Start a "free workout" (no predefined structure)
+
+---
+
+3.4.2 FREE WORKOUT MODE
+Users can:
+- Start an empty workout
+- Add exercises dynamically during the workout
+- Define sets, reps, weight, etc. on the fly
+
+---
+
+3.4.3 WORKOUT EXECUTION
+
+During a workout:
+- A global workout timer runs
+- Exercises are displayed as a list
+
+For each exercise:
+- Users can log:
+  - Sets
+  - Reps
+  - Weight
+  - RIR
+
+Users can:
+- Add sets
+- Remove sets
+- Adjust reps and weight at any time
+
+---
+
+3.4.4 TIMER SYSTEM
+
+The system tracks:
+- Total workout duration
+- Rest time between sets
+- Rest time between exercises
+
+Timers must:
+- Start/stop automatically based on user actions
+- Adjust dynamically if sets/exercises are modified
+
+---
+
+3.4.5 DYNAMIC WORKOUT MODIFICATION
+
+During a workout, users can:
+
+- Replace an exercise
+  - Select from library or create new
+  - Previous exercise data is discarded
+
+- Delete an exercise
+  - All associated data is discarded
+
+- Add a new exercise
+  - Data is tracked normally
+
+---
+
+3.4.6 ENDING A WORKOUT
+
+Users can:
+- Complete workout
+- End early
+
+After ending:
+- User chooses to:
+  - Save workout
+  - Discard workout
+
+If saved:
+- All logged data is stored
+
+---
+
+3.4.7 BLUEPRINT UPDATE
+
+After completing a workout:
+- User is asked whether to update the blueprint
+
+If YES:
+- The current workout structure and values overwrite the blueprint
+- Changes apply only to future workouts in the cycle
+- For future workouts in upcoming weeks, the updated blueprint is used to generate workout suggestions and values are prefilled from the last logged workout
+
+If NO:
+- Workout is stored only as historical data
+
+---
+
+3.5 WORKOUT SCHEDULING FLEXIBILITY
+
+The system must allow:
+- Performing a scheduled workout on a different day
+- Performing workouts out of order
+- Ignoring suggested workouts entirely
+
+The system should:
+- Suggest workouts based on schedule
+- Never restrict user choice
+
+---
+
+3.6 DASHBOARD & ANALYTICS
+
+The dashboard displays:
+
+Cycle overview:
+- Current week (e.g. Week 3 of 12)
+- Remaining weeks
+
+Calendar view:
+- Shows current week
+- Highlights workout and rest days
+- Allows viewing past workouts
+
+Metrics:
+
+1. Volume progression
+   - Formula: sets × reps × weight
+   - Filter by workout or muscle group
+
+2. Strength progression (% of 1RM)
+   - Based on Epley formula:
+     weight × (1 + reps / 30)
+   - Baseline derived from first week
+
+3. Volume distribution
+   - By muscle group (pie chart)
+
+4. Time tracking
+   - Total minutes trained per week
+   - Average workout duration
+
+5. Volume summaries
+   - Per workout
+   - Per muscle group
+   - Per week
+
+6. Personal records (PRs)
+   - Weight, reps, date
+
+---
+
+3.7 CYCLE MANAGEMENT
+
+After completing a cycle:
+- User can:
+  - Create a new cycle from scratch
+  - Copy previous cycle and modify it
+
+If no active cycle:
+- Dashboard prompts user to create one
+
+---
+
+4. GENERAL REQUIREMENTS
+
+- Mobile-first design
+- Responsive UI
+- Clean, card-based interface
+- Modal-driven interactions
+- Light and dark mode support
+- English language only
+
+---
+
+5. NON-FUNCTIONAL REQUIREMENTS
+
+- Fast interaction during workouts (low latency)
+- Reliable data persistence
+- Ability to handle partial/incomplete workouts
+- Scalable data model for analytics
+- Offline capability (preferred, optional in first version)
+
+---
+
+END OF DOCUMENT

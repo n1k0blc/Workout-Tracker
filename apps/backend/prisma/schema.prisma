@@ -1,0 +1,206 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum MuscleGroup {
+  CHEST
+  BACK
+  BICEPS
+  TRICEPS
+  ABS
+  SHOULDERS
+  LEGS
+}
+
+enum Equipment {
+  CABLE
+  MACHINE
+  DUMBBELL
+  BARBELL
+  BODYWEIGHT
+  SMITH_MACHINE
+  EZ_BAR
+}
+
+enum WorkoutStatus {
+  IN_PROGRESS
+  COMPLETED
+  DISCARDED
+}
+
+enum SetType {
+  WARMUP
+  WORKING
+}
+
+// Models
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String
+  createdAt     DateTime @default(now())
+
+  workoutCycles WorkoutCycle[]
+  exercises     Exercise[]
+  workouts      Workout[]
+}
+
+model WorkoutCycle {
+  id          String   @id @default(uuid())
+  name        String
+  duration    Int      // in weeks
+  startDate   DateTime
+  status      CycleStatus @default(ACTIVE)
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  workoutDays WorkoutDay[]
+  workouts    Workout[]
+}
+
+enum CycleStatus {
+  ACTIVE
+  COMPLETED
+}
+
+model WorkoutDay {
+  id        String   @id @default(uuid())
+  weekday   Int      // 0 = Sunday, 6 = Saturday
+  name      String   // e.g. "Upper", "Leg Day"
+
+  cycleId String
+  cycle   WorkoutCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+
+  blueprint WorkoutBlueprint?
+  workouts  Workout[]
+}
+
+model WorkoutBlueprint {
+  id String @id @default(uuid())
+
+  workoutDayId String @unique
+  workoutDay   WorkoutDay @relation(fields: [workoutDayId], references: [id], onDelete: Cascade)
+
+  exercises BlueprintExercise[]
+  updatedAt DateTime @updatedAt
+}
+
+model BlueprintExercise {
+  id String @id @default(uuid())
+
+  order Int
+
+  blueprintId String
+  blueprint   WorkoutBlueprint @relation(fields: [blueprintId], references: [id], onDelete: Cascade)
+
+  exerciseId String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id])
+
+  sets BlueprintSet[]
+}
+
+model BlueprintSet {
+  id String @id @default(uuid())
+
+  order Int
+  setType SetType @default(WORKING)
+
+  reps   Int
+  weight Float
+  rir    Int
+  restAfterSet Int @default(90) // seconds
+
+  blueprintExerciseId String
+  blueprintExercise   BlueprintExercise @relation(fields: [blueprintExerciseId], references: [id], onDelete: Cascade)
+}
+
+model Workout {
+  id        String   @id @default(uuid())
+  date      DateTime @default(now())
+  status    WorkoutStatus
+  isFreeWorkout Boolean @default(false)
+
+  totalDuration Int? // seconds
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  cycleId String?
+  cycle   WorkoutCycle? @relation(fields: [cycleId], references: [id], onDelete: SetNull)
+
+  workoutDayId String?
+  workoutDay   WorkoutDay? @relation(fields: [workoutDayId], references: [id], onDelete: SetNull)
+
+  exercises ExerciseLog[]
+
+  createdAt DateTime @default(now())
+}
+
+model Exercise {
+  id          String   @id @default(uuid())
+  name        String
+  muscleGroup MuscleGroup
+  equipment   Equipment
+
+  isCustom Boolean @default(false)
+
+  userId String?
+  user   User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  blueprintExercises BlueprintExercise[]
+  exerciseLogs       ExerciseLog[]
+}
+
+model ExerciseLog {
+  id String @id @default(uuid())
+
+  order Int
+
+  workoutId String
+  workout   Workout @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+
+  exerciseId String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id])
+
+  // Custom planned sets (used when exercise is replaced to preserve set structure)
+  customPlannedSets Json?
+
+  sets SetLog[]
+}
+
+model SetLog {
+  id String @id @default(uuid())
+
+  exerciseLogId String
+  exerciseLog   ExerciseLog @relation(fields: [exerciseLogId], references: [id], onDelete: Cascade)
+
+  setNumber Int
+  setType   SetType @default(WORKING)
+
+  // Target values (from blueprint)
+  targetReps   Int?
+  targetWeight Float?
+  targetRir    Int?
+
+  // Actual values (logged by user)
+  reps   Int
+  weight Float
+  rir    Int?
+
+  // Actual rest duration after this set (in seconds)
+  actualRestDuration Int?
+
+  completedAt DateTime @default(now())
+}

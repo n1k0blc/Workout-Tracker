@@ -1,0 +1,23 @@
+{
+  "name": "workout-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Personal Workout Tracking Application",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "backend": "cd apps/backend && npm run start:dev",
+    "frontend": "cd apps/frontend && npm run dev",
+    "backend:build": "cd apps/backend && npm run build",
+    "frontend:build": "cd apps/frontend && npm run build"
+  },
+  "keywords": [
+    "workout",
+    "fitness",
+    "tracking"
+  ],
+  "author": "",
+  "license": "MIT"
+}

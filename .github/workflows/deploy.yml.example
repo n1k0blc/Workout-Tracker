@@ -1,0 +1,45 @@
+# Optional: GitHub Actions CI/CD Workflow
+# Uncomment and configure if you want automatic deployment
+
+name: Deploy to Raspberry Pi
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+    
+    - name: Add Pi to known hosts
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan -H ${{ secrets.PI_HOST }} >> ~/.ssh/known_hosts
+    
+    - name: Deploy to Raspberry Pi
+      run: |
+        ssh ${{ secrets.PI_USER }}@${{ secrets.PI_HOST }} << 'EOF'
+          cd ~/apps/workout-tracker
+          git pull origin main
+          ./deploy.sh
+        EOF
+    
+    - name: Verify deployment
+      run: |
+        sleep 30
+        curl -f https://workout.nikobjelic.com/api/health || exit 1
+
+# Required GitHub Secrets:
+# - SSH_PRIVATE_KEY: Your SSH private key for Pi access
+# - PI_HOST: Raspberry Pi IP or hostname
+# - PI_USER: SSH user (usually 'pi')

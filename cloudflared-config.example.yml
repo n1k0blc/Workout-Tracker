@@ -1,0 +1,27 @@
+# Cloudflare Tunnel Configuration
+# Copy this to ~/.cloudflared/config.yml on your Raspberry Pi
+
+# Replace <TUNNEL-ID> with your actual tunnel ID from:
+# cloudflared tunnel create workout-tracker
+
+tunnel: <TUNNEL-ID>
+credentials-file: /home/pi/.cloudflared/<TUNNEL-ID>.json
+
+ingress:
+  # Frontend (Next.js) - Main site
+  - hostname: workout.nikobjelic.com
+    service: http://localhost:3000
+  
+  # Backend API - Optional direct access (if needed for debugging)
+  # - hostname: api.workout.nikobjelic.com
+  #   service: http://localhost:3001
+  
+  # Catch-all rule (required)
+  - service: http_status:404
+
+# Optional: Enable logging
+# loglevel: info
+# logfile: /var/log/cloudflared.log
+
+# Optional: Metrics
+# metrics: localhost:2000

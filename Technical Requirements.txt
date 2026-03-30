@@ -1,0 +1,250 @@
+PERSONAL WORKOUT TRACKING APPLICATION  
+TECHNICAL REQUIREMENTS DOCUMENT
+
+---
+
+1. TECH STACK
+
+Frontend:
+- Next.js (App Router)
+- TypeScript
+- Tailwind CSS (or similar utility-first CSS framework)
+- PWA support (offline capability)
+
+Backend:
+- Node.js with NestJS (preferred) or Express with TypeScript
+- REST API architecture
+
+Database:
+- PostgreSQL
+
+ORM:
+- Prisma
+
+Optional (future enhancements):
+- Redis (caching, timers, sessions)
+- Background worker (analytics aggregation)
+
+---
+
+2. SYSTEM ARCHITECTURE
+
+The system follows a standard 3-tier architecture:
+
+- Presentation Layer (Frontend - Next.js)
+- Application Layer (Backend API - NestJS)
+- Data Layer (PostgreSQL + Prisma)
+
+Communication:
+- Frontend communicates with backend via REST API (JSON)
+
+---
+
+3. CORE MODULES (BACKEND)
+
+The backend must be modular and structured into the following domains:
+
+3.1 AUTH MODULE
+- User registration
+- User login/logout
+- JWT-based authentication
+- Password hashing (bcrypt)
+- Token validation middleware
+
+---
+
+3.2 USER MODULE
+- User profile management
+- Basic user settings (e.g. theme)
+
+---
+
+3.3 WORKOUT CYCLE MODULE
+- Create/update/delete workout cycles
+- Store cycle duration, start date, selected weekdays
+- Generate schedule dynamically (no static duplication)
+
+---
+
+3.4 WORKOUT MODULE
+- Manage workouts within a cycle
+- Store workout blueprints (templates)
+- Store completed workouts (historical data)
+
+Key requirements:
+- Separation between blueprint and actual workout logs
+- Support flexible execution (out-of-order workouts)
+
+---
+
+3.5 EXERCISE MODULE
+- Predefined exercise library (seeded data)
+- User-specific custom exercises
+- Filtering by:
+  - Muscle group
+  - Equipment
+
+---
+
+3.6 WORKOUT EXECUTION MODULE
+- Start workout session
+- Log sets, reps, weight, RIR
+- Modify exercises during workout:
+  - Add
+  - Remove
+  - Replace
+
+- Timer handling:
+  - Workout timer
+  - Set rest timer
+  - Exercise rest timer
+
+---
+
+3.7 ANALYTICS MODULE
+- Volume calculation:
+  volume = sets × reps × weight
+
+- 1RM calculation (Epley formula):
+  1RM = weight × (1 + reps / 30)
+
+- Aggregations:
+  - Per workout
+  - Per week
+  - Per muscle group
+
+- PR detection
+
+Note:
+- Heavy calculations should be optimized (precomputation or caching in future)
+
+---
+
+4. DATA MODEL REQUIREMENTS
+
+Core entities:
+
+- User
+- WorkoutCycle
+- WorkoutDay (planned structure)
+- WorkoutBlueprint (template per day)
+- Workout (completed session)
+- Exercise (global seeded + user-defined)
+- ExerciseLog
+- SetLog
+
+Key constraints:
+
+- Clear separation:
+  - Blueprint (template)
+  - Workout (actual execution)
+
+- Relationships:
+  - One user → many cycles
+  - One cycle → many workout days
+  - One workout → many exercises
+  - One exercise → many sets
+
+---
+
+5. API DESIGN
+
+REST API must include endpoints for:
+
+Auth:
+- POST /auth/register
+- POST /auth/login
+
+Workout Cycles:
+- GET /cycles
+- POST /cycles
+- GET /cycles/:id
+- PUT /cycles/:id
+
+Workouts:
+- GET /workouts
+- POST /workouts/start
+- POST /workouts/:id/log
+- POST /workouts/:id/complete
+
+Exercises:
+- GET /exercises
+- POST /exercises (user-defined)
+
+Analytics:
+- GET /analytics/volume
+- GET /analytics/1rm
+- GET /analytics/prs
+
+---
+
+6. FRONTEND REQUIREMENTS
+
+- Mobile-first design
+- Component-based architecture
+- State management:
+  - React Context or lightweight state manager (e.g. Zustand)
+
+Core UI sections:
+- Authentication pages
+- Dashboard
+- Workout mode (high priority UX)
+- Cycle setup
+- Exercise library
+
+---
+
+7. OFFLINE SUPPORT (IMPORTANT)
+
+- Use PWA capabilities
+- Cache:
+  - Active workout session
+  - Recent workouts
+
+- Sync strategy:
+  - Local changes sync to backend when connection is restored
+
+---
+
+8. TIMER IMPLEMENTATION
+
+Timers must:
+- Work reliably on mobile devices
+- Survive screen changes (frontend state or backend-assisted)
+
+Timer types:
+- WORKOUT
+- SET_REST
+- EXERCISE_REST
+
+---
+
+9. SECURITY REQUIREMENTS
+
+- Password hashing (bcrypt)
+- JWT authentication
+- Input validation (DTOs / schemas)
+- Basic rate limiting (future)
+
+---
+
+10. PERFORMANCE REQUIREMENTS
+
+- Fast response times (<200ms for core endpoints)
+- Efficient database queries
+- Avoid heavy calculations in request cycle where possible
+
+---
+
+11. DEPLOYMENT REQUIREMENTS
+
+- Dockerized application
+- Must run on Raspberry Pi (ARM compatible images)
+- Environment-based configuration:
+  - development
+  - staging
+  - production
+
+---
+
+END OF DOCUMENT

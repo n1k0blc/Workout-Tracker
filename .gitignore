@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# Build
+dist/
+build/
+.next/
+out/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Testing
+coverage/
+.nyc_output/
+
+# Prisma
+**/prisma/migrations/
+
+# Misc
+*.tsbuildinfo
+
+# Docker
+postgres_data/
+postgres_data_prod/
+*.sql
+*.sql.gz
+
+# Backups
+backups/
+*.backup
+
+# SSL/Certificates
+*.pem
+*.key
+*.crt
+ssl/
+
+# Cloudflare
+.cloudflared/

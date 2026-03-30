@@ -1,0 +1,156 @@
+PERSONAL WORKOUT TRACKING APPLICATION  
+ARCHITECTURE OVERVIEW
+
+---
+
+1. HIGH-LEVEL ARCHITECTURE
+
+The application is a full-stack web application consisting of:
+
+- Frontend (Next.js, PWA)
+- Backend (Node.js API)
+- Database (PostgreSQL)
+
+All components are containerized using Docker and run on a Raspberry Pi.
+
+---
+
+2. SYSTEM FLOW
+
+Client (Browser / Mobile)
+        ↓
+Cloudflare (DNS + Tunnel)
+        ↓
+Raspberry Pi
+        ↓
+Docker Containers:
+    - Frontend (Next.js)
+    - Backend API
+    - PostgreSQL Database
+
+---
+
+3. DOMAIN STRUCTURE
+
+The backend is structured into domains:
+
+- Auth
+- Users
+- Workout Cycles
+- Workouts
+- Exercises
+- Analytics
+
+Each domain:
+- Has its own module
+- Contains controller, service, and data layer
+
+---
+
+4. DATA FLOW
+
+1. User interacts with frontend
+2. Frontend sends REST request to backend
+3. Backend processes request via service layer
+4. Prisma interacts with PostgreSQL
+5. Response returned as JSON
+
+---
+
+5. DEPLOYMENT ARCHITECTURE
+
+The application runs on a single Raspberry Pi using Docker Compose.
+
+Two environments are hosted:
+
+PRODUCTION:
+- Domain: workout.nikobjelic.com
+- Port: 3000
+
+STAGING:
+- Domain: staging.workout.nikobjelic.com
+- Port: 3001
+
+Each environment has:
+- Separate containers
+- Separate database (or schema)
+
+---
+
+6. CLOUDFLARE TUNNEL
+
+Cloudflare Tunnel is used to expose the local Raspberry Pi to the internet.
+
+Flow:
+Internet → Cloudflare → Tunnel → Raspberry Pi → Application
+
+Benefits:
+- No port forwarding required
+- Secure HTTPS access
+- Domain routing
+
+---
+
+7. DOCKER SETUP
+
+Services:
+
+- frontend
+- backend
+- database (PostgreSQL)
+
+Optional:
+- redis (future)
+- worker (analytics)
+
+Each environment (staging/prod) runs its own Docker Compose stack.
+
+---
+
+8. CI/CD PIPELINE
+
+Using GitHub Actions:
+
+- develop branch → deploy to staging
+- main branch → deploy to production
+
+Deployment steps:
+1. Pull latest code
+2. Build Docker images
+3. Restart containers
+
+---
+
+9. SCALABILITY CONSIDERATIONS
+
+Although running on a single Raspberry Pi:
+
+Future improvements:
+- Move database to managed service
+- Add caching layer (Redis)
+- Introduce background workers
+
+---
+
+10. OFFLINE-FIRST STRATEGY
+
+Frontend (PWA):
+- Cache assets and active workout data
+- Allow workouts without internet
+
+Sync:
+- Sync local data with backend when online
+
+---
+
+11. DESIGN PRIORITIES
+
+- Reliability during workouts
+- Fast UI interactions
+- Clear separation of concerns
+- Maintainable modular backend
+- Simple deployment and operations
+
+---
+
+END OF DOCUMEN

@@ -1,0 +1,46 @@
+# Example: Extending Existing Cloudflare Tunnel Config
+# 
+# If you already have a Cloudflare tunnel running on your Pi,
+# DO NOT replace the config file! Instead, ADD new ingress rules.
+#
+# Original config might look like:
+
+# tunnel: existing-tunnel-id-1234
+# credentials-file: /home/pi/.cloudflared/existing-tunnel-id-1234.json
+# 
+# ingress:
+#   - hostname: app1.nikobjelic.com
+#     service: http://localhost:8080
+#   
+#   - hostname: app2.nikobjelic.com
+#     service: http://localhost:8081
+#   
+#   - service: http_status:404
+
+# ============================================
+# EXTEND IT by adding workout-tracker rules:
+# ============================================
+
+tunnel: existing-tunnel-id-1234
+credentials-file: /home/pi/.cloudflared/existing-tunnel-id-1234.json
+
+ingress:
+  # ✅ Keep your existing apps
+  - hostname: app1.nikobjelic.com
+    service: http://localhost:8080
+  
+  - hostname: app2.nikobjelic.com
+    service: http://localhost:8081
+  
+  # ✨ ADD workout-tracker (adjust ports if needed)
+  - hostname: workout.nikobjelic.com
+    service: http://localhost:3000
+  
+  # Keep catch-all at the end
+  - service: http_status:404
+
+# ============================================
+# After editing:
+# ============================================
+# sudo systemctl restart cloudflared
+# sudo journalctl -u cloudflared -f  # Check logs

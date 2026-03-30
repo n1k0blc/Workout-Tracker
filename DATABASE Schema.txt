@@ -1,0 +1,193 @@
+PRISMA DATABASE SCHEMA
+
+---
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+---
+
+enum MuscleGroup {
+  CHEST
+  BACK
+  ABS
+  LEGS
+  SHOULDERS
+  BICEPS
+  TRICEPS
+  FOREARMS
+}
+
+enum Equipment {
+  BARBELL
+  DUMBBELL
+  MACHINE
+  CABLE
+  SMITH_MACHINE
+  SZ_BAR
+  BODYWEIGHT
+}
+
+enum WorkoutStatus {
+  IN_PROGRESS
+  COMPLETED
+  DISCARDED
+}
+
+---
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String
+  createdAt     DateTime @default(now())
+
+  workoutCycles WorkoutCycle[]
+  exercises     Exercise[]
+  workouts      Workout[]
+}
+
+---
+
+model WorkoutCycle {
+  id          String   @id @default(uuid())
+  name        String
+  duration    Int      // in weeks
+  startDate   DateTime
+  createdAt   DateTime @default(now())
+
+  userId String
+  user   User @relation(fields: [userId], references: [id])
+
+  workoutDays WorkoutDay[]
+}
+
+---
+
+model WorkoutDay {
+  id        String   @id @default(uuid())
+  weekday   Int      // 0 = Sunday, 6 = Saturday
+  name      String   // e.g. "Upper", "Leg Day"
+
+  cycleId String
+  cycle   WorkoutCycle @relation(fields: [cycleId], references: [id])
+
+  blueprint WorkoutBlueprint?
+}
+
+---
+
+model WorkoutBlueprint {
+  id String @id @default(uuid())
+
+  workoutDayId String @unique
+  workoutDay   WorkoutDay @relation(fields: [workoutDayId], references: [id])
+
+  exercises BlueprintExercise[]
+  updatedAt DateTime @updatedAt
+}
+
+---
+
+model BlueprintExercise {
+  id String @id @default(uuid())
+
+  order Int
+
+  blueprintId String
+  blueprint   WorkoutBlueprint @relation(fields: [blueprintId], references: [id])
+
+  exerciseId String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id])
+
+  sets Int
+  reps Int
+  rir  Int
+  weight Float
+
+  restBetweenSets Int
+  restBetweenExercises Int
+}
+
+---
+
+model Workout {
+  id        String   @id @default(uuid())
+  date      DateTime
+  status    WorkoutStatus
+  isFreeWorkout Boolean @default(false)
+
+  totalDuration Int? // seconds
+
+  userId String
+  user   User @relation(fields: [userId], references: [id])
+
+  cycleId String?
+  cycle   WorkoutCycle? @relation(fields: [cycleId], references: [id])
+
+  workoutDayId String?
+  workoutDay   WorkoutDay? @relation(fields: [workoutDayId], references: [id])
+
+  exercises ExerciseLog[]
+
+  createdAt DateTime @default(now())
+}
+
+---
+
+model Exercise {
+  id          String   @id @default(uuid())
+  name        String
+  muscleGroup MuscleGroup
+  equipment   Equipment
+
+  isCustom Boolean @default(false)
+
+  userId String?
+  user   User? @relation(fields: [userId], references: [id])
+
+  blueprintExercises BlueprintExercise[]
+  exerciseLogs       ExerciseLog[]
+}
+
+---
+
+model ExerciseLog {
+  id String @id @default(uuid())
+
+  order Int
+
+  workoutId String
+  workout   Workout @relation(fields: [workoutId], references: [id])
+
+  exerciseId String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id])
+
+  sets SetLog[]
+}
+
+---
+
+model SetLog {
+  id String @id @default(uuid())
+
+  exerciseLogId String
+  exerciseLog   ExerciseLog @relation(fields: [exerciseLogId], references: [id])
+
+  setNumber Int
+
+  reps   Int
+  weight Float
+  rir    Int?
+
+  completedAt DateTime @default(now())
+}
+---
+
+END OF SCHEMA

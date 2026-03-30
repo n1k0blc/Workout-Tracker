@@ -1,0 +1,285 @@
+You are a senior full-stack engineer.
+
+Your task is to build a production-ready personal workout tracking application based on the following specifications.
+
+---
+
+## CONTEXT
+
+This is a mobile-first workout tracking application designed for real-world gym usage.
+
+Key philosophy:
+- Workout plans are flexible, not strict
+- Users can deviate from schedules
+- The system must still track progress accurately
+
+---
+
+## INPUT DOCUMENTS
+
+You must strictly follow these:
+
+1. Business Requirements
+2. Technical Requirements
+3. Architecture Overview
+4. Prisma Database Schema
+
+Do NOT invent new data models or change the schema unless explicitly instructed.
+
+---
+
+## TECH STACK
+
+Frontend:
+- Next.js (App Router)
+- TypeScript
+- Tailwind CSS
+- PWA support
+
+Backend:
+- Node.js with NestJS (preferred)
+- REST API
+
+Database:
+- PostgreSQL
+
+ORM:
+- Prisma
+
+Deployment target:
+- Dockerized environment running on Raspberry Pi (ARM compatible)
+
+---
+
+## ARCHITECTURE RULES
+
+- Use clean architecture principles
+- Separate concerns:
+  - controllers
+  - services
+  - data access (Prisma)
+
+- Backend must be modular:
+  - auth
+  - users
+  - workout-cycles
+  - workouts
+  - exercises
+  - analytics
+
+- No business logic in controllers
+
+---
+
+## CORE DOMAIN RULES
+
+### 1. Blueprint vs Workout
+- WorkoutBlueprint = template
+- Workout = actual execution
+
+- Blueprint updates:
+  - Only affect future workouts
+  - Never modify past workouts
+
+---
+
+### 2. Flexible Workout Execution
+Users can:
+- Skip workouts
+- Perform workouts on different days
+- Do workouts out of order
+- Start free workouts
+
+System must:
+- Suggest workouts
+- Never enforce schedule
+
+---
+
+### 3. Workout Mode
+Must support:
+- Dynamic exercise changes
+- Adding/removing/replacing exercises
+- Adjusting sets/reps/weight during workout
+
+---
+
+### 4. Timer System
+Implement abstraction for:
+- WORKOUT timer
+- SET REST timer
+- EXERCISE REST timer
+
+Timers must:
+- Be reliable on mobile
+- Survive UI re-renders
+
+---
+
+### 5. Exercise System
+- Pre-seeded global exercises
+- User-created exercises are private
+
+---
+
+### 6. Analytics
+Implement:
+- Volume calculation
+- 1RM (Epley formula)
+- PR tracking
+
+Optimize for future performance (no heavy queries in request path if avoidable)
+
+---
+
+## IMPLEMENTATION INSTRUCTIONS
+
+### STEP 1 — PROJECT SETUP
+
+Create a monorepo structure:
+
+/apps
+  /frontend (Next.js)
+  /backend (NestJS)
+
+/packages (optional shared types)
+
+Initialize:
+- TypeScript everywhere
+- ESLint + Prettier
+
+---
+
+### STEP 2 — BACKEND FOUNDATION
+
+- Initialize NestJS app
+- Configure Prisma
+- Connect to PostgreSQL
+- Implement environment config
+
+---
+
+### STEP 3 — AUTH MODULE
+
+- Register (email + password)
+- Login (JWT)
+- Password hashing (bcrypt)
+- Auth guard middleware
+
+---
+
+### STEP 4 — CORE MODULES
+
+Implement in this order:
+
+1. Users
+2. Exercises
+3. Workout Cycles
+4. Workouts
+5. Workout Execution logic
+
+Each module must include:
+- Controller
+- Service
+- DTOs
+- Prisma integration
+
+---
+
+### STEP 5 — WORKOUT ENGINE
+
+Implement logic for:
+- Determining today's suggested workout
+- Handling free workouts
+- Linking workouts optionally to cycle/day
+
+---
+
+### STEP 6 — FRONTEND FOUNDATION
+
+- Setup Next.js App Router
+- Create layout and routing
+- Implement authentication pages
+
+---
+
+### STEP 7 — WORKOUT MODE UI
+
+This is the highest priority UI:
+- Exercise list (cards)
+- Set logging
+- Timers
+- Add/remove/replace exercises
+
+---
+
+### STEP 8 — DASHBOARD
+
+- Basic stats first:
+  - total workouts
+  - total volume
+- Then extend to:
+  - graphs
+  - PRs
+  - weekly stats
+
+---
+
+### STEP 9 — PWA SUPPORT
+
+- Enable service worker
+- Cache critical assets
+- Support offline workout logging (basic version)
+
+---
+
+### STEP 10 — DOCKER SETUP
+
+- Create Dockerfiles for:
+  - frontend
+  - backend
+
+- Create docker-compose:
+  - app
+  - database
+
+Ensure ARM compatibility for Raspberry Pi
+
+---
+
+## CODING STANDARDS
+
+- Use TypeScript strictly (no any)
+- Use DTO validation (class-validator or zod)
+- Use async/await
+- Keep functions small and readable
+- Add meaningful naming
+
+---
+
+## OUTPUT FORMAT
+
+- Generate code step-by-step
+- Do NOT dump entire project at once
+- Start with:
+  → Backend setup (NestJS + Prisma)
+
+Explain decisions briefly where necessary.
+
+---
+
+## IMPORTANT
+
+- Do not simplify domain logic
+- Do not remove flexibility features
+- Do not merge blueprint and workout models
+- Follow schema exactly
+
+---
+
+Start by:
+1. Initializing the backend (NestJS)
+2. Setting up Prisma with the provided schema
+3. Creating the Auth module
+
+Proceed step-by-step.

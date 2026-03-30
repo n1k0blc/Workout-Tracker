@@ -1,0 +1,98 @@
+# Alternative Port Configuration
+# Use this if ports 3000/3001 are already in use on your Pi
+
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: workout-tracker-db-prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-workoutuser}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME:-workout_tracker}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    networks:
+      - workout-network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER:-workoutuser}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # No external ports - only internal
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: workout-tracker-backend-prod
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://${DB_USER:-workoutuser}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-workout_tracker}?schema=public
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-7d}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://workout.nikobjelic.com}
+    ports:
+      # ⚠️ CHANGE THIS if port 3011 is also in use
+      - "3011:3001"  # External:Internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - workout-network
+    command: >
+      sh -c "npx prisma migrate deploy && node dist/main.js"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    container_name: workout-tracker-frontend-prod
+    restart: always
+    environment:
+      NODE_ENV: production
+      # ⚠️ IMPORTANT: This should point to the INTERNAL backend (not external port)
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3011}
+    ports:
+      # ⚠️ CHANGE THIS if port 3010 is also in use
+      - "3010:3000"  # External:Internal
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - workout-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  workout-network:
+    driver: bridge
+
+volumes:
+  postgres_data_prod:
+    driver: local
+
+# ============================================
+# How to use this file:
+# ============================================
+# 1. Copy this to docker-compose.prod.yml (backup the original first!)
+# 2. Adjust ports in the 'ports:' sections if needed
+# 3. Update ~/.cloudflared/config.yml to point to the correct port
+#    Example: service: http://localhost:3010 (for frontend)
+# 4. Update NEXT_PUBLIC_API_URL in .env.production to match your domain
+#    Example: NEXT_PUBLIC_API_URL=https://workout.nikobjelic.com/api
