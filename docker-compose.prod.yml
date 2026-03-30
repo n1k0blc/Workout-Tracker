@@ -61,6 +61,8 @@ services:
     build:
       context: .
       dockerfile: apps/frontend/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://workout.nikobjelic.com/api}
     container_name: workout-tracker-frontend-prod
     restart: always
     env_file:
