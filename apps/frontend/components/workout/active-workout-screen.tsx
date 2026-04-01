@@ -32,6 +32,8 @@ export default function ActiveWorkoutScreen() {
     reorderExercises,
     loading,
     workoutDuration,
+    isPaused,
+    togglePause,
   } = useWorkout();
 
   const [showExerciseModal, setShowExerciseModal] = useState(false);
@@ -145,17 +147,41 @@ export default function ActiveWorkoutScreen() {
         <div className="bg-white shadow-sm sticky top-0 z-10">
           <div className="max-w-4xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {activeWorkout.isFreeWorkout
-                    ? 'Freies Workout'
-                    : activeWorkout.workoutDayName || 'Workout'}
-                </h1>
-                {activeWorkout.cycleName && (
-                  <p className="text-sm text-gray-600 mt-1">
-                    {activeWorkout.cycleName}
-                  </p>
-                )}
+              <div className="flex items-center gap-3">
+                {/* Pause/Play Button */}
+                <button
+                  onClick={togglePause}
+                  className={`p-2 rounded-lg transition-colors ${
+                    isPaused
+                      ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                  title={isPaused ? 'Training fortsetzen' : 'Training pausieren'}
+                >
+                  {isPaused ? (
+                    // Play Icon
+                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z"/>
+                    </svg>
+                  ) : (
+                    // Pause Icon
+                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                    </svg>
+                  )}
+                </button>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">
+                    {activeWorkout.isFreeWorkout
+                      ? 'Freies Workout'
+                      : activeWorkout.workoutDayName || 'Workout'}
+                  </h1>
+                  {activeWorkout.cycleName && (
+                    <p className="text-sm text-gray-600 mt-1">
+                      {activeWorkout.cycleName}
+                    </p>
+                  )}
+                </div>
               </div>
               <div className="flex flex-col items-end gap-2">
                 <WorkoutTimer workoutDuration={workoutDuration} />

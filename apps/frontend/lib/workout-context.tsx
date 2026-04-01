@@ -7,6 +7,8 @@ import { apiClient } from '@/lib/api';
 interface WorkoutContextType {
   activeWorkout: Workout | null;
   loading: boolean;
+  isPaused: boolean;
+  togglePause: () => void;
   startWorkout: (data: {
     cycleId?: string;
     workoutDayId?: string;
@@ -54,6 +56,7 @@ const WorkoutContext = createContext<WorkoutContextType | undefined>(undefined);
 export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const [activeWorkout, setActiveWorkout] = useState<Workout | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [workoutDuration, setWorkoutDuration] = useState(0);
   const [restTimer, setRestTimer] = useState(0); // Elapsed seconds
   const [restTimerTarget, setRestTimerTarget] = useState(0); // Target seconds
@@ -63,9 +66,13 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const workoutTimerRef = useRef<NodeJS.Timeout | null>(null);
   const restTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  const togglePause = () => {
+    setIsPaused(prev => !prev);
+  };
+
   // Workout Duration Timer
   useEffect(() => {
-    if (activeWorkout && activeWorkout.status === 'IN_PROGRESS') {
+    if (activeWorkout && activeWorkout.status === 'IN_PROGRESS' && !isPaused) {
       workoutTimerRef.current = setInterval(() => {
         setWorkoutDuration((prev) => prev + 1);
       }, 1000);
@@ -74,7 +81,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         clearInterval(workoutTimerRef.current);
         workoutTimerRef.current = null;
       }
-      setWorkoutDuration(0);
+      // Don't reset duration when pausing
+      if (!activeWorkout) {
+        setWorkoutDuration(0);
+      }
     }
 
     return () => {
@@ -82,11 +92,11 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         clearInterval(workoutTimerRef.current);
       }
     };
-  }, [activeWorkout]);
+  }, [activeWorkout, isPaused]);
 
   // Rest Timer (Stopwatch - counts UP)
   useEffect(() => {
-    if (restTimerStartedAt !== null) {
+    if (restTimerStartedAt !== null && !isPaused) {
       restTimerRef.current = setInterval(() => {
         setRestTimer((prev) => {
           const newValue = prev + 1;
@@ -102,7 +112,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         clearInterval(restTimerRef.current);
         restTimerRef.current = null;
       }
-      setRestTimer(0);
+      // Don't reset rest timer when pausing
+      if (restTimerStartedAt === null) {
+        setRestTimer(0);
+      }
     }
 
     return () => {
@@ -110,7 +123,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         clearInterval(restTimerRef.current);
       }
     };
-  }, [restTimerStartedAt, restTimerTarget]);
+  }, [restTimerStartedAt, restTimerTarget, isPaused]);
 
   const refreshActiveWorkout = async () => {
     // Only try to load active workout if user is logged in (has token)
@@ -379,6 +392,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       value={{
         activeWorkout,
         loading,
+        isPaused,
+        togglePause,
         startWorkout,
         completeWorkout,
         discardWorkout,
