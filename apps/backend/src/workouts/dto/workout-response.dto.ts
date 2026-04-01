@@ -39,6 +39,8 @@ export class ExerciseLogDto {
   id: string;
   exerciseId: string;
   exerciseName: string;
+  isUnilateral?: boolean;
+  isDoubleWeight?: boolean;
   order: number;
   sets: SetLogDto[];
   plannedSets?: PlannedSetDto[];

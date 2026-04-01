@@ -42,6 +42,8 @@ export class ExercisesService {
         name: true,
         muscleGroup: true,
         equipment: true,
+        isUnilateral: true,
+        isDoubleWeight: true,
         isCustom: true,
         userId: true,
       },
@@ -59,6 +61,8 @@ export class ExercisesService {
         name: true,
         muscleGroup: true,
         equipment: true,
+        isUnilateral: true,
+        isDoubleWeight: true,
         isCustom: true,
         userId: true,
       },
@@ -80,7 +84,7 @@ export class ExercisesService {
     createExerciseDto: CreateExerciseDto,
     userId: string,
   ): Promise<ExerciseDto> {
-    const { name, muscleGroup, equipment } = createExerciseDto;
+    const { name, muscleGroup, equipment, isUnilateral, isDoubleWeight } = createExerciseDto;
 
     // Check if custom exercise with same name already exists for this user
     const existingExercise = await this.prisma.exercise.findFirst({
@@ -103,6 +107,8 @@ export class ExercisesService {
         name,
         muscleGroup: muscleGroup as any,
         equipment: equipment as any,
+        isUnilateral: isUnilateral ?? false,
+        isDoubleWeight: isDoubleWeight ?? false,
         isCustom: true,
         userId,
       },
@@ -111,6 +117,8 @@ export class ExercisesService {
         name: true,
         muscleGroup: true,
         equipment: true,
+        isUnilateral: true,
+        isDoubleWeight: true,
         isCustom: true,
         userId: true,
       },

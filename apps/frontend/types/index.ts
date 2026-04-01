@@ -47,6 +47,8 @@ export interface Exercise {
   name: string;
   muscleGroup: MuscleGroup;
   equipment: Equipment;
+  isUnilateral: boolean;
+  isDoubleWeight: boolean;
   isCustom: boolean;
   userId?: string;
 }
@@ -91,6 +93,8 @@ export interface ExerciseLog {
   id: string;
   exerciseId: string;
   exerciseName: string;
+  isUnilateral?: boolean;
+  isDoubleWeight?: boolean;
   order: number;
   sets: SetLog[];
   plannedSets?: PlannedSet[];
@@ -141,6 +145,8 @@ export interface BlueprintExercise {
   id: string;
   exerciseId: string;
   exerciseName: string;
+  isUnilateral?: boolean;
+  isDoubleWeight?: boolean;
   order: number;
   sets: BlueprintSet[];
 }

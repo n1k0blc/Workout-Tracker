@@ -98,7 +98,7 @@ export class WorkoutsService {
         exercises: {
           include: {
             exercise: {
-              select: { name: true },
+              select: { name: true, isUnilateral: true, isDoubleWeight: true },
             },
             sets: {
               orderBy: { setNumber: 'asc' },
@@ -144,7 +144,7 @@ export class WorkoutsService {
         exercises: {
           include: {
             exercise: {
-              select: { name: true },
+              select: { name: true, isUnilateral: true, isDoubleWeight: true },
             },
             sets: {
               orderBy: { setNumber: 'asc' },
@@ -250,7 +250,7 @@ export class WorkoutsService {
         exercises: {
           include: {
             exercise: {
-              select: { name: true },
+              select: { name: true, isUnilateral: true, isDoubleWeight: true },
             },
             sets: true,
           },
@@ -714,6 +714,8 @@ export class WorkoutsService {
           id: ex.id,
           exerciseId: ex.exerciseId,
           exerciseName: ex.exercise.name,
+          isUnilateral: ex.exercise.isUnilateral,
+          isDoubleWeight: ex.exercise.isDoubleWeight,
           order: ex.order,
           sets: ex.sets.map((set: any) => ({
             id: set.id,

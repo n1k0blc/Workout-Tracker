@@ -225,7 +225,7 @@ export default function EditWorkoutPage() {
                           <div className="grid grid-cols-3 gap-3">
                             <div>
                               <label className="block text-xs text-gray-600 mb-1">
-                                Wiederholungen
+                                Wiederholungen{exercise.isUnilateral ? ' (2x)' : ''}
                               </label>
                               <input
                                 type="number"
@@ -244,7 +244,7 @@ export default function EditWorkoutPage() {
                             </div>
                             <div>
                               <label className="block text-xs text-gray-600 mb-1">
-                                Gewicht (kg)
+                                Gewicht (kg){exercise.isDoubleWeight ? ' (2x)' : ''}
                               </label>
                               <input
                                 type="number"

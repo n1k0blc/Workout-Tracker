@@ -136,6 +136,8 @@ class ApiClient {
     name: string;
     muscleGroup: MuscleGroup;
     equipment: Equipment;
+    isUnilateral?: boolean;
+    isDoubleWeight?: boolean;
   }): Promise<Exercise> {
     return this.request<Exercise>('/exercises', {
       method: 'POST',

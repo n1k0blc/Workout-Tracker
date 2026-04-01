@@ -67,7 +67,9 @@ export default function WorkoutDetailPage() {
     for (const exercise of workout.exercises) {
       for (const set of exercise.sets) {
         if (set.setType === SetType.WORKING) {
-          total += set.weight * set.reps;
+          const unilateralMultiplier = exercise.isUnilateral ? 2 : 1;
+          const doubleWeightMultiplier = exercise.isDoubleWeight ? 2 : 1;
+          total += set.weight * set.reps * unilateralMultiplier * doubleWeightMultiplier;
         }
       }
     }

@@ -3,15 +3,8 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useState } from 'react';
-import { SetType } from '@/types';
+import { SetType, Exercise } from '@/types';
 import { BlueprintSetData } from './cycle-wizard';
-
-interface Exercise {
-  id: string;
-  name: string;
-  muscleGroup: string;
-  equipment: string;
-}
 
 interface BlueprintExercise {
   exerciseId: string;
@@ -173,7 +166,7 @@ export function BlueprintExerciseCard({
                   </div>
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">
-                      Wdh.
+                      {`Wdh${exercise?.isUnilateral ? ' (2x)' : ''}`}
                     </label>
                     <input
                       type="number"
@@ -188,7 +181,7 @@ export function BlueprintExerciseCard({
                   </div>
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">
-                      Gewicht (kg)
+                      {`Gewicht (kg)${exercise?.isDoubleWeight ? ' (2x)' : ''}`}
                     </label>
                     <input
                       type="number"

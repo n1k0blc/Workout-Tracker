@@ -391,7 +391,7 @@ export default function ExerciseCard({
                           <div className="grid grid-cols-3 gap-2">
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Gewicht (kg)
+                                {`Gewicht (kg)${exercise.isDoubleWeight ? ' (2x)' : ''}`}
                               </label>
                               <input
                                 type="number"
@@ -404,7 +404,7 @@ export default function ExerciseCard({
                             </div>
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Wdh
+                                {`Wdh${exercise.isUnilateral ? ' (2x)' : ''}`}
                               </label>
                               <input
                                 type="number"
@@ -495,7 +495,7 @@ export default function ExerciseCard({
                         <div className="grid grid-cols-3 gap-2">
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Gewicht (kg)
+                              {`Gewicht (kg)${exercise.isDoubleWeight ? ' (2x)' : ''}`}
                             </label>
                             <input
                               type="number"
@@ -508,7 +508,7 @@ export default function ExerciseCard({
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Wdh
+                              {`Wdh${exercise.isUnilateral ? ' (2x)' : ''}`}
                             </label>
                             <input
                               type="number"
@@ -592,7 +592,7 @@ export default function ExerciseCard({
                           <div className="grid grid-cols-3 gap-2">
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Gewicht (kg)
+                                {`Gewicht (kg)${exercise.isDoubleWeight ? ' (2x)' : ''}`}
                               </label>
                               <input
                                 type="number"
@@ -605,7 +605,7 @@ export default function ExerciseCard({
                             </div>
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Wdh
+                                {`Wdh${exercise.isUnilateral ? ' (2x)' : ''}`}
                               </label>
                               <input
                                 type="number"
@@ -708,7 +708,7 @@ export default function ExerciseCard({
                         <div className="grid grid-cols-3 gap-2">
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Gewicht (kg)
+                              {`Gewicht (kg)${exercise.isDoubleWeight ? ' (2x)' : ''}`}
                             </label>
                             <input
                               type="number"
@@ -721,7 +721,7 @@ export default function ExerciseCard({
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Wdh
+                              {`Wdh${exercise.isUnilateral ? ' (2x)' : ''}`}
                             </label>
                             <input
                               type="number"
@@ -775,7 +775,7 @@ export default function ExerciseCard({
                     <div className="grid grid-cols-3 gap-2">
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Gewicht (kg)
+                          {`Gewicht (kg)${exercise.isDoubleWeight ? ' (2x)' : ''}`}
                         </label>
                         <input
                           type="number"
@@ -788,7 +788,7 @@ export default function ExerciseCard({
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Wdh
+                          {`Wdh${exercise.isUnilateral ? ' (2x)' : ''}`}
                         </label>
                         <input
                           type="number"

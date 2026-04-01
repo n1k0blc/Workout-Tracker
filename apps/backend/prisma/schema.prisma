@@ -93,6 +93,8 @@ model Exercise {
   name               String
   muscleGroup        MuscleGroup
   equipment          Equipment
+  isUnilateral       Boolean             @default(false)
+  isDoubleWeight     Boolean             @default(false)
   isCustom           Boolean             @default(false)
   userId             String?
   blueprintExercises BlueprintExercise[]

@@ -60,6 +60,8 @@ export class WorkoutCyclesService {
                     exercise: {
                       select: {
                         name: true,
+                        isUnilateral: true,
+                        isDoubleWeight: true,
                       },
                     },
                     sets: {
@@ -96,6 +98,8 @@ export class WorkoutCyclesService {
                     exercise: {
                       select: {
                         name: true,
+                        isUnilateral: true,
+                        isDoubleWeight: true,
                       },
                     },
                     sets: {
@@ -181,6 +185,8 @@ export class WorkoutCyclesService {
                     exercise: {
                       select: {
                         name: true,
+                        isUnilateral: true,
+                        isDoubleWeight: true,
                       },
                     },
                     sets: {
@@ -225,6 +231,8 @@ export class WorkoutCyclesService {
                     exercise: {
                       select: {
                         name: true,
+                        isUnilateral: true,
+                        isDoubleWeight: true,
                       },
                     },
                     sets: {
@@ -352,6 +360,8 @@ export class WorkoutCyclesService {
                     exercise: {
                       select: {
                         name: true,
+                        isUnilateral: true,
+                        isDoubleWeight: true,
                       },
                     },
                     sets: {
@@ -401,6 +411,8 @@ export class WorkoutCyclesService {
                 id: ex.id,
                 exerciseId: ex.exerciseId,
                 exerciseName: ex.exercise.name,
+                isUnilateral: ex.exercise.isUnilateral,
+                isDoubleWeight: ex.exercise.isDoubleWeight,
                 order: ex.order,
                 sets: ex.sets.map((set: any) => ({
                   id: set.id,
