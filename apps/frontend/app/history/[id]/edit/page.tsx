@@ -1,14 +1,12 @@
 'use client';
 
 import { ProtectedRoute } from '@/components/protected-route';
-import { useAuth } from '@/lib/auth-context';
 import { useRouter, useParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
 import { Workout } from '@/types';
 
 export default function EditWorkoutPage() {
-  const { user, logout } = useAuth();
   const router = useRouter();
   const params = useParams();
   const workoutId = params.id as string;
@@ -111,11 +109,6 @@ export default function EditWorkoutPage() {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    router.push('/login');
-  };
-
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return new Intl.DateTimeFormat('de-DE', {
@@ -139,30 +132,6 @@ export default function EditWorkoutPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50">
-        {/* Navigation */}
-        <nav className="bg-white shadow">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between h-16">
-              <div className="flex">
-                <div className="flex-shrink-0 flex items-center">
-                  <h1 className="text-xl font-bold text-gray-900">
-                    Workout Tracker
-                  </h1>
-                </div>
-              </div>
-              <div className="flex items-center">
-                <span className="text-sm text-gray-700 mr-4">{user?.email}</span>
-                <button
-                  onClick={handleLogout}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                >
-                  Abmelden
-                </button>
-              </div>
-            </div>
-          </div>
-        </nav>
-
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0 space-y-6">
             {/* Header */}

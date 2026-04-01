@@ -1,15 +1,14 @@
 'use client';
 
 import { ProtectedRoute } from '@/components/protected-route';
-import { useAuth } from '@/lib/auth-context';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
 import { WorkoutCycle } from '@/types';
+import { Trash2, CheckCircle } from 'lucide-react';
 
 export default function CyclesPage() {
-  const { user, logout } = useAuth();
   const router = useRouter();
   const [cycles, setCycles] = useState<WorkoutCycle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,11 +33,6 @@ export default function CyclesPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleLogout = () => {
-    logout();
-    router.push('/login');
   };
 
   const handleCreateNewCycle = async () => {
@@ -106,68 +100,6 @@ export default function CyclesPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50">
-        {/* Navigation */}
-        <nav className="bg-white shadow">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between h-16">
-              <div className="flex">
-                <div className="flex-shrink-0 flex items-center">
-                  <h1 className="text-xl font-bold text-gray-900">
-                    Workout Tracker
-                  </h1>
-                </div>
-                <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                  <Link
-                    href="/dashboard"
-                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                  >
-                    Dashboard
-                  </Link>
-                  <Link
-                    href="/workout"
-                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                  >
-                    Workout
-                  </Link>
-                  <Link
-                    href="/cycles"
-                    className="border-blue-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                  >
-                    Zyklen
-                  </Link>
-                  <Link
-                    href="/exercises"
-                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                  >
-                    Übungen
-                  </Link>
-                  <Link
-                    href="/history"
-                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                  >
-                    Verlauf
-                  </Link>
-                  <Link
-                    href="/analytics"
-                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                  >
-                    Analytics
-                  </Link>
-                </div>
-              </div>
-              <div className="flex items-center">
-                <span className="text-sm text-gray-700 mr-4">{user?.email}</span>
-                <button
-                  onClick={handleLogout}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                >
-                  Abmelden
-                </button>
-              </div>
-            </div>
-          </div>
-        </nav>
-
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
             <div className="space-y-6">
@@ -231,15 +163,19 @@ export default function CyclesPage() {
                                 <button
                                   onClick={() => setCompleteConfirm(cycle.id)}
                                   disabled={completing === cycle.id}
-                                  className="px-3 py-1 text-sm font-medium text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                                  className="p-2 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-md disabled:opacity-50 transition-colors"
+                                  title="Zyklus beenden"
+                                  aria-label="Zyklus beenden"
                                 >
-                                  {completing === cycle.id ? 'Beende...' : 'Beenden'}
+                                  <CheckCircle className="h-5 w-5" />
                                 </button>
                                 <button
                                   onClick={() => setDeleteConfirm(cycle.id)}
-                                  className="text-red-600 hover:text-red-800 text-sm font-medium"
+                                  className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
+                                  title="Zyklus löschen"
+                                  aria-label="Zyklus löschen"
                                 >
-                                  Löschen
+                                  <Trash2 className="h-5 w-5" />
                                 </button>
                               </div>
                             </div>
@@ -352,9 +288,11 @@ export default function CyclesPage() {
                                   </div>
                                   <button
                                     onClick={() => setDeleteConfirm(cycle.id)}
-                                    className="text-red-600 hover:text-red-800 text-sm font-medium"
+                                    className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
+                                    title="Zyklus löschen"
+                                    aria-label="Zyklus löschen"
                                   >
-                                    Löschen
+                                    <Trash2 className="h-5 w-5" />
                                   </button>
                                 </div>
 

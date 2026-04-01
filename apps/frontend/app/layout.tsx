@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import { WorkoutProvider } from "@/lib/workout-context";
+import { MobileNav } from "@/components/mobile-nav";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,7 +32,10 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-gray-50">
         <AuthProvider>
-          <WorkoutProvider>{children}</WorkoutProvider>
+          <WorkoutProvider>
+            <MobileNav />
+            {children}
+          </WorkoutProvider>
         </AuthProvider>
       </body>
     </html>
