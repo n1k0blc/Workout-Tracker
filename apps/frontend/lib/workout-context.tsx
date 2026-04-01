@@ -9,6 +9,8 @@ interface WorkoutContextType {
   loading: boolean;
   isPaused: boolean;
   togglePause: () => void;
+  removedPlannedSets: Map<string, Set<number>>; // exerciseLogId -> set of setNumbers that were removed
+  markPlannedSetAsRemoved: (exerciseLogId: string, setNumber: number) => void;
   startWorkout: (data: {
     cycleId?: string;
     workoutDayId?: string;
@@ -57,6 +59,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const [activeWorkout, setActiveWorkout] = useState<Workout | null>(null);
   const [loading, setLoading] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [removedPlannedSets, setRemovedPlannedSets] = useState<Map<string, Set<number>>>(new Map());
   const [workoutDuration, setWorkoutDuration] = useState(0);
   const [restTimer, setRestTimer] = useState(0); // Elapsed seconds
   const [restTimerTarget, setRestTimerTarget] = useState(0); // Target seconds
@@ -68,6 +71,16 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
   const togglePause = () => {
     setIsPaused(prev => !prev);
+  };
+
+  const markPlannedSetAsRemoved = (exerciseLogId: string, setNumber: number) => {
+    setRemovedPlannedSets(prev => {
+      const newMap = new Map(prev);
+      const exerciseSet = newMap.get(exerciseLogId) || new Set();
+      exerciseSet.add(setNumber);
+      newMap.set(exerciseLogId, exerciseSet);
+      return newMap;
+    });
   };
 
   // Workout Duration Timer
@@ -154,6 +167,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       const workout = await apiClient.startWorkout(data);
       setActiveWorkout(workout);
       setWorkoutDuration(0);
+      setRemovedPlannedSets(new Map()); // Reset removed sets for new workout
     } catch (error) {
       console.error('Failed to start workout:', error);
       throw error;
@@ -394,6 +408,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         loading,
         isPaused,
         togglePause,
+        removedPlannedSets,
+        markPlannedSetAsRemoved,
         startWorkout,
         completeWorkout,
         discardWorkout,

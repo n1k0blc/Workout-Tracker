@@ -34,6 +34,7 @@ export default function ActiveWorkoutScreen() {
     workoutDuration,
     isPaused,
     togglePause,
+    removedPlannedSets,
   } = useWorkout();
 
   const [showExerciseModal, setShowExerciseModal] = useState(false);
@@ -58,14 +59,21 @@ export default function ActiveWorkoutScreen() {
 
   const hasBlueprint = !activeWorkout.isFreeWorkout && activeWorkout.workoutDayId;
 
-  // Check if all planned sets are logged
+  // Check if all planned sets are either logged or removed
   const areAllSetsLogged = (): boolean => {
     if (activeWorkout.exercises.length === 0) return false;
 
     return activeWorkout.exercises.every((exercise) => {
-      // If exercise has planned sets, check if all are logged
+      // If exercise has planned sets, check if all are either logged or removed
       if (exercise.plannedSets && exercise.plannedSets.length > 0) {
-        return exercise.sets.length >= exercise.plannedSets.length;
+        const removedSets = removedPlannedSets.get(exercise.id) || new Set();
+        
+        return exercise.plannedSets.every((plannedSet) => {
+          // Set is okay if it's either logged or removed
+          const isLogged = exercise.sets.some(s => s.setNumber === plannedSet.order);
+          const isRemoved = removedSets.has(plannedSet.order);
+          return isLogged || isRemoved;
+        });
       }
       // For free workouts or unplanned exercises, require at least one set
       return exercise.sets.length > 0;

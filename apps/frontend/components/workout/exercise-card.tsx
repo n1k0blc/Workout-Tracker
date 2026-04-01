@@ -25,12 +25,11 @@ export default function ExerciseCard({
   exercise,
   exerciseNumber,
 }: ExerciseCardProps) {
-  const { removeExercise, replaceExercise, logSet, deleteSet, updateSet, loading } =
+  const { removeExercise, replaceExercise, logSet, deleteSet, updateSet, loading, removedPlannedSets, markPlannedSetAsRemoved } =
     useWorkout();
 
   const [editValues, setEditValues] = useState<{[key: number]: {weight: string, reps: string, rir: string, setType: SetType}}>({});
   const [unplannedSets, setUnplannedSets] = useState<UnplannedSet[]>([]);
-  const [hiddenPlannedSets, setHiddenPlannedSets] = useState<Set<number>>(new Set());
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showReplaceModal, setShowReplaceModal] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
@@ -192,8 +191,8 @@ export default function ExerciseCard({
   };
 
   const removePlannedSet = (setNumber: number) => {
-    // Hide the planned set from view
-    setHiddenPlannedSets(prev => new Set(prev).add(setNumber));
+    // Mark the set as removed in the context
+    markPlannedSetAsRemoved(exercise.id, setNumber);
     // Remove from editValues if it was being edited
     setEditValues(prev => {
       const newVals = {...prev};
@@ -301,7 +300,11 @@ export default function ExerciseCard({
           <div className="p-4 space-y-2">
           {/* Planned Sets */}
           {hasPlannedSets && exercise.plannedSets!
-            .filter(plannedSet => !hiddenPlannedSets.has(plannedSet.order))
+            .filter(plannedSet => {
+              // Filter out removed sets
+              const removedSets = removedPlannedSets.get(exercise.id);
+              return !removedSets || !removedSets.has(plannedSet.order);
+            })
             .map((plannedSet, idx) => {
             const setNumber = plannedSet.order;
             const loggedSet = getLoggedSet(setNumber);
