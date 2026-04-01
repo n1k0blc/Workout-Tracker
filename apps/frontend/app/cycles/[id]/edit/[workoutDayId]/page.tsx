@@ -33,6 +33,7 @@ export default function EditBlueprintPage() {
 
   const [cycle, setCycle] = useState<WorkoutCycle | null>(null);
   const [workoutDayName, setWorkoutDayName] = useState<string>('');
+  const [plannedWeekday, setPlannedWeekday] = useState<number>(1);
   const [exercises, setExercises] = useState<BlueprintExercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -65,6 +66,7 @@ export default function EditBlueprintPage() {
       }
 
       setWorkoutDayName(workoutDay.name);
+      setPlannedWeekday(workoutDay.weekday);
 
       if (workoutDay.blueprint) {
         setExercises(workoutDay.blueprint.exercises);
@@ -174,8 +176,19 @@ export default function EditBlueprintPage() {
   };
 
   const handleSave = async () => {
+    if (!workoutDayName.trim()) {
+      alert('Bitte gib einen Workout-Namen ein');
+      return;
+    }
+    
     setSaving(true);
     try {
+      // First update the workout day name and weekday
+      await apiClient.updateWorkoutDay(cycleId, workoutDayId, {
+        name: workoutDayName.trim(),
+        weekday: plannedWeekday,
+      });
+      
       // Transform exercises to match API format
       const blueprintData = {
         exercises: exercises.map((ex) => ({
@@ -261,8 +274,54 @@ export default function EditBlueprintPage() {
                 Blueprint bearbeiten
               </h2>
               <p className="mt-1 text-sm text-gray-600">
-                {cycle?.name} - {workoutDayName}
+                {cycle?.name}
               </p>
+            </div>
+
+            {/* Workout Day Settings */}
+            <div className="bg-white rounded-lg shadow p-6 mb-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                Workout-Einstellungen
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Workout-Name
+                  </label>
+                  <input
+                    type="text"
+                    value={workoutDayName}
+                    onChange={(e) => setWorkoutDayName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="z.B. Push Day, Pull Day, Legs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Geplanter Wochentag
+                  </label>
+                  <select
+                    value={plannedWeekday}
+                    onChange={(e) => setPlannedWeekday(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value={1}>Montag</option>
+                    <option value={2}>Dienstag</option>
+                    <option value={3}>Mittwoch</option>
+                    <option value={4}>Donnerstag</option>
+                    <option value={5}>Freitag</option>
+                    <option value={6}>Samstag</option>
+                    <option value={0}>Sonntag</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Exercise List Header */}
+            <div className="mb-4">
+              <h3 className="text-lg font-medium text-gray-900">
+                Übungen
+              </h3>
             </div>
 
             {/* Exercise List */}

@@ -119,6 +119,7 @@ export class AnalyticsService {
       where: {
         userId,
         status: 'COMPLETED' as any,
+        gymLocation: 'HOME' as any, // Only count 1RM from HOME gym
         exercises: {
           some: {
             exerciseId,
@@ -192,6 +193,7 @@ export class AnalyticsService {
       where: {
         userId,
         status: 'COMPLETED' as any,
+        gymLocation: 'HOME' as any, // Only count PRs from HOME gym
       },
       include: {
         exercises: {

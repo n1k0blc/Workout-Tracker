@@ -180,6 +180,10 @@ class ApiClient {
     cycleId?: string;
     workoutDayId?: string;
     isFreeWorkout: boolean;
+    gymLocation: 'HOME' | 'OTHER';
+    isPastWorkout?: boolean;
+    pastWorkoutDate?: string;
+    pastWorkoutDuration?: number;
   }): Promise<Workout> {
     return this.request<Workout>('/workouts/start', {
       method: 'POST',
@@ -395,6 +399,44 @@ class ApiClient {
         body: JSON.stringify(data),
       }
     );
+  }
+
+  async updateWorkoutDay(
+    cycleId: string,
+    workoutDayId: string,
+    data: {
+      name: string;
+      weekday: number;
+    }
+  ): Promise<WorkoutCycle> {
+    return this.request<WorkoutCycle>(
+      `/cycles/${cycleId}/workout-days/${workoutDayId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
+  async updateCompletedWorkout(
+    workoutId: string,
+    data: {
+      completedAt?: string;
+      exercises: Array<{
+        id: string;
+        sets: Array<{
+          id: string;
+          reps: number;
+          weight: number;
+          rir?: number;
+        }>;
+      }>;
+    }
+  ): Promise<Workout> {
+    return this.request<Workout>(`/workouts/${workoutId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
   }
 
   // Analytics Methods

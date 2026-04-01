@@ -25,8 +25,19 @@ export default function ExerciseCard({
   exercise,
   exerciseNumber,
 }: ExerciseCardProps) {
-  const { removeExercise, replaceExercise, logSet, deleteSet, updateSet, loading, removedPlannedSets, markPlannedSetAsRemoved } =
-    useWorkout();
+  const { 
+    removeExercise, 
+    replaceExercise, 
+    logSet, 
+    deleteSet, 
+    updateSet, 
+    loading, 
+    removedPlannedSets, 
+    markPlannedSetAsRemoved,
+    unplannedSets: contextUnplannedSets,
+    addUnplannedSet: addUnplannedSetToContext,
+    removeUnplannedSet: removeUnplannedSetFromContext,
+  } = useWorkout();
 
   const [editValues, setEditValues] = useState<{[key: number]: {weight: string, reps: string, rir: string, setType: SetType}}>({});
   const [unplannedSets, setUnplannedSets] = useState<UnplannedSet[]>([]);
@@ -95,6 +106,11 @@ export default function ExerciseCard({
         setType,
         plannedRestAfterSet,
       });
+
+      // If this was an unplanned set, remove it from context tracking
+      if (isUnplanned) {
+        removeUnplannedSetFromContext(exercise.id, setNumber);
+      }
 
       // Clear edit state
       setEditValues(prev => {
@@ -178,9 +194,17 @@ export default function ExerciseCard({
       rir: '',
       setType: SetType.WORKING,
     }]);
+    
+    // Track in context for validation
+    addUnplannedSetToContext(exercise.id, nextSetNumber);
   };
 
   const removeUnplannedSet = (id: string) => {
+    // Find the set to get its setNumber before removing
+    const setToRemove = unplannedSets.find(s => s.id === id);
+    if (setToRemove) {
+      removeUnplannedSetFromContext(exercise.id, setToRemove.setNumber);
+    }
     setUnplannedSets(prev => prev.filter(s => s.id !== id));
   };
 

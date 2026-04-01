@@ -194,10 +194,11 @@ export function BlueprintExerciseCard({
                     </label>
                     <input
                       type="number"
-                      value={set.reps || ''}
-                      onChange={(e) =>
-                        handleUpdateSet(setIdx, 'reps', parseInt(e.target.value) || 0)
-                      }
+                      value={set.reps ?? ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        handleUpdateSet(setIdx, 'reps', value === '' ? null : parseInt(value));
+                      }}
                       min="1"
                       className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
@@ -209,10 +210,11 @@ export function BlueprintExerciseCard({
                     <input
                       type="number"
                       step="0.5"
-                      value={set.weight || ''}
-                      onChange={(e) =>
-                        handleUpdateSet(setIdx, 'weight', parseFloat(e.target.value) || 0)
-                      }
+                      value={set.weight ?? ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        handleUpdateSet(setIdx, 'weight', value === '' ? null : parseFloat(value));
+                      }}
                       min="0"
                       className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
@@ -222,9 +224,10 @@ export function BlueprintExerciseCard({
                     <input
                       type="number"
                       value={set.rir ?? ''}
-                      onChange={(e) =>
-                        handleUpdateSet(setIdx, 'rir', parseInt(e.target.value) || 0)
-                      }
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        handleUpdateSet(setIdx, 'rir', value === '' ? null : parseInt(value));
+                      }}
                       min="0"
                       max="10"
                       className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -238,12 +241,14 @@ export function BlueprintExerciseCard({
                   </label>
                   <input
                     type="number"
-                    value={set.restAfterSet ?? 90}
-                    onChange={(e) =>
-                      handleUpdateSet(setIdx, 'restAfterSet', parseInt(e.target.value) || 0)
-                    }
+                    value={set.restAfterSet ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      handleUpdateSet(setIdx, 'restAfterSet', value === '' ? null : parseInt(value));
+                    }}
                     min="0"
                     step="15"
+                    placeholder="90"
                     className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>

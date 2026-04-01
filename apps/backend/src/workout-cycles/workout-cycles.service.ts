@@ -4,6 +4,7 @@ import {
   CreateCycleDto,
   UpdateCycleDto,
   UpdateBlueprintDto,
+  UpdateWorkoutDayDto,
   CycleResponseDto,
 } from './dto';
 
@@ -291,6 +292,37 @@ export class WorkoutCyclesService {
         },
       });
     }
+
+    // Return updated cycle
+    return this.findById(cycleId, userId);
+  }
+
+  async updateWorkoutDay(
+    cycleId: string,
+    workoutDayId: string,
+    updateWorkoutDayDto: UpdateWorkoutDayDto,
+    userId: string,
+  ): Promise<CycleResponseDto> {
+    // Check ownership
+    await this.findById(cycleId, userId);
+
+    // Find workout day
+    const workoutDay = await this.prisma.workoutDay.findUnique({
+      where: { id: workoutDayId },
+    });
+
+    if (!workoutDay || workoutDay.cycleId !== cycleId) {
+      throw new NotFoundException('Workout day not found');
+    }
+
+    // Update workout day
+    await this.prisma.workoutDay.update({
+      where: { id: workoutDayId },
+      data: {
+        name: updateWorkoutDayDto.name,
+        weekday: updateWorkoutDayDto.weekday,
+      },
+    });
 
     // Return updated cycle
     return this.findById(cycleId, userId);

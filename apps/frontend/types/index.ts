@@ -96,12 +96,15 @@ export interface ExerciseLog {
   plannedSets?: PlannedSet[];
 }
 
+export type GymLocation = 'HOME' | 'OTHER';
+
 export interface Workout {
   id: string;
   date: string;
   status: WorkoutStatus;
   isFreeWorkout: boolean;
   totalDuration?: number;
+  gymLocation: GymLocation;
   cycleId?: string;
   cycleName?: string;
   workoutDayId?: string;
@@ -116,6 +119,7 @@ export interface WorkoutListItem {
   status: WorkoutStatus;
   isFreeWorkout: boolean;
   totalDuration?: number;
+  gymLocation: GymLocation;
   cycleName?: string;
   workoutDayName?: string;
   exerciseCount: number;
