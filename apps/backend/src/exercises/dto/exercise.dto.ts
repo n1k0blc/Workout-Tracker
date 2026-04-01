@@ -5,6 +5,8 @@ export class ExerciseDto {
   name: string;
   muscleGroup: MuscleGroup;
   equipment: Equipment;
+  isUnilateral: boolean;
+  isDoubleWeight: boolean;
   isCustom: boolean;
   userId?: string;
 }

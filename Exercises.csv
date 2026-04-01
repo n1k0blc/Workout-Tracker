@@ -1,118 +1,118 @@
-﻿Excercise;Muscle Group;Equipment
-Cable Crunch;Abs;Cable
-Dumbbell Russian Twist;Abs;Dumbbell
-Machine Abs Crunch;Abs;Machine
-Lat Pull Down Narrow Grip;Back;Cable
-Lat Pull Down Wide Grip;Back;Cable
-Cable Row Narrow Grip;Back;Cable
-Cable Row Wide Grip;Back;Cable
-Unilateral Cable Lat Pull;Back;Cable
-Dumbbell Row;Back;Dumbbell
-Barbell Row;Back;Barbell
-Machine Row Wide Grip;Back;Machine
-Machine Lat Pull Down;Back;Machine
-Machine High Row;Back;Machine
-Machine Low Row;Back;Machine
-T-Bar Row;Back;Machine
-Machine Row Hammer Grip;Back;Machine
-Machine Back Extensions;Back;Machine
-Smith Machine Row;Back;Smith Machine
-Smith Machine Romanian Deadlift;Back;Smith Machine
-Barbell Romanian Deadlift;Back;Barbell
-Barbell Deadlift;Back;Barbell
-Cable Romanian Deadlift;Back;Cable
-Jefferson Curl;Back;Barbell
-Dumbbell Romanian Deadlift;Back;Dumbbell
-Pull Ups;Back;Bodyweight
-Supported Pull Ups;Back;Machine
-Face Pulls;Back;Cable
-Cable Reverse Flies;Back;Cable
-Butterfly Reverse;Back;Machine
-Dumbbell Reverse Flies;Back;Dumbbell
-Kelso Shrug;Back;Machine
-Cable Kelso Shrug;Back;Cable
-Unilateral Butterfly Reverse;Back;Machine
-Cable Bar Biceps Curl;Biceps;Cable
-Bayesian Curl;Biceps;Cable
-Cable Hammer Curl;Biceps;Cable
-Dumbbell Biceps Curl;Biceps;Dumbbell
-Dumbbell Hammer Curl;Biceps;Dumbbell
-Dumbbell Incline Biceps Curl;Biceps;Dumbbell
-Zotman Curl;Biceps;Dumbbell
-Dumbbell Preacher Curl;Biceps;Dumbbell
-Dumbbell Spider Curl;Biceps;Dumbbell
-Barbell Biceps Curl;Biceps;Barbell
-Barbell Preacher Curl;Biceps;Barbell
-Machine Preacher Curl;Biceps;Machine
-EZ-Bar Curl;Biceps;EZ-Bar
-EZ-Bar Preacher Curl;Biceps;EZ-Bar
-Cable Flies;Chest;Cable
-Cable Chest Press;Chest;Cable
-Push Up;Chest;Bodyweight
-Dumbbell Bench Press;Chest;Dumbbell
-Dumbbell Incline Bench Press;Chest;Dumbbell
-Dumbbell Flies;Chest;Dumbbell
-Barbell Bench Press;Chest;Barbell
-Barbell Incline Bench Press;Chest;Barbell
-Butterfly;Chest;Machine
-Chest Press;Chest;Machine
-Machine Incline Press;Chest;Machine
-Machine Flat Press;Chest;Machine
-Smith Machine Bench Press;Chest;Smith Machine
-Smith Machine Incline Bench Press;Chest;Smith Machine
-Seated Hamstring Curl;Legs;Machine
-Lying Hamstring Curl;Legs;Machine
-Hip Thrust;Legs;Machine
-Smith Machine Hip Thrust;Legs;Smith Machine
-Barbell Hip Thrust;Legs;Barbell
-Cable Kickbacks;Legs;Cable
-Cable Hip Abduction;Legs;Cable
-Dumbbell Bulgarian Split Squat;Legs;Dumbbell
-Sumo Squat;Legs;Dumbbell
-Goblin Squat;Legs;Dumbbell
-Barbell Squat;Legs;Barbell
-Dumbbell Lunge;Legs;Dumbbell
-Barbell Lunge;Legs;Barbell
-Smith Machine Lunge;Legs;Smith Machine
-Smith Machine Bulgarian Split Squat;Legs;Smith Machine
-Leg Press;Legs;Machine
-Hack Squat;Legs;Machine
-Hip Abduction;Legs;Machine
-Hip Adduction;Legs;Machine
-V Squat;Legs;Machine
-Pendulum Squat;Legs;Machine
-Smith Machine Squat;Legs;Smith Machine
-Leg Extension;Legs;Machine
-Seated Calf Raise;Legs;Machine
-Standing Calf Raise;Legs;Machine
-Smith Machine Calf Raise;Legs;Smith Machine
-Leg Press Calf Raise;Legs;Machine
-Cable Lateral Raise;Shoulders;Cable
-Dumbbell Shoulder Press;Shoulders;Dumbbell
-Dumbbell Lateral Raise;Shoulders;Dumbbell
-Dumbbell Incline Lateral Raise;Shoulders;Dumbbell
-Y Raise;Shoulders;Dumbbell
-Military Press;Shoulders;Barbell
-Seated Barbell Shoulder Press;Shoulders;Barbell
-Machine Lateral Raise;Shoulders;Machine
-Machine Shoulder Press;Shoulders;Machine
-Smith Machine Shoulder Press;Shoulders;Smith Machine
-Machine Shrug;Shoulders;Machine
-Dumbbell Shrug;Shoulders;Dumbbell
-Barbell Shrug;Shoulders;Barbell
-Smith Machine Shrug;Shoulders;Smith Machine
-Incline Dumbbell Y-Raise;Shoulders;Dumbbell
-Cable Y-Raise;Shoulders;Cable
-Unilateral Triceps Cable Kickback;Triceps;Cable
-Cable Bar Triceps Pushdown;Triceps;Cable
-Cable Rope Triceps Pushdown;Triceps;Cable
-Cable Bar Overhead Triceps Externsion;Triceps;Cable
-Cable Rope Overhead Triceps Externsion;Triceps;Cable
-Dips;Triceps;Bodyweight
-Dumbbell Skull Crushers;Triceps;Dumbbell
-Dumbbell Triceps Kickbacks;Triceps;Dumbbell
-Dumbbell Overhead Externsion;Triceps;Dumbbell
-Dumbbell Skull Crushers;Triceps;Barbell
-Machine Triceps Press;Triceps;Machine
-EZ-Bar Skull Crushers;Triceps;EZ-Bar
-EZ-Bar Overhead Extensions;Triceps;EZ-Bar
+﻿ID;Übung;Muskelgruppe;Equipment;Unilateral;Bilateral;Gewicht 2x
+1;Kabel Crunch;Bauch;Kabel;nein;ja;nein
+2;Kurzhantel Russian Twist;Bauch;Kurzhantel;nein;ja;nein
+3;Maschine Bauch Crunch;Bauch;Maschine;nein;ja;nein
+4;Latzug enger Griff;Rücken;Kabel;nein;ja;nein
+5;Latzug breiter Griff;Rücken;Kabel;nein;ja;nein
+6;Kabel Rudern enger Griff;Rücken;Kabel;nein;ja;nein
+7;Kabel Rudern Wide breiter Griff;Rücken;Kabel;nein;ja;nein
+8;Unilateral Kabel Latzug;Rücken;Kabel;nein;ja;nein
+9;Kurzhantel Rudern;Rücken;Kurzhantel;ja;nein;nein
+10;Langhantel Rudern;Rücken;Langhantel;nein;ja;nein
+11;Maschine Rudern breiter Griff;Rücken;Maschine;nein;ja;nein
+12;Maschine Latzug;Rücken;Maschine;nein;ja;nein
+13;Maschine High Row;Rücken;Maschine;nein;ja;nein
+14;Maschine Low Row;Rücken;Maschine;nein;ja;nein
+15;T-Bar Rudern;Rücken;Maschine;nein;ja;nein
+16;Maschine Rudern Hammergriff;Rücken;Maschine;nein;ja;nein
+17;Maschine Rücken Extension;Rücken;Maschine;nein;ja;nein
+18;Smith Maschine Rudern;Rücken;Smith Maschine;nein;ja;nein
+19;Smith Maschine Romanian Deadlift;Rücken;Smith Maschine;nein;ja;nein
+20;Langhantel Romanian Deadlift;Rücken;Langhantel;nein;ja;nein
+21;Langhantel Deadlift;Rücken;Langhantel;nein;ja;nein
+22;Kabel Romanian Deadlift;Rücken;Kabel;nein;ja;nein
+23;Jefferson Curl;Rücken;Langhantel;nein;ja;nein
+24;Kurzhantel Romanian Deadlift;Rücken;Kurzhantel;nein;ja;ja
+25;Klimmzug;Rücken;Körpergewicht;nein;ja;nein
+26;Unterstützer Klimmzug;Rücken;Maschine;nein;ja;nein
+27;Face Pulls;Rücken;Kabel;nein;ja;nein
+28;Kabel Reverse Flies;Rücken;Kabel;ja;nein;nein
+29;Butterfly Reverse;Rücken;Maschine;nein;ja;nein
+30;Kurzhantel Reverse Flies;Rücken;Kurzhantel;nein;ja;ja
+31;Kelso Shrug;Rücken;Maschine;nein;ja;nein
+32;Kabel Kelso Shrug;Rücken;Kabel;nein;ja;nein
+33;Unilateral Butterfly Reverse;Rücken;Maschine;nein;nein;nein
+34;Kabel Bar Bizeps Curl;Bizeps;Kabel;nein;ja;nein
+35;Bayesian Curl;Bizeps;Kabel;ja;nein;nein
+36;Kabel Hammer Curl;Bizeps;Kabel;nein;ja;nein
+37;Kurzhantel Bizeps Curl;Bizeps;Kurzhantel;ja;nein;nein
+38;Kurzhantel Hammer Curl;Bizeps;Kurzhantel;ja;nein;nein
+39;Kurzhantel Schräg Bizeps Curl;Bizeps;Kurzhantel;ja;nein;nein
+40;Zotman Curl;Bizeps;Kurzhantel;ja;nein;nein
+41;Kurzhantel Preacher Curl;Bizeps;Kurzhantel;ja;nein;nein
+42;Kurzhantel Spider Curl;Bizeps;Kurzhantel;ja;nein;nein
+43;Langhantel Bizeps Curl;Bizeps;Langhantel;nein;ja;nein
+44;Langhantel Preacher Curl;Bizeps;Langhantel;nein;ja;nein
+45;Maschine Preacher Curl;Bizeps;Maschine;nein;ja;nein
+46;EZ-Bar Curl;Bizeps;EZ-Bar;nein;ja;nein
+47;EZ-Bar Preacher Curl;Bizeps;EZ-Bar;nein;ja;nein
+48;Kabel Flies;Brust;Kabel;nein;ja;nein
+49;Kabel Brustpresse;Brust;Kabel;nein;ja;nein
+50;Liegestütze;Brust;Körpergewicht;nein;ja;nein
+51;Kurzhantel Bankdrücken;Brust;Kurzhantel;nein;ja;ja
+52;Kurzhantel Schrägbankdrücken;Brust;Kurzhantel;nein;ja;ja
+53;Kurzhantel Flies;Brust;Kurzhantel;nein;ja;ja
+54;Langhantel Bankdrücken;Brust;Langhantel;nein;ja;nein
+55;Langhantel Schrägbankdrücken;Brust;Langhantel;nein;ja;nein
+56;Butterfly;Brust;Maschine;nein;ja;nein
+57;Brustpresse;Brust;Maschine;nein;ja;nein
+58;Maschine Schrägbrustpresse;Brust;Maschine;nein;ja;nein
+59;Maschine Brustpresse (flach);Brust;Maschine;nein;ja;nein
+60;Smith Maschine Bankdrücken;Brust;Smith Maschine;nein;ja;nein
+61;Smith Maschine Schrägbankdrücken;Brust;Smith Maschine;nein;ja;nein
+62;Beinbeuger sitzend;Beine;Maschine;nein;ja;nein
+63;Beinbeuger liegend;Beine;Maschine;nein;ja;nein
+64;Hip Thrust;Beine;Maschine;nein;ja;nein
+65;Smith Maschine Hip Thrust;Beine;Smith Maschine;nein;ja;nein
+66;Langhantel Hip Thrust;Beine;Langhantel;nein;ja;nein
+67;Kabel Kickbacks;Beine;Kabel;ja;nein;nein
+68;Kabel Hüftabduktion;Beine;Kabel;ja;nein;nein
+69;Kurzhantel Bulgarian Split Squat;Beine;Kurzhantel;ja;nein;ja
+70;Sumo Squat;Beine;Kurzhantel;nein;ja;nein
+71;Goblin Squat;Beine;Kurzhantel;nein;ja;nein
+72;Langhantel Squat;Beine;Langhantel;nein;ja;nein
+73;Kurzhantel Lunge;Beine;Kurzhantel;ja;nein;ja
+74;Langhantel Lunge;Beine;Langhantel;ja;nein;nein
+75;Smith Maschine Lunge;Beine;Smith Maschine;ja;nein;nein
+76;Smith Maschine Bulgarian Split Squat;Beine;Smith Maschine;ja;nein;nein
+77;Beinpresse;Beine;Maschine;nein;ja;nein
+78;Hack Squat;Beine;Maschine;nein;ja;nein
+79;Hüftabduktion;Beine;Maschine;nein;ja;nein
+80;Hüftadduktion;Beine;Maschine;nein;ja;nein
+81;V Squat;Beine;Maschine;nein;ja;nein
+82;Pendulum Squat;Beine;Maschine;nein;ja;nein
+83;Smith Maschine Squat;Beine;Smith Maschine;nein;ja;nein
+84;Beinstrecker;Beine;Maschine;nein;ja;nein
+85;Wadenpresse sitzend;Beine;Maschine;nein;ja;nein
+86;Wadenheben;Beine;Maschine;nein;ja;nein
+87;Smith Maschine Wadenheben;Beine;Smith Maschine;nein;ja;nein
+88;Wadenheben Beinpresse;Beine;Maschine;nein;ja;nein
+89;Kabel Seitheben;Schultern;Kabel;ja;nein;nein
+90;Kurzhantel Schulterpresse;Schultern;Kurzhantel;nein;ja;ja
+91;Kurzhantel Seitheben;Schultern;Kurzhantel;nein;ja;ja
+92;Kurzhantel Schräg Seitheben sitzend;Schultern;Kurzhantel;nein;ja;ja
+93;Y Raise;Schultern;Kurzhantel;nein;ja;ja
+94;Military Press;Schultern;Langhantel;nein;ja;nein
+95;Langhantel Schulterpresse sitzend;Schultern;Langhantel;nein;ja;nein
+96;Maschine Seitheben;Schultern;Maschine;nein;ja;nein
+97;Maschine Schulterpresse;Schultern;Maschine;nein;ja;nein
+98;Smith Maschine Schulterpresse;Schultern;Smith Maschine;nein;ja;nein
+99;Maschine Shrug;Schultern;Maschine;nein;ja;nein
+100;Kurzhantel Shrug;Schultern;Kurzhantel;nein;ja;ja
+101;Langhantel Shrug;Schultern;Langhantel;nein;ja;nein
+102;Smith Maschine Shrug;Schultern;Smith Maschine;nein;ja;nein
+103;Schräg Kurzhantel Y-Raise;Schultern;Kurzhantel;nein;ja;ja
+104;Kabel Y-Raise;Schultern;Kabel;nein;ja;nein
+105;Unilateral Trizeps Kabel Kickbacks;Trizeps;Kabel;ja;nein;nein
+106;Kabel Bar Trizeps Pushdown;Trizeps;Kabel;nein;ja;nein
+107;Kabel Seil Trizeps Pushdown;Trizeps;Kabel;nein;ja;nein
+108;Kabel Bar Überkopf Trizeps Externsion;Trizeps;Kabel;nein;ja;nein
+109;Kabel Seil Overhead Trizeps Externsion;Trizeps;Kabel;nein;ja;nein
+110;Dips;Trizeps;Körpergewicht;nein;ja;nein
+111;Kurzhantel Skull Crushers;Trizeps;Kurzhantel;nein;ja;nein
+112;Kurzhantel Trizeps Kickbacks;Trizeps;Kurzhantel;ja;nein;nein
+113;Kurzhantel Überkopf Extension;Trizeps;Kurzhantel;nein;ja;nein
+114;Langhantel Skull Crushers;Trizeps;Langhantel;nein;ja;nein
+115;Maschine Trizeps Drücken;Trizeps;Maschine;nein;ja;nein
+116;EZ-Bar Skull Crushers;Trizeps;EZ-Bar;nein;ja;nein
+117;EZ-Bar Überkopf Extensions;Trizeps;EZ-Bar;nein;ja;nein

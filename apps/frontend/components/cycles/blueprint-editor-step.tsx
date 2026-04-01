@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { CycleFormData, WorkoutDayData, BlueprintSetData } from './cycle-wizard';
-import { SetType } from '@/types';
+import { SetType, Exercise } from '@/types';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import { BlueprintExerciseCard } from './blueprint-exercise-card';
 import { apiClient } from '@/lib/api/client';
@@ -19,13 +19,6 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-
-interface Exercise {
-  id: string;
-  name: string;
-  muscleGroup: string;
-  equipment: string;
-}
 
 interface BlueprintEditorStepProps {
   formData: CycleFormData;

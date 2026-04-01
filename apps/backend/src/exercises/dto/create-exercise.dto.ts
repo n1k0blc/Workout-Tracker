@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsOptional, MaxLength } from 'class-validator';
+import { IsString, IsEnum, IsOptional, MaxLength, IsBoolean } from 'class-validator';
 
 export enum MuscleGroup {
   CHEST = 'CHEST',
@@ -30,6 +30,14 @@ export class CreateExerciseDto {
 
   @IsEnum(Equipment, { message: 'Invalid equipment type' })
   equipment: Equipment;
+
+  @IsOptional()
+  @IsBoolean()
+  isUnilateral?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  isDoubleWeight?: boolean;
 
   @IsOptional()
   @IsString()

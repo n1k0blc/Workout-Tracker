@@ -25,8 +25,19 @@ export default function ExerciseCard({
   exercise,
   exerciseNumber,
 }: ExerciseCardProps) {
-  const { removeExercise, replaceExercise, logSet, deleteSet, updateSet, loading } =
-    useWorkout();
+  const { 
+    removeExercise, 
+    replaceExercise, 
+    logSet, 
+    deleteSet, 
+    updateSet, 
+    loading, 
+    removedPlannedSets, 
+    markPlannedSetAsRemoved,
+    unplannedSets: contextUnplannedSets,
+    addUnplannedSet: addUnplannedSetToContext,
+    removeUnplannedSet: removeUnplannedSetFromContext,
+  } = useWorkout();
 
   const [editValues, setEditValues] = useState<{[key: number]: {weight: string, reps: string, rir: string, setType: SetType}}>({});
   const [unplannedSets, setUnplannedSets] = useState<UnplannedSet[]>([]);
@@ -95,6 +106,11 @@ export default function ExerciseCard({
         setType,
         plannedRestAfterSet,
       });
+
+      // If this was an unplanned set, remove it from context tracking
+      if (isUnplanned) {
+        removeUnplannedSetFromContext(exercise.id, setNumber);
+      }
 
       // Clear edit state
       setEditValues(prev => {
@@ -178,9 +194,17 @@ export default function ExerciseCard({
       rir: '',
       setType: SetType.WORKING,
     }]);
+    
+    // Track in context for validation
+    addUnplannedSetToContext(exercise.id, nextSetNumber);
   };
 
   const removeUnplannedSet = (id: string) => {
+    // Find the set to get its setNumber before removing
+    const setToRemove = unplannedSets.find(s => s.id === id);
+    if (setToRemove) {
+      removeUnplannedSetFromContext(exercise.id, setToRemove.setNumber);
+    }
     setUnplannedSets(prev => prev.filter(s => s.id !== id));
   };
 
@@ -188,6 +212,17 @@ export default function ExerciseCard({
     setUnplannedSets(prev => prev.map(s => 
       s.id === id ? { ...s, [field]: value } : s
     ));
+  };
+
+  const removePlannedSet = (setNumber: number) => {
+    // Mark the set as removed in the context
+    markPlannedSetAsRemoved(exercise.id, setNumber);
+    // Remove from editValues if it was being edited
+    setEditValues(prev => {
+      const newVals = {...prev};
+      delete newVals[setNumber];
+      return newVals;
+    });
   };
 
   const getLoggedSet = (setNumber: number) => {
@@ -205,12 +240,14 @@ export default function ExerciseCard({
   };
 
   const getEditValue = (setNumber: number, field: 'weight' | 'reps' | 'rir'): string => {
-    if (editValues[setNumber]?.[field]) {
+    // Check if we have an edit value (including empty strings)
+    if (editValues[setNumber] && editValues[setNumber][field] !== undefined) {
       return editValues[setNumber][field] as string;
     }
+    // Fall back to planned set value
     const plannedSet = exercise.plannedSets?.[setNumber - 1];
     if (!plannedSet) return '';
-    return plannedSet[field].toString();
+    return plannedSet[field]?.toString() || '';
   };
 
   const getEditSetType = (setNumber: number): SetType => {
@@ -286,7 +323,13 @@ export default function ExerciseCard({
         {!isCollapsed && (
           <div className="p-4 space-y-2">
           {/* Planned Sets */}
-          {hasPlannedSets && exercise.plannedSets!.map((plannedSet, idx) => {
+          {hasPlannedSets && exercise.plannedSets!
+            .filter(plannedSet => {
+              // Filter out removed sets
+              const removedSets = removedPlannedSets.get(exercise.id);
+              return !removedSets || !removedSets.has(plannedSet.order);
+            })
+            .map((plannedSet, idx) => {
             const setNumber = plannedSet.order;
             const loggedSet = getLoggedSet(setNumber);
 
@@ -323,10 +366,22 @@ export default function ExerciseCard({
 
                   {/* Set Content */}
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-gray-700">
                         Satz {setNumber}
                       </span>
+                      {/* Trash icon for unlogged planned sets */}
+                      {!loggedSet && (
+                        <button
+                          onClick={() => removePlannedSet(setNumber)}
+                          className="text-red-600 hover:text-red-800"
+                          title="Geplanten Satz entfernen"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
 
                     {loggedSet ? (
@@ -336,7 +391,7 @@ export default function ExerciseCard({
                           <div className="grid grid-cols-3 gap-2">
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Gewicht (kg)
+                                {`Gewicht (kg)${exercise.isDoubleWeight ? ' (2x)' : ''}`}
                               </label>
                               <input
                                 type="number"
@@ -349,7 +404,7 @@ export default function ExerciseCard({
                             </div>
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Wdh
+                                {`Wdh${exercise.isUnilateral ? ' (2x)' : ''}`}
                               </label>
                               <input
                                 type="number"
@@ -407,28 +462,16 @@ export default function ExerciseCard({
                               <span className="text-sm text-gray-600">RIR {loggedSet.rir}</span>
                             )}
                           </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleEditSet(loggedSet)}
-                              disabled={loading}
-                              className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
-                              title="Bearbeiten"
-                            >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                              </svg>
-                            </button>
-                            <button
-                              onClick={() => handleDeleteSet(loggedSet.id)}
-                              disabled={loading}
-                              className="text-red-600 hover:text-red-800 disabled:opacity-50"
-                              title="Satz löschen"
-                            >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                          </div>
+                          <button
+                            onClick={() => handleEditSet(loggedSet)}
+                            disabled={loading}
+                            className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
+                            title="Bearbeiten"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                          </button>
                         </div>
                       )
                     ) : (
@@ -452,7 +495,7 @@ export default function ExerciseCard({
                         <div className="grid grid-cols-3 gap-2">
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Gewicht (kg)
+                              {`Gewicht (kg)${exercise.isDoubleWeight ? ' (2x)' : ''}`}
                             </label>
                             <input
                               type="number"
@@ -465,7 +508,7 @@ export default function ExerciseCard({
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Wdh
+                              {`Wdh${exercise.isUnilateral ? ' (2x)' : ''}`}
                             </label>
                             <input
                               type="number"
@@ -549,7 +592,7 @@ export default function ExerciseCard({
                           <div className="grid grid-cols-3 gap-2">
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Gewicht (kg)
+                                {`Gewicht (kg)${exercise.isDoubleWeight ? ' (2x)' : ''}`}
                               </label>
                               <input
                                 type="number"
@@ -562,7 +605,7 @@ export default function ExerciseCard({
                             </div>
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">
-                                Wdh
+                                {`Wdh${exercise.isUnilateral ? ' (2x)' : ''}`}
                               </label>
                               <input
                                 type="number"
@@ -665,7 +708,7 @@ export default function ExerciseCard({
                         <div className="grid grid-cols-3 gap-2">
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Gewicht (kg)
+                              {`Gewicht (kg)${exercise.isDoubleWeight ? ' (2x)' : ''}`}
                             </label>
                             <input
                               type="number"
@@ -678,7 +721,7 @@ export default function ExerciseCard({
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Wdh
+                              {`Wdh${exercise.isUnilateral ? ' (2x)' : ''}`}
                             </label>
                             <input
                               type="number"
@@ -732,7 +775,7 @@ export default function ExerciseCard({
                     <div className="grid grid-cols-3 gap-2">
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Gewicht (kg)
+                          {`Gewicht (kg)${exercise.isDoubleWeight ? ' (2x)' : ''}`}
                         </label>
                         <input
                           type="number"
@@ -745,7 +788,7 @@ export default function ExerciseCard({
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Wdh
+                          {`Wdh${exercise.isUnilateral ? ' (2x)' : ''}`}
                         </label>
                         <input
                           type="number"

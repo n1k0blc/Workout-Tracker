@@ -4,6 +4,7 @@ import {
   CreateCycleDto,
   UpdateCycleDto,
   UpdateBlueprintDto,
+  UpdateWorkoutDayDto,
   CycleResponseDto,
 } from './dto';
 
@@ -59,6 +60,8 @@ export class WorkoutCyclesService {
                     exercise: {
                       select: {
                         name: true,
+                        isUnilateral: true,
+                        isDoubleWeight: true,
                       },
                     },
                     sets: {
@@ -95,6 +98,8 @@ export class WorkoutCyclesService {
                     exercise: {
                       select: {
                         name: true,
+                        isUnilateral: true,
+                        isDoubleWeight: true,
                       },
                     },
                     sets: {
@@ -180,6 +185,8 @@ export class WorkoutCyclesService {
                     exercise: {
                       select: {
                         name: true,
+                        isUnilateral: true,
+                        isDoubleWeight: true,
                       },
                     },
                     sets: {
@@ -224,6 +231,8 @@ export class WorkoutCyclesService {
                     exercise: {
                       select: {
                         name: true,
+                        isUnilateral: true,
+                        isDoubleWeight: true,
                       },
                     },
                     sets: {
@@ -296,6 +305,37 @@ export class WorkoutCyclesService {
     return this.findById(cycleId, userId);
   }
 
+  async updateWorkoutDay(
+    cycleId: string,
+    workoutDayId: string,
+    updateWorkoutDayDto: UpdateWorkoutDayDto,
+    userId: string,
+  ): Promise<CycleResponseDto> {
+    // Check ownership
+    await this.findById(cycleId, userId);
+
+    // Find workout day
+    const workoutDay = await this.prisma.workoutDay.findUnique({
+      where: { id: workoutDayId },
+    });
+
+    if (!workoutDay || workoutDay.cycleId !== cycleId) {
+      throw new NotFoundException('Workout day not found');
+    }
+
+    // Update workout day
+    await this.prisma.workoutDay.update({
+      where: { id: workoutDayId },
+      data: {
+        name: updateWorkoutDayDto.name,
+        weekday: updateWorkoutDayDto.weekday,
+      },
+    });
+
+    // Return updated cycle
+    return this.findById(cycleId, userId);
+  }
+
   async completeCycle(id: string, userId: string): Promise<CycleResponseDto> {
     // Check ownership
     const cycle = await this.findById(id, userId);
@@ -320,6 +360,8 @@ export class WorkoutCyclesService {
                     exercise: {
                       select: {
                         name: true,
+                        isUnilateral: true,
+                        isDoubleWeight: true,
                       },
                     },
                     sets: {
@@ -369,6 +411,8 @@ export class WorkoutCyclesService {
                 id: ex.id,
                 exerciseId: ex.exerciseId,
                 exerciseName: ex.exercise.name,
+                isUnilateral: ex.exercise.isUnilateral,
+                isDoubleWeight: ex.exercise.isDoubleWeight,
                 order: ex.order,
                 sets: ex.sets.map((set: any) => ({
                   id: set.id,

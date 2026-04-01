@@ -42,6 +42,8 @@ export class AnalyticsService {
             exercise: {
               select: {
                 muscleGroup: true,
+                isUnilateral: true,
+                isDoubleWeight: true,
               },
             },
             sets: true,
@@ -63,7 +65,9 @@ export class AnalyticsService {
           // Skip warmup sets - only count working sets for volume
           if (set.setType === 'WARMUP') continue;
 
-          const setVolume = set.reps * set.weight;
+          const setVolume = set.reps * set.weight * 
+            (exerciseLog.exercise.isUnilateral ? 2 : 1) * 
+            (exerciseLog.exercise.isDoubleWeight ? 2 : 1);
           workoutVolume += setVolume;
 
           // Track by muscle group
@@ -108,7 +112,11 @@ export class AnalyticsService {
     // Verify exercise exists
     const exercise = await this.prisma.exercise.findUnique({
       where: { id: exerciseId },
-      select: { name: true },
+      select: { 
+        name: true,
+        isUnilateral: true,
+        isDoubleWeight: true,
+      },
     });
 
     if (!exercise) {
@@ -119,6 +127,7 @@ export class AnalyticsService {
       where: {
         userId,
         status: 'COMPLETED' as any,
+        gymLocation: 'HOME' as any, // Only count 1RM from HOME gym
         exercises: {
           some: {
             exerciseId,
@@ -129,6 +138,12 @@ export class AnalyticsService {
         exercises: {
           where: { exerciseId },
           include: {
+            exercise: {
+              select: {
+                isUnilateral: true,
+                isDoubleWeight: true,
+              },
+            },
             sets: {
               orderBy: { completedAt: 'asc' },
             },
@@ -148,12 +163,13 @@ export class AnalyticsService {
           // Skip warmup sets - only count working sets for 1RM
           if (set.setType === 'WARMUP') continue;
 
-          const oneRM = this.calculateOneRM(set.weight, set.reps);
+          const adjustedWeight = set.weight * (exerciseLog.exercise.isDoubleWeight ? 2 : 1);
+          const oneRM = this.calculateOneRM(adjustedWeight, set.reps);
 
           history.push({
             date: workout.date.toISOString().split('T')[0],
             oneRepMax: oneRM,
-            weight: set.weight,
+            weight: adjustedWeight,
             reps: set.reps,
             workoutId: workout.id,
           });
@@ -192,6 +208,7 @@ export class AnalyticsService {
       where: {
         userId,
         status: 'COMPLETED' as any,
+        gymLocation: 'HOME' as any, // Only count PRs from HOME gym
       },
       include: {
         exercises: {
@@ -201,6 +218,8 @@ export class AnalyticsService {
                 name: true,
                 muscleGroup: true,
                 equipment: true,
+                isUnilateral: true,
+                isDoubleWeight: true,
               },
             },
             sets: true,
@@ -230,17 +249,18 @@ export class AnalyticsService {
           if (set.setType === 'WARMUP') continue;
 
           const currentPR = prsByExercise.get(exerciseId);
+          const adjustedWeight = set.weight * (exerciseLog.exercise.isDoubleWeight ? 2 : 1);
 
           // Weight PR - only track weight PRs now
-          if (!currentPR || set.weight > currentPR.value) {
+          if (!currentPR || adjustedWeight > currentPR.value) {
             prsByExercise.set(exerciseId, {
               exerciseId,
               exerciseName,
               type: 'weight',
-              value: set.weight,
+              value: adjustedWeight,
               date: workout.date,
               workoutId: workout.id,
-              details: { weight: set.weight, reps: set.reps },
+              details: { weight: adjustedWeight, reps: set.reps },
             });
           }
         }
@@ -283,6 +303,8 @@ export class AnalyticsService {
             exercise: {
               select: {
                 muscleGroup: true,
+                isUnilateral: true,
+                isDoubleWeight: true,
               },
             },
             sets: true,
@@ -312,7 +334,9 @@ export class AnalyticsService {
           // Skip warmup sets - only count working sets for muscle distribution
           if (set.setType === 'WARMUP') continue;
 
-          const setVolume = set.reps * set.weight;
+          const setVolume = set.reps * set.weight * 
+            (exerciseLog.exercise.isUnilateral ? 2 : 1) * 
+            (exerciseLog.exercise.isDoubleWeight ? 2 : 1);
           data.volume += setVolume;
           totalVolume += setVolume;
         }

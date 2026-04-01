@@ -1,9 +1,7 @@
 'use client';
 
 import { ProtectedRoute } from '@/components/protected-route';
-import { useAuth } from '@/lib/auth-context';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
 import {
@@ -27,8 +25,6 @@ import {
 } from 'recharts';
 
 export default function AnalyticsPage() {
-  const { user, logout } = useAuth();
-  const router = useRouter();
   const [volumeData, setVolumeData] = useState<VolumeAnalytics | null>(null);
   const [prs, setPrs] = useState<PersonalRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,11 +60,6 @@ export default function AnalyticsPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleLogout = () => {
-    logout();
-    router.push('/login');
   };
 
   const formatNumber = (num: number) => {
@@ -144,68 +135,6 @@ export default function AnalyticsPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50">
-        {/* Navigation */}
-        <nav className="bg-white shadow">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between h-16">
-              <div className="flex">
-                <div className="flex-shrink-0 flex items-center">
-                  <h1 className="text-xl font-bold text-gray-900">
-                    Workout Tracker
-                  </h1>
-                </div>
-                <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                  <Link
-                    href="/dashboard"
-                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                  >
-                    Dashboard
-                  </Link>
-                  <Link
-                    href="/workout"
-                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                  >
-                    Workout
-                  </Link>
-                  <Link
-                    href="/cycles"
-                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                  >
-                    Zyklen
-                  </Link>
-                  <Link
-                    href="/exercises"
-                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                  >
-                    Übungen
-                  </Link>
-                  <Link
-                    href="/history"
-                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                  >
-                    Verlauf
-                  </Link>
-                  <Link
-                    href="/analytics"
-                    className="border-blue-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                  >
-                    Analytics
-                  </Link>
-                </div>
-              </div>
-              <div className="flex items-center">
-                <span className="text-sm text-gray-700 mr-4">{user?.email}</span>
-                <button
-                  onClick={handleLogout}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                >
-                  Abmelden
-                </button>
-              </div>
-            </div>
-          </div>
-        </nav>
-
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
             {loading ? (

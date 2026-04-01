@@ -1,5 +1,10 @@
 import { SetType } from '../../common/types';
 
+export enum GymLocation {
+  HOME = 'HOME',
+  OTHER = 'OTHER',
+}
+
 export enum WorkoutStatus {
   IN_PROGRESS = 'IN_PROGRESS',
   COMPLETED = 'COMPLETED',
@@ -34,6 +39,8 @@ export class ExerciseLogDto {
   id: string;
   exerciseId: string;
   exerciseName: string;
+  isUnilateral?: boolean;
+  isDoubleWeight?: boolean;
   order: number;
   sets: SetLogDto[];
   plannedSets?: PlannedSetDto[];
@@ -45,6 +52,7 @@ export class WorkoutResponseDto {
   status: WorkoutStatus;
   isFreeWorkout: boolean;
   totalDuration?: number;
+  gymLocation: GymLocation;
   cycleId?: string;
   cycleName?: string;
   workoutDayId?: string;
@@ -59,6 +67,7 @@ export class WorkoutListItemDto {
   status: WorkoutStatus;
   isFreeWorkout: boolean;
   totalDuration?: number;
+  gymLocation: GymLocation;
   cycleName?: string;
   workoutDayName?: string;
   exerciseCount: number;

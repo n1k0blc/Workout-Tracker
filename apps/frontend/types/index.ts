@@ -47,6 +47,8 @@ export interface Exercise {
   name: string;
   muscleGroup: MuscleGroup;
   equipment: Equipment;
+  isUnilateral: boolean;
+  isDoubleWeight: boolean;
   isCustom: boolean;
   userId?: string;
 }
@@ -91,10 +93,14 @@ export interface ExerciseLog {
   id: string;
   exerciseId: string;
   exerciseName: string;
+  isUnilateral?: boolean;
+  isDoubleWeight?: boolean;
   order: number;
   sets: SetLog[];
   plannedSets?: PlannedSet[];
 }
+
+export type GymLocation = 'HOME' | 'OTHER';
 
 export interface Workout {
   id: string;
@@ -102,6 +108,7 @@ export interface Workout {
   status: WorkoutStatus;
   isFreeWorkout: boolean;
   totalDuration?: number;
+  gymLocation: GymLocation;
   cycleId?: string;
   cycleName?: string;
   workoutDayId?: string;
@@ -116,6 +123,7 @@ export interface WorkoutListItem {
   status: WorkoutStatus;
   isFreeWorkout: boolean;
   totalDuration?: number;
+  gymLocation: GymLocation;
   cycleName?: string;
   workoutDayName?: string;
   exerciseCount: number;
@@ -137,6 +145,8 @@ export interface BlueprintExercise {
   id: string;
   exerciseId: string;
   exerciseName: string;
+  isUnilateral?: boolean;
+  isDoubleWeight?: boolean;
   order: number;
   sets: BlueprintSet[];
 }

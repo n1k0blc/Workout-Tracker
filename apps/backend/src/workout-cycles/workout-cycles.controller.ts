@@ -15,6 +15,7 @@ import {
   CreateCycleDto,
   UpdateCycleDto,
   UpdateBlueprintDto,
+  UpdateWorkoutDayDto,
   CycleResponseDto,
 } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -74,6 +75,21 @@ export class WorkoutCyclesController {
       cycleId,
       workoutDayId,
       updateBlueprintDto,
+      user.id,
+    );
+  }
+
+  @Patch(':cycleId/workout-days/:workoutDayId')
+  async updateWorkoutDay(
+    @Param('cycleId') cycleId: string,
+    @Param('workoutDayId') workoutDayId: string,
+    @Body() updateWorkoutDayDto: UpdateWorkoutDayDto,
+    @CurrentUser() user: { id: string },
+  ): Promise<CycleResponseDto> {
+    return this.workoutCyclesService.updateWorkoutDay(
+      cycleId,
+      workoutDayId,
+      updateWorkoutDayDto,
       user.id,
     );
   }

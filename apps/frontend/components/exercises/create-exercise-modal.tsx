@@ -16,6 +16,8 @@ export default function CreateExerciseModal({
   const [name, setName] = useState('');
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup>(MuscleGroup.CHEST);
   const [equipment, setEquipment] = useState<Equipment>(Equipment.DUMBBELL);
+  const [isUnilateral, setIsUnilateral] = useState(false);
+  const [isDoubleWeight, setIsDoubleWeight] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -34,6 +36,8 @@ export default function CreateExerciseModal({
         name: name.trim(),
         muscleGroup,
         equipment,
+        isUnilateral,
+        isDoubleWeight,
       });
       onCreated(exercise);
       onClose();
@@ -108,6 +112,34 @@ export default function CreateExerciseModal({
               <option value={Equipment.SMITH_MACHINE}>Smith Machine</option>
               <option value={Equipment.EZ_BAR}>SZ-Stange</option>
             </select>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="isUnilateral"
+                checked={isUnilateral}
+                onChange={(e) => setIsUnilateral(e.target.checked)}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <label htmlFor="isUnilateral" className="ml-2 text-sm text-gray-700">
+                Unilateral (Wiederholungen zählen 2x)
+              </label>
+            </div>
+
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="isDoubleWeight"
+                checked={isDoubleWeight}
+                onChange={(e) => setIsDoubleWeight(e.target.checked)}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <label htmlFor="isDoubleWeight" className="ml-2 text-sm text-gray-700">
+                Doppeltes Gewicht (Gewicht zählt 2x)
+              </label>
+            </div>
           </div>
 
           <div className="flex gap-3 pt-2">

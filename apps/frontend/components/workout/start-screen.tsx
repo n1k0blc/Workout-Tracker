@@ -4,8 +4,10 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWorkout } from '@/lib/workout-context';
 import { apiClient } from '@/lib/api';
-import { Workout } from '@/types';
+import { Workout, GymLocation } from '@/types';
 import CycleWorkoutSelectionModal from './cycle-workout-selection-modal';
+import GymLocationModal from './gym-location-modal';
+import PastWorkoutSetupModal from './past-workout-setup-modal';
 
 export default function WorkoutStartScreen() {
   const router = useRouter();
@@ -16,7 +18,17 @@ export default function WorkoutStartScreen() {
   const [loadingSuggestion, setLoadingSuggestion] = useState(true);
   const [error, setError] = useState('');
   const [showCycleWorkoutModal, setShowCycleWorkoutModal] = useState(false);
+  const [showGymLocationModal, setShowGymLocationModal] = useState(false);
+  const [showPastWorkoutModal, setShowPastWorkoutModal] = useState(false);
   const [hasActiveCycle, setHasActiveCycle] = useState(false);
+  const [pendingWorkoutData, setPendingWorkoutData] = useState<{
+    cycleId?: string;
+    workoutDayId?: string;
+    isFreeWorkout: boolean;
+    isPastWorkout?: boolean;
+    pastWorkoutDate?: string;
+    pastWorkoutDuration?: number;
+  } | null>(null);
 
   useEffect(() => {
     const loadSuggestion = async () => {
@@ -46,41 +58,80 @@ export default function WorkoutStartScreen() {
     checkActiveCycle();
   }, []);
 
-  const handleStartSuggested = async () => {
+  const handleStartSuggested = () => {
     if (!suggestedWorkout) return;
 
+    setPendingWorkoutData({
+      cycleId: suggestedWorkout.cycleId,
+      workoutDayId: suggestedWorkout.workoutDayId,
+      isFreeWorkout: false,
+    });
+    setShowGymLocationModal(true);
+  };
+
+  const handleStartFree = () => {
+    setPendingWorkoutData({
+      isFreeWorkout: true,
+    });
+    setShowGymLocationModal(true);
+  };
+
+  const handleStartCycleWorkout = (cycleId: string, workoutDayId: string) => {
+    setPendingWorkoutData((prev) => ({
+      ...prev,
+      cycleId,
+      workoutDayId,
+      isFreeWorkout: false,
+      isPastWorkout: prev?.isPastWorkout,
+      pastWorkoutDate: prev?.pastWorkoutDate,
+      pastWorkoutDuration: prev?.pastWorkoutDuration,
+    }));
+    setShowCycleWorkoutModal(false);
+    setShowGymLocationModal(true);
+  };
+
+  const handleGymLocationSelected = async (gymLocation: GymLocation) => {
+    if (!pendingWorkoutData) return;
+
+    setShowGymLocationModal(false);
+    
     try {
       await startWorkout({
-        cycleId: suggestedWorkout.cycleId,
-        workoutDayId: suggestedWorkout.workoutDayId,
-        isFreeWorkout: false,
+        ...pendingWorkoutData,
+        gymLocation,
       });
+      setPendingWorkoutData(null);
     } catch (err) {
       setError('Fehler beim Starten des Workouts');
+      console.error('Failed to start workout:', err);
     }
   };
 
-  const handleStartFree = async () => {
-    try {
-      await startWorkout({
-        isFreeWorkout: true,
-      });
-    } catch (err) {
-      setError('Fehler beim Starten des Workouts');
-    }
+  const handleStartPastWorkout = () => {
+    setShowPastWorkoutModal(true);
   };
 
-  const handleStartCycleWorkout = async (cycleId: string, workoutDayId: string) => {
-    try {
-      await startWorkout({
-        cycleId,
-        workoutDayId,
-        isFreeWorkout: false,
-      });
-      setShowCycleWorkoutModal(false);
-    } catch (err) {
-      setError('Fehler beim Starten des Workouts');
-    }
+  const handlePastWorkoutFree = (date: string, durationMinutes: number) => {
+    setPendingWorkoutData({
+      isFreeWorkout: true,
+      isPastWorkout: true,
+      pastWorkoutDate: date,
+      pastWorkoutDuration: durationMinutes * 60,
+    });
+    setShowPastWorkoutModal(false);
+    setShowGymLocationModal(true);
+  };
+
+  const handlePastWorkoutCycle = (date: string, durationMinutes: number) => {
+    // Store date and duration temporarily and show cycle selection
+    setPendingWorkoutData({
+      isFreeWorkout: false,
+      isPastWorkout: true,
+      pastWorkoutDate: date,
+      pastWorkoutDuration: durationMinutes * 60,
+    });
+    setShowPastWorkoutModal(false);
+    setShowCycleWorkoutModal(true);
   };
 
   const formatTime = (seconds: number): string => {
@@ -237,6 +288,25 @@ export default function WorkoutStartScreen() {
           </div>
         )}
 
+        {/* Past Workout Tracking */}
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          <div className="p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">
+              Vergangenes Workout tracken
+            </h2>
+            <p className="text-gray-600 text-sm mb-4">
+              Trage ein bereits durchgeführtes Workout nachträglich ein.
+            </p>
+            <button
+              onClick={handleStartPastWorkout}
+              disabled={loading}
+              className="w-full py-3 px-4 border-2 border-purple-300 text-purple-700 font-medium rounded-lg hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Vergangenes Workout tracken
+            </button>
+          </div>
+        </div>
+
         {/* Info Box */}
         {suggestedWorkout && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -256,6 +326,24 @@ export default function WorkoutStartScreen() {
           onSelect={handleStartCycleWorkout}
         />
       )}
+
+      {/* Gym Location Modal */}
+      <GymLocationModal
+        isOpen={showGymLocationModal}
+        onClose={() => {
+          setShowGymLocationModal(false);
+          setPendingWorkoutData(null);
+        }}
+        onSelectGym={handleGymLocationSelected}
+      />
+
+      {/* Past Workout Setup Modal */}
+      <PastWorkoutSetupModal
+        isOpen={showPastWorkoutModal}
+        onClose={() => setShowPastWorkoutModal(false)}
+        onStartFree={handlePastWorkoutFree}
+        onStartCycle={handlePastWorkoutCycle}
+      />
     </div>
   );
 }

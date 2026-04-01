@@ -1,16 +1,30 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { Workout, SetType } from '@/types';
+import { Workout, SetType, GymLocation } from '@/types';
 import { apiClient } from '@/lib/api';
 
 interface WorkoutContextType {
   activeWorkout: Workout | null;
   loading: boolean;
+  isPaused: boolean;
+  togglePause: () => void;
+  isPastWorkout: boolean;
+  pastWorkoutDuration: number;
+  setPastWorkoutDuration: (duration: number) => void;
+  removedPlannedSets: Map<string, Set<number>>; // exerciseLogId -> set of setNumbers that were removed
+  markPlannedSetAsRemoved: (exerciseLogId: string, setNumber: number) => void;
+  unplannedSets: Map<string, Set<number>>; // exerciseLogId -> set of setNumbers for unplanned sets
+  addUnplannedSet: (exerciseLogId: string, setNumber: number) => void;
+  removeUnplannedSet: (exerciseLogId: string, setNumber: number) => void;
   startWorkout: (data: {
     cycleId?: string;
     workoutDayId?: string;
     isFreeWorkout: boolean;
+    gymLocation: GymLocation;
+    isPastWorkout?: boolean;
+    pastWorkoutDate?: string;
+    pastWorkoutDuration?: number;
   }) => Promise<void>;
   completeWorkout: (data?: {
     totalDuration?: number;
@@ -54,6 +68,11 @@ const WorkoutContext = createContext<WorkoutContextType | undefined>(undefined);
 export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const [activeWorkout, setActiveWorkout] = useState<Workout | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [isPastWorkout, setIsPastWorkout] = useState(false);
+  const [pastWorkoutDuration, setPastWorkoutDuration] = useState(0);
+  const [removedPlannedSets, setRemovedPlannedSets] = useState<Map<string, Set<number>>>(new Map());
+  const [unplannedSets, setUnplannedSets] = useState<Map<string, Set<number>>>(new Map());
   const [workoutDuration, setWorkoutDuration] = useState(0);
   const [restTimer, setRestTimer] = useState(0); // Elapsed seconds
   const [restTimerTarget, setRestTimerTarget] = useState(0); // Target seconds
@@ -63,9 +82,49 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const workoutTimerRef = useRef<NodeJS.Timeout | null>(null);
   const restTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Workout Duration Timer
+  const togglePause = () => {
+    setIsPaused(prev => !prev);
+  };
+
+  const markPlannedSetAsRemoved = (exerciseLogId: string, setNumber: number) => {
+    setRemovedPlannedSets(prev => {
+      const newMap = new Map(prev);
+      const exerciseSet = newMap.get(exerciseLogId) || new Set();
+      exerciseSet.add(setNumber);
+      newMap.set(exerciseLogId, exerciseSet);
+      return newMap;
+    });
+  };
+
+  const addUnplannedSet = (exerciseLogId: string, setNumber: number) => {
+    setUnplannedSets(prev => {
+      const newMap = new Map(prev);
+      const exerciseSet = newMap.get(exerciseLogId) || new Set();
+      exerciseSet.add(setNumber);
+      newMap.set(exerciseLogId, exerciseSet);
+      return newMap;
+    });
+  };
+
+  const removeUnplannedSet = (exerciseLogId: string, setNumber: number) => {
+    setUnplannedSets(prev => {
+      const newMap = new Map(prev);
+      const exerciseSet = newMap.get(exerciseLogId);
+      if (exerciseSet) {
+        exerciseSet.delete(setNumber);
+        if (exerciseSet.size === 0) {
+          newMap.delete(exerciseLogId);
+        } else {
+          newMap.set(exerciseLogId, exerciseSet);
+        }
+      }
+      return newMap;
+    });
+  };
+
+  // Workout Duration Timer (only for live workouts, not past workouts)
   useEffect(() => {
-    if (activeWorkout && activeWorkout.status === 'IN_PROGRESS') {
+    if (activeWorkout && activeWorkout.status === 'IN_PROGRESS' && !isPaused && !isPastWorkout) {
       workoutTimerRef.current = setInterval(() => {
         setWorkoutDuration((prev) => prev + 1);
       }, 1000);
@@ -74,7 +133,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         clearInterval(workoutTimerRef.current);
         workoutTimerRef.current = null;
       }
-      setWorkoutDuration(0);
+      // Don't reset duration when pausing
+      if (!activeWorkout) {
+        setWorkoutDuration(0);
+      }
     }
 
     return () => {
@@ -82,11 +144,11 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         clearInterval(workoutTimerRef.current);
       }
     };
-  }, [activeWorkout]);
+  }, [activeWorkout, isPaused, isPastWorkout]);
 
-  // Rest Timer (Stopwatch - counts UP)
+  // Rest Timer (Stopwatch - counts UP) - disabled for past workouts
   useEffect(() => {
-    if (restTimerStartedAt !== null) {
+    if (restTimerStartedAt !== null && !isPaused && !isPastWorkout) {
       restTimerRef.current = setInterval(() => {
         setRestTimer((prev) => {
           const newValue = prev + 1;
@@ -102,7 +164,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         clearInterval(restTimerRef.current);
         restTimerRef.current = null;
       }
-      setRestTimer(0);
+      // Don't reset rest timer when pausing
+      if (restTimerStartedAt === null) {
+        setRestTimer(0);
+      }
     }
 
     return () => {
@@ -110,7 +175,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         clearInterval(restTimerRef.current);
       }
     };
-  }, [restTimerStartedAt, restTimerTarget]);
+  }, [restTimerStartedAt, restTimerTarget, isPaused, isPastWorkout]);
 
   const refreshActiveWorkout = async () => {
     // Only try to load active workout if user is logged in (has token)
@@ -135,12 +200,20 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     cycleId?: string;
     workoutDayId?: string;
     isFreeWorkout: boolean;
+    gymLocation: GymLocation;
+    isPastWorkout?: boolean;
+    pastWorkoutDate?: string;
+    pastWorkoutDuration?: number;
   }) => {
     setLoading(true);
     try {
       const workout = await apiClient.startWorkout(data);
       setActiveWorkout(workout);
       setWorkoutDuration(0);
+      setIsPastWorkout(data.isPastWorkout ?? false);
+      setPastWorkoutDuration(data.pastWorkoutDuration ?? 0);
+      setRemovedPlannedSets(new Map()); // Reset removed sets for new workout
+      setUnplannedSets(new Map()); // Reset unplanned sets for new workout
     } catch (error) {
       console.error('Failed to start workout:', error);
       throw error;
@@ -379,6 +452,16 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       value={{
         activeWorkout,
         loading,
+        isPaused,
+        togglePause,
+        isPastWorkout,
+        pastWorkoutDuration,
+        setPastWorkoutDuration,
+        removedPlannedSets,
+        markPlannedSetAsRemoved,
+        unplannedSets,
+        addUnplannedSet,
+        removeUnplannedSet,
         startWorkout,
         completeWorkout,
         discardWorkout,

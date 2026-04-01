@@ -1,8 +1,6 @@
 'use client';
 
 import { ProtectedRoute } from '@/components/protected-route';
-import { useAuth } from '@/lib/auth-context';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
@@ -11,8 +9,6 @@ import { WorkoutListItem } from '@/types';
 type FilterType = '7days' | '30days' | '90days' | 'currentMonth' | 'currentYear' | 'custom';
 
 export default function HistoryPage() {
-  const { user, logout } = useAuth();
-  const router = useRouter();
   const [workouts, setWorkouts] = useState<WorkoutListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<FilterType>('30days');
@@ -87,11 +83,6 @@ export default function HistoryPage() {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    router.push('/login');
-  };
-
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return new Intl.DateTimeFormat('de-DE', {
@@ -112,67 +103,6 @@ export default function HistoryPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50">
-        <nav className="bg-white shadow">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between h-16">
-              <div className="flex">
-                <div className="flex-shrink-0 flex items-center">
-                  <h1 className="text-xl font-bold text-gray-900">
-                    Workout Tracker
-                  </h1>
-                </div>
-                <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
-                  <Link
-                    href="/dashboard"
-                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                  >
-                    Dashboard
-                  </Link>
-                  <Link
-                    href="/workout"
-                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                  >
-                    Workout
-                  </Link>
-                  <Link
-                    href="/cycles"
-                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                  >
-                    Zyklen
-                  </Link>
-                  <Link
-                    href="/exercises"
-                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                  >
-                    Übungen
-                  </Link>
-                  <Link
-                    href="/history"
-                    className="border-blue-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                  >
-                    Verlauf
-                  </Link>
-                  <Link
-                    href="/analytics"
-                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                  >
-                    Analytics
-                  </Link>
-                </div>
-              </div>
-              <div className="flex items-center">
-                <span className="text-sm text-gray-700 mr-4">{user?.email}</span>
-                <button
-                  onClick={handleLogout}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                >
-                  Abmelden
-                </button>
-              </div>
-            </div>
-          </div>
-        </nav>
-
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
             <div className="space-y-6">
@@ -296,13 +226,15 @@ export default function HistoryPage() {
                     {workouts.length} Workout{workouts.length !== 1 ? 's' : ''} gefunden
                   </div>
                   {workouts.map((workout) => (
-                    <Link
+                    <div
                       key={workout.id}
-                      href={`/history/${workout.id}`}
                       className="block bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-6"
                     >
                       <div className="flex items-start justify-between">
-                        <div className="flex-1">
+                        <Link
+                          href={`/history/${workout.id}`}
+                          className="flex-1"
+                        >
                           <div className="flex items-center gap-3 mb-2">
                             <h3 className="text-lg font-semibold text-gray-900">
                               {workout.isFreeWorkout
@@ -337,12 +269,30 @@ export default function HistoryPage() {
                               <span>{workout.exerciseCount} Übung{workout.exerciseCount !== 1 ? 'en' : ''}</span>
                             </div>
                           </div>
+                        </Link>
+                        <div className="flex items-center gap-2 ml-4">
+                          <Link
+                            href={`/history/${workout.id}/edit`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Workout bearbeiten"
+                          >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </Link>
+                          <Link
+                            href={`/history/${workout.id}`}
+                            className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                            title="Details anzeigen"
+                          >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </Link>
                         </div>
-                        <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
                       </div>
-                    </Link>
+                    </div>
                   ))}
                 </div>
               ) : (

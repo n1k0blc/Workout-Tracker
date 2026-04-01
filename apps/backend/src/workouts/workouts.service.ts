@@ -6,9 +6,11 @@ import {
   UpdateSetDto,
   AddExerciseToWorkoutDto,
   CompleteWorkoutDto,
+  UpdateCompletedWorkoutDto,
   WorkoutResponseDto,
   WorkoutListItemDto,
   WorkoutStatus,
+  GymLocation,
 } from './dto';
 
 @Injectable()
@@ -58,6 +60,7 @@ export class WorkoutsService {
       status: workout.status as WorkoutStatus,
       isFreeWorkout: workout.isFreeWorkout,
       totalDuration: workout.totalDuration,
+      gymLocation: workout.gymLocation as GymLocation,
       cycleName: workout.cycle?.name,
       workoutDayName: workout.workoutDay?.name,
       exerciseCount: workout.exercises.length,
@@ -95,7 +98,7 @@ export class WorkoutsService {
         exercises: {
           include: {
             exercise: {
-              select: { name: true },
+              select: { name: true, isUnilateral: true, isDoubleWeight: true },
             },
             sets: {
               orderBy: { setNumber: 'asc' },
@@ -141,7 +144,7 @@ export class WorkoutsService {
         exercises: {
           include: {
             exercise: {
-              select: { name: true },
+              select: { name: true, isUnilateral: true, isDoubleWeight: true },
             },
             sets: {
               orderBy: { setNumber: 'asc' },
@@ -164,7 +167,7 @@ export class WorkoutsService {
   }
 
   async start(startWorkoutDto: StartWorkoutDto, userId: string): Promise<WorkoutResponseDto> {
-    const { isFreeWorkout, cycleId, workoutDayId, exercises } = startWorkoutDto;
+    const { isFreeWorkout, cycleId, workoutDayId, exercises, gymLocation, isPastWorkout, pastWorkoutDate } = startWorkoutDto;
 
     // Validate: If not free workout, cycleId and workoutDayId must be provided
     if (!isFreeWorkout && (!cycleId || !workoutDayId)) {
@@ -207,9 +210,10 @@ export class WorkoutsService {
     const workout = await this.prisma.workout.create({
       data: {
         userId,
-        date: new Date(),
+        date: isPastWorkout && pastWorkoutDate ? new Date(pastWorkoutDate) : new Date(),
         status: 'IN_PROGRESS' as any,
         isFreeWorkout: isFreeWorkout ?? false,
+        gymLocation: gymLocation,
         cycleId: cycleId || null,
         workoutDayId: workoutDayId || null,
         ...(exercisesToCreate &&
@@ -246,7 +250,7 @@ export class WorkoutsService {
         exercises: {
           include: {
             exercise: {
-              select: { name: true },
+              select: { name: true, isUnilateral: true, isDoubleWeight: true },
             },
             sets: true,
           },
@@ -535,9 +539,47 @@ export class WorkoutsService {
       },
     });
 
-    // Update blueprint if requested
-    if (completeWorkoutDto.updateBlueprint && workout.workoutDayId) {
+    // Update blueprint if requested (only for HOME gym workouts)
+    if (completeWorkoutDto.updateBlueprint && workout.workoutDayId && workout.gymLocation === 'HOME') {
       await this.updateBlueprintFromWorkout(workoutId, workout.workoutDayId);
+    }
+
+    return this.findById(workoutId, userId);
+  }
+
+  async updateCompletedWorkout(
+    workoutId: string,
+    updateDto: UpdateCompletedWorkoutDto,
+    userId: string,
+  ): Promise<WorkoutResponseDto> {
+    const workout = await this.findById(workoutId, userId);
+
+    if (workout.status !== WorkoutStatus.COMPLETED) {
+      throw new BadRequestException('Only completed workouts can be edited');
+    }
+
+    // Update workout date if provided
+    if (updateDto.completedAt) {
+      await this.prisma.workout.update({
+        where: { id: workoutId },
+        data: {
+          date: new Date(updateDto.completedAt),
+        },
+      });
+    }
+
+    // Update sets
+    for (const exerciseUpdate of updateDto.exercises) {
+      for (const setUpdate of exerciseUpdate.sets) {
+        await this.prisma.setLog.update({
+          where: { id: setUpdate.id },
+          data: {
+            reps: setUpdate.reps,
+            weight: setUpdate.weight,
+            rir: setUpdate.rir,
+          },
+        });
+      }
     }
 
     return this.findById(workoutId, userId);
@@ -632,6 +674,7 @@ export class WorkoutsService {
       status: workout.status as WorkoutStatus,
       isFreeWorkout: workout.isFreeWorkout,
       totalDuration: workout.totalDuration,
+      gymLocation: workout.gymLocation as GymLocation,
       cycleId: workout.cycleId,
       cycleName: workout.cycle?.name,
       workoutDayId: workout.workoutDayId,
@@ -671,6 +714,8 @@ export class WorkoutsService {
           id: ex.id,
           exerciseId: ex.exerciseId,
           exerciseName: ex.exercise.name,
+          isUnilateral: ex.exercise.isUnilateral,
+          isDoubleWeight: ex.exercise.isDoubleWeight,
           order: ex.order,
           sets: ex.sets.map((set: any) => ({
             id: set.id,

@@ -19,6 +19,7 @@ import {
   UpdateSetDto,
   AddExerciseToWorkoutDto,
   CompleteWorkoutDto,
+  UpdateCompletedWorkoutDto,
   WorkoutResponseDto,
   WorkoutListItemDto,
   WorkoutStatus,
@@ -165,6 +166,15 @@ export class WorkoutsController {
     @CurrentUser() user: { id: string },
   ): Promise<WorkoutResponseDto> {
     return this.workoutsService.complete(id, completeWorkoutDto, user.id);
+  }
+
+  @Patch(':id')
+  async updateCompletedWorkout(
+    @Param('id') id: string,
+    @Body() updateDto: UpdateCompletedWorkoutDto,
+    @CurrentUser() user: { id: string },
+  ): Promise<WorkoutResponseDto> {
+    return this.workoutsService.updateCompletedWorkout(id, updateDto, user.id);
   }
 
   @Post(':id/discard')

@@ -1,0 +1,118 @@
+﻿ID;Excercise;Muscle Group;Equipment
+1;Cable Crunch;Abs;Cable
+2;Dumbbell Russian Twist;Abs;Dumbbell
+3;Machine Abs Crunch;Abs;Machine
+4;Lat Pull Down Narrow Grip;Back;Cable
+5;Lat Pull Down Wide Grip;Back;Cable
+6;Cable Row Narrow Grip;Back;Cable
+7;Cable Row Wide Grip;Back;Cable
+8;Unilateral Cable Lat Pull;Back;Cable
+9;Dumbbell Row;Back;Dumbbell
+10;Barbell Row;Back;Barbell
+11;Machine Row Wide Grip;Back;Machine
+12;Machine Lat Pull Down;Back;Machine
+13;Machine High Row;Back;Machine
+14;Machine Low Row;Back;Machine
+15;T-Bar Row;Back;Machine
+16;Machine Row Hammer Grip;Back;Machine
+17;Machine Back Extensions;Back;Machine
+18;Smith Machine Row;Back;Smith Machine
+19;Smith Machine Romanian Deadlift;Back;Smith Machine
+20;Barbell Romanian Deadlift;Back;Barbell
+21;Barbell Deadlift;Back;Barbell
+22;Cable Romanian Deadlift;Back;Cable
+23;Jefferson Curl;Back;Barbell
+24;Dumbbell Romanian Deadlift;Back;Dumbbell
+25;Pull Ups;Back;Bodyweight
+26;Supported Pull Ups;Back;Machine
+27;Face Pulls;Back;Cable
+28;Cable Reverse Flies;Back;Cable
+29;Butterfly Reverse;Back;Machine
+30;Dumbbell Reverse Flies;Back;Dumbbell
+31;Kelso Shrug;Back;Machine
+32;Cable Kelso Shrug;Back;Cable
+33;Unilateral Butterfly Reverse;Back;Machine
+34;Cable Bar Biceps Curl;Biceps;Cable
+35;Bayesian Curl;Biceps;Cable
+36;Cable Hammer Curl;Biceps;Cable
+37;Dumbbell Biceps Curl;Biceps;Dumbbell
+38;Dumbbell Hammer Curl;Biceps;Dumbbell
+39;Dumbbell Incline Biceps Curl;Biceps;Dumbbell
+40;Zotman Curl;Biceps;Dumbbell
+41;Dumbbell Preacher Curl;Biceps;Dumbbell
+42;Dumbbell Spider Curl;Biceps;Dumbbell
+43;Barbell Biceps Curl;Biceps;Barbell
+44;Barbell Preacher Curl;Biceps;Barbell
+45;Machine Preacher Curl;Biceps;Machine
+46;EZ-Bar Curl;Biceps;EZ-Bar
+47;EZ-Bar Preacher Curl;Biceps;EZ-Bar
+48;Cable Flies;Chest;Cable
+49;Cable Chest Press;Chest;Cable
+50;Push Up;Chest;Bodyweight
+51;Dumbbell Bench Press;Chest;Dumbbell
+52;Dumbbell Incline Bench Press;Chest;Dumbbell
+53;Dumbbell Flies;Chest;Dumbbell
+54;Barbell Bench Press;Chest;Barbell
+55;Barbell Incline Bench Press;Chest;Barbell
+56;Butterfly;Chest;Machine
+57;Chest Press;Chest;Machine
+58;Machine Incline Press;Chest;Machine
+59;Machine Flat Press;Chest;Machine
+60;Smith Machine Bench Press;Chest;Smith Machine
+61;Smith Machine Incline Bench Press;Chest;Smith Machine
+62;Seated Hamstring Curl;Legs;Machine
+63;Lying Hamstring Curl;Legs;Machine
+64;Hip Thrust;Legs;Machine
+65;Smith Machine Hip Thrust;Legs;Smith Machine
+66;Barbell Hip Thrust;Legs;Barbell
+67;Cable Kickbacks;Legs;Cable
+68;Cable Hip Abduction;Legs;Cable
+69;Dumbbell Bulgarian Split Squat;Legs;Dumbbell
+70;Sumo Squat;Legs;Dumbbell
+71;Goblin Squat;Legs;Dumbbell
+72;Barbell Squat;Legs;Barbell
+73;Dumbbell Lunge;Legs;Dumbbell
+74;Barbell Lunge;Legs;Barbell
+75;Smith Machine Lunge;Legs;Smith Machine
+76;Smith Machine Bulgarian Split Squat;Legs;Smith Machine
+77;Leg Press;Legs;Machine
+78;Hack Squat;Legs;Machine
+79;Hip Abduction;Legs;Machine
+80;Hip Adduction;Legs;Machine
+81;V Squat;Legs;Machine
+82;Pendulum Squat;Legs;Machine
+83;Smith Machine Squat;Legs;Smith Machine
+84;Leg Extension;Legs;Machine
+85;Seated Calf Raise;Legs;Machine
+86;Standing Calf Raise;Legs;Machine
+87;Smith Machine Calf Raise;Legs;Smith Machine
+88;Leg Press Calf Raise;Legs;Machine
+89;Cable Lateral Raise;Shoulders;Cable
+90;Dumbbell Shoulder Press;Shoulders;Dumbbell
+91;Dumbbell Lateral Raise;Shoulders;Dumbbell
+92;Dumbbell Incline Lateral Raise;Shoulders;Dumbbell
+93;Y Raise;Shoulders;Dumbbell
+94;Military Press;Shoulders;Barbell
+95;Seated Barbell Shoulder Press;Shoulders;Barbell
+96;Machine Lateral Raise;Shoulders;Machine
+97;Machine Shoulder Press;Shoulders;Machine
+98;Smith Machine Shoulder Press;Shoulders;Smith Machine
+99;Machine Shrug;Shoulders;Machine
+100;Dumbbell Shrug;Shoulders;Dumbbell
+101;Barbell Shrug;Shoulders;Barbell
+102;Smith Machine Shrug;Shoulders;Smith Machine
+103;Incline Dumbbell Y-Raise;Shoulders;Dumbbell
+104;Cable Y-Raise;Shoulders;Cable
+105;Unilateral Triceps Cable Kickback;Triceps;Cable
+106;Cable Bar Triceps Pushdown;Triceps;Cable
+107;Cable Rope Triceps Pushdown;Triceps;Cable
+108;Cable Bar Overhead Triceps Externsion;Triceps;Cable
+109;Cable Rope Overhead Triceps Externsion;Triceps;Cable
+110;Dips;Triceps;Bodyweight
+111;Dumbbell Skull Crushers;Triceps;Dumbbell
+112;Dumbbell Triceps Kickbacks;Triceps;Dumbbell
+113;Dumbbell Overhead Externsion;Triceps;Dumbbell
+114;Dumbbell Skull Crushers;Triceps;Barbell
+115;Machine Triceps Press;Triceps;Machine
+116;EZ-Bar Skull Crushers;Triceps;EZ-Bar
+117;EZ-Bar Overhead Extensions;Triceps;EZ-Bar
