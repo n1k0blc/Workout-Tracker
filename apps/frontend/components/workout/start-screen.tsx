@@ -217,7 +217,7 @@ export default function WorkoutStartScreen() {
                                 </div>
                                 {exercise.plannedSets.map((set, setIdx) => (
                                   <div key={setIdx} className="text-sm text-gray-600">
-                                    Satz {set.order}: {set.setType === 'WARMUP' ? '🔥 Aufwärmen' : '💪 Arbeit'} - {set.reps} Wdh × {set.weight}kg @ RIR {set.rir}
+                                    {set.setType === 'WARMUP' ? '🔥 Aufwärmen' : '💪 Arbeit'} - {set.reps} Wdh × {set.weight}kg @ RIR {set.rir}
                                   </div>
                                 ))}
                               </div>

@@ -183,9 +183,7 @@ export default function EditWorkoutPage() {
                           className="bg-gray-50 rounded-lg p-4 border border-gray-200"
                         >
                           <div className="flex items-center justify-between mb-3">
-                            <span className="text-sm font-medium text-gray-600">
-                              Satz {set.setNumber}
-                            </span>
+                            <div className="flex-1"></div>
                             <span className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">
                               {set.setType === 'WARMUP' ? 'Aufwärmen' : 'Arbeitssatz'}
                             </span>

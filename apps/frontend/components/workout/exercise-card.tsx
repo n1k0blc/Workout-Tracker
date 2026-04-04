@@ -258,11 +258,59 @@ export default function ExerciseCard({
     return plannedSet?.setType || SetType.WORKING;
   };
 
+  // Check if all sets for this exercise are logged
+  const isExerciseComplete = (): boolean => {
+    // Get all set numbers that should exist
+    const setsToLog: Set<number> = new Set();
+    
+    // Add planned sets (that aren't removed)
+    const removedSets = removedPlannedSets.get(exercise.id) || new Set();
+    if (hasPlannedSets) {
+      exercise.plannedSets?.forEach((_, index) => {
+        const setNumber = index + 1;
+        if (!removedSets.has(setNumber)) {
+          setsToLog.add(setNumber);
+        }
+      });
+    }
+    
+    // Add unplanned sets (both those in local state and in context)
+    const contextUnplannedForExercise = contextUnplannedSets.get(exercise.id) || new Set();
+    contextUnplannedForExercise.forEach(setNum => setsToLog.add(setNum));
+    
+    // If there are no sets to log, exercise is not complete
+    if (setsToLog.size === 0) {
+      return false;
+    }
+    
+    // Check if every set that should exist has been logged
+    const loggedSetNumbers = new Set(exercise.sets.map(s => s.setNumber));
+    for (const setNum of setsToLog) {
+      if (!loggedSetNumbers.has(setNum)) {
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
+  const exerciseComplete = isExerciseComplete();
+
   return (
     <>
-      <div ref={setNodeRef} style={style} className="bg-white rounded-lg shadow-sm overflow-hidden">
+      <div 
+        ref={setNodeRef} 
+        style={style} 
+        className={`rounded-lg shadow-sm overflow-hidden ${
+          exerciseComplete 
+            ? 'bg-green-50/50 ring-2 ring-green-200' 
+            : 'bg-white'
+        }`}
+      >
         {/* Exercise Header */}
-        <div className="bg-gray-100 px-4 py-3 flex items-center justify-between">
+        <div className={`px-4 py-3 flex items-center justify-between ${
+          exerciseComplete ? 'bg-green-100/50' : 'bg-gray-100'
+        }`}>
           <div className="flex items-center gap-3">
             {/* Drag Handle */}
             <button
@@ -367,10 +415,8 @@ export default function ExerciseCard({
                   {/* Set Content */}
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-700">
-                        Satz {setNumber}
-                      </span>
                       {/* Trash icon for unlogged planned sets */}
+                      <div className="flex-1"></div>
                       {!loggedSet && (
                         <button
                           onClick={() => removePlannedSet(setNumber)}
@@ -570,7 +616,7 @@ export default function ExerciseCard({
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-gray-700">
-                        Satz {unplannedSet.setNumber} <span className="text-xs text-gray-500">(ungeplant)</span>
+                        <span className="text-xs text-gray-500">(ungeplant)</span>
                       </span>
                       {!loggedSet && (
                         <button
@@ -768,9 +814,6 @@ export default function ExerciseCard({
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                       </div>
-                      <span className="text-sm font-medium text-gray-700">
-                        Satz {set.setNumber}
-                      </span>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
                       <div>
@@ -837,9 +880,6 @@ export default function ExerciseCard({
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                       </div>
-                      <span className="text-sm font-medium text-gray-700">
-                        Satz {set.setNumber}
-                      </span>
                       <div className="flex items-center gap-3 text-sm">
                         <span className={`text-xs px-2 py-0.5 rounded ${
                           set.setType === SetType.WARMUP
