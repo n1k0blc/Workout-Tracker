@@ -78,6 +78,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const [restTimerTarget, setRestTimerTarget] = useState(0); // Target seconds
   const [restTimerStartedAt, setRestTimerStartedAt] = useState<number | null>(null);
   const [showRestAlert, setShowRestAlert] = useState(false);
+  
+  // Timestamp-based timers (stored in localStorage for persistence)
+  const [workoutStartTime, setWorkoutStartTime] = useState<number | null>(null);
+  const [restStartTime, setRestStartTime] = useState<number | null>(null);
 
   const workoutTimerRef = useRef<NodeJS.Timeout | null>(null);
   const restTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -122,20 +126,37 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  // Workout Duration Timer (only for live workouts, not past workouts)
+  // Workout Duration Timer (timestamp-based, persists across tab switches and app restarts)
   useEffect(() => {
     if (activeWorkout && activeWorkout.status === 'IN_PROGRESS' && !isPaused && !isPastWorkout) {
+      // Start timer if not already started
+      if (workoutStartTime === null) {
+        const now = Date.now();
+        setWorkoutStartTime(now);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('workoutStartTime', now.toString());
+        }
+      }
+
+      // Update duration every 100ms based on elapsed time
       workoutTimerRef.current = setInterval(() => {
-        setWorkoutDuration((prev) => prev + 1);
-      }, 1000);
+        if (workoutStartTime !== null) {
+          const elapsed = Math.floor((Date.now() - workoutStartTime) / 1000);
+          setWorkoutDuration(elapsed);
+        }
+      }, 100);
     } else {
       if (workoutTimerRef.current) {
         clearInterval(workoutTimerRef.current);
         workoutTimerRef.current = null;
       }
-      // Don't reset duration when pausing
+      // Reset timer when no active workout
       if (!activeWorkout) {
         setWorkoutDuration(0);
+        setWorkoutStartTime(null);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('workoutStartTime');
+        }
       }
     }
 
@@ -144,29 +165,45 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         clearInterval(workoutTimerRef.current);
       }
     };
-  }, [activeWorkout, isPaused, isPastWorkout]);
+  }, [activeWorkout, isPaused, isPastWorkout, workoutStartTime]);
 
-  // Rest Timer (Stopwatch - counts UP) - disabled for past workouts
+  // Rest Timer (timestamp-based, persists across tab switches)
   useEffect(() => {
     if (restTimerStartedAt !== null && !isPaused && !isPastWorkout) {
+      // Set start time if not already set
+      if (restStartTime === null) {
+        setRestStartTime(restTimerStartedAt);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('restStartTime', restTimerStartedAt.toString());
+          localStorage.setItem('restTimerTarget', restTimerTarget.toString());
+        }
+      }
+
+      // Update rest timer every 100ms based on elapsed time
       restTimerRef.current = setInterval(() => {
-        setRestTimer((prev) => {
-          const newValue = prev + 1;
+        if (restStartTime !== null) {
+          const elapsed = Math.floor((Date.now() - restStartTime) / 1000);
+          setRestTimer(elapsed);
+          
           // Show alert when target time is reached
-          if (newValue === restTimerTarget && restTimerTarget > 0) {
+          if (elapsed === restTimerTarget && restTimerTarget > 0 && !showRestAlert) {
             setShowRestAlert(true);
           }
-          return newValue;
-        });
-      }, 1000);
+        }
+      }, 100);
     } else {
       if (restTimerRef.current) {
         clearInterval(restTimerRef.current);
         restTimerRef.current = null;
       }
-      // Don't reset rest timer when pausing
+      // Reset rest timer when stopped
       if (restTimerStartedAt === null) {
         setRestTimer(0);
+        setRestStartTime(null);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('restStartTime');
+          localStorage.removeItem('restTimerTarget');
+        }
       }
     }
 
@@ -175,7 +212,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         clearInterval(restTimerRef.current);
       }
     };
-  }, [restTimerStartedAt, restTimerTarget, isPaused, isPastWorkout]);
+  }, [restTimerStartedAt, restTimerTarget, isPaused, isPastWorkout, restStartTime, showRestAlert]);
 
   const refreshActiveWorkout = async () => {
     // Only try to load active workout if user is logged in (has token)
@@ -214,6 +251,15 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       setPastWorkoutDuration(data.pastWorkoutDuration ?? 0);
       setRemovedPlannedSets(new Map()); // Reset removed sets for new workout
       setUnplannedSets(new Map()); // Reset unplanned sets for new workout
+      
+      // Initialize workout timer
+      if (!data.isPastWorkout) {
+        const now = Date.now();
+        setWorkoutStartTime(now);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('workoutStartTime', now.toString());
+        }
+      }
     } catch (error) {
       console.error('Failed to start workout:', error);
       throw error;
@@ -237,6 +283,15 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       setRestTimerStartedAt(null);
       setRestTimerTarget(0);
       setShowRestAlert(false);
+      setWorkoutStartTime(null);
+      setRestStartTime(null);
+      
+      // Clear localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('workoutStartTime');
+        localStorage.removeItem('restStartTime');
+        localStorage.removeItem('restTimerTarget');
+      }
     } catch (error) {
       console.error('Failed to complete workout:', error);
       throw error;
@@ -257,6 +312,15 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       setRestTimerStartedAt(null);
       setRestTimerTarget(0);
       setShowRestAlert(false);
+      setWorkoutStartTime(null);
+      setRestStartTime(null);
+      
+      // Clear localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('workoutStartTime');
+        localStorage.removeItem('restStartTime');
+        localStorage.removeItem('restTimerTarget');
+      }
     } catch (error) {
       console.error('Failed to discard workout:', error);
       throw error;
@@ -441,6 +505,27 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const dismissRestAlert = () => {
     setShowRestAlert(false);
   };
+
+  // Restore timers from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedWorkoutStartTime = localStorage.getItem('workoutStartTime');
+      const savedRestStartTime = localStorage.getItem('restStartTime');
+      const savedRestTarget = localStorage.getItem('restTimerTarget');
+
+      if (savedWorkoutStartTime) {
+        setWorkoutStartTime(parseInt(savedWorkoutStartTime));
+      }
+
+      if (savedRestStartTime) {
+        setRestStartTime(parseInt(savedRestStartTime));
+        setRestTimerStartedAt(parseInt(savedRestStartTime));
+        if (savedRestTarget) {
+          setRestTimerTarget(parseInt(savedRestTarget));
+        }
+      }
+    }
+  }, []);
 
   useEffect(() => {
     // Load active workout on mount

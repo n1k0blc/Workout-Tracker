@@ -163,9 +163,7 @@ export function BlueprintExerciseCard({
                 className="bg-gray-50 rounded-lg p-3 border border-gray-200"
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-600">
-                    Satz {set.order}
-                  </span>
+                  <div className="flex-1"></div>
                   <button
                     onClick={() => handleRemoveSet(setIdx)}
                     className="text-red-600 hover:text-red-800 text-xs"

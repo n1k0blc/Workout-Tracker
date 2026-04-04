@@ -180,9 +180,6 @@ export default function WorkoutDetailPage() {
                               }`}
                             >
                               <div className="flex items-center gap-4">
-                                <span className="text-sm font-medium text-gray-700">
-                                  Satz {set.setNumber}
-                                </span>
                                 <span
                                   className={`text-xs px-2 py-0.5 rounded ${
                                     set.setType === SetType.WARMUP

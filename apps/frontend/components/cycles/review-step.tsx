@@ -127,7 +127,6 @@ export default function ReviewStep({
                       </div>
                       {ex.sets.map((set, setIdx) => (
                         <div key={setIdx} className="bg-gray-50 rounded p-2 text-sm">
-                          <span className="font-medium">Satz {set.order}:</span>{' '}
                           <span className={set.setType === 'WARMUP' ? 'text-orange-600' : 'text-blue-600'}>
                             {set.setType === 'WARMUP' ? 'Aufwärmen' : 'Arbeit'}
                           </span>
