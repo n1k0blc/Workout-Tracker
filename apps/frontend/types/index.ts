@@ -179,6 +179,7 @@ export interface WorkoutDay {
   id: string;
   weekday: number;
   name: string;
+  plannedHomeGymId?: string;
   blueprint?: WorkoutBlueprint;
 }
 
