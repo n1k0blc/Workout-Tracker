@@ -42,6 +42,10 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-https://workout.nikobjelic.com}
     ports:
       - "3001:3001"
+    volumes:
+      # CSV Dateien für Exercise Migration (read-only)
+      - ./data/Exercises.csv:/app/Exercises.csv:ro
+      - ./data/Exercises_old.csv:/app/Exercises_old.csv:ro
     depends_on:
       postgres:
         condition: service_healthy
