@@ -1,29 +1,49 @@
 'use client';
 
-export type GymLocation = 'HOME' | 'OTHER';
+import { useAuth } from '@/lib/auth-context';
+import { HomeGym } from '@/types';
 
 interface GymLocationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectGym: (location: GymLocation) => void;
+  onSelectGym: (homeGymId: string | null) => void;
+  plannedHomeGymId?: string | null;
 }
 
 export default function GymLocationModal({
   isOpen,
   onClose,
   onSelectGym,
+  plannedHomeGymId,
 }: GymLocationModalProps) {
+  const { user } = useAuth();
+
   if (!isOpen) return null;
+
+  // Sort home gyms alphabetically
+  const homeGyms = [...(user?.homeGyms || [])].sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 relative">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 relative max-h-[90vh] overflow-y-auto">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
         >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <svg
+            className="w-6 h-6"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         </button>
 
@@ -34,20 +54,33 @@ export default function GymLocationModal({
           Wähle dein Trainingsort aus
         </p>
 
-        <div className="space-y-4">
-          <button
-            onClick={() => onSelectGym('HOME')}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-6 px-6 rounded-lg transition-colors flex flex-col items-center gap-2 text-lg"
-          >
-            <span className="text-3xl">🏠</span>
-            <span>Home Gym</span>
-          </button>
+        <div className="space-y-3">
+          {/* Home Gyms */}
+          {homeGyms.map((gym) => {
+            const isRecommended = plannedHomeGymId === gym.id;
+            return (
+              <button
+                key={gym.id}
+                onClick={() => onSelectGym(gym.id)}
+                className="relative w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold py-5 px-6 rounded-lg transition-colors flex flex-col items-center gap-1 text-lg"
+              >
+                {isRecommended && (
+                  <span className="absolute top-2 right-2 text-xs bg-white text-violet-600 px-2 py-1 rounded-full font-medium">
+                    Heute empfohlen
+                  </span>
+                )}
+                <span className="text-2xl">🏠</span>
+                <span>{gym.name}</span>
+              </button>
+            );
+          })}
 
+          {/* Other Gym */}
           <button
-            onClick={() => onSelectGym('OTHER')}
-            className="w-full bg-gray-600 hover:bg-gray-700 text-white font-semibold py-6 px-6 rounded-lg transition-colors flex flex-col items-center gap-2 text-lg"
+            onClick={() => onSelectGym(null)}
+            className="w-full bg-gray-600 hover:bg-gray-700 text-white font-semibold py-5 px-6 rounded-lg transition-colors flex flex-col items-center gap-1 text-lg"
           >
-            <span className="text-3xl">🏋️</span>
+            <span className="text-2xl">🏋️</span>
             <span>Anderes Gym</span>
           </button>
         </div>

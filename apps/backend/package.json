@@ -21,7 +21,9 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "prisma:seed": "ts-node prisma/seed.ts",
-    "migrate:prod": "ts-node scripts/migrate-production-exercises.ts"
+    "migrate:prod": "ts-node scripts/migrate-production-exercises.ts",
+    "migrate:home-gyms": "ts-node migrate-home-gyms.ts",
+    "migrate:exercise-flags": "ts-node update-exercise-flags.ts"
   },
   "keywords": [
     "workout",

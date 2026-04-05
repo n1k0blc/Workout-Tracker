@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuth } from '@/lib/auth-context';
 import { CycleFormData, WorkoutDayData } from './cycle-wizard';
 
 interface WorkoutDaysStepProps {
@@ -14,6 +15,7 @@ export default function WorkoutDaysStep({
   onNext,
   onBack,
 }: WorkoutDaysStepProps) {
+  const { user } = useAuth();
   const [selectedDays, setSelectedDays] = useState<number[]>(
     formData.workoutDays.map((d) => d.weekday)
   );
@@ -22,6 +24,17 @@ export default function WorkoutDaysStep({
       (acc, d) => ({ ...acc, [d.weekday]: d.name }),
       {}
     )
+  );
+  const [dayGyms, setDayGyms] = useState<Record<number, string>>(
+    formData.workoutDays.reduce(
+      (acc, d) => ({ ...acc, [d.weekday]: d.plannedHomeGymId || '' }),
+      {}
+    )
+  );
+
+  // Sort home gyms alphabetically
+  const homeGyms = [...(user?.homeGyms || [])].sort((a, b) =>
+    a.name.localeCompare(b.name)
   );
 
   const weekdays = [
@@ -40,13 +53,24 @@ export default function WorkoutDaysStep({
       const newDayNames = { ...dayNames };
       delete newDayNames[day];
       setDayNames(newDayNames);
+      const newDayGyms = { ...dayGyms };
+      delete newDayGyms[day];
+      setDayGyms(newDayGyms);
     } else {
       setSelectedDays([...selectedDays, day]);
+      // Set first home gym as default
+      if (homeGyms.length > 0) {
+        setDayGyms({ ...dayGyms, [day]: homeGyms[0].id });
+      }
     }
   };
 
   const updateDayName = (day: number, name: string) => {
     setDayNames({ ...dayNames, [day]: name });
+  };
+
+  const updateDayGym = (day: number, gymId: string) => {
+    setDayGyms({ ...dayGyms, [day]: gymId });
   };
 
   const handleNext = () => {
@@ -63,6 +87,7 @@ export default function WorkoutDaysStep({
         return {
           weekday: day,
           name: dayNames[day] || weekdays.find((w) => w.value === day)?.label || `Tag ${index + 1}`,
+          plannedHomeGymId: dayGyms[day] || (homeGyms.length > 0 ? homeGyms[0].id : undefined),
           blueprint: existingDay?.blueprint || { exercises: [] },
         };
       });
@@ -110,15 +135,30 @@ export default function WorkoutDaysStep({
                       {weekday.label}
                     </label>
                     {selectedDays.includes(weekday.value) && (
-                      <input
-                        type="text"
-                        value={dayNames[weekday.value] || ''}
-                        onChange={(e) =>
-                          updateDayName(weekday.value, e.target.value)
-                        }
-                        placeholder={`z.B. Push, Pull, Legs, ...`}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                      />
+                      <div className="space-y-2">
+                        <input
+                          type="text"
+                          value={dayNames[weekday.value] || ''}
+                          onChange={(e) =>
+                            updateDayName(weekday.value, e.target.value)
+                          }
+                          placeholder={`z.B. Push, Pull, Legs, ...`}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        />
+                        <select
+                          value={dayGyms[weekday.value] || ''}
+                          onChange={(e) =>
+                            updateDayGym(weekday.value, e.target.value)
+                          }
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white"
+                        >
+                          {homeGyms.map((gym) => (
+                            <option key={gym.id} value={gym.id}>
+                              {gym.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     )}
                   </div>
                 </div>

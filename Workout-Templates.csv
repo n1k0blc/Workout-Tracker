@@ -1,0 +1,108 @@
+﻿WorkoutID;WorkoutName;ExerciseID;ExcerciseName;WarmUpSet;WorkingSet;Reps;Weight;RIR
+1;Upper;55;Langhantel Schrägbankdrücken;true;false;10;30;0
+1;Upper;55;Langhantel Schrägbankdrücken;true;false;6;50;0
+1;Upper;55;Langhantel Schrägbankdrücken;false;true;6;70;2
+1;Upper;55;Langhantel Schrägbankdrücken;false;true;6;70;1
+1;Upper;55;Langhantel Schrägbankdrücken;false;true;6;70;0
+1;Upper;48;Kabel Flies;true;false;10;20;0
+1;Upper;48;Kabel Flies;false;true;10;35;2
+1;Upper;48;Kabel Flies;false;true;10;35;2
+1;Upper;5;Latzug breiter Griff;true;false;10;25;0
+1;Upper;5;Latzug breiter Griff;true;false;6;40;0
+1;Upper;5;Latzug breiter Griff;false;true;8;50;2
+1;Upper;5;Latzug breiter Griff;false;true;8;50;1
+1;Upper;5;Latzug breiter Griff;false;true;8;50;0
+1;Upper;89;Kabel Seitheben;true;false;10;7,5;0
+1;Upper;89;Kabel Seitheben;false;true;10;12,5;2
+1;Upper;89;Kabel Seitheben;false;true;10;12,5;2
+1;Upper;10;Langhantel Rudern;true;false;10;40;0
+1;Upper;10;Langhantel Rudern;false;true;8;70;2
+1;Upper;10;Langhantel Rudern;false;true;8;70;1
+1;Upper;108;Kabel Bar Überkopf Trizeps Extension;true;false;10;20;0
+1;Upper;108;Kabel Bar Überkopf Trizeps Extension;false;true;10;30;2
+1;Upper;108;Kabel Bar Überkopf Trizeps Extension;false;true;10;30;2
+1;Upper;35;Bayesian Curl;true;false;10;10;0
+1;Upper;35;Bayesian Curl;false;true;10;20;2
+1;Upper;35;Bayesian Curl;false;true;10;20;2
+2;Lower;63;Beinbeuger liegend;true;false;10;60;0
+2;Lower;63;Beinbeuger liegend;false;true;10;85;0
+2;Lower;63;Beinbeuger liegend;false;true;10;85;0
+2;Lower;83;Smith Maschine Squat;true;false;10;30;0
+2;Lower;83;Smith Maschine Squat;true;false;6;60;0
+2;Lower;83;Smith Maschine Squat;false;true;10;90;2
+2;Lower;83;Smith Maschine Squat;false;true;10;90;1
+2;Lower;83;Smith Maschine Squat;false;true;10;90;0
+2;Lower;20;Langhantel Romanian Deadlift;true;false;10;60;0
+2;Lower;20;Langhantel Romanian Deadlift;true;false;6;80;0
+2;Lower;20;Langhantel Romanian Deadlift;false;true;10;100;2
+2;Lower;20;Langhantel Romanian Deadlift;false;true;10;100;1
+2;Lower;20;Langhantel Romanian Deadlift;false;true;10;100;0
+2;Lower;84;Beinstrecker;true;false;10;75;0
+2;Lower;84;Beinstrecker;false;true;10;115;2
+2;Lower;84;Beinstrecker;false;true;10;115;2
+2;Lower;87;Smith Maschine Wadenheben;true;false;10;50;0
+2;Lower;87;Smith Maschine Wadenheben;false;true;10;90;2
+2;Lower;87;Smith Maschine Wadenheben;false;true;10;90;2
+2;Lower;1;Kabel Crunch;true;false;10;25;0
+2;Lower;1;Kabel Crunch;false;true;10;43;2
+2;Lower;1;Kabel Crunch;false;true;10;43;2
+3;Pull;4;Latzug enger Griff;true;false;10;25;0
+3;Pull;4;Latzug enger Griff;true;false;6;40;0
+3;Pull;4;Latzug enger Griff;false;true;10;50;1
+3;Pull;4;Latzug enger Griff;false;true;10;50;0
+3;Pull;14;Maschine Low Row;true;false;10;70;0
+3;Pull;14;Maschine Low Row;false;true;10;130;2
+3;Pull;14;Maschine Low Row;false;true;10;130;1
+3;Pull;14;Maschine Low Row;false;true;10;130;0
+3;Pull;6;Kabel Rudern enger Griff;true;false;10;25;0
+3;Pull;6;Kabel Rudern enger Griff;false;true;10;50;1
+3;Pull;6;Kabel Rudern enger Griff;false;true;10;50;0
+3;Pull;101;Langhantel Shrug;false;true;10;80;2
+3;Pull;101;Langhantel Shrug;false;true;10;80;2
+3;Pull;34;Kabel Bar Bizeps Curl;true;false;10;12,5;0
+3;Pull;34;Kabel Bar Bizeps Curl;false;true;10;32,5;2
+3;Pull;34;Kabel Bar Bizeps Curl;false;true;10;32,5;0
+3;Pull;45;Maschine Preacher Curl;true;false;10;15;0
+3;Pull;45;Maschine Preacher Curl;false;true;10;30;0
+4;Push;54;Langhantel Bankdrücken;true;false;10;30;0
+4;Push;54;Langhantel Bankdrücken;true;false;6;50;0
+4;Push;54;Langhantel Bankdrücken;false;true;10;70;2
+4;Push;54;Langhantel Bankdrücken;false;true;10;70;1
+4;Push;54;Langhantel Bankdrücken;false;true;10;70;0
+4;Push;97;Maschine Schulterpresse;true;false;10;25;0
+4;Push;97;Maschine Schulterpresse;false;true;8;50;2
+4;Push;97;Maschine Schulterpresse;false;true;8;50;0
+4;Push;56;Butterfly;true;false;10;60;0
+4;Push;56;Butterfly;false;true;10;105;0
+4;Push;56;Butterfly;false;true;10;105;0
+4;Push;89;Kabel Seitheben;true;false;10;7,5;0
+4;Push;89;Kabel Seitheben;false;true;10;12,5;2
+4;Push;89;Kabel Seitheben;false;true;10;12,5;2
+4;Push;108;Kabel Bar Überkopf Trizeps Extension;true;false;10;20;0
+4;Push;108;Kabel Bar Überkopf Trizeps Extension;false;true;10;30;2
+4;Push;108;Kabel Bar Überkopf Trizeps Extension;false;true;10;30;2
+4;Push;105;Unilateral Trizeps Kabel Kickbacks;true;false;10;5;0
+4;Push;105;Unilateral Trizeps Kabel Kickbacks;false;true;10;12,5;0
+5;Legs;77;Beinpresse;true;false;10;150;0
+5;Legs;77;Beinpresse;true;false;6;250;0
+5;Legs;77;Beinpresse;false;true;10;300;2
+5;Legs;77;Beinpresse;false;true;10;300;1
+5;Legs;77;Beinpresse;false;true;10;300;0
+5;Legs;62;Beinbeuger sitzend;true;false;10;25;0
+5;Legs;62;Beinbeuger sitzend;false;true;10;50;2
+5;Legs;62;Beinbeuger sitzend;false;true;10;50;0
+5;Legs;69;Kurzhantel Bulgarian Split Squat;true;false;10;6;0
+5;Legs;69;Kurzhantel Bulgarian Split Squat;false;true;10;12;2
+5;Legs;69;Kurzhantel Bulgarian Split Squat;false;true;10;12;0
+5;Legs;84;Beinstrecker;true;false;10;75;0
+5;Legs;84;Beinstrecker;false;true;10;115;2
+5;Legs;84;Beinstrecker;false;true;10;115;2
+5;Legs;79;Hüftabduktion;true;false;10;60;0
+5;Legs;79;Hüftabduktion;false;true;10;105;0
+5;Legs;79;Hüftabduktion;false;true;10;105;0
+5;Legs;80;Hüftadduktion;true;false;10;60;0
+5;Legs;80;Hüftadduktion;false;true;10;105;0
+5;Legs;80;Hüftadduktion;false;true;10;105;0
+5;Legs;88;Wadenheben Beinpresse;true;false;10;150;0
+5;Legs;88;Wadenheben Beinpresse;false;true;10;270;0
+5;Legs;88;Wadenheben Beinpresse;false;true;10;270;0

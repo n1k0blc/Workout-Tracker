@@ -235,7 +235,7 @@ export default function HistoryPage() {
                           href={`/history/${workout.id}`}
                           className="flex-1"
                         >
-                          <div className="flex items-center gap-3 mb-2">
+                          <div className="flex items-center gap-3 mb-2 flex-wrap">
                             <h3 className="text-lg font-semibold text-gray-900">
                               {workout.isFreeWorkout
                                 ? 'Freies Workout'
@@ -244,6 +244,15 @@ export default function HistoryPage() {
                             {workout.cycleName && (
                               <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
                                 {workout.cycleName}
+                              </span>
+                            )}
+                            {workout.homeGym ? (
+                              <span className="text-xs bg-violet-100 text-violet-800 px-2 py-1 rounded">
+                                {workout.homeGym.name}
+                              </span>
+                            ) : (
+                              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                                Anderes Gym
                               </span>
                             )}
                           </div>

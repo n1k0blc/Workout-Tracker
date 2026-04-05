@@ -1,6 +1,11 @@
 import { SetType } from '../../common/types';
 import { CycleStatus } from '@prisma/client';
 
+export class HomeGymDto {
+  id: string;
+  name: string;
+}
+
 export class BlueprintSetResponseDto {
   id: string;
   order: number;
@@ -29,6 +34,8 @@ export class WorkoutDayResponseDto {
   id: string;
   weekday: number;
   name: string;
+  plannedHomeGymId?: string;
+  plannedHomeGym?: HomeGymDto;
   blueprint?: WorkoutBlueprintResponseDto;
 }
 

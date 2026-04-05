@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { Workout, SetType, GymLocation } from '@/types';
+import { Workout, SetType } from '@/types';
 import { apiClient } from '@/lib/api';
 
 interface WorkoutContextType {
@@ -21,7 +21,7 @@ interface WorkoutContextType {
     cycleId?: string;
     workoutDayId?: string;
     isFreeWorkout: boolean;
-    gymLocation: GymLocation;
+    homeGymId: string | null;
     isPastWorkout?: boolean;
     pastWorkoutDate?: string;
     pastWorkoutDuration?: number;
@@ -237,7 +237,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     cycleId?: string;
     workoutDayId?: string;
     isFreeWorkout: boolean;
-    gymLocation: GymLocation;
+    homeGymId: string | null;
     isPastWorkout?: boolean;
     pastWorkoutDate?: string;
     pastWorkoutDuration?: number;

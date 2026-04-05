@@ -7,6 +7,7 @@ export interface SuggestedWorkout {
   workoutDayId: string;
   workoutDayName: string;
   weekday: number;
+  plannedHomeGymId?: string | null;
   exercises: {
     exerciseId: string;
     exerciseName: string;
@@ -173,6 +174,7 @@ export class WorkoutEngineService {
       workoutDayId: todaysWorkoutDay.id,
       workoutDayName: todaysWorkoutDay.name,
       weekday: todaysWorkoutDay.weekday,
+      plannedHomeGymId: todaysWorkoutDay.plannedHomeGymId,
       exercises,
     };
   }

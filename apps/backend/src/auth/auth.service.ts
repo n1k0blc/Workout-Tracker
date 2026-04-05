@@ -17,7 +17,7 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
-    const { email, password } = registerDto;
+    const { email, password, firstName, lastName, dateOfBirth, height, weight, homeGyms } = registerDto;
 
     // Check if user already exists
     const existingUser = await this.prisma.user.findUnique({
@@ -31,12 +31,25 @@ export class AuthService {
     // Hash password
     const passwordHash = await this.hashPassword(password);
 
-    // Create user
+    // Create user with profile data and home gyms in a transaction
     try {
       const user = await this.prisma.user.create({
         data: {
           email,
           passwordHash,
+          firstName,
+          lastName,
+          dateOfBirth: new Date(dateOfBirth),
+          height,
+          weight,
+          homeGyms: {
+            create: homeGyms.map((gym) => ({
+              name: gym.name,
+            })),
+          },
+        },
+        include: {
+          homeGyms: true,
         },
       });
 

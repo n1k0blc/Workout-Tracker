@@ -7,11 +7,9 @@ import {
   ArrayMinSize,
   IsInt,
   Min,
-  IsEnum,
   IsDateString,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { GymLocation } from './workout-response.dto';
 
 export class StartWorkoutExerciseDto {
   @IsString()
@@ -42,8 +40,9 @@ export class StartWorkoutDto {
   @ArrayMinSize(1)
   exercises?: StartWorkoutExerciseDto[];
 
-  @IsEnum(GymLocation)
-  gymLocation: GymLocation;
+  @IsOptional()
+  @IsString()
+  homeGymId?: string;
 
   @IsOptional()
   @IsBoolean()
