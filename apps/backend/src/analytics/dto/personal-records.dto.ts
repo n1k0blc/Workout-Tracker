@@ -1,6 +1,8 @@
 export class PersonalRecord {
   exerciseId: string;
   exerciseName: string;
+  isUnilateral: boolean;
+  isDoubleWeight: boolean;
   type: 'weight' | 'reps' | 'volume' | 'one_rm';
   value: number;
   date: Date;

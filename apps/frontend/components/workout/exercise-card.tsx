@@ -278,6 +278,14 @@ export default function ExerciseCard({
     const contextUnplannedForExercise = contextUnplannedSets.get(exercise.id) || new Set();
     contextUnplannedForExercise.forEach(setNum => setsToLog.add(setNum));
     
+    // For free workouts (no planned sets): consider complete if there are logged sets
+    // and no pending unplanned sets
+    if (!hasPlannedSets) {
+      const hasLoggedSets = exercise.sets && exercise.sets.length > 0;
+      const noPendingUnplannedSets = contextUnplannedForExercise.size === 0;
+      return hasLoggedSets && noPendingUnplannedSets;
+    }
+    
     // If there are no sets to log, exercise is not complete
     if (setsToLog.size === 0) {
       return false;

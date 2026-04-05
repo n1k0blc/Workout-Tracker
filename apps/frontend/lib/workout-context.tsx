@@ -445,10 +445,18 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
       // Start new rest timer with this set's planned rest duration
       if (data.plannedRestAfterSet !== undefined && data.plannedRestAfterSet > 0) {
-        setRestTimerStartedAt(Date.now());
+        const now = Date.now();
+        setRestTimerStartedAt(now);
+        setRestStartTime(now);
         setRestTimerTarget(data.plannedRestAfterSet);
         setRestTimer(0);
         setShowRestAlert(false);
+        
+        // Persist to localStorage
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('restStartTime', now.toString());
+          localStorage.setItem('restTimerTarget', data.plannedRestAfterSet.toString());
+        }
       }
     } catch (error) {
       console.error('Failed to log set:', error);

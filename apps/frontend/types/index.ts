@@ -198,6 +198,8 @@ export interface VolumeAnalytics {
 export interface PersonalRecord {
   exerciseId: string;
   exerciseName: string;
+  isUnilateral: boolean;
+  isDoubleWeight: boolean;
   type: 'weight' | 'reps' | 'volume' | 'one_rm';
   value: number;
   date: string;

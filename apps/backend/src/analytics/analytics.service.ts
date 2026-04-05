@@ -256,6 +256,8 @@ export class AnalyticsService {
             prsByExercise.set(exerciseId, {
               exerciseId,
               exerciseName,
+              isUnilateral: exerciseLog.exercise.isUnilateral,
+              isDoubleWeight: exerciseLog.exercise.isDoubleWeight,
               type: 'weight',
               value: adjustedWeight,
               date: workout.date,
