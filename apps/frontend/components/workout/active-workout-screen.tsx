@@ -61,7 +61,7 @@ export default function ActiveWorkoutScreen() {
     return null;
   }
 
-  const hasBlueprint = !activeWorkout.isFreeWorkout && activeWorkout.workoutDayId && activeWorkout.gymLocation === 'HOME';
+  const hasBlueprint = !activeWorkout.isFreeWorkout && activeWorkout.workoutDayId && activeWorkout.homeGymId !== null;
 
   // Check if all exercises have at least one logged set AND all planned sets are either logged or removed
   // AND all unplanned sets are either logged or removed
