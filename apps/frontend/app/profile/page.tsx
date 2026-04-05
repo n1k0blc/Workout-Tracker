@@ -281,7 +281,7 @@ export default function ProfilePage() {
                 {isEditingProfile ? (
                   <DatePicker
                     selected={dateOfBirth}
-                    onChange={(date) => setDateOfBirth(date)}
+                    onChange={(date: Date | null) => setDateOfBirth(date)}
                     dateFormat="dd.MM.yyyy"
                     showYearDropdown
                     scrollableYearDropdown
