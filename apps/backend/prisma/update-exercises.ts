@@ -65,8 +65,15 @@ async function main() {
   console.log('🔄 Start updating exercises...');
 
   // Read old CSV file
-  const oldCsvPath = path.join(__dirname, '../../../Exercises_old.csv');
-  const newCsvPath = path.join(__dirname, '../../../Exercises.csv');
+  // In Docker: /app/Exercises_old.csv (via volume mount)
+  // Local: ../../../Exercises_old.csv (from project root)
+  const oldCsvPath = process.env.NODE_ENV === 'production' 
+    ? '/app/Exercises_old.csv'
+    : path.join(__dirname, '../../../Exercises_old.csv');
+    
+  const newCsvPath = process.env.NODE_ENV === 'production'
+    ? '/app/Exercises.csv'
+    : path.join(__dirname, '../../../Exercises.csv');
 
   if (!fs.existsSync(oldCsvPath)) {
     console.log('❌ Exercises_old.csv not found at:', oldCsvPath);
