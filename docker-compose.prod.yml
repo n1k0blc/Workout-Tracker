@@ -44,8 +44,9 @@ services:
       - "3001:3001"
     volumes:
       # CSV Dateien für Exercise Migration (read-only)
-      - ./data/Exercises.csv:/app/Exercises.csv:ro
-      - ./data/Exercises_old.csv:/app/Exercises_old.csv:ro
+      # Liegen im Repo-Root, werden mit git pull aktualisiert
+      - ./Exercises.csv:/app/Exercises.csv:ro
+      - ./Exercises_old.csv:/app/Exercises_old.csv:ro
     depends_on:
       postgres:
         condition: service_healthy
