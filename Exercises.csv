@@ -5,7 +5,7 @@
 4;Latzug enger Griff;Rücken;Kabel;nein;ja;nein
 5;Latzug breiter Griff;Rücken;Kabel;nein;ja;nein
 6;Kabel Rudern enger Griff;Rücken;Kabel;nein;ja;nein
-7;Kabel Rudern Wide breiter Griff;Rücken;Kabel;nein;ja;nein
+7;Kabel Rudern breiter Griff;Rücken;Kabel;nein;ja;nein
 8;Unilateral Kabel Latzug;Rücken;Kabel;nein;ja;nein
 9;Kurzhantel Rudern;Rücken;Kurzhantel;ja;nein;nein
 10;Langhantel Rudern;Rücken;Langhantel;nein;ja;nein
@@ -106,8 +106,8 @@
 105;Unilateral Trizeps Kabel Kickbacks;Trizeps;Kabel;ja;nein;nein
 106;Kabel Bar Trizeps Pushdown;Trizeps;Kabel;nein;ja;nein
 107;Kabel Seil Trizeps Pushdown;Trizeps;Kabel;nein;ja;nein
-108;Kabel Bar Überkopf Trizeps Externsion;Trizeps;Kabel;nein;ja;nein
-109;Kabel Seil Overhead Trizeps Externsion;Trizeps;Kabel;nein;ja;nein
+108;Kabel Bar Überkopf Trizeps Extension;Trizeps;Kabel;nein;ja;nein
+109;Kabel Seil Overhead Trizeps Extension;Trizeps;Kabel;nein;ja;nein
 110;Dips;Trizeps;Körpergewicht;nein;ja;nein
 111;Kurzhantel Skull Crushers;Trizeps;Kurzhantel;nein;ja;nein
 112;Kurzhantel Trizeps Kickbacks;Trizeps;Kurzhantel;ja;nein;nein

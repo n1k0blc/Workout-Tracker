@@ -4,6 +4,7 @@ import { ProtectedRoute } from '@/components/protected-route';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
 import { WorkoutCycle, Exercise, BlueprintExercise, SetType } from '@/types';
 import {
   DndContext,
@@ -26,12 +27,14 @@ import ExerciseSelectionModal from '@/components/workout/exercise-selection-moda
 export default function EditBlueprintPage() {
   const params = useParams();
   const router = useRouter();
+  const { user } = useAuth();
   const cycleId = params.id as string;
   const workoutDayId = params.workoutDayId as string;
 
   const [cycle, setCycle] = useState<WorkoutCycle | null>(null);
   const [workoutDayName, setWorkoutDayName] = useState<string>('');
   const [plannedWeekday, setPlannedWeekday] = useState<number>(1);
+  const [plannedHomeGymId, setPlannedHomeGymId] = useState<string>('');
   const [exercises, setExercises] = useState<BlueprintExercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -65,6 +68,7 @@ export default function EditBlueprintPage() {
 
       setWorkoutDayName(workoutDay.name);
       setPlannedWeekday(workoutDay.weekday);
+      setPlannedHomeGymId(workoutDay.plannedHomeGymId || (user?.homeGyms && user.homeGyms.length > 0 ? user.homeGyms[0].id : ''));
 
       if (workoutDay.blueprint) {
         setExercises(workoutDay.blueprint.exercises);
@@ -180,6 +184,7 @@ export default function EditBlueprintPage() {
       await apiClient.updateWorkoutDay(cycleId, workoutDayId, {
         name: workoutDayName.trim(),
         weekday: plannedWeekday,
+        plannedHomeGymId: plannedHomeGymId || undefined,
       });
       
       // Transform exercises to match API format
@@ -252,7 +257,7 @@ export default function EditBlueprintPage() {
               <h3 className="text-lg font-medium text-gray-900 mb-4">
                 Workout-Einstellungen
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Workout-Name
@@ -281,6 +286,28 @@ export default function EditBlueprintPage() {
                     <option value={5}>Freitag</option>
                     <option value={6}>Samstag</option>
                     <option value={0}>Sonntag</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Geplantes Gym
+                  </label>
+                  <select
+                    value={plannedHomeGymId}
+                    onChange={(e) => setPlannedHomeGymId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  >
+                    {user?.homeGyms && user.homeGyms.length > 0 ? (
+                      [...user.homeGyms]
+                        .sort((a, b) => a.name.localeCompare(b.name))
+                        .map((gym) => (
+                          <option key={gym.id} value={gym.id}>
+                            {gym.name}
+                          </option>
+                        ))
+                    ) : (
+                      <option value="">Keine Gyms verfügbar</option>
+                    )}
                   </select>
                 </div>
               </div>

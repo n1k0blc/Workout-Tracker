@@ -1,4 +1,4 @@
-import { IsString, IsInt, Min, Max } from 'class-validator';
+import { IsString, IsInt, Min, Max, IsOptional } from 'class-validator';
 
 export class UpdateWorkoutDayDto {
   @IsString()
@@ -8,4 +8,8 @@ export class UpdateWorkoutDayDto {
   @Min(0)
   @Max(6)
   weekday: number;
+
+  @IsOptional()
+  @IsString()
+  plannedHomeGymId?: string;
 }

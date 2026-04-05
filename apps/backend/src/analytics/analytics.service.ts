@@ -127,7 +127,7 @@ export class AnalyticsService {
       where: {
         userId,
         status: 'COMPLETED' as any,
-        gymLocation: 'HOME' as any, // Only count 1RM from HOME gym
+        homeGymId: { not: null }, // Only count 1RM from home gym workouts
         exercises: {
           some: {
             exerciseId,
@@ -208,7 +208,7 @@ export class AnalyticsService {
       where: {
         userId,
         status: 'COMPLETED' as any,
-        gymLocation: 'HOME' as any, // Only count PRs from HOME gym
+        homeGymId: { not: null }, // Only count PRs from home gym workouts
       },
       include: {
         exercises: {
@@ -256,6 +256,8 @@ export class AnalyticsService {
             prsByExercise.set(exerciseId, {
               exerciseId,
               exerciseName,
+              isUnilateral: exerciseLog.exercise.isUnilateral,
+              isDoubleWeight: exerciseLog.exercise.isDoubleWeight,
               type: 'weight',
               value: adjustedWeight,
               date: workout.date,

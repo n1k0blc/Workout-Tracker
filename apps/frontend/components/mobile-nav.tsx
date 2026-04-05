@@ -15,6 +15,7 @@ import {
   History,
   BarChart3,
   LogOut,
+  UserCircle,
 } from 'lucide-react';
 
 export function MobileNav() {
@@ -28,8 +29,13 @@ export function MobileNav() {
     setIsOpen(false);
   }, [pathname]);
 
-  // Don't show navigation on workout page or when there's an active workout
-  if (pathname?.startsWith('/workout') || activeWorkout) {
+  // Don't show navigation on auth pages, workout page, or when there's an active workout
+  if (
+    pathname === '/login' ||
+    pathname === '/register' ||
+    pathname?.startsWith('/workout') ||
+    activeWorkout
+  ) {
     return null;
   }
 
@@ -62,7 +68,13 @@ export function MobileNav() {
           <h1 className="text-lg font-bold text-gray-900 absolute left-1/2 transform -translate-x-1/2">
             Workout Tracker
           </h1>
-          <div className="w-10" /> {/* Spacer for centering */}
+          <Link
+            href="/profile"
+            className="p-2 -mr-2 text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 rounded-md"
+            aria-label="Profil"
+          >
+            <UserCircle className="h-6 w-6" />
+          </Link>
         </div>
       </div>
 
@@ -96,13 +108,13 @@ export function MobileNav() {
               </div>
             </div>
             <div className="flex items-center">
-              <span className="text-sm text-gray-700 mr-4">{user?.email}</span>
-              <button
-                onClick={handleLogout}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              <Link
+                href="/profile"
+                className="p-2 text-gray-600 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 rounded-md"
+                aria-label="Profil"
               >
-                Abmelden
-              </button>
+                <UserCircle className="h-8 w-8" />
+              </Link>
             </div>
           </div>
         </div>

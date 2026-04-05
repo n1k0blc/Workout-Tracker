@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWorkout } from '@/lib/workout-context';
 import { apiClient } from '@/lib/api';
-import { Workout, GymLocation } from '@/types';
+import { Workout } from '@/types';
 import CycleWorkoutSelectionModal from './cycle-workout-selection-modal';
 import GymLocationModal from './gym-location-modal';
 import PastWorkoutSetupModal from './past-workout-setup-modal';
@@ -90,7 +90,7 @@ export default function WorkoutStartScreen() {
     setShowGymLocationModal(true);
   };
 
-  const handleGymLocationSelected = async (gymLocation: GymLocation) => {
+  const handleGymLocationSelected = async (homeGymId: string | null) => {
     if (!pendingWorkoutData) return;
 
     setShowGymLocationModal(false);
@@ -98,7 +98,7 @@ export default function WorkoutStartScreen() {
     try {
       await startWorkout({
         ...pendingWorkoutData,
-        gymLocation,
+        homeGymId,
       });
       setPendingWorkoutData(null);
     } catch (err) {
@@ -335,6 +335,7 @@ export default function WorkoutStartScreen() {
           setPendingWorkoutData(null);
         }}
         onSelectGym={handleGymLocationSelected}
+        plannedHomeGymId={suggestedWorkout?.plannedHomeGymId}
       />
 
       {/* Past Workout Setup Modal */}

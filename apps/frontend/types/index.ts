@@ -2,6 +2,18 @@
 export interface User {
   id: string;
   email: string;
+  firstName?: string;
+  lastName?: string;
+  dateOfBirth?: string;
+  height?: number;
+  weight?: number;
+  createdAt: string;
+  homeGyms?: HomeGym[];
+}
+
+export interface HomeGym {
+  id: string;
+  name: string;
   createdAt: string;
 }
 
@@ -19,6 +31,12 @@ export interface LoginCredentials {
 export interface RegisterCredentials {
   email: string;
   password: string;
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string; // YYYY-MM-DD
+  height: number; // cm
+  weight: number; // kg
+  homeGyms: { name: string }[];
 }
 
 // Exercise Types
@@ -100,15 +118,14 @@ export interface ExerciseLog {
   plannedSets?: PlannedSet[];
 }
 
-export type GymLocation = 'HOME' | 'OTHER';
-
 export interface Workout {
   id: string;
   date: string;
   status: WorkoutStatus;
   isFreeWorkout: boolean;
   totalDuration?: number;
-  gymLocation: GymLocation;
+  homeGymId?: string | null;
+  homeGym?: HomeGym;
   cycleId?: string;
   cycleName?: string;
   workoutDayId?: string;
@@ -123,7 +140,8 @@ export interface WorkoutListItem {
   status: WorkoutStatus;
   isFreeWorkout: boolean;
   totalDuration?: number;
-  gymLocation: GymLocation;
+  homeGymId?: string | null;
+  homeGym?: HomeGym;
   cycleName?: string;
   workoutDayName?: string;
   exerciseCount: number;
@@ -198,6 +216,8 @@ export interface VolumeAnalytics {
 export interface PersonalRecord {
   exerciseId: string;
   exerciseName: string;
+  isUnilateral: boolean;
+  isDoubleWeight: boolean;
   type: 'weight' | 'reps' | 'volume' | 'one_rm';
   value: number;
   date: string;

@@ -12,9 +12,25 @@ model User {
   email         String         @unique
   passwordHash  String
   createdAt     DateTime       @default(now())
+  dateOfBirth   DateTime?
+  firstName     String?
+  height        Int?
+  lastName      String?
+  weight        Float?
   exercises     Exercise[]
+  homeGyms      HomeGym[]
   workouts      Workout[]
   workoutCycles WorkoutCycle[]
+}
+
+model HomeGym {
+  id                 String       @id @default(uuid())
+  name               String
+  userId             String
+  createdAt          DateTime     @default(now())
+  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workouts           Workout[]
+  plannedWorkoutDays WorkoutDay[] @relation("PlannedHomeGym")
 }
 
 model WorkoutCycle {
@@ -32,13 +48,15 @@ model WorkoutCycle {
 }
 
 model WorkoutDay {
-  id        String            @id @default(uuid())
-  weekday   Int
-  name      String
-  cycleId   String
-  workouts  Workout[]
-  blueprint WorkoutBlueprint?
-  cycle     WorkoutCycle      @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  id               String            @id @default(uuid())
+  weekday          Int
+  name             String
+  cycleId          String
+  plannedHomeGymId String?
+  workouts         Workout[]
+  blueprint        WorkoutBlueprint?
+  cycle            WorkoutCycle      @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  plannedHomeGym   HomeGym?          @relation("PlannedHomeGym", fields: [plannedHomeGymId], references: [id])
 }
 
 model WorkoutBlueprint {
@@ -77,13 +95,14 @@ model Workout {
   status        WorkoutStatus
   isFreeWorkout Boolean       @default(false)
   totalDuration Int?
-  gymLocation   GymLocation   @default(HOME)
   userId        String
   cycleId       String?
   workoutDayId  String?
   createdAt     DateTime      @default(now())
+  homeGymId     String?
   exercises     ExerciseLog[]
   cycle         WorkoutCycle? @relation(fields: [cycleId], references: [id])
+  homeGym       HomeGym?      @relation(fields: [homeGymId], references: [id])
   user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   workoutDay    WorkoutDay?   @relation(fields: [workoutDayId], references: [id])
 }
@@ -93,10 +112,10 @@ model Exercise {
   name               String
   muscleGroup        MuscleGroup
   equipment          Equipment
-  isUnilateral       Boolean             @default(false)
-  isDoubleWeight     Boolean             @default(false)
   isCustom           Boolean             @default(false)
   userId             String?
+  isDoubleWeight     Boolean             @default(false)
+  isUnilateral       Boolean             @default(false)
   blueprintExercises BlueprintExercise[]
   user               User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
   exerciseLogs       ExerciseLog[]

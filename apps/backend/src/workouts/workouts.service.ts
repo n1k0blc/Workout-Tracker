@@ -10,7 +10,6 @@ import {
   WorkoutResponseDto,
   WorkoutListItemDto,
   WorkoutStatus,
-  GymLocation,
 } from './dto';
 
 @Injectable()
@@ -47,6 +46,9 @@ export class WorkoutsService {
         workoutDay: {
           select: { name: true },
         },
+        homeGym: {
+          select: { id: true, name: true, createdAt: true },
+        },
         exercises: {
           select: { id: true },
         },
@@ -60,7 +62,12 @@ export class WorkoutsService {
       status: workout.status as WorkoutStatus,
       isFreeWorkout: workout.isFreeWorkout,
       totalDuration: workout.totalDuration,
-      gymLocation: workout.gymLocation as GymLocation,
+      homeGymId: workout.homeGymId,
+      homeGym: workout.homeGym ? {
+        id: workout.homeGym.id,
+        name: workout.homeGym.name,
+        createdAt: workout.homeGym.createdAt,
+      } : undefined,
       cycleName: workout.cycle?.name,
       workoutDayName: workout.workoutDay?.name,
       exerciseCount: workout.exercises.length,
@@ -94,6 +101,9 @@ export class WorkoutsService {
               },
             },
           },
+        },
+        homeGym: {
+          select: { id: true, name: true },
         },
         exercises: {
           include: {
@@ -141,6 +151,9 @@ export class WorkoutsService {
             },
           },
         },
+        homeGym: {
+          select: { id: true, name: true },
+        },
         exercises: {
           include: {
             exercise: {
@@ -167,7 +180,7 @@ export class WorkoutsService {
   }
 
   async start(startWorkoutDto: StartWorkoutDto, userId: string): Promise<WorkoutResponseDto> {
-    const { isFreeWorkout, cycleId, workoutDayId, exercises, gymLocation, isPastWorkout, pastWorkoutDate } = startWorkoutDto;
+    const { isFreeWorkout, cycleId, workoutDayId, exercises, homeGymId, isPastWorkout, pastWorkoutDate } = startWorkoutDto;
 
     // Validate: If not free workout, cycleId and workoutDayId must be provided
     if (!isFreeWorkout && (!cycleId || !workoutDayId)) {
@@ -213,7 +226,7 @@ export class WorkoutsService {
         date: isPastWorkout && pastWorkoutDate ? new Date(pastWorkoutDate) : new Date(),
         status: 'IN_PROGRESS' as any,
         isFreeWorkout: isFreeWorkout ?? false,
-        gymLocation: gymLocation,
+        homeGymId: homeGymId || null,
         cycleId: cycleId || null,
         workoutDayId: workoutDayId || null,
         ...(exercisesToCreate &&
@@ -246,6 +259,9 @@ export class WorkoutsService {
               },
             },
           },
+        },
+        homeGym: {
+          select: { id: true, name: true },
         },
         exercises: {
           include: {
@@ -539,8 +555,8 @@ export class WorkoutsService {
       },
     });
 
-    // Update blueprint if requested (only for HOME gym workouts)
-    if (completeWorkoutDto.updateBlueprint && workout.workoutDayId && workout.gymLocation === 'HOME') {
+    // Update blueprint if requested (only for home gym workouts)
+    if (completeWorkoutDto.updateBlueprint && workout.workoutDayId && workout.homeGymId !== null) {
       await this.updateBlueprintFromWorkout(workoutId, workout.workoutDayId);
     }
 
@@ -674,7 +690,8 @@ export class WorkoutsService {
       status: workout.status as WorkoutStatus,
       isFreeWorkout: workout.isFreeWorkout,
       totalDuration: workout.totalDuration,
-      gymLocation: workout.gymLocation as GymLocation,
+      homeGymId: workout.homeGymId,
+      homeGym: workout.homeGym ? { id: workout.homeGym.id, name: workout.homeGym.name } : undefined,
       cycleId: workout.cycleId,
       cycleName: workout.cycle?.name,
       workoutDayId: workout.workoutDayId,

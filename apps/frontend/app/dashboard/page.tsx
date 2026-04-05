@@ -228,7 +228,9 @@ export default function DashboardPage() {
                                   </div>
                                   <div className="text-sm text-gray-600 mt-1">
                                     {pr.type === 'weight' && `Gewicht: ${pr.value}kg`}
-                                    {pr.type === 'reps' && `Wiederholungen: ${pr.value}`}
+                                    {pr.type === 'reps' && pr.isUnilateral && pr.details?.reps && 
+                                      `Wiederholungen: ${pr.details.reps * 2} (${pr.details.reps}x2)`}
+                                    {pr.type === 'reps' && !pr.isUnilateral && `Wiederholungen: ${pr.value}`}
                                     {pr.type === 'volume' && `Volumen: ${formatNumber(pr.value)}kg`}
                                     {pr.type === 'one_rm' && `1RM: ${pr.value.toFixed(1)}kg`}
                                   </div>

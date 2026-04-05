@@ -53,6 +53,9 @@ export class WorkoutCyclesService {
       include: {
         workoutDays: {
           include: {
+            plannedHomeGym: {
+              select: { id: true, name: true },
+            },
             blueprint: {
               include: {
                 exercises: {
@@ -91,6 +94,9 @@ export class WorkoutCyclesService {
       include: {
         workoutDays: {
           include: {
+            plannedHomeGym: {
+              select: { id: true, name: true },
+            },
             blueprint: {
               include: {
                 exercises: {
@@ -152,6 +158,7 @@ export class WorkoutCyclesService {
           create: workoutDays.map((day) => ({
             weekday: day.weekday,
             name: day.name,
+            plannedHomeGymId: day.plannedHomeGymId || null,
             blueprint: {
               create: {
                 exercises: {
@@ -178,6 +185,9 @@ export class WorkoutCyclesService {
       include: {
         workoutDays: {
           include: {
+            plannedHomeGym: {
+              select: { id: true, name: true },
+            },
             blueprint: {
               include: {
                 exercises: {
@@ -329,6 +339,9 @@ export class WorkoutCyclesService {
       data: {
         name: updateWorkoutDayDto.name,
         weekday: updateWorkoutDayDto.weekday,
+        ...(updateWorkoutDayDto.plannedHomeGymId !== undefined && {
+          plannedHomeGymId: updateWorkoutDayDto.plannedHomeGymId,
+        }),
       },
     });
 
@@ -403,6 +416,8 @@ export class WorkoutCyclesService {
         id: day.id,
         weekday: day.weekday,
         name: day.name,
+        plannedHomeGymId: day.plannedHomeGymId,
+        plannedHomeGym: day.plannedHomeGym ? { id: day.plannedHomeGym.id, name: day.plannedHomeGym.name } : undefined,
         blueprint: day.blueprint
           ? {
               id: day.blueprint.id,

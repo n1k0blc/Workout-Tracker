@@ -9,6 +9,7 @@ import {
   Max,
   ArrayMinSize,
   IsEnum,
+  IsOptional,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { SetType } from '../../common/types';
@@ -62,6 +63,10 @@ export class WorkoutDayDto {
 
   @IsString()
   name: string; // e.g., "Upper Body", "Leg Day"
+
+  @IsOptional()
+  @IsString()
+  plannedHomeGymId?: string;
 
   @IsArray()
   @ValidateNested({ each: true })

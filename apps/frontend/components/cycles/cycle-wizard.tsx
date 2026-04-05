@@ -21,6 +21,7 @@ export interface BlueprintSetData {
 export interface WorkoutDayData {
   weekday: number;
   name: string;
+  plannedHomeGymId?: string;
   blueprint: {
     exercises: Array<{
       exerciseId: string;
@@ -81,6 +82,7 @@ export default function CycleWizard() {
         workoutDays: formData.workoutDays.map((day) => ({
           weekday: day.weekday,
           name: day.name,
+          plannedHomeGymId: day.plannedHomeGymId,
           exercises: day.blueprint.exercises.map((ex) => ({
             exerciseId: ex.exerciseId,
             order: ex.order,

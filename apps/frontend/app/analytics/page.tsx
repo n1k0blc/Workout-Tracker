@@ -391,7 +391,7 @@ export default function AnalyticsPage() {
                                 </div>
                                 {pr.details && pr.details.weight && pr.details.reps && (
                                   <div className="text-xs text-gray-500 mt-1">
-                                    {pr.details.weight}kg × {pr.details.reps} Wdh.
+                                    {pr.details.weight}kg × {pr.isUnilateral ? `${pr.details.reps * 2} (${pr.details.reps}x2)` : pr.details.reps} Wdh.
                                   </div>
                                 )}
                               </div>

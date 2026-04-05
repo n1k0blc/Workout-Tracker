@@ -12,6 +12,7 @@ import {
   PersonalRecordsResponse,
   MuscleGroup,
   Equipment,
+  HomeGym,
 } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
@@ -114,6 +115,44 @@ class ApiClient {
     return this.request<User>('/users/me');
   }
 
+  async updateProfile(data: {
+    firstName?: string;
+    lastName?: string;
+    dateOfBirth?: string;
+    height?: number;
+    weight?: number;
+  }): Promise<User> {
+    return this.request<User>('/users/me', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // HomeGym Methods
+  async getHomeGyms(): Promise<HomeGym[]> {
+    return this.request<HomeGym[]>('/users/me/home-gyms');
+  }
+
+  async createHomeGym(data: { name: string }): Promise<HomeGym> {
+    return this.request<HomeGym>('/users/me/home-gyms', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateHomeGym(id: string, data: { name: string }): Promise<HomeGym> {
+    return this.request<HomeGym>(`/users/me/home-gyms/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteHomeGym(id: string): Promise<void> {
+    await this.request(`/users/me/home-gyms/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Exercise Methods
   async getExercises(params?: {
     search?: string;
@@ -182,7 +221,7 @@ class ApiClient {
     cycleId?: string;
     workoutDayId?: string;
     isFreeWorkout: boolean;
-    gymLocation: 'HOME' | 'OTHER';
+    homeGymId: string | null;
     isPastWorkout?: boolean;
     pastWorkoutDate?: string;
     pastWorkoutDuration?: number;
@@ -409,6 +448,7 @@ class ApiClient {
     data: {
       name: string;
       weekday: number;
+      plannedHomeGymId?: string;
     }
   ): Promise<WorkoutCycle> {
     return this.request<WorkoutCycle>(
