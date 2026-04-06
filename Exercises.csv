@@ -6,7 +6,7 @@
 5;Latzug breiter Griff;Rücken;Kabel;nein;ja;nein
 6;Kabel Rudern enger Griff;Rücken;Kabel;nein;ja;nein
 7;Kabel Rudern breiter Griff;Rücken;Kabel;nein;ja;nein
-8;Unilateral Kabel Latzug;Rücken;Kabel;nein;ja;nein
+8;Unilateral Kabel Latzug;Rücken;Kabel;ja;nein;nein
 9;Kurzhantel Rudern;Rücken;Kurzhantel;ja;nein;nein
 10;Langhantel Rudern;Rücken;Langhantel;nein;ja;nein
 11;Maschine Rudern breiter Griff;Rücken;Maschine;nein;ja;nein
@@ -31,7 +31,7 @@
 30;Kurzhantel Reverse Flies;Rücken;Kurzhantel;nein;ja;ja
 31;Kelso Shrug;Rücken;Maschine;nein;ja;nein
 32;Kabel Kelso Shrug;Rücken;Kabel;nein;ja;nein
-33;Unilateral Butterfly Reverse;Rücken;Maschine;nein;nein;nein
+33;Unilateral Butterfly Reverse;Rücken;Maschine;ja;nein;nein
 34;Kabel Bar Bizeps Curl;Bizeps;Kabel;nein;ja;nein
 35;Bayesian Curl;Bizeps;Kabel;ja;nein;nein
 36;Kabel Hammer Curl;Bizeps;Kabel;nein;ja;nein
