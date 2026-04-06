@@ -109,10 +109,8 @@
 108;Kabel Bar Überkopf Trizeps Extension;Trizeps;Kabel;nein;ja;nein
 109;Kabel Seil Overhead Trizeps Extension;Trizeps;Kabel;nein;ja;nein
 110;Dips;Trizeps;Körpergewicht;nein;ja;nein
-111;Kurzhantel Skull Crushers;Trizeps;Kurzhantel;nein;ja;nein
-112;Kurzhantel Trizeps Kickbacks;Trizeps;Kurzhantel;ja;nein;nein
-113;Kurzhantel Überkopf Extension;Trizeps;Kurzhantel;nein;ja;nein
-114;Langhantel Skull Crushers;Trizeps;Langhantel;nein;ja;nein
-115;Maschine Trizeps Drücken;Trizeps;Maschine;nein;ja;nein
-116;EZ-Bar Skull Crushers;Trizeps;EZ-Bar;nein;ja;nein
-117;EZ-Bar Überkopf Extensions;Trizeps;EZ-Bar;nein;ja;nein
+111;Kurzhantel Trizeps Kickbacks;Trizeps;Kurzhantel;ja;nein;nein
+112;Kurzhantel Überkopf Extension;Trizeps;Kurzhantel;nein;ja;nein
+113;Maschine Trizeps Drücken;Trizeps;Maschine;nein;ja;nein
+114;EZ-Bar Skull Crushers;Trizeps;EZ-Bar;nein;ja;nein
+115;EZ-Bar Überkopf Extensions;Trizeps;EZ-Bar;nein;ja;nein
