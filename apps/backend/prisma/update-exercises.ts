@@ -139,13 +139,24 @@ async function main() {
     }
 
     try {
-      // Find exercise by new name first (if DB was already updated), then try old name
+      // Find exercise: 1) by csvId (most reliable), 2) by new name, 3) by old name
+      const csvId = parseInt(id, 10);
       let existingExercise = await prisma.exercise.findFirst({
         where: {
-          name: newEx.name,
+          csvId: csvId,
           isCustom: false,
         },
       });
+
+      if (!existingExercise) {
+        // Try new name
+        existingExercise = await prisma.exercise.findFirst({
+          where: {
+            name: newEx.name,
+            isCustom: false,
+          },
+        });
+      }
 
       if (!existingExercise) {
         // Try old name as fallback
@@ -158,15 +169,16 @@ async function main() {
       }
 
       if (!existingExercise) {
-        console.log(`⚠️  Exercise not found in DB: ${oldEx.name} / ${newEx.name}`);
+        console.log(`⚠️  Exercise not found in DB: ${oldEx.name} / ${newEx.name} (CSV ID: ${csvId})`);
         notFoundCount++;
         continue;
       }
 
-      // Update exercise
+      // Update exercise (including csvId)
       await prisma.exercise.update({
         where: { id: existingExercise.id },
         data: {
+          csvId: csvId,
           name: newEx.name,
           muscleGroup: muscleGroupMap[newEx.muscleGroup] as any,
           equipment: equipmentMap[newEx.equipment] as any,
@@ -175,7 +187,7 @@ async function main() {
         },
       });
 
-      console.log(`✅ Updated: ${oldEx.name} → ${newEx.name} (unilateral: ${newEx.isUnilateral}, doubleWeight: ${newEx.isDoubleWeight})`);
+      console.log(`✅ Updated: ${oldEx.name} → ${newEx.name} (CSV ID: ${csvId}, unilateral: ${newEx.isUnilateral}, doubleWeight: ${newEx.isDoubleWeight})`);
       successCount++;
     } catch (error: any) {
       console.error(`❌ Failed to update exercise: ${oldEx.name}`, error.message);

@@ -109,6 +109,7 @@ model Workout {
 
 model Exercise {
   id                 String              @id @default(uuid())
+  csvId              Int?                @unique
   name               String
   muscleGroup        MuscleGroup
   equipment          Equipment
