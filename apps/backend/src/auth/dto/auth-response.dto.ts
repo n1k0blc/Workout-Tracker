@@ -1,8 +1,6 @@
+import { UserDto } from '../../users/dto';
+
 export class AuthResponseDto {
   access_token: string;
-  user: {
-    id: string;
-    email: string;
-    createdAt: Date;
-  };
+  user: UserDto;
 }
