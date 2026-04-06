@@ -139,16 +139,26 @@ async function main() {
     }
 
     try {
-      // Find exercise by old name
-      const existingExercise = await prisma.exercise.findFirst({
+      // Find exercise by new name first (if DB was already updated), then try old name
+      let existingExercise = await prisma.exercise.findFirst({
         where: {
-          name: oldEx.name,
+          name: newEx.name,
           isCustom: false,
         },
       });
 
       if (!existingExercise) {
-        console.log(`⚠️  Exercise not found in DB: ${oldEx.name}`);
+        // Try old name as fallback
+        existingExercise = await prisma.exercise.findFirst({
+          where: {
+            name: oldEx.name,
+            isCustom: false,
+          },
+        });
+      }
+
+      if (!existingExercise) {
+        console.log(`⚠️  Exercise not found in DB: ${oldEx.name} / ${newEx.name}`);
         notFoundCount++;
         continue;
       }
