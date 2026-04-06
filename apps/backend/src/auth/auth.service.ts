@@ -48,8 +48,25 @@ export class AuthService {
             })),
           },
         },
-        include: {
-          homeGyms: true,
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          dateOfBirth: true,
+          height: true,
+          weight: true,
+          createdAt: true,
+          homeGyms: {
+            select: {
+              id: true,
+              name: true,
+              createdAt: true,
+            },
+            orderBy: {
+              name: 'asc',
+            },
+          },
         },
       });
 
@@ -58,11 +75,7 @@ export class AuthService {
 
       return {
         access_token,
-        user: {
-          id: user.id,
-          email: user.email,
-          createdAt: user.createdAt,
-        },
+        user,
       };
     } catch (error) {
       throw new InternalServerErrorException('Failed to create user');
@@ -72,32 +85,58 @@ export class AuthService {
   async login(loginDto: LoginDto): Promise<AuthResponseDto> {
     const { email, password } = loginDto;
 
-    // Find user by email
-    const user = await this.prisma.user.findUnique({
+    // Find user by email with password hash for verification
+    const userWithPassword = await this.prisma.user.findUnique({
       where: { email },
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
+      },
     });
 
-    if (!user) {
+    if (!userWithPassword) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
     // Verify password
-    const isPasswordValid = await this.verifyPassword(password, user.passwordHash);
+    const isPasswordValid = await this.verifyPassword(password, userWithPassword.passwordHash);
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
+
+    // Fetch full user data with profile and homeGyms
+    const user = await this.prisma.user.findUnique({
+      where: { id: userWithPassword.id },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        dateOfBirth: true,
+        height: true,
+        weight: true,
+        createdAt: true,
+        homeGyms: {
+          select: {
+            id: true,
+            name: true,
+            createdAt: true,
+          },
+          orderBy: {
+            name: 'asc',
+          },
+        },
+      },
+    });
 
     // Generate JWT token
     const access_token = await this.generateToken(user.id, user.email);
 
     return {
       access_token,
-      user: {
-        id: user.id,
-        email: user.email,
-        createdAt: user.createdAt,
-      },
+      user,
     };
   }
 
