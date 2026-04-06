@@ -126,6 +126,7 @@ export interface Workout {
   totalDuration?: number;
   homeGymId?: string | null;
   homeGym?: HomeGym;
+  plannedHomeGymId?: string | null;
   cycleId?: string;
   cycleName?: string;
   workoutDayId?: string;
