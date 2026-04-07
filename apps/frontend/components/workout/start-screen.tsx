@@ -8,10 +8,11 @@ import { Workout } from '@/types';
 import CycleWorkoutSelectionModal from './cycle-workout-selection-modal';
 import GymLocationModal from './gym-location-modal';
 import PastWorkoutSetupModal from './past-workout-setup-modal';
+import TemplateSelectionModal from './template-selection-modal';
 
 export default function WorkoutStartScreen() {
   const router = useRouter();
-  const { startWorkout, loading } = useWorkout();
+  const { startWorkout, loading, refreshActiveWorkout, setActiveWorkoutDirectly } = useWorkout();
   const [suggestedWorkout, setSuggestedWorkout] = useState<Workout | null>(
     null
   );
@@ -20,6 +21,9 @@ export default function WorkoutStartScreen() {
   const [showCycleWorkoutModal, setShowCycleWorkoutModal] = useState(false);
   const [showGymLocationModal, setShowGymLocationModal] = useState(false);
   const [showPastWorkoutModal, setShowPastWorkoutModal] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [templateRecommendedGymId, setTemplateRecommendedGymId] = useState<string | undefined>();
   const [hasActiveCycle, setHasActiveCycle] = useState(false);
   const [pendingWorkoutData, setPendingWorkoutData] = useState<{
     cycleId?: string;
@@ -91,6 +95,13 @@ export default function WorkoutStartScreen() {
   };
 
   const handleGymLocationSelected = async (homeGymId: string | null) => {
+    // Check if this is for a template workout
+    if (selectedTemplateId) {
+      await handleGymForTemplate(homeGymId);
+      return;
+    }
+
+    // Normal workout start
     if (!pendingWorkoutData) return;
 
     setShowGymLocationModal(false);
@@ -132,6 +143,38 @@ export default function WorkoutStartScreen() {
     });
     setShowPastWorkoutModal(false);
     setShowCycleWorkoutModal(true);
+  };
+
+  const handleTemplateSelected = (templateId: string, recommendedGymId?: string) => {
+    setSelectedTemplateId(templateId);
+    setTemplateRecommendedGymId(recommendedGymId);
+    setShowTemplateModal(false);
+    setShowGymLocationModal(true);
+  };
+
+  const handleGymForTemplate = async (homeGymId: string | null) => {
+    if (!selectedTemplateId) return;
+
+    setShowGymLocationModal(false);
+
+    try {
+      // Start workout from template - this returns the created workout
+      const workout = await apiClient.startWorkoutFromTemplate(
+        selectedTemplateId,
+        homeGymId || undefined
+      );
+      
+      console.log('Template workout started:', workout);
+      
+      setSelectedTemplateId(null);
+      setTemplateRecommendedGymId(undefined);
+      
+      // Directly set the active workout instead of refreshing (avoids potential timing issues)
+      setActiveWorkoutDirectly(workout);
+    } catch (err) {
+      setError('Fehler beim Starten des Vorlagen-Workouts');
+      console.error('Failed to start template workout:', err);
+    }
   };
 
   const formatTime = (seconds: number): string => {
@@ -267,6 +310,26 @@ export default function WorkoutStartScreen() {
           </div>
         </div>
 
+        {/* Template Workout */}
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          <div className="p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">
+              Vorlagenworkout starten
+            </h2>
+            <p className="text-gray-600 text-sm mb-4">
+              Wähle eine gespeicherte Workout-Vorlage und starte direkt mit
+              vorausgefüllten Übungen und Werten.
+            </p>
+            <button
+              onClick={() => setShowTemplateModal(true)}
+              disabled={loading}
+              className="w-full py-3 px-4 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Vorlage wählen
+            </button>
+          </div>
+        </div>
+
         {/* Cycle Workout Selection */}
         {hasActiveCycle && (
           <div className="bg-white rounded-lg shadow-sm overflow-hidden">
@@ -327,15 +390,25 @@ export default function WorkoutStartScreen() {
         />
       )}
 
+      {/* Template Selection Modal */}
+      {showTemplateModal && (
+        <TemplateSelectionModal
+          onClose={() => setShowTemplateModal(false)}
+          onSelect={handleTemplateSelected}
+        />
+      )}
+
       {/* Gym Location Modal */}
       <GymLocationModal
         isOpen={showGymLocationModal}
         onClose={() => {
           setShowGymLocationModal(false);
           setPendingWorkoutData(null);
+          setSelectedTemplateId(null);
+          setTemplateRecommendedGymId(undefined);
         }}
         onSelectGym={handleGymLocationSelected}
-        plannedHomeGymId={suggestedWorkout?.plannedHomeGymId}
+        plannedHomeGymId={templateRecommendedGymId || suggestedWorkout?.plannedHomeGymId}
       />
 
       {/* Past Workout Setup Modal */}

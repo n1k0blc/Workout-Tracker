@@ -35,11 +35,15 @@ export default function EditBlueprintPage() {
   const [workoutDayName, setWorkoutDayName] = useState<string>('');
   const [plannedWeekday, setPlannedWeekday] = useState<number>(1);
   const [plannedHomeGymId, setPlannedHomeGymId] = useState<string>('');
+  const [blueprintId, setBlueprintId] = useState<string | null>(null);
   const [exercises, setExercises] = useState<BlueprintExercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showExerciseModal, setShowExerciseModal] = useState(false);
   const [replacingExerciseId, setReplacingExerciseId] = useState<string | null>(null);
+  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [savingTemplate, setSavingTemplate] = useState(false);
 
   // DnD Kit sensors
   const sensors = useSensors(
@@ -71,6 +75,7 @@ export default function EditBlueprintPage() {
       setPlannedHomeGymId(workoutDay.plannedHomeGymId || (user?.homeGyms && user.homeGyms.length > 0 ? user.homeGyms[0].id : ''));
 
       if (workoutDay.blueprint) {
+        setBlueprintId(workoutDay.blueprint.id);
         setExercises(workoutDay.blueprint.exercises);
       }
     } catch (error) {
@@ -217,6 +222,52 @@ export default function EditBlueprintPage() {
     router.push('/cycles');
   };
 
+  const handleSaveAsTemplate = async () => {
+    if (!templateName.trim()) {
+      alert('Bitte gib einen Vorlagen-Namen ein');
+      return;
+    }
+
+    if (exercises.length === 0) {
+      alert('Füge mindestens eine Übung hinzu');
+      return;
+    }
+
+    setSavingTemplate(true);
+    try {
+      // Convert frontend data to DTO format
+      const templateData = {
+        name: templateName.trim(),
+        recommendedGymId: plannedHomeGymId || undefined,
+        exercises: exercises.map((ex) => ({
+          exerciseId: ex.exerciseId,
+          order: ex.order,
+          sets: ex.sets.map((set) => ({
+            order: set.order,
+            isWarmup: set.setType === SetType.WARMUP,
+            targetReps: set.reps,
+            targetWeight: set.weight,
+            targetRir: set.rir,
+          })),
+        })),
+      };
+
+      await apiClient.createWorkoutTemplate(templateData);
+      alert('Vorlage erfolgreich erstellt!');
+      setShowSaveTemplateModal(false);
+      setTemplateName('');
+    } catch (error: any) {
+      console.error('Failed to save template:', error);
+      if (error.response?.status === 409) {
+        alert('Eine Vorlage mit diesem Namen existiert bereits');
+      } else {
+        alert('Fehler beim Speichern der Vorlage');
+      }
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
   const openReplaceModal = (exerciseId: string) => {
     setReplacingExerciseId(exerciseId);
     setShowExerciseModal(true);
@@ -353,6 +404,19 @@ export default function EditBlueprintPage() {
               + Weitere Übung hinzufügen
             </button>
 
+            {/* Save as Template Button */}
+            {exercises.length > 0 && (
+              <div className="mt-4">
+                <button
+                  onClick={() => setShowSaveTemplateModal(true)}
+                  disabled={saving}
+                  className="w-full py-3 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 font-medium disabled:opacity-50"
+                >
+                  📋 Als Vorlage speichern
+                </button>
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div className="mt-6 flex gap-3">
               <button
@@ -385,6 +449,53 @@ export default function EditBlueprintPage() {
             setReplacingExerciseId(null);
           }}
         />
+      )}
+
+      {/* Save Template Modal */}
+      {showSaveTemplateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Blueprint als Vorlage speichern
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Gib einen Namen für deine Workout-Vorlage ein. Diese Vorlage kannst du
+              später wiederverwenden oder direkt als Workout starten.
+            </p>
+            <input
+              type="text"
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              placeholder="z.B. Mein Push Workout"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !savingTemplate) {
+                  handleSaveAsTemplate();
+                }
+              }}
+              autoFocus
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowSaveTemplateModal(false);
+                  setTemplateName('');
+                }}
+                disabled={savingTemplate}
+                className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 font-medium transition-colors disabled:opacity-50"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleSaveAsTemplate}
+                disabled={savingTemplate || !templateName.trim()}
+                className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium transition-colors disabled:opacity-50"
+              >
+                {savingTemplate ? 'Speichert...' : 'Speichern'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </ProtectedRoute>
   );

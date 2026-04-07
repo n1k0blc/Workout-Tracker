@@ -13,6 +13,9 @@ import {
   MuscleGroup,
   Equipment,
   HomeGym,
+  WorkoutTemplate,
+  CreateWorkoutTemplate,
+  UpdateWorkoutTemplate,
 } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
@@ -229,6 +232,16 @@ class ApiClient {
     return this.request<Workout>('/workouts/start', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  }
+
+  async startWorkoutFromTemplate(
+    templateId: string,
+    homeGymId?: string
+  ): Promise<Workout> {
+    return this.request<Workout>(`/workouts/start-from-template/${templateId}`, {
+      method: 'POST',
+      body: JSON.stringify({ homeGymId }),
     });
   }
 
@@ -510,6 +523,49 @@ class ApiClient {
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<PersonalRecordsResponse>(`/analytics/prs${queryString}`);
+  }
+
+  // Workout Template Methods
+  async getWorkoutTemplates(): Promise<WorkoutTemplate[]> {
+    return this.request<WorkoutTemplate[]>('/workout-templates');
+  }
+
+  async getWorkoutTemplate(id: string): Promise<WorkoutTemplate> {
+    return this.request<WorkoutTemplate>(`/workout-templates/${id}`);
+  }
+
+  async createWorkoutTemplate(data: CreateWorkoutTemplate): Promise<WorkoutTemplate> {
+    return this.request<WorkoutTemplate>('/workout-templates', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateWorkoutTemplate(id: string, data: UpdateWorkoutTemplate): Promise<WorkoutTemplate> {
+    return this.request<WorkoutTemplate>(`/workout-templates/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteWorkoutTemplate(id: string): Promise<void> {
+    await this.request(`/workout-templates/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async createWorkoutTemplateFromBlueprint(blueprintId: string, name: string): Promise<WorkoutTemplate> {
+    return this.request<WorkoutTemplate>(`/workout-templates/from-blueprint/${blueprintId}`, {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+  }
+
+  async createWorkoutTemplateFromWorkout(workoutId: string, name: string): Promise<WorkoutTemplate> {
+    return this.request<WorkoutTemplate>(`/workout-templates/from-workout/${workoutId}`, {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
   }
 }
 

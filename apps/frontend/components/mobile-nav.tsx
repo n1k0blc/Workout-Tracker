@@ -43,7 +43,7 @@ export function MobileNav() {
     { href: '/dashboard', label: 'Dashboard', icon: Home },
     { href: '/workout', label: 'Workout', icon: Dumbbell },
     { href: '/cycles', label: 'Zyklen', icon: RefreshCw },
-    { href: '/exercises', label: 'Übungen', icon: ListChecks },
+    { href: '/templates', label: 'Vorlagen', icon: ListChecks },
     { href: '/history', label: 'Verlauf', icon: History },
     { href: '/analytics', label: 'Analytics', icon: BarChart3 },
   ];

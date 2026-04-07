@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWorkout } from '@/lib/workout-context';
+import { apiClient } from '@/lib/api';
 import ExerciseCard from '@/components/workout/exercise-card';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import WorkoutTimer from '@/components/workout/workout-timer';
@@ -39,12 +40,14 @@ export default function ActiveWorkoutScreen() {
     setPastWorkoutDuration,
     removedPlannedSets,
     unplannedSets,
+    initTemplateSave,
   } = useWorkout();
 
   const [showExerciseModal, setShowExerciseModal] = useState(false);
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [updateBlueprint, setUpdateBlueprint] = useState(false);
+  const [saveAsTemplate, setSaveAsTemplate] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -78,7 +81,8 @@ export default function ActiveWorkoutScreen() {
         const removedSets = removedPlannedSets.get(exercise.id) || new Set();
         
         allPlannedHandled = exercise.plannedSets.every((plannedSet) => {
-          const isLogged = exercise.sets.some(s => s.setNumber === plannedSet.order);
+          // setNumber is 1-based, order is 0-based
+          const isLogged = exercise.sets.some(s => s.setNumber === plannedSet.order + 1);
           const isRemoved = removedSets.has(plannedSet.order);
           return isLogged || isRemoved;
         });
@@ -129,11 +133,29 @@ export default function ActiveWorkoutScreen() {
 
   const handleComplete = async () => {
     try {
+      // Store workout ID BEFORE completing (activeWorkout will be null after)
+      const workoutIdForTemplate = saveAsTemplate && activeWorkout ? activeWorkout.id : null;
+      
+      console.log('Completing workout:', {
+        saveAsTemplate,
+        activeWorkoutId: activeWorkout?.id,
+        workoutIdForTemplate,
+      });
+      
       await completeWorkout({
         totalDuration: isPastWorkout ? pastWorkoutDuration : workoutDuration,
         updateBlueprint: updateBlueprint,
       });
-      router.push('/dashboard');
+      
+      // Show template modal if requested
+      if (workoutIdForTemplate) {
+        console.log('Initiating template save for workout:', workoutIdForTemplate);
+        initTemplateSave(workoutIdForTemplate);
+        setShowCompleteConfirm(false);
+      } else {
+        console.log('No template save requested, going to dashboard');
+        router.push('/dashboard');
+      }
     } catch (error) {
       console.error('Failed to complete workout:', error);
     }
@@ -320,7 +342,7 @@ export default function ActiveWorkoutScreen() {
 
             {/* Blueprint Update Checkbox */}
             {hasBlueprint && (
-              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="checkbox"
@@ -341,11 +363,32 @@ export default function ActiveWorkoutScreen() {
               </div>
             )}
 
+            {/* Save as Template Checkbox */}
+            <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={saveAsTemplate}
+                  onChange={(e) => setSaveAsTemplate(e.target.checked)}
+                  className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                />
+                <div>
+                  <div className="font-medium text-gray-900">
+                    Als Vorlage speichern
+                  </div>
+                  <div className="text-sm text-gray-600 mt-1">
+                    Speichere dieses Workout als wiederverwendbare Vorlage mit deinen heutigen Werten.
+                  </div>
+                </div>
+              </label>
+            </div>
+
             <div className="flex gap-3">
               <button
                 onClick={() => {
                   setShowCompleteConfirm(false);
                   setUpdateBlueprint(false);
+                  setSaveAsTemplate(false);
                 }}
                 className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50"
               >

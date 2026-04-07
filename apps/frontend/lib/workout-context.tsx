@@ -56,11 +56,16 @@ interface WorkoutContextType {
     }
   ) => Promise<void>;
   refreshActiveWorkout: () => Promise<void>;
+  setActiveWorkoutDirectly: (workout: Workout) => void;
   workoutDuration: number;
   restTimer: number; // Elapsed seconds since rest started
   restTimerTarget: number; // Target rest duration in seconds
   showRestAlert: boolean;
   dismissRestAlert: () => void;
+  pendingTemplateSave: { workoutId: string } | null;
+  initTemplateSave: (workoutId: string) => void;
+  cancelTemplateSave: () => void;
+  completeTemplateSave: () => void;
 }
 
 const WorkoutContext = createContext<WorkoutContextType | undefined>(undefined);
@@ -78,6 +83,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const [restTimerTarget, setRestTimerTarget] = useState(0); // Target seconds
   const [restTimerStartedAt, setRestTimerStartedAt] = useState<number | null>(null);
   const [showRestAlert, setShowRestAlert] = useState(false);
+  const [pendingTemplateSave, setPendingTemplateSave] = useState<{ workoutId: string } | null>(null);
   
   // Timestamp-based timers (stored in localStorage for persistence)
   const [workoutStartTime, setWorkoutStartTime] = useState<number | null>(null);
@@ -231,6 +237,15 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       }
       console.error('Failed to refresh active workout:', error);
     }
+  };
+
+  const setActiveWorkoutDirectly = (workout: Workout) => {
+    setActiveWorkout(workout);
+    setWorkoutDuration(0);
+    setIsPastWorkout(false);
+    setPastWorkoutDuration(0);
+    setRemovedPlannedSets(new Map());
+    setUnplannedSets(new Map());
   };
 
   const startWorkout = async (data: {
@@ -514,6 +529,18 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setShowRestAlert(false);
   };
 
+  const initTemplateSave = (workoutId: string) => {
+    setPendingTemplateSave({ workoutId });
+  };
+
+  const cancelTemplateSave = () => {
+    setPendingTemplateSave(null);
+  };
+
+  const completeTemplateSave = () => {
+    setPendingTemplateSave(null);
+  };
+
   // Restore timers from localStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -566,11 +593,16 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         deleteSet,
         updateSet,
         refreshActiveWorkout,
+        setActiveWorkoutDirectly,
         workoutDuration,
         restTimer,
         restTimerTarget,
         showRestAlert,
         dismissRestAlert,
+        pendingTemplateSave,
+        initTemplateSave,
+        cancelTemplateSave,
+        completeTemplateSave,
       }}
     >
       {children}

@@ -24,6 +24,7 @@ import {
   WorkoutListItemDto,
   WorkoutStatus,
   ReplaceExerciseDto,
+  StartFromTemplateDto,
 } from './dto';
 import { ReorderExercisesDto } from './dto/reorder-exercises.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -84,6 +85,15 @@ export class WorkoutsController {
     @CurrentUser() user: { id: string },
   ): Promise<WorkoutResponseDto> {
     return this.workoutsService.start(startWorkoutDto, user.id);
+  }
+
+  @Post('start-from-template/:templateId')
+  async startFromTemplate(
+    @Param('templateId') templateId: string,
+    @Body() dto: StartFromTemplateDto,
+    @CurrentUser() user: { id: string },
+  ): Promise<WorkoutResponseDto> {
+    return this.workoutsService.startFromTemplate(templateId, user.id, dto.homeGymId);
   }
 
   @Post(':id/exercises')

@@ -106,3 +106,92 @@
 5;Legs;88;Wadenheben Beinpresse;true;false;10;150;0
 5;Legs;88;Wadenheben Beinpresse;false;true;10;270;0
 5;Legs;88;Wadenheben Beinpresse;false;true;10;270;0
+6;Upper Low Voume A;55;Langhantel Schrägbankdrücken;true;false;10;30;0
+6;Upper Low Voume A;55;Langhantel Schrägbankdrücken;true;false;6;50;0
+6;Upper Low Voume A;55;Langhantel Schrägbankdrücken;false;true;6;70;0
+6;Upper Low Voume A;55;Langhantel Schrägbankdrücken;false;true;6;70;0
+6;Upper Low Voume A;56;Butterfly;true;false;10;60;0
+6;Upper Low Voume A;56;Butterfly;false;true;10;105;0
+6;Upper Low Voume A;56;Butterfly;false;true;10;105;0
+6;Upper Low Voume A;103;Schräg Kurzhantel Y-Raise;true;false;10;6;0
+6;Upper Low Voume A;103;Schräg Kurzhantel Y-Raise;false;true;10;12;0
+6;Upper Low Voume A;103;Schräg Kurzhantel Y-Raise;false;true;10;12;0
+6;Upper Low Voume A;5;Latzug breiter Griff;true;false;10;25;0
+6;Upper Low Voume A;5;Latzug breiter Griff;true;false;6;40;0
+6;Upper Low Voume A;5;Latzug breiter Griff;false;true;8;50;0
+6;Upper Low Voume A;5;Latzug breiter Griff;false;true;8;50;0
+6;Upper Low Voume A;31;Kelso Shrug;true;false;10;70;0
+6;Upper Low Voume A;31;Kelso Shrug;false;true;10;130;0
+6;Upper Low Voume A;31;Kelso Shrug;false;true;10;130;0
+6;Upper Low Voume A;47;EZ-Bar Preacher Curl;true;false;10;10;0
+6;Upper Low Voume A;47;EZ-Bar Preacher Curl;false;true;10;20;0
+6;Upper Low Voume A;47;EZ-Bar Preacher Curl;false;true;10;20;0
+6;Upper Low Voume A;106;Kabel Bar Trizeps Pushdown;true;false;10;20;0
+6;Upper Low Voume A;106;Kabel Bar Trizeps Pushdown;false;true;10;36;0
+6;Upper Low Voume A;106;Kabel Bar Trizeps Pushdown;false;true;10;36;0
+7;Lower Low Voume A;63;Beinbeuger liegend;true;false;10;60;0
+7;Lower Low Voume A;63;Beinbeuger liegend;false;true;10;85;0
+7;Lower Low Voume A;63;Beinbeuger liegend;false;true;10;85;0
+7;Lower Low Voume A;83;Smith Maschine Squat;true;false;10;30;0
+7;Lower Low Voume A;83;Smith Maschine Squat;true;false;6;60;0
+7;Lower Low Voume A;83;Smith Maschine Squat;false;true;10;90;0
+7;Lower Low Voume A;83;Smith Maschine Squat;false;true;10;90;0
+7;Lower Low Voume A;75;Smith Maschine Lunge;true;false;10;10;0
+7;Lower Low Voume A;75;Smith Maschine Lunge;false;true;10;20;0
+7;Lower Low Voume A;84;Beinstrecker;true;false;10;75;0
+7;Lower Low Voume A;84;Beinstrecker;false;true;10;115;2
+7;Lower Low Voume A;84;Beinstrecker;false;true;10;115;2
+7;Lower Low Voume A;79;Hüftabduktion;true;false;10;60;0
+7;Lower Low Voume A;79;Hüftabduktion;false;true;10;105;0
+7;Lower Low Voume A;79;Hüftabduktion;false;true;10;105;0
+7;Lower Low Voume A;85;Wadenpresse sitzend;true;false;10;100;0
+7;Lower Low Voume A;85;Wadenpresse sitzend;false;true;10;200;0
+7;Lower Low Voume A;85;Wadenpresse sitzend;false;true;10;200;0
+8;Upper Low Voume B;4;Latzug enger Griff;true;false;10;25;0
+8;Upper Low Voume B;4;Latzug enger Griff;true;false;6;40;0
+8;Upper Low Voume B;4;Latzug enger Griff;false;true;10;50;1
+8;Upper Low Voume B;4;Latzug enger Griff;false;true;10;50;0
+8;Upper Low Voume B;11;Maschine Rudern breiter Griff;true;false;10;70;0
+8;Upper Low Voume B;11;Maschine Rudern breiter Griff;false;true;10;130;0
+8;Upper Low Voume B;11;Maschine Rudern breiter Griff;false;true;10;130;0
+8;Upper Low Voume B;101;Langhantel Shrug;true;false;10;40;0
+8;Upper Low Voume B;101;Langhantel Shrug;false;true;10;80;0
+8;Upper Low Voume B;57;Brustpresse;true;false;10;40;0
+8;Upper Low Voume B;57;Brustpresse;true;false;6;60;0
+8;Upper Low Voume B;57;Brustpresse;false;true;8;80;0
+8;Upper Low Voume B;57;Brustpresse;false;true;8;80;0
+8;Upper Low Voume B;89;Kabel Seitheben;true;false;10;7,5;0
+8;Upper Low Voume B;89;Kabel Seitheben;false;true;10;12,5;0
+8;Upper Low Voume B;89;Kabel Seitheben;false;true;10;12,5;0
+8;Upper Low Voume B;33;Unilateral Butterfly Reverse;true;false;10;20;0
+8;Upper Low Voume B;33;Unilateral Butterfly Reverse;false;true;10;52;0
+8;Upper Low Voume B;1;Kabel Crunch;true;false;10;25;0
+8;Upper Low Voume B;1;Kabel Crunch;false;true;10;43;0
+8;Upper Low Voume B;1;Kabel Crunch;false;true;10;43;0
+9;Lower Low Voume B;84;Beinstrecker;true;false;10;75;0
+9;Lower Low Voume B;84;Beinstrecker;false;true;10;115;2
+9;Lower Low Voume B;84;Beinstrecker;false;true;10;115;2
+9;Lower Low Voume B;20;Langhantel Romanian Deadlift;true;false;10;40;0
+9;Lower Low Voume B;20;Langhantel Romanian Deadlift;true;false;8;60;0
+9;Lower Low Voume B;20;Langhantel Romanian Deadlift;false;true;10;80;0
+9;Lower Low Voume B;20;Langhantel Romanian Deadlift;false;true;10;80;0
+9;Lower Low Voume B;64;Hip Thrust;true;false;10;80;0
+9;Lower Low Voume B;64;Hip Thrust;false;true;10;120;0
+9;Lower Low Voume B;64;Hip Thrust;false;true;10;120;0
+9;Lower Low Voume B;77;Beinpresse;true;false;10;150;0
+9;Lower Low Voume B;77;Beinpresse;false;true;10;300;0
+9;Lower Low Voume B;88;Wadenheben Beinpresse;true;false;10;150;0
+9;Lower Low Voume B;88;Wadenheben Beinpresse;false;true;10;270;0
+9;Lower Low Voume B;88;Wadenheben Beinpresse;false;true;10;270;0
+10;Arms and Delts Low Voume;35;Bayesian Curl;true;false;10;10;0
+10;Arms and Delts Low Voume;35;Bayesian Curl;false;true;10;20;2
+10;Arms and Delts Low Voume;35;Bayesian Curl;false;true;10;20;2
+10;Arms and Delts Low Voume;108;Kabel Bar Überkopf Trizeps Extension;true;false;10;20;0
+10;Arms and Delts Low Voume;108;Kabel Bar Überkopf Trizeps Extension;false;true;10;30;0
+10;Arms and Delts Low Voume;108;Kabel Bar Überkopf Trizeps Extension;false;true;10;30;0
+10;Arms and Delts Low Voume;40;Zotman Curl;false;true;10;16;0
+10;Arms and Delts Low Voume;105;Unilateral Trizeps Kabel Kickbacks;true;false;10;5;0
+10;Arms and Delts Low Voume;105;Unilateral Trizeps Kabel Kickbacks;false;true;10;12,5;0
+10;Arms and Delts Low Voume;37;Kurzhantel Bizeps Curl;false;true;10;16;0
+10;Arms and Delts Low Voume;96;Maschine Seitheben;true;false;10;25;0
+10;Arms and Delts Low Voume;96;Maschine Seitheben;false;true;10;50;0

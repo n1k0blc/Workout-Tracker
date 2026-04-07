@@ -278,6 +278,78 @@ export class WorkoutsService {
     return this.mapWorkoutToResponse(workout);
   }
 
+  async startFromTemplate(
+    templateId: string,
+    userId: string,
+    homeGymId?: string,
+  ): Promise<WorkoutResponseDto> {
+    // Load template with all exercises and sets
+    const template = await this.prisma.workoutTemplate.findUnique({
+      where: { id: templateId },
+      include: {
+        exercises: {
+          include: {
+            sets: {
+              orderBy: { order: 'asc' },
+            },
+          },
+          orderBy: { order: 'asc' },
+        },
+      },
+    });
+
+    if (!template) {
+      throw new NotFoundException('Workout template not found');
+    }
+
+    // Check access: system templates or user's own templates
+    if (template.isCustom && template.userId !== userId) {
+      throw new NotFoundException('Workout template not found');
+    }
+
+    // Create workout as free workout
+    const workout = await this.prisma.workout.create({
+      data: {
+        userId,
+        date: new Date(),
+        status: 'IN_PROGRESS' as any,
+        isFreeWorkout: true,
+        homeGymId: homeGymId || template.recommendedGymId || null,
+        exercises: {
+          create: template.exercises.map((templateEx) => ({
+            exerciseId: templateEx.exerciseId,
+            order: templateEx.order,
+            // Save template sets as customPlannedSets
+            customPlannedSets: templateEx.sets.map((set) => ({
+              order: set.order,
+              setType: set.isWarmup ? 'WARMUP' : 'WORKING',
+              reps: set.targetReps,
+              weight: set.targetWeight,
+              rir: set.targetRir,
+              restAfterSet: 90, // Default rest time
+            })),
+          })),
+        },
+      },
+      include: {
+        homeGym: {
+          select: { id: true, name: true },
+        },
+        exercises: {
+          include: {
+            exercise: {
+              select: { name: true, isUnilateral: true, isDoubleWeight: true },
+            },
+            sets: true,
+          },
+          orderBy: { order: 'asc' },
+        },
+      },
+    });
+
+    return this.mapWorkoutToResponse(workout);
+  }
+
   async addExercise(
     workoutId: string,
     addExerciseDto: AddExerciseToWorkoutDto,
