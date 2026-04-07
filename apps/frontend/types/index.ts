@@ -235,3 +235,60 @@ export interface PersonalRecordsResponse {
   recentPRs: PersonalRecord[];
   allTimePRs: PersonalRecord[];
 }
+
+// Workout Template Types
+export interface WorkoutTemplateSet {
+  id: string;
+  order: number;
+  isWarmup: boolean;
+  targetReps: number;
+  targetWeight: number;
+  targetRir: number;
+}
+
+export interface WorkoutTemplateExercise {
+  id: string;
+  order: number;
+  exerciseId: string;
+  exerciseName?: string;
+  sets: WorkoutTemplateSet[];
+}
+
+export interface WorkoutTemplate {
+  id: string;
+  name: string;
+  isCustom: boolean;
+  userId?: string;
+  recommendedGymId?: string;
+  recommendedGymName?: string;
+  createdAt: string;
+  exercises?: WorkoutTemplateExercise[];
+  totalExercises?: number;
+  totalSets?: number;
+}
+
+export interface CreateWorkoutTemplateSet {
+  order: number;
+  isWarmup: boolean;
+  targetReps: number;
+  targetWeight: number;
+  targetRir: number;
+}
+
+export interface CreateWorkoutTemplateExercise {
+  exerciseId: string;
+  order: number;
+  sets: CreateWorkoutTemplateSet[];
+}
+
+export interface CreateWorkoutTemplate {
+  name: string;
+  recommendedGymId?: string;
+  exercises: CreateWorkoutTemplateExercise[];
+}
+
+export interface UpdateWorkoutTemplate {
+  name?: string;
+  recommendedGymId?: string;
+  exercises?: CreateWorkoutTemplateExercise[];
+}

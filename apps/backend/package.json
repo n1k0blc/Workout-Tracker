@@ -25,7 +25,8 @@
     "migrate:home-gyms": "ts-node migrate-home-gyms.ts",
     "migrate:exercise-flags": "ts-node update-exercise-flags.ts",
     "migrate:update-exercises": "ts-node prisma/update-exercises.ts",
-    "migrate:assign-csv-ids": "ts-node prisma/assign-csv-ids.ts"
+    "migrate:assign-csv-ids": "ts-node prisma/assign-csv-ids.ts",
+    "import:workout-templates": "ts-node prisma/import-workout-templates.ts"
   },
   "keywords": [
     "workout",

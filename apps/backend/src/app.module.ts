@@ -6,6 +6,7 @@ import { UsersModule } from './users/users.module';
 import { ExercisesModule } from './exercises/exercises.module';
 import { WorkoutCyclesModule } from './workout-cycles/workout-cycles.module';
 import { WorkoutsModule } from './workouts/workouts.module';
+import { WorkoutTemplatesModule } from './workout-templates/workout-templates.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { HealthModule } from './health/health.module';
 
@@ -21,6 +22,7 @@ import { HealthModule } from './health/health.module';
     ExercisesModule,
     WorkoutCyclesModule,
     WorkoutsModule,
+    WorkoutTemplatesModule,
     AnalyticsModule,
     HealthModule,
   ],

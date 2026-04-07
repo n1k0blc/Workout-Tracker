@@ -54,6 +54,12 @@ export class AddExerciseToWorkoutDto {
   order?: number;
 }
 
+export class StartFromTemplateDto {
+  @IsOptional()
+  @IsString()
+  homeGymId?: string;
+}
+
 export class UpdateSetDto {
   @IsInt()
   @Min(0)

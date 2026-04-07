@@ -84,7 +84,8 @@ export default function ExerciseCard({
       setType = unplannedSet.setType;
       plannedRestAfterSet = 90; // Default for unplanned sets
     } else {
-      const plannedSet = exercise.plannedSets?.[setNumber - 1];
+      // setNumber is 1-based, order is 0-based
+      const plannedSet = exercise.plannedSets?.find(ps => ps.order === setNumber - 1);
       if (!plannedSet) return;
 
       // Merge edited values with planned set values
@@ -215,8 +216,8 @@ export default function ExerciseCard({
   };
 
   const removePlannedSet = (setNumber: number) => {
-    // Mark the set as removed in the context
-    markPlannedSetAsRemoved(exercise.id, setNumber);
+    // Mark the set as removed in the context (convert 1-based setNumber to 0-based order)
+    markPlannedSetAsRemoved(exercise.id, setNumber - 1);
     // Remove from editValues if it was being edited
     setEditValues(prev => {
       const newVals = {...prev};
@@ -244,8 +245,8 @@ export default function ExerciseCard({
     if (editValues[setNumber] && editValues[setNumber][field] !== undefined) {
       return editValues[setNumber][field] as string;
     }
-    // Fall back to planned set value
-    const plannedSet = exercise.plannedSets?.[setNumber - 1];
+    // Fall back to planned set value (setNumber is 1-based, order is 0-based)
+    const plannedSet = exercise.plannedSets?.find(ps => ps.order === setNumber - 1);
     if (!plannedSet) return '';
     return plannedSet[field]?.toString() || '';
   };
@@ -254,7 +255,8 @@ export default function ExerciseCard({
     if (editValues[setNumber]?.setType) {
       return editValues[setNumber].setType;
     }
-    const plannedSet = exercise.plannedSets?.[setNumber - 1];
+    // setNumber is 1-based, order is 0-based
+    const plannedSet = exercise.plannedSets?.find(ps => ps.order === setNumber - 1);
     return plannedSet?.setType || SetType.WORKING;
   };
 
@@ -386,7 +388,8 @@ export default function ExerciseCard({
               return !removedSets || !removedSets.has(plannedSet.order);
             })
             .map((plannedSet, idx) => {
-            const setNumber = plannedSet.order;
+            // setNumber is 1-based for API/DB, order is 0-based
+            const setNumber = plannedSet.order + 1;
             const loggedSet = getLoggedSet(setNumber);
 
             return (

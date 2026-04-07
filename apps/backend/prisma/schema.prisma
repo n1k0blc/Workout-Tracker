@@ -8,19 +8,20 @@ datasource db {
 }
 
 model User {
-  id            String         @id @default(uuid())
-  email         String         @unique
-  passwordHash  String
-  createdAt     DateTime       @default(now())
-  dateOfBirth   DateTime?
-  firstName     String?
-  height        Int?
-  lastName      String?
-  weight        Float?
-  exercises     Exercise[]
-  homeGyms      HomeGym[]
-  workouts      Workout[]
-  workoutCycles WorkoutCycle[]
+  id               String            @id @default(uuid())
+  email            String            @unique
+  passwordHash     String
+  createdAt        DateTime          @default(now())
+  dateOfBirth      DateTime?
+  firstName        String?
+  height           Int?
+  lastName         String?
+  weight           Float?
+  exercises        Exercise[]
+  homeGyms         HomeGym[]
+  workouts         Workout[]
+  workoutCycles    WorkoutCycle[]
+  workoutTemplates WorkoutTemplate[]
 }
 
 model HomeGym {
@@ -108,18 +109,19 @@ model Workout {
 }
 
 model Exercise {
-  id                 String              @id @default(uuid())
-  csvId              Int?                @unique
-  name               String
-  muscleGroup        MuscleGroup
-  equipment          Equipment
-  isCustom           Boolean             @default(false)
-  userId             String?
-  isDoubleWeight     Boolean             @default(false)
-  isUnilateral       Boolean             @default(false)
-  blueprintExercises BlueprintExercise[]
-  user               User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  exerciseLogs       ExerciseLog[]
+  id                      String                    @id @default(uuid())
+  csvId                   Int?                      @unique
+  name                    String
+  muscleGroup             MuscleGroup
+  equipment               Equipment
+  isCustom                Boolean                   @default(false)
+  userId                  String?
+  isDoubleWeight          Boolean                   @default(false)
+  isUnilateral            Boolean                   @default(false)
+  blueprintExercises      BlueprintExercise[]
+  user                    User?                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exerciseLogs            ExerciseLog[]
+  workoutTemplateExercise WorkoutTemplateExercise[]
 }
 
 model ExerciseLog {
@@ -147,6 +149,40 @@ model SetLog {
   actualRestDuration Int?
   completedAt        DateTime    @default(now())
   exerciseLog        ExerciseLog @relation(fields: [exerciseLogId], references: [id], onDelete: Cascade)
+}
+
+model WorkoutTemplate {
+  id                 String                    @id @default(uuid())
+  name               String
+  isCustom           Boolean                   @default(false)
+  userId             String?
+  recommendedGymId   String?
+  createdAt          DateTime                  @default(now())
+  user               User?                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercises          WorkoutTemplateExercise[]
+
+  @@unique([userId, name])
+}
+
+model WorkoutTemplateExercise {
+  id         String               @id @default(uuid())
+  templateId String
+  exerciseId String
+  order      Int
+  template   WorkoutTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  exercise   Exercise             @relation(fields: [exerciseId], references: [id])
+  sets       WorkoutTemplateSet[]
+}
+
+model WorkoutTemplateSet {
+  id                  String                  @id @default(uuid())
+  templateExerciseId  String
+  order               Int
+  isWarmup            Boolean                 @default(false)
+  targetReps          Int
+  targetWeight        Float
+  targetRir           Int
+  templateExercise    WorkoutTemplateExercise @relation(fields: [templateExerciseId], references: [id], onDelete: Cascade)
 }
 
 enum MuscleGroup {
