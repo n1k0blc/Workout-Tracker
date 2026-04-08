@@ -56,7 +56,7 @@ interface WorkoutContextType {
     }
   ) => Promise<void>;
   refreshActiveWorkout: () => Promise<void>;
-  setActiveWorkoutDirectly: (workout: Workout) => void;
+  setActiveWorkoutDirectly: (workout: Workout, isPastWorkout?: boolean, pastWorkoutDuration?: number) => void;
   workoutDuration: number;
   restTimer: number; // Elapsed seconds since rest started
   restTimerTarget: number; // Target rest duration in seconds
@@ -239,13 +239,22 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const setActiveWorkoutDirectly = (workout: Workout) => {
+  const setActiveWorkoutDirectly = (workout: Workout, isPast?: boolean, pastDuration?: number) => {
     setActiveWorkout(workout);
     setWorkoutDuration(0);
-    setIsPastWorkout(false);
-    setPastWorkoutDuration(0);
+    setIsPastWorkout(isPast ?? false);
+    setPastWorkoutDuration(pastDuration ?? 0);
     setRemovedPlannedSets(new Map());
     setUnplannedSets(new Map());
+    
+    // Initialize workout timer only for non-past workouts
+    if (!isPast) {
+      const now = Date.now();
+      setWorkoutStartTime(now);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('workoutStartTime', now.toString());
+      }
+    }
   };
 
   const startWorkout = async (data: {

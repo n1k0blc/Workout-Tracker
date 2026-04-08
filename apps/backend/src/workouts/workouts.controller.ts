@@ -93,7 +93,14 @@ export class WorkoutsController {
     @Body() dto: StartFromTemplateDto,
     @CurrentUser() user: { id: string },
   ): Promise<WorkoutResponseDto> {
-    return this.workoutsService.startFromTemplate(templateId, user.id, dto.homeGymId);
+    return this.workoutsService.startFromTemplate(
+      templateId,
+      user.id,
+      dto.homeGymId,
+      dto.isPastWorkout,
+      dto.pastWorkoutDate,
+      dto.pastWorkoutDuration,
+    );
   }
 
   @Post(':id/exercises')

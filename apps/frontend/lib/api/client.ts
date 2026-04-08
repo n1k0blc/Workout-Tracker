@@ -237,11 +237,19 @@ class ApiClient {
 
   async startWorkoutFromTemplate(
     templateId: string,
-    homeGymId?: string
+    homeGymId?: string,
+    isPastWorkout?: boolean,
+    pastWorkoutDate?: string,
+    pastWorkoutDuration?: number,
   ): Promise<Workout> {
     return this.request<Workout>(`/workouts/start-from-template/${templateId}`, {
       method: 'POST',
-      body: JSON.stringify({ homeGymId }),
+      body: JSON.stringify({ 
+        homeGymId,
+        isPastWorkout,
+        pastWorkoutDate,
+        pastWorkoutDuration,
+      }),
     });
   }
 

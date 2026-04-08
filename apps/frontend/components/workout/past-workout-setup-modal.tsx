@@ -7,6 +7,7 @@ interface PastWorkoutSetupModalProps {
   onClose: () => void;
   onStartFree: (date: string, durationMinutes: number) => void;
   onStartCycle: (date: string, durationMinutes: number) => void;
+  onStartTemplate: (date: string, durationMinutes: number) => void;
 }
 
 export default function PastWorkoutSetupModal({
@@ -14,15 +15,16 @@ export default function PastWorkoutSetupModal({
   onClose,
   onStartFree,
   onStartCycle,
+  onStartTemplate,
 }: PastWorkoutSetupModalProps) {
   const [step, setStep] = useState<'type' | 'details'>('type');
-  const [workoutType, setWorkoutType] = useState<'free' | 'cycle' | null>(null);
+  const [workoutType, setWorkoutType] = useState<'free' | 'cycle' | 'template' | null>(null);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [durationMinutes, setDurationMinutes] = useState(60);
 
   if (!isOpen) return null;
 
-  const handleTypeSelection = (type: 'free' | 'cycle') => {
+  const handleTypeSelection = (type: 'free' | 'cycle' | 'template') => {
     setWorkoutType(type);
     setStep('details');
   };
@@ -36,8 +38,10 @@ export default function PastWorkoutSetupModal({
 
     if (workoutType === 'free') {
       onStartFree(date, durationMinutes);
-    } else {
+    } else if (workoutType === 'cycle') {
       onStartCycle(date, durationMinutes);
+    } else {
+      onStartTemplate(date, durationMinutes);
     }
   };
 
@@ -78,6 +82,14 @@ export default function PastWorkoutSetupModal({
                 <span className="text-3xl">📋</span>
                 <span>Zyklus-Workout</span>
               </button>
+
+              <button
+                onClick={() => handleTypeSelection('template')}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-6 px-6 rounded-lg transition-colors flex flex-col items-center gap-2 text-lg"
+              >
+                <span className="text-3xl">📝</span>
+                <span>Vorlagen-Workout</span>
+              </button>
             </div>
           </>
         ) : (
@@ -96,7 +108,11 @@ export default function PastWorkoutSetupModal({
               Workout-Details
             </h2>
             <p className="text-gray-600 mb-6">
-              {workoutType === 'free' ? 'Freies Workout' : 'Zyklus-Workout'}
+              {workoutType === 'free' 
+                ? 'Freies Workout' 
+                : workoutType === 'cycle' 
+                ? 'Zyklus-Workout' 
+                : 'Vorlagen-Workout'}
             </p>
 
             <div className="space-y-4 mb-6">

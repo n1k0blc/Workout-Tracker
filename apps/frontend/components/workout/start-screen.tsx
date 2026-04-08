@@ -145,10 +145,29 @@ export default function WorkoutStartScreen() {
     setShowCycleWorkoutModal(true);
   };
 
+  const handlePastWorkoutTemplate = (date: string, durationMinutes: number) => {
+    // Store date and duration temporarily and show template selection
+    setPendingWorkoutData({
+      isFreeWorkout: false,
+      isPastWorkout: true,
+      pastWorkoutDate: date,
+      pastWorkoutDuration: durationMinutes * 60,
+    });
+    setShowPastWorkoutModal(false);
+    setShowTemplateModal(true);
+  };
+
   const handleTemplateSelected = (templateId: string, recommendedGymId?: string) => {
     setSelectedTemplateId(templateId);
     setTemplateRecommendedGymId(recommendedGymId);
     setShowTemplateModal(false);
+    
+    // If this is part of a past workout flow, keep the past workout data
+    // Otherwise, clear it (normal template workout)
+    if (!pendingWorkoutData?.isPastWorkout) {
+      setPendingWorkoutData(null);
+    }
+    
     setShowGymLocationModal(true);
   };
 
@@ -161,7 +180,10 @@ export default function WorkoutStartScreen() {
       // Start workout from template - this returns the created workout
       const workout = await apiClient.startWorkoutFromTemplate(
         selectedTemplateId,
-        homeGymId || undefined
+        homeGymId || undefined,
+        pendingWorkoutData?.isPastWorkout,
+        pendingWorkoutData?.pastWorkoutDate,
+        pendingWorkoutData?.pastWorkoutDuration,
       );
       
       console.log('Template workout started:', workout);
@@ -169,8 +191,15 @@ export default function WorkoutStartScreen() {
       setSelectedTemplateId(null);
       setTemplateRecommendedGymId(undefined);
       
-      // Directly set the active workout instead of refreshing (avoids potential timing issues)
-      setActiveWorkoutDirectly(workout);
+      // Navigate to workout screen for all template workouts
+      // Pass isPastWorkout and pastWorkoutDuration to context
+      setActiveWorkoutDirectly(
+        workout,
+        pendingWorkoutData?.isPastWorkout,
+        pendingWorkoutData?.pastWorkoutDuration
+      );
+      
+      setPendingWorkoutData(null);
     } catch (err) {
       setError('Fehler beim Starten des Vorlagen-Workouts');
       console.error('Failed to start template workout:', err);
@@ -417,6 +446,7 @@ export default function WorkoutStartScreen() {
         onClose={() => setShowPastWorkoutModal(false)}
         onStartFree={handlePastWorkoutFree}
         onStartCycle={handlePastWorkoutCycle}
+        onStartTemplate={handlePastWorkoutTemplate}
       />
     </div>
   );
