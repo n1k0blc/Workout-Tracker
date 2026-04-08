@@ -6,6 +6,22 @@ import { apiClient } from '@/lib/api';
 import { Exercise, HomeGym, WorkoutTemplate, SetType } from '@/types';
 import { Plus, Trash2 } from 'lucide-react';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
+import { TemplateExerciseCard } from './template-exercise-card';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 
 interface TemplateSet {
   id: string;
@@ -36,8 +52,20 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
   const [availableExercises, setAvailableExercises] = useState<Exercise[]>([]);
   const [availableGyms, setAvailableGyms] = useState<HomeGym[]>([]);
   const [showExerciseModal, setShowExerciseModal] = useState(false);
+  const [replacingExerciseId, setReplacingExerciseId] = useState<string | null>(null);
   const [loading, setLoading] = useState(!!templateId);
   const [saving, setSaving] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   useEffect(() => {
     loadData();
@@ -85,6 +113,12 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
   };
 
   const handleAddExercise = async (exerciseId: string) => {
+    // Check if this is a replace operation
+    if (replacingExerciseId) {
+      handleReplaceExercise(exerciseId);
+      return;
+    }
+
     const exercise = availableExercises.find((ex) => ex.id === exerciseId);
     if (!exercise) {
       alert('Übung nicht gefunden.');
@@ -104,6 +138,50 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
       },
     ]);
     setShowExerciseModal(false);
+  };
+
+  const handleReplaceExercise = (newExerciseId: string) => {
+    if (!replacingExerciseId) return;
+
+    const newExercise = availableExercises.find((ex) => ex.id === newExerciseId);
+    if (!newExercise) {
+      alert('Übung nicht gefunden.');
+      return;
+    }
+
+    setExercises(
+      exercises.map((ex) =>
+        ex.id === replacingExerciseId
+          ? {
+              ...ex,
+              exerciseId: newExercise.id,
+              exerciseName: newExercise.name,
+            }
+          : ex
+      )
+    );
+    setShowExerciseModal(false);
+    setReplacingExerciseId(null);
+  };
+
+  const handleOpenReplaceModal = (exerciseId: string) => {
+    setReplacingExerciseId(exerciseId);
+    setShowExerciseModal(true);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      setExercises((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+
+        const reordered = arrayMove(items, oldIndex, newIndex);
+        // Update order property
+        return reordered.map((ex, idx) => ({ ...ex, order: idx }));
+      });
+    }
   };
 
   const handleRemoveExercise = (exerciseId: string) => {
@@ -178,6 +256,10 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
         return ex;
       })
     );
+  };
+
+  const getExerciseDetails = (exerciseId: string): Exercise | undefined => {
+    return availableExercises.find((ex) => ex.id === exerciseId);
   };
 
   const handleSave = async () => {
@@ -287,147 +369,36 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
           </div>
 
           {/* Exercises */}
-          <div className="space-y-4">
-            {exercises.map((exercise, index) => (
-              <div key={exercise.id} className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    #{index + 1} {exercise.exerciseName}
-                  </h3>
-                  <button
-                    onClick={() => handleRemoveExercise(exercise.id)}
-                    className="text-red-600 hover:text-red-800 transition-colors"
-                    title="Übung entfernen"
-                  >
-                    <Trash2 className="h-5 w-5" />
-                  </button>
-                </div>
-
-                {/* Sets */}
-                <div className="space-y-3">
-                  {exercise.sets.map((set, setIndex) => (
-                    <div
-                      key={set.id}
-                      className="bg-gray-50 rounded-lg p-4 border border-gray-200"
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm font-medium text-gray-700">
-                          Satz {setIndex + 1}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">
-                            {set.isWarmup ? 'Aufwärmen' : 'Arbeitssatz'}
-                          </span>
-                          <button
-                            onClick={() => handleRemoveSet(exercise.id, set.id)}
-                            className="text-red-600 hover:text-red-800 transition-colors"
-                            title="Satz entfernen"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                        <div>
-                          <label className="block text-xs text-gray-600 mb-1">
-                            Typ
-                          </label>
-                          <select
-                            value={set.isWarmup ? 'warmup' : 'working'}
-                            onChange={(e) =>
-                              handleUpdateSet(
-                                exercise.id,
-                                set.id,
-                                'isWarmup',
-                                e.target.value === 'warmup'
-                              )
-                            }
-                            className="w-full px-2 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          >
-                            <option value="warmup">Aufwärmen</option>
-                            <option value="working">Arbeitssatz</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs text-gray-600 mb-1">
-                            Wiederholungen
-                          </label>
-                          <input
-                            type="number"
-                            value={set.targetReps}
-                            onChange={(e) =>
-                              handleUpdateSet(
-                                exercise.id,
-                                set.id,
-                                'targetReps',
-                                parseInt(e.target.value) || 0
-                              )
-                            }
-                            min="1"
-                            className="w-full px-2 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs text-gray-600 mb-1">
-                            Gewicht (kg)
-                          </label>
-                          <input
-                            type="number"
-                            step="0.5"
-                            value={set.targetWeight}
-                            onChange={(e) =>
-                              handleUpdateSet(
-                                exercise.id,
-                                set.id,
-                                'targetWeight',
-                                parseFloat(e.target.value) || 0
-                              )
-                            }
-                            min="0"
-                            className="w-full px-2 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs text-gray-600 mb-1">
-                            RIR
-                          </label>
-                          <input
-                            type="number"
-                            value={set.targetRir}
-                            onChange={(e) =>
-                              handleUpdateSet(
-                                exercise.id,
-                                set.id,
-                                'targetRir',
-                                parseInt(e.target.value) || 0
-                              )
-                            }
-                            min="0"
-                            max="10"
-                            placeholder="-"
-                            className="w-full px-2 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-                      </div>
-                    </div>
+          {exercises.length > 0 ? (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={exercises.map((ex) => ex.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-4">
+                  {exercises.map((exercise, index) => (
+                    <TemplateExerciseCard
+                      key={exercise.id}
+                      exercise={exercise}
+                      exerciseDetails={getExerciseDetails(exercise.exerciseId)}
+                      index={index}
+                      onRemove={() => handleRemoveExercise(exercise.id)}
+                      onReplace={() => handleOpenReplaceModal(exercise.id)}
+                      onAddSet={() => handleAddSet(exercise.id)}
+                      onRemoveSet={(setId) => handleRemoveSet(exercise.id, setId)}
+                      onUpdateSet={(setId, field, value) =>
+                        handleUpdateSet(exercise.id, setId, field, value)
+                      }
+                    />
                   ))}
-
-                  {/* Add Set Button */}
-                  <button
-                    onClick={() => handleAddSet(exercise.id)}
-                    className="w-full py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-2"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Satz hinzufügen
-                  </button>
                 </div>
-              </div>
-            ))}
-          </div>
+              </SortableContext>
+            </DndContext>
+          ) : null}
 
           {/* Add Exercise Button */}
           <button
@@ -464,7 +435,10 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
       {showExerciseModal && (
         <ExerciseSelectionModal
           onSelect={handleAddExercise}
-          onClose={() => setShowExerciseModal(false)}
+          onClose={() => {
+            setShowExerciseModal(false);
+            setReplacingExerciseId(null);
+          }}
         />
       )}
     </div>

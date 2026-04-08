@@ -1,4 +1,4 @@
-import { IsString, IsInt, IsNumber, IsOptional, Min, IsEnum } from 'class-validator';
+import { IsString, IsInt, IsNumber, IsOptional, Min, IsEnum, IsBoolean } from 'class-validator';
 import { SetType } from '../../common/types';
 
 export class LogSetDto {
@@ -58,6 +58,19 @@ export class StartFromTemplateDto {
   @IsOptional()
   @IsString()
   homeGymId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isPastWorkout?: boolean;
+
+  @IsOptional()
+  @IsString()
+  pastWorkoutDate?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  pastWorkoutDuration?: number;
 }
 
 export class UpdateSetDto {

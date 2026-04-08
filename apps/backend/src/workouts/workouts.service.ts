@@ -282,6 +282,9 @@ export class WorkoutsService {
     templateId: string,
     userId: string,
     homeGymId?: string,
+    isPastWorkout?: boolean,
+    pastWorkoutDate?: string,
+    pastWorkoutDuration?: number,
   ): Promise<WorkoutResponseDto> {
     // Load template with all exercises and sets
     const template = await this.prisma.workoutTemplate.findUnique({
@@ -307,11 +310,16 @@ export class WorkoutsService {
       throw new NotFoundException('Workout template not found');
     }
 
+    // Determine workout date (status is always IN_PROGRESS at start, like Free/Cycle workouts)
+    const workoutDate = isPastWorkout && pastWorkoutDate 
+      ? new Date(pastWorkoutDate) 
+      : new Date();
+
     // Create workout as free workout
     const workout = await this.prisma.workout.create({
       data: {
         userId,
-        date: new Date(),
+        date: workoutDate,
         status: 'IN_PROGRESS' as any,
         isFreeWorkout: true,
         homeGymId: homeGymId || template.recommendedGymId || null,
