@@ -110,8 +110,9 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setUnplannedSets(prev => {
       const newMap = new Map(prev);
       const exerciseSet = newMap.get(exerciseLogId) || new Set();
-      exerciseSet.add(setNumber);
-      newMap.set(exerciseLogId, exerciseSet);
+      const newExerciseSet = new Set(exerciseSet);  // Clone the Set!
+      newExerciseSet.add(setNumber);
+      newMap.set(exerciseLogId, newExerciseSet);
       return newMap;
     });
   };
@@ -121,11 +122,12 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       const newMap = new Map(prev);
       const exerciseSet = newMap.get(exerciseLogId);
       if (exerciseSet) {
-        exerciseSet.delete(setNumber);
-        if (exerciseSet.size === 0) {
+        const newExerciseSet = new Set(exerciseSet);  // Clone the Set!
+        newExerciseSet.delete(setNumber);
+        if (newExerciseSet.size === 0) {
           newMap.delete(exerciseLogId);
         } else {
-          newMap.set(exerciseLogId, exerciseSet);
+          newMap.set(exerciseLogId, newExerciseSet);
         }
       }
       return newMap;

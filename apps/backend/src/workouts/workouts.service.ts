@@ -70,6 +70,8 @@ export class WorkoutsService {
       } : undefined,
       cycleName: workout.cycle?.name,
       workoutDayName: workout.workoutDay?.name,
+      templateId: workout.templateId,
+      templateName: workout.templateName,
       exerciseCount: workout.exercises.length,
       createdAt: workout.createdAt,
     }));
@@ -315,13 +317,15 @@ export class WorkoutsService {
       ? new Date(pastWorkoutDate) 
       : new Date();
 
-    // Create workout as free workout
+    // Create workout as free workout with template info
     const workout = await this.prisma.workout.create({
       data: {
         userId,
         date: workoutDate,
         status: 'IN_PROGRESS' as any,
         isFreeWorkout: true,
+        templateId: template.id,
+        templateName: template.name,
         homeGymId: homeGymId || template.recommendedGymId || null,
         exercises: {
           create: template.exercises.map((templateEx) => ({
@@ -776,6 +780,8 @@ export class WorkoutsService {
       cycleName: workout.cycle?.name,
       workoutDayId: workout.workoutDayId,
       workoutDayName: workout.workoutDay?.name,
+      templateId: workout.templateId,
+      templateName: workout.templateName,
       exercises: workout.exercises.map((ex: any) => {
         const blueprintExercise = blueprintExercisesMap.get(ex.exerciseId);
         

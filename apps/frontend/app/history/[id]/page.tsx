@@ -100,7 +100,7 @@ export default function WorkoutDetailPage() {
                     <div>
                       <h2 className="text-2xl font-bold text-gray-900">
                         {workout.isFreeWorkout
-                          ? 'Freies Workout'
+                          ? workout.templateName || 'Freies Workout'
                           : workout.workoutDayName || 'Workout'}
                       </h2>
                       {workout.cycleName && (

@@ -99,6 +99,8 @@ model Workout {
   userId        String
   cycleId       String?
   workoutDayId  String?
+  templateId    String?
+  templateName  String?
   createdAt     DateTime      @default(now())
   homeGymId     String?
   exercises     ExerciseLog[]
