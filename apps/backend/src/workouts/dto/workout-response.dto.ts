@@ -58,6 +58,8 @@ export class WorkoutResponseDto {
   cycleName?: string;
   workoutDayId?: string;
   workoutDayName?: string;
+  templateId?: string;
+  templateName?: string;
   exercises: ExerciseLogDto[];
   createdAt: Date;
 }
@@ -75,6 +77,8 @@ export class WorkoutListItemDto {
   };
   cycleName?: string;
   workoutDayName?: string;
+  templateId?: string;
+  templateName?: string;
   exerciseCount: number;
   createdAt: Date;
 }

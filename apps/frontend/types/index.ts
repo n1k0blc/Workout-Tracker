@@ -131,6 +131,8 @@ export interface Workout {
   cycleName?: string;
   workoutDayId?: string;
   workoutDayName?: string;
+  templateId?: string;
+  templateName?: string;
   exercises: ExerciseLog[];
   createdAt: string;
 }
@@ -145,6 +147,8 @@ export interface WorkoutListItem {
   homeGym?: HomeGym;
   cycleName?: string;
   workoutDayName?: string;
+  templateId?: string;
+  templateName?: string;
   exerciseCount: number;
   createdAt: string;
 }

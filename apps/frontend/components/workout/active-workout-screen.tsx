@@ -81,8 +81,8 @@ export default function ActiveWorkoutScreen() {
         const removedSets = removedPlannedSets.get(exercise.id) || new Set();
         
         allPlannedHandled = exercise.plannedSets.every((plannedSet) => {
-          // setNumber is 1-based, order is 0-based
-          const isLogged = exercise.sets.some(s => s.setNumber === plannedSet.order + 1);
+          // Both setNumber and order are 1-based
+          const isLogged = exercise.sets.some(s => s.setNumber === plannedSet.order);
           const isRemoved = removedSets.has(plannedSet.order);
           return isLogged || isRemoved;
         });
@@ -193,7 +193,7 @@ export default function ActiveWorkoutScreen() {
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">
                   {activeWorkout.isFreeWorkout
-                    ? 'Freies Workout'
+                    ? activeWorkout.templateName || 'Freies Workout'
                     : activeWorkout.workoutDayName || 'Workout'}
                 </h1>
                 {activeWorkout.cycleName && (

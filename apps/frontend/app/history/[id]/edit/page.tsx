@@ -141,7 +141,7 @@ export default function EditWorkoutPage() {
               </h2>
               <p className="mt-1 text-sm text-gray-600">
                 {workout.isFreeWorkout
-                  ? 'Freies Workout'
+                  ? workout.templateName || 'Freies Workout'
                   : workout.workoutDayName || 'Workout'}
                 {workout.cycleName && ` - ${workout.cycleName}`}
               </p>

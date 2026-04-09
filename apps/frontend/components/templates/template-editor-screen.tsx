@@ -86,8 +86,18 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
         setRecommendedGymId(template.recommendedGymId || '');
         
         if (template.exercises) {
+          // Fix 0-based orders from old templates (ensure 1-based)
+          const fixedExercises = template.exercises.map((ex, idx) => ({
+            ...ex,
+            order: ex.order === 0 ? idx + 1 : ex.order,
+            sets: ex.sets.map((set, setIdx) => ({
+              ...set,
+              order: set.order === 0 ? setIdx + 1 : set.order,
+            })),
+          }));
+          
           setExercises(
-            template.exercises.map((ex) => ({
+            fixedExercises.map((ex) => ({
               id: `ex-${ex.order}`,
               exerciseId: ex.exerciseId,
               exerciseName: ex.exerciseName || '',
@@ -112,27 +122,37 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
     }
   };
 
-  const handleAddExercise = async (exerciseId: string) => {
+  const handleAddExercise = async (exerciseId: string, exercise?: Exercise) => {
     // Check if this is a replace operation
     if (replacingExerciseId) {
-      handleReplaceExercise(exerciseId);
+      handleReplaceExercise(exerciseId, exercise);
       return;
     }
 
-    const exercise = availableExercises.find((ex) => ex.id === exerciseId);
-    if (!exercise) {
+    // Use provided exercise or find in available exercises
+    let selectedExercise = exercise;
+    if (!selectedExercise) {
+      selectedExercise = availableExercises.find((ex) => ex.id === exerciseId);
+    }
+    
+    if (!selectedExercise) {
       alert('Übung nicht gefunden.');
       return;
     }
 
-    const newOrder = exercises.length;
+    // If this is a newly created exercise, add it to availableExercises
+    if (exercise && !availableExercises.find((ex) => ex.id === exercise.id)) {
+      setAvailableExercises((prev) => [exercise, ...prev]);
+    }
+
+    const newOrder = exercises.length + 1;
 
     setExercises([
       ...exercises,
       {
         id: `ex-${Date.now()}`,
-        exerciseId: exercise.id,
-        exerciseName: exercise.name,
+        exerciseId: selectedExercise.id,
+        exerciseName: selectedExercise.name,
         order: newOrder,
         sets: [],
       },
@@ -140,13 +160,23 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
     setShowExerciseModal(false);
   };
 
-  const handleReplaceExercise = (newExerciseId: string) => {
+  const handleReplaceExercise = (newExerciseId: string, newExercise?: Exercise) => {
     if (!replacingExerciseId) return;
 
-    const newExercise = availableExercises.find((ex) => ex.id === newExerciseId);
-    if (!newExercise) {
+    // Use provided exercise or find in available exercises
+    let selectedExercise = newExercise;
+    if (!selectedExercise) {
+      selectedExercise = availableExercises.find((ex) => ex.id === newExerciseId);
+    }
+    
+    if (!selectedExercise) {
       alert('Übung nicht gefunden.');
       return;
+    }
+
+    // If this is a newly created exercise, add it to availableExercises
+    if (newExercise && !availableExercises.find((ex) => ex.id === newExercise.id)) {
+      setAvailableExercises((prev) => [newExercise, ...prev]);
     }
 
     setExercises(
@@ -154,8 +184,8 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
         ex.id === replacingExerciseId
           ? {
               ...ex,
-              exerciseId: newExercise.id,
-              exerciseName: newExercise.name,
+              exerciseId: selectedExercise.id,
+              exerciseName: selectedExercise.name,
             }
           : ex
       )
@@ -197,7 +227,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
     setExercises(
       exercises.map((ex) => {
         if (ex.id === exerciseId) {
-          const newSetOrder = ex.sets.length;
+          const newSetOrder = ex.sets.length + 1;
           return {
             ...ex,
             sets: [

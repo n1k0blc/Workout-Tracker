@@ -238,7 +238,7 @@ export default function HistoryPage() {
                           <div className="flex items-center gap-3 mb-2 flex-wrap">
                             <h3 className="text-lg font-semibold text-gray-900">
                               {workout.isFreeWorkout
-                                ? 'Freies Workout'
+                                ? workout.templateName || 'Freies Workout'
                                 : workout.workoutDayName || 'Workout'}
                             </h3>
                             {workout.cycleName && (

@@ -84,8 +84,8 @@ export default function ExerciseCard({
       setType = unplannedSet.setType;
       plannedRestAfterSet = 90; // Default for unplanned sets
     } else {
-      // setNumber is 1-based, order is 0-based
-      const plannedSet = exercise.plannedSets?.find(ps => ps.order === setNumber - 1);
+      // Both setNumber and order are 1-based
+      const plannedSet = exercise.plannedSets?.find(ps => ps.order === setNumber);
       if (!plannedSet) return;
 
       // Merge edited values with planned set values
@@ -216,8 +216,9 @@ export default function ExerciseCard({
   };
 
   const removePlannedSet = (setNumber: number) => {
-    // Mark the set as removed in the context (convert 1-based setNumber to 0-based order)
-    markPlannedSetAsRemoved(exercise.id, setNumber - 1);
+    // Mark the set as removed in the context
+    // Both setNumber and order are 1-based, so we use setNumber directly
+    markPlannedSetAsRemoved(exercise.id, setNumber);
     // Remove from editValues if it was being edited
     setEditValues(prev => {
       const newVals = {...prev};
@@ -245,8 +246,8 @@ export default function ExerciseCard({
     if (editValues[setNumber] && editValues[setNumber][field] !== undefined) {
       return editValues[setNumber][field] as string;
     }
-    // Fall back to planned set value (setNumber is 1-based, order is 0-based)
-    const plannedSet = exercise.plannedSets?.find(ps => ps.order === setNumber - 1);
+    // Fall back to planned set value (both setNumber and order are 1-based)
+    const plannedSet = exercise.plannedSets?.find(ps => ps.order === setNumber);
     if (!plannedSet) return '';
     return plannedSet[field]?.toString() || '';
   };
@@ -255,8 +256,8 @@ export default function ExerciseCard({
     if (editValues[setNumber]?.setType) {
       return editValues[setNumber].setType;
     }
-    // setNumber is 1-based, order is 0-based
-    const plannedSet = exercise.plannedSets?.find(ps => ps.order === setNumber - 1);
+    // Both setNumber and order are 1-based
+    const plannedSet = exercise.plannedSets?.find(ps => ps.order === setNumber);
     return plannedSet?.setType || SetType.WORKING;
   };
 
@@ -268,9 +269,10 @@ export default function ExerciseCard({
     // Add planned sets (that aren't removed)
     const removedSets = removedPlannedSets.get(exercise.id) || new Set();
     if (hasPlannedSets) {
-      exercise.plannedSets?.forEach((_, index) => {
-        const setNumber = index + 1;
-        if (!removedSets.has(setNumber)) {
+      exercise.plannedSets?.forEach((plannedSet) => {
+        // Both order and setNumber are 1-based
+        const setNumber = plannedSet.order;
+        if (!removedSets.has(setNumber)) {  // Check with 1-based setNumber
           setsToLog.add(setNumber);
         }
       });
@@ -295,6 +297,7 @@ export default function ExerciseCard({
     
     // Check if every set that should exist has been logged
     const loggedSetNumbers = new Set(exercise.sets.map(s => s.setNumber));
+    
     for (const setNum of setsToLog) {
       if (!loggedSetNumbers.has(setNum)) {
         return false;
@@ -388,8 +391,8 @@ export default function ExerciseCard({
               return !removedSets || !removedSets.has(plannedSet.order);
             })
             .map((plannedSet, idx) => {
-            // setNumber is 1-based for API/DB, order is 0-based
-            const setNumber = plannedSet.order + 1;
+            // setNumber and order are both 1-based in the database
+            const setNumber = plannedSet.order;
             const loggedSet = getLoggedSet(setNumber);
 
             return (
@@ -603,7 +606,11 @@ export default function ExerciseCard({
             return (
               <div
                 key={unplannedSet.id}
-                className="border rounded-lg p-3 bg-gray-50 border-gray-300"
+                className={`border rounded-lg p-3 ${
+                  loggedSet
+                    ? 'bg-green-50 border-green-200'
+                    : 'bg-gray-50 border-gray-300'
+                }`}
               >
                 <div className="flex items-start gap-3">
                   {/* Checkbox */}

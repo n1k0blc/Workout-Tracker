@@ -180,7 +180,7 @@ export default function DashboardPage() {
                               <div className="flex items-start justify-between">
                                 <div className="flex-1">
                                   <div className="font-medium text-gray-900">
-                                    {workout.workoutDayName || 'Freies Workout'}
+                                    {workout.workoutDayName || workout.templateName || 'Freies Workout'}
                                   </div>
                                   <div className="text-sm text-gray-600 mt-1">
                                     {formatDate(workout.date)}

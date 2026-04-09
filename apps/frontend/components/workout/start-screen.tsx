@@ -186,8 +186,6 @@ export default function WorkoutStartScreen() {
         pendingWorkoutData?.pastWorkoutDuration,
       );
       
-      console.log('Template workout started:', workout);
-      
       setSelectedTemplateId(null);
       setTemplateRecommendedGymId(undefined);
       
