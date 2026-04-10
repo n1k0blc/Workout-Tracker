@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Delete,
   Body,
   Param,
@@ -11,7 +12,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ExercisesService } from './exercises.service';
-import { CreateExerciseDto, FilterExerciseDto, ExerciseDto } from './dto';
+import { CreateExerciseDto, FilterExerciseDto, ExerciseDto, UpdateExerciseDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
@@ -44,6 +45,16 @@ export class ExercisesController {
     @CurrentUser() user: { id: string },
   ): Promise<ExerciseDto> {
     return this.exercisesService.create(createExerciseDto, user.id);
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  async update(
+    @Param('id') id: string,
+    @Body() updateExerciseDto: UpdateExerciseDto,
+    @CurrentUser() user: { id: string },
+  ): Promise<ExerciseDto> {
+    return this.exercisesService.update(id, user.id, updateExerciseDto);
   }
 
   @Delete(':id')

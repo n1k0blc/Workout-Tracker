@@ -97,13 +97,13 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
           }));
           
           setExercises(
-            fixedExercises.map((ex) => ({
-              id: `ex-${ex.order}`,
+            fixedExercises.map((ex, exIdx) => ({
+              id: `ex-${Date.now()}-${exIdx}`,
               exerciseId: ex.exerciseId,
               exerciseName: ex.exerciseName || '',
               order: ex.order,
-              sets: ex.sets.map((set) => ({
-                id: `set-${ex.order}-${set.order}`,
+              sets: ex.sets.map((set, setIdx) => ({
+                id: `set-${Date.now()}-${exIdx}-${setIdx}`,
                 order: set.order,
                 isWarmup: set.isWarmup,
                 targetReps: set.targetReps,

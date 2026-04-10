@@ -4,6 +4,7 @@ import {
   RegisterCredentials,
   User,
   Exercise,
+  UpdateExerciseDto,
   Workout,
   WorkoutListItem,
   WorkoutCycle,
@@ -190,6 +191,13 @@ class ApiClient {
   async deleteExercise(id: string): Promise<void> {
     await this.request(`/exercises/${id}`, {
       method: 'DELETE',
+    });
+  }
+
+  async updateExercise(id: string, data: UpdateExerciseDto): Promise<Exercise> {
+    return this.request<Exercise>(`/exercises/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
     });
   }
 

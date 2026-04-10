@@ -120,6 +120,7 @@ model Exercise {
   userId                  String?
   isDoubleWeight          Boolean                   @default(false)
   isUnilateral            Boolean                   @default(false)
+  deletedAt               DateTime?
   blueprintExercises      BlueprintExercise[]
   user                    User?                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   exerciseLogs            ExerciseLog[]
