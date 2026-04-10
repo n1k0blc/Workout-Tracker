@@ -1,11 +1,14 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
+import { ORMService } from '../orm/orm.service';
 import {
   VolumeAnalyticsDto,
   OneRMAnalyticsDto,
   PersonalRecordsDto,
   MuscleDistributionDto,
   TimeTrackingDto,
+  CycleListDto,
+  ORMByCycleDto,
 } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -13,7 +16,10 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 @Controller('analytics')
 @UseGuards(JwtAuthGuard)
 export class AnalyticsController {
-  constructor(private readonly analyticsService: AnalyticsService) {}
+  constructor(
+    private readonly analyticsService: AnalyticsService,
+    private readonly ormService: ORMService,
+  ) {}
 
   @Get('volume')
   async getVolumeAnalytics(
@@ -21,10 +27,23 @@ export class AnalyticsController {
     @Query('period') period: 'week' | 'month' | 'all' = 'month',
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('gymId') gymId?: string,
+    @Query('muscleGroup') muscleGroup?: string,
+    @Query('equipment') equipment?: string,
+    @Query('cycleId') cycleId?: string,
   ): Promise<VolumeAnalyticsDto> {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
-    return this.analyticsService.getVolumeAnalytics(user.id, period, start, end);
+    return this.analyticsService.getVolumeAnalytics(
+      user.id,
+      period,
+      start,
+      end,
+      gymId,
+      muscleGroup,
+      equipment,
+      cycleId,
+    );
   }
 
   @Get('1rm/:exerciseId')
@@ -40,16 +59,18 @@ export class AnalyticsController {
     @CurrentUser() user: { id: string },
     @Query('muscleGroup') muscleGroup?: string,
     @Query('equipment') equipment?: string,
+    @Query('gymId') gymId?: string,
   ): Promise<PersonalRecordsDto> {
-    return this.analyticsService.getPersonalRecords(user.id, muscleGroup, equipment);
+    return this.analyticsService.getPersonalRecords(user.id, muscleGroup, equipment, gymId);
   }
 
   @Get('muscle-distribution')
   async getMuscleDistribution(
-    @Query('period') period: 'week' | 'month' | 'all' = 'month',
     @CurrentUser() user: { id: string },
+    @Query('period') period: 'week' | 'month' | 'all' = 'month',
+    @Query('gymId') gymId?: string,
   ): Promise<MuscleDistributionDto> {
-    return this.analyticsService.getMuscleDistribution(user.id, period);
+    return this.analyticsService.getMuscleDistribution(user.id, period, gymId);
   }
 
   @Get('time-tracking')
@@ -58,5 +79,31 @@ export class AnalyticsController {
     @CurrentUser() user: { id: string },
   ): Promise<TimeTrackingDto> {
     return this.analyticsService.getTimeTracking(user.id, period);
+  }
+
+  @Get('orm/:cycleId/:workoutDayId')
+  async getORMAnalytics(
+    @Param('cycleId') cycleId: string,
+    @Param('workoutDayId') workoutDayId: string,
+    @CurrentUser() user: { id: string },
+  ) {
+    return this.analyticsService.getORMAnalytics(cycleId, workoutDayId, user.id);
+  }
+
+  @Get('cycles')
+  async getCycles(
+    @CurrentUser() user: { id: string },
+  ): Promise<CycleListDto> {
+    return this.analyticsService.getCycles(user.id);
+  }
+
+  @Get('orm-by-cycle/:cycleId')
+  async getORMByCycle(
+    @Param('cycleId') cycleId: string,
+    @CurrentUser() user: { id: string },
+    @Query('muscleGroup') muscleGroup?: string,
+    @Query('equipment') equipment?: string,
+  ): Promise<ORMByCycleDto> {
+    return this.analyticsService.getORMByCycle(user.id, cycleId, muscleGroup, equipment);
   }
 }

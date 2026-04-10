@@ -9,6 +9,9 @@ import {
   PersonalRecord,
   MuscleGroup,
   Equipment,
+  HomeGym,
+  CycleList,
+  ORMByCycleAnalytics,
 } from '@/types';
 import {
   LineChart,
@@ -23,42 +26,167 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function AnalyticsPage() {
+  // Data states
   const [volumeData, setVolumeData] = useState<VolumeAnalytics | null>(null);
+  const [ormData, setOrmData] = useState<ORMByCycleAnalytics | null>(null);
   const [prs, setPrs] = useState<PersonalRecord[]>([]);
+  const [homeGyms, setHomeGyms] = useState<HomeGym[]>([]);
+  const [cycles, setCycles] = useState<CycleList | null>(null);
+  
+  // UI states
   const [loading, setLoading] = useState(true);
-  const [dateRange, setDateRange] = useState<'7d' | '30d' | '90d'>('30d');
-  const [prMuscleFilter, setPrMuscleFilter] = useState<MuscleGroup | undefined>();
-  const [prEquipmentFilter, setPrEquipmentFilter] = useState<Equipment | undefined>();
+  const [cycleMode, setCycleMode] = useState(false);
+  const [viewMode, setViewMode] = useState<'volume' | 'orm'>('volume');
+  
+  // Filter states
+  const [timeFilter, setTimeFilter] = useState('7');
+  const [gymFilter, setGymFilter] = useState('alle');
+  const [muscleFilter, setMuscleFilter] = useState<MuscleGroup | undefined>();
+  const [equipmentFilter, setEquipmentFilter] = useState<Equipment | undefined>();
+  
+  // Cycle navigation
+  const [selectedCycleIndex, setSelectedCycleIndex] = useState<number>(0);
 
+  // Load initial data
   useEffect(() => {
-    loadAnalyticsData();
-  }, [dateRange, prMuscleFilter, prEquipmentFilter]);
+    loadInitialData();
+  }, []);
 
-  const loadAnalyticsData = async () => {
+  // Reload analytics when filters change
+  useEffect(() => {
+    if (!loading) {
+      loadAnalyticsData();
+    }
+  }, [cycleMode, timeFilter, gymFilter, muscleFilter, equipmentFilter, selectedCycleIndex, viewMode]);
+
+  const loadInitialData = async () => {
     setLoading(true);
     try {
-      const endDate = new Date().toISOString();
-      const days = dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 90;
-      const startDate = new Date(
-        Date.now() - days * 24 * 60 * 60 * 1000
-      ).toISOString();
+      const [gyms, cyclesList] = await Promise.all([
+        apiClient.getHomeGyms(),
+        apiClient.getAnalyticsCycles(),
+      ]);
+      
+      setHomeGyms(gyms);
+      setCycles(cyclesList);
+      
+      // Default: activate cycle mode if active cycle exists
+      if (cyclesList.activeCycle) {
+        setCycleMode(true);
+      }
+    } catch (error) {
+      console.error('Failed to load initial data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadAnalyticsData = async () => {
+    try {
+      if (cycleMode) {
+        await loadCycleModeData();
+      } else {
+        await loadTimeModeData();
+      }
+    } catch (error) {
+      console.error('Failed to load analytics data:', error);
+    }
+  };
+
+  const loadTimeModeData = async () => {
+    const endDate = new Date().toISOString();
+    const days = parseInt(timeFilter);
+    const startDate = timeFilter === 'all'
+      ? undefined
+      : new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+    const [volume, records] = await Promise.all([
+      apiClient.getVolumeAnalytics({
+        startDate,
+        endDate,
+        gymId: gymFilter,
+        muscleGroup: muscleFilter,
+        equipment: equipmentFilter,
+      }),
+      apiClient.getPersonalRecords({
+        muscleGroup: muscleFilter,
+        equipment: equipmentFilter,
+        gymId: gymFilter,
+      }),
+    ]);
+
+    setVolumeData(volume);
+    setPrs(records.allTimePRs || []);
+  };
+
+  const loadCycleModeData = async () => {
+    if (!cycles) return;
+
+    // Get selected cycle
+    const allCycles = [
+      ...(cycles.activeCycle ? [cycles.activeCycle] : []),
+      ...cycles.completedCycles,
+    ];
+    
+    if (allCycles.length === 0) return;
+    
+    const selectedCycle = allCycles[selectedCycleIndex];
+
+    if (viewMode === 'volume') {
+      // Load volume for cycle period
+      const cycleStart = new Date(selectedCycle.startDate).toISOString();
+      // For active cycles, don't set endDate to allow future mock dates
+      const cycleEnd = selectedCycle.completedAt
+        ? new Date(selectedCycle.completedAt).toISOString()
+        : undefined;
 
       const [volume, records] = await Promise.all([
-        apiClient.getVolumeAnalytics({ startDate, endDate }),
+        apiClient.getVolumeAnalytics({
+          startDate: cycleStart,
+          endDate: cycleEnd,
+          gymId: gymFilter,
+          muscleGroup: muscleFilter,
+          equipment: equipmentFilter,
+          cycleId: selectedCycle.id, // NEW: Only this cycle's workouts
+        }),
         apiClient.getPersonalRecords({
-          muscleGroup: prMuscleFilter,
-          equipment: prEquipmentFilter,
+          muscleGroup: muscleFilter,
+          equipment: equipmentFilter,
+          gymId: gymFilter,
         }),
       ]);
 
-      setVolumeData(volume);
+      // Add trainingDay to dataPoints for cycle mode
+      const volumeWithTrainingDays = {
+        ...volume,
+        dataPoints: volume.dataPoints.map((point, index) => ({
+          ...point,
+          trainingDay: index + 1,
+        })),
+      };
+
+      setVolumeData(volumeWithTrainingDays as any);
       setPrs(records.allTimePRs || []);
-    } catch (error) {
-      console.error('Failed to load analytics data:', error);
-    } finally {
-      setLoading(false);
+    } else {
+      // Load ORM data for cycle
+      const [orm, records] = await Promise.all([
+        apiClient.getORMByCycle(
+          selectedCycle.id,
+          muscleFilter,
+          equipmentFilter,
+        ),
+        apiClient.getPersonalRecords({
+          muscleGroup: muscleFilter,
+          equipment: equipmentFilter,
+          gymId: gymFilter,
+        }),
+      ]);
+
+      setOrmData(orm);
+      setPrs(records.allTimePRs || []);
     }
   };
 
@@ -132,58 +260,220 @@ export default function AnalyticsPage() {
     '#6366f1', // indigo
   ];
 
+  const allCycles = cycles
+    ? [...(cycles.activeCycle ? [cycles.activeCycle] : []), ...cycles.completedCycles]
+    : [];
+  const selectedCycle = allCycles[selectedCycleIndex];
+  const isActiveCycle = selectedCycle?.status === 'ACTIVE';
+
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50">
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                Trainingsanalyse
+              </h2>
+
+              {/* Filter Section - ALWAYS ON TOP */}
+              <div className="bg-white rounded-lg shadow p-6 space-y-4">
+                {/* Row 1: Cycle Mode Toggle + Time/Gym Filter */}
+                <div className="flex flex-wrap gap-4 items-center">
+                  {/* Cycle Mode Button */}
+                  <button
+                    onClick={() => {
+                      setCycleMode(!cycleMode);
+                      setViewMode('volume'); // Reset to volume when switching modes
+                    }}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                      cycleMode
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Zyklus-Modus
+                  </button>
+
+                  {/* Time Filter (only in Time Mode) */}
+                  {!cycleMode && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium text-gray-700">
+                        Zeitraum:
+                      </label>
+                      <select
+                        value={timeFilter}
+                        onChange={(e) => setTimeFilter(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="7">7 Tage</option>
+                        <option value="14">14 Tage</option>
+                        <option value="30">30 Tage</option>
+                        <option value="90">90 Tage</option>
+                        <option value="180">180 Tage</option>
+                        <option value="365">1 Jahr</option>
+                        <option value="all">Alle</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Gym Filter */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      Gym:
+                    </label>
+                    <select
+                      value={gymFilter}
+                      onChange={(e) => setGymFilter(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="alle">Alle</option>
+                      {homeGyms.map((gym) => (
+                        <option key={gym.id} value={gym.id}>
+                          {gym.name}
+                        </option>
+                      ))}
+                      <option value="andere">Andere Gyms</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Row 2: Cycle Navigation (only in Cycle Mode) */}
+                {cycleMode && allCycles.length > 0 && (
+                  <div className="flex items-center justify-between border-t pt-4">
+                    <button
+                      onClick={() => setSelectedCycleIndex(Math.min(allCycles.length - 1, selectedCycleIndex + 1))}
+                      disabled={selectedCycleIndex === allCycles.length - 1}
+                      className="p-2 rounded-lg text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+
+                    <div className="text-center">
+                      <div className="text-lg font-semibold text-gray-900">
+                        {selectedCycle?.name}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        {formatDate(selectedCycle?.startDate || '')}
+                        {selectedCycle?.completedAt && ` - ${formatDate(selectedCycle.completedAt)}`}
+                        <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
+                          isActiveCycle ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {isActiveCycle ? 'Aktiv' : 'Abgeschlossen'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setSelectedCycleIndex(Math.max(0, selectedCycleIndex - 1))}
+                      disabled={selectedCycleIndex === 0}
+                      className="p-2 rounded-lg text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Row 3: Volume/ORM Toggle (only in Cycle Mode) */}
+                {cycleMode && (
+                  <div className="flex items-center gap-2 border-t pt-4">
+                    <button
+                      onClick={() => setViewMode('volume')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                        viewMode === 'volume'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Volumen
+                    </button>
+                    <button
+                      onClick={() => setViewMode('orm')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                        viewMode === 'orm'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      %ORM
+                    </button>
+                  </div>
+                )}
+
+                {/* Row 4: Muscle Group Filter */}
+                <div className="border-t pt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Muskelgruppe
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setMuscleFilter(undefined)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                        !muscleFilter
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Alle
+                    </button>
+                    {muscleGroups.map((mg) => (
+                      <button
+                        key={mg}
+                        onClick={() => setMuscleFilter(mg)}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                          muscleFilter === mg
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {translateMuscleGroup(mg)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Row 5: Equipment Filter */}
+                <div className="border-t pt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Equipment
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setEquipmentFilter(undefined)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                        !equipmentFilter
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Alle
+                    </button>
+                    {equipments.map((eq) => (
+                      <button
+                        key={eq}
+                        onClick={() => setEquipmentFilter(eq)}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                          equipmentFilter === eq
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {translateEquipment(eq)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <div className="text-lg text-gray-600">Lädt Analytics...</div>
               </div>
             ) : (
               <div className="space-y-6">
-                {/* Header with Date Range Selector */}
-                <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Trainingsanalyse
-                  </h2>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setDateRange('7d')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                        dateRange === '7d'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      7 Tage
-                    </button>
-                    <button
-                      onClick={() => setDateRange('30d')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                        dateRange === '30d'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      30 Tage
-                    </button>
-                    <button
-                      onClick={() => setDateRange('90d')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                        dateRange === '90d'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      90 Tage
-                    </button>
-                  </div>
-                </div>
-
                 {/* Volume Chart */}
-                {volumeData && volumeData.dataPoints.length > 0 && (
+                {(!cycleMode || viewMode === 'volume') && volumeData && volumeData.dataPoints.length > 0 && (
                   <div className="bg-white rounded-lg shadow p-6">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">
                       Volumen-Entwicklung
@@ -192,8 +482,8 @@ export default function AnalyticsPage() {
                       <LineChart data={volumeData.dataPoints}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis
-                          dataKey="date"
-                          tickFormatter={formatDate}
+                          dataKey={cycleMode ? "trainingDay" : "date"}
+                          tickFormatter={cycleMode ? (val) => `Tag ${val}` : formatDate}
                           style={{ fontSize: '12px' }}
                         />
                         <YAxis
@@ -205,7 +495,9 @@ export default function AnalyticsPage() {
                             `${formatNumber(value as number)} kg`,
                             'Volumen',
                           ]}
-                          labelFormatter={(label: any) => formatDate(label as string)}
+                          labelFormatter={(label: any) =>
+                            cycleMode ? `Tag ${label}` : formatDate(label as string)
+                          }
                         />
                         <Legend />
                         <Line
@@ -229,6 +521,69 @@ export default function AnalyticsPage() {
                   </div>
                 )}
 
+                {/* ORM Chart (only in Cycle Mode) */}
+                {cycleMode && viewMode === 'orm' && (
+                  <div className="bg-white rounded-lg shadow p-6">
+                    {gymFilter === 'andere' ? (
+                      <div className="text-center py-12">
+                        <p className="text-gray-600">
+                          %ORM Tracking ist nur für Home Gym Workouts verfügbar.
+                        </p>
+                        <p className="text-sm text-gray-500 mt-2">
+                          Bitte wähle ein Home Gym oder "Alle" aus.
+                        </p>
+                      </div>
+                    ) : ormData && ormData.dataPoints.length > 0 ? (
+                      <>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                          %ORM-Entwicklung
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={ormData.dataPoints}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis
+                              dataKey="trainingDay"
+                              tickFormatter={(val) => `Tag ${val}`}
+                              style={{ fontSize: '12px' }}
+                            />
+                            <YAxis
+                              tickFormatter={(value) => `${value}%`}
+                              style={{ fontSize: '12px' }}
+                            />
+                            <Tooltip
+                              formatter={(value: any) => [`${value}%`, '%ORM']}
+                              labelFormatter={(label: any) => `Tag ${label}`}
+                            />
+                            <Legend />
+                            <Line
+                              type="monotone"
+                              dataKey="percentORM"
+                              stroke="#10b981"
+                              strokeWidth={2}
+                              dot={{ r: 4 }}
+                              name="%ORM"
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                        <div className="mt-4 text-center">
+                          <div className="text-sm text-gray-600">
+                            Durchschnitt %ORM
+                          </div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {ormData.averagePercentORM}%
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center py-12">
+                        <p className="text-gray-600">
+                          Keine ORM Daten verfügbar für die ausgewählten Filter.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Muscle Distribution Chart */}
                 {volumeData && volumeData.byMuscleGroup && volumeData.byMuscleGroup.length > 0 && (
                   <div className="bg-white rounded-lg shadow p-6">
@@ -244,7 +599,7 @@ export default function AnalyticsPage() {
                             cy="50%"
                             labelLine={false}
                             label={(entry: any) =>
-                              `${translateMuscleGroup(entry.muscleGroup)} (${entry.percentage}%)`
+                              `${translateMuscleGroup(entry.muscleGroup)} (${Math.round(entry.percentage)}%)`
                             }
                             outerRadius={80}
                             fill="#8884d8"
@@ -287,7 +642,7 @@ export default function AnalyticsPage() {
                                 {formatNumber(mg.volume)} kg
                               </div>
                               <div className="text-xs text-gray-600">
-                                {mg.percentage}%
+                                {Math.round(mg.percentage)}%
                               </div>
                             </div>
                           </div>
@@ -303,73 +658,6 @@ export default function AnalyticsPage() {
                     <h3 className="text-lg font-semibold text-gray-900">
                       Persönliche Rekorde
                     </h3>
-                  </div>
-                  
-                  {/* PR Filters */}
-                  <div className="p-6 border-b border-gray-200 space-y-4">
-                    {/* Muscle Group Filter */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Muskelgruppe
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          onClick={() => setPrMuscleFilter(undefined)}
-                          className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
-                            !prMuscleFilter
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }`}
-                        >
-                          Alle
-                        </button>
-                        {muscleGroups.map((mg) => (
-                          <button
-                            key={mg}
-                            onClick={() => setPrMuscleFilter(mg)}
-                            className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
-                              prMuscleFilter === mg
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                          >
-                            {translateMuscleGroup(mg)}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Equipment Filter */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Equipment
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        <button
-                          onClick={() => setPrEquipmentFilter(undefined)}
-                          className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
-                            !prEquipmentFilter
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }`}
-                        >
-                          Alle
-                        </button>
-                        {equipments.map((eq) => (
-                          <button
-                            key={eq}
-                            onClick={() => setPrEquipmentFilter(eq)}
-                            className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
-                              prEquipmentFilter === eq
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                          >
-                            {translateEquipment(eq)}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
                   </div>
 
                   <div className="p-6">
@@ -404,7 +692,7 @@ export default function AnalyticsPage() {
                       </div>
                     ) : (
                       <p className="text-gray-500 text-center py-8">
-                        {prMuscleFilter || prEquipmentFilter
+                        {muscleFilter || equipmentFilter
                           ? 'Keine persönlichen Rekorde für die ausgewählten Filter gefunden'
                           : 'Noch keine persönlichen Rekorde vorhanden'}
                       </p>
@@ -415,14 +703,15 @@ export default function AnalyticsPage() {
                 {/* Empty State */}
                 {(!volumeData || volumeData.dataPoints.length === 0) && (
                   <div className="bg-white rounded-lg shadow p-12 text-center">
-                    <p className="text-gray-600 mb-4">
-                      Noch keine Daten für den gewählten Zeitraum vorhanden.
+                    <p className="text-gray-500">
+                      Noch keine Trainingsdaten für den ausgewählten Zeitraum
+                      vorhanden.
                     </p>
                     <Link
                       href="/workout"
-                      className="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700"
+                      className="mt-4 inline-block text-blue-600 hover:text-blue-800"
                     >
-                      Erstes Workout starten
+                      Zum Workout →
                     </Link>
                   </div>
                 )}

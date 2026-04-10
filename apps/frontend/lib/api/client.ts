@@ -11,6 +11,9 @@ import {
   VolumeAnalytics,
   PersonalRecord,
   PersonalRecordsResponse,
+  ORMAnalytics,
+  CycleList,
+  ORMByCycleAnalytics,
   MuscleGroup,
   Equipment,
   HomeGym,
@@ -514,14 +517,18 @@ class ApiClient {
   async getVolumeAnalytics(params?: {
     startDate?: string;
     endDate?: string;
-    exerciseId?: string;
-    muscleGroup?: MuscleGroup;
+    gymId?: string;
+    muscleGroup?: string;
+    equipment?: string;
+    cycleId?: string;
   }): Promise<VolumeAnalytics> {
     const query = new URLSearchParams();
     if (params?.startDate) query.append('startDate', params.startDate);
     if (params?.endDate) query.append('endDate', params.endDate);
-    if (params?.exerciseId) query.append('exerciseId', params.exerciseId);
+    if (params?.gymId) query.append('gymId', params.gymId);
     if (params?.muscleGroup) query.append('muscleGroup', params.muscleGroup);
+    if (params?.equipment) query.append('equipment', params.equipment);
+    if (params?.cycleId) query.append('cycleId', params.cycleId);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<VolumeAnalytics>(`/analytics/volume${queryString}`);
@@ -531,14 +538,44 @@ class ApiClient {
     exerciseId?: string;
     muscleGroup?: string;
     equipment?: string;
+    gymId?: string;
   }): Promise<PersonalRecordsResponse> {
     const query = new URLSearchParams();
     if (params?.exerciseId) query.append('exerciseId', params.exerciseId);
     if (params?.muscleGroup) query.append('muscleGroup', params.muscleGroup);
     if (params?.equipment) query.append('equipment', params.equipment);
+    if (params?.gymId) query.append('gymId', params.gymId);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<PersonalRecordsResponse>(`/analytics/prs${queryString}`);
+  }
+
+  async getORMAnalytics(
+    cycleId: string,
+    workoutDayId: string,
+  ): Promise<ORMAnalytics> {
+    return this.request<ORMAnalytics>(
+      `/analytics/orm/${cycleId}/${workoutDayId}`
+    );
+  }
+
+  async getAnalyticsCycles(): Promise<CycleList> {
+    return this.request<CycleList>('/analytics/cycles');
+  }
+
+  async getORMByCycle(
+    cycleId: string,
+    muscleGroup?: string,
+    equipment?: string,
+  ): Promise<ORMByCycleAnalytics> {
+    const query = new URLSearchParams();
+    if (muscleGroup) query.append('muscleGroup', muscleGroup);
+    if (equipment) query.append('equipment', equipment);
+
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    return this.request<ORMByCycleAnalytics>(
+      `/analytics/orm-by-cycle/${cycleId}${queryString}`
+    );
   }
 
   // Workout Template Methods
