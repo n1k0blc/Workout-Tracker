@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
 import { Exercise, MuscleGroup, Equipment } from '@/types';
 import CreateExerciseModal from '@/components/exercises/create-exercise-modal';
-import { Plus, Trash2 } from 'lucide-react';
+import EditExerciseModal from '@/components/exercises/edit-exercise-modal';
+import { Plus, Trash2, Pencil } from 'lucide-react';
 
 export default function ExercisesTab() {
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -13,6 +14,7 @@ export default function ExercisesTab() {
   const [muscleGroupFilter, setMuscleGroupFilter] = useState<MuscleGroup | undefined>();
   const [equipmentFilter, setEquipmentFilter] = useState<Equipment | undefined>();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editExercise, setEditExercise] = useState<Exercise | null>(null);
   const [deleteExerciseId, setDeleteExerciseId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -39,6 +41,13 @@ export default function ExercisesTab() {
   const handleExerciseCreated = (exercise: Exercise) => {
     setExercises((prev) => [exercise, ...prev]);
     setShowCreateModal(false);
+  };
+
+  const handleExerciseUpdated = (updatedExercise: Exercise) => {
+    setExercises((prev) =>
+      prev.map((ex) => (ex.id === updatedExercise.id ? updatedExercise : ex))
+    );
+    setEditExercise(null);
   };
 
   const handleDeleteExercise = async () => {
@@ -238,13 +247,22 @@ export default function ExercisesTab() {
                       <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded whitespace-nowrap">
                         Custom
                       </span>
-                      <button
-                        onClick={() => setDeleteExerciseId(exercise.id)}
-                        className="text-red-600 hover:text-red-800 transition-colors"
-                        title="Übung löschen"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setEditExercise(exercise)}
+                          className="text-blue-600 hover:text-blue-800 transition-colors"
+                          title="Übung bearbeiten"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteExerciseId(exercise.id)}
+                          className="text-red-600 hover:text-red-800 transition-colors"
+                          title="Übung löschen"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </>
                   )}
                 </div>
@@ -263,6 +281,15 @@ export default function ExercisesTab() {
         <CreateExerciseModal
           onClose={() => setShowCreateModal(false)}
           onCreated={handleExerciseCreated}
+        />
+      )}
+
+      {/* Edit Exercise Modal */}
+      {editExercise && (
+        <EditExerciseModal
+          exercise={editExercise}
+          onClose={() => setEditExercise(null)}
+          onUpdated={handleExerciseUpdated}
         />
       )}
 

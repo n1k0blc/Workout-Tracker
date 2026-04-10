@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateExerciseDto, FilterExerciseDto, ExerciseDto } from './dto';
+import { CreateExerciseDto, FilterExerciseDto, ExerciseDto, UpdateExerciseDto } from './dto';
 
 @Injectable()
 export class ExercisesService {
@@ -11,6 +11,7 @@ export class ExercisesService {
 
     // Build where clause
     const where: any = {
+      deletedAt: null, // Filter soft-deleted exercises
       OR: [
         { isCustom: false }, // Global exercises
         ...(includeCustom === 'true' && userId
@@ -141,8 +142,48 @@ export class ExercisesService {
       throw new ConflictException('You can only delete your own custom exercises');
     }
 
-    await this.prisma.exercise.delete({
+    // Soft-delete instead of hard-delete to prevent FK constraint errors
+    await this.prisma.exercise.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+  }
+
+  async update(id: string, userId: string, updateDto: UpdateExerciseDto): Promise<ExerciseDto> {
+    const exercise = await this.prisma.exercise.findUnique({
       where: { id },
     });
+
+    if (!exercise) {
+      throw new NotFoundException('Exercise not found');
+    }
+
+    // Only custom exercises can be updated and only by their owner
+    if (!exercise.isCustom || exercise.userId !== userId) {
+      throw new ConflictException('You can only update your own custom exercises');
+    }
+
+    const updated = await this.prisma.exercise.update({
+      where: { id },
+      data: {
+        name: updateDto.name,
+        muscleGroup: updateDto.muscleGroup,
+        equipment: updateDto.equipment,
+        isUnilateral: updateDto.isUnilateral,
+        isDoubleWeight: updateDto.isDoubleWeight,
+      },
+      select: {
+        id: true,
+        name: true,
+        muscleGroup: true,
+        equipment: true,
+        isUnilateral: true,
+        isDoubleWeight: true,
+        isCustom: true,
+        userId: true,
+      },
+    });
+
+    return updated as ExerciseDto;
   }
 }

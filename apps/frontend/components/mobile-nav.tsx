@@ -31,6 +31,7 @@ export function MobileNav() {
 
   // Don't show navigation on auth pages, workout page, or when there's an active workout
   if (
+    pathname === '/' ||
     pathname === '/login' ||
     pathname === '/register' ||
     pathname?.startsWith('/workout') ||

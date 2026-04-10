@@ -383,7 +383,7 @@ export class WorkoutTemplatesService {
             order: exerciseLog.order,
             sets: {
               create: exerciseLog.sets.map((set, index) => ({
-                order: index,
+                order: index + 1, // 1-based order
                 isWarmup: set.setType === 'WARMUP',
                 targetReps: set.reps,
                 targetWeight: set.weight,

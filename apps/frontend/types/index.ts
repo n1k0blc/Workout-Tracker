@@ -71,6 +71,14 @@ export interface Exercise {
   userId?: string;
 }
 
+export interface UpdateExerciseDto {
+  name: string;
+  muscleGroup: MuscleGroup;
+  equipment: Equipment;
+  isUnilateral?: boolean;
+  isDoubleWeight?: boolean;
+}
+
 // Workout Types
 export enum WorkoutStatus {
   IN_PROGRESS = 'IN_PROGRESS',
