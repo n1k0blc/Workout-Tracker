@@ -35,29 +35,31 @@ model HomeGym {
 }
 
 model WorkoutCycle {
-  id          String       @id @default(uuid())
-  name        String
-  duration    Int
-  startDate   DateTime
-  status      CycleStatus  @default(ACTIVE)
-  completedAt DateTime?
-  createdAt   DateTime     @default(now())
-  userId      String
-  workouts    Workout[]
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workoutDays WorkoutDay[]
+  id                 String              @id @default(uuid())
+  name               String
+  duration           Int
+  startDate          DateTime
+  status             CycleStatus         @default(ACTIVE)
+  completedAt        DateTime?
+  createdAt          DateTime            @default(now())
+  userId             String
+  workouts           Workout[]
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutDays        WorkoutDay[]
+  exerciseBenchmarks ExerciseBenchmark[]
 }
 
 model WorkoutDay {
-  id               String            @id @default(uuid())
-  weekday          Int
-  name             String
-  cycleId          String
-  plannedHomeGymId String?
-  workouts         Workout[]
-  blueprint        WorkoutBlueprint?
-  cycle            WorkoutCycle      @relation(fields: [cycleId], references: [id], onDelete: Cascade)
-  plannedHomeGym   HomeGym?          @relation("PlannedHomeGym", fields: [plannedHomeGymId], references: [id])
+  id                 String              @id @default(uuid())
+  weekday            Int
+  name               String
+  cycleId            String
+  plannedHomeGymId   String?
+  workouts           Workout[]
+  blueprint          WorkoutBlueprint?
+  cycle              WorkoutCycle        @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  plannedHomeGym     HomeGym?            @relation("PlannedHomeGym", fields: [plannedHomeGymId], references: [id])
+  exerciseBenchmarks ExerciseBenchmark[]
 }
 
 model WorkoutBlueprint {
@@ -91,23 +93,24 @@ model BlueprintSet {
 }
 
 model Workout {
-  id            String        @id @default(uuid())
-  date          DateTime      @default(now())
-  status        WorkoutStatus
-  isFreeWorkout Boolean       @default(false)
-  totalDuration Int?
-  userId        String
-  cycleId       String?
-  workoutDayId  String?
-  templateId    String?
-  templateName  String?
-  createdAt     DateTime      @default(now())
-  homeGymId     String?
-  exercises     ExerciseLog[]
-  cycle         WorkoutCycle? @relation(fields: [cycleId], references: [id])
-  homeGym       HomeGym?      @relation(fields: [homeGymId], references: [id])
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workoutDay    WorkoutDay?   @relation(fields: [workoutDayId], references: [id])
+  id             String              @id @default(uuid())
+  date           DateTime            @default(now())
+  status         WorkoutStatus
+  isFreeWorkout  Boolean             @default(false)
+  totalDuration  Int?
+  userId         String
+  cycleId        String?
+  workoutDayId   String?
+  templateId     String?
+  templateName   String?
+  createdAt      DateTime            @default(now())
+  homeGymId      String?
+  exercises      ExerciseLog[]
+  cycle          WorkoutCycle?       @relation(fields: [cycleId], references: [id])
+  homeGym        HomeGym?            @relation(fields: [homeGymId], references: [id])
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutDay     WorkoutDay?         @relation(fields: [workoutDayId], references: [id])
+  benchmarksSet  ExerciseBenchmark[] @relation("BenchmarkWorkout")
 }
 
 model Exercise {
@@ -125,6 +128,24 @@ model Exercise {
   user                    User?                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   exerciseLogs            ExerciseLog[]
   workoutTemplateExercise WorkoutTemplateExercise[]
+  benchmarks              ExerciseBenchmark[]
+}
+
+model ExerciseBenchmark {
+  id             String       @id @default(uuid())
+  cycleId        String
+  workoutDayId   String
+  exerciseId     String
+  ormBenchmark   Float
+  setAtWorkoutId String
+  createdAt      DateTime     @default(now())
+  cycle          WorkoutCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  workoutDay     WorkoutDay   @relation(fields: [workoutDayId], references: [id], onDelete: Cascade)
+  exercise       Exercise     @relation(fields: [exerciseId], references: [id])
+  setAtWorkout   Workout      @relation("BenchmarkWorkout", fields: [setAtWorkoutId], references: [id])
+
+  @@unique([cycleId, workoutDayId, exerciseId])
+  @@index([cycleId, workoutDayId])
 }
 
 model ExerciseLog {

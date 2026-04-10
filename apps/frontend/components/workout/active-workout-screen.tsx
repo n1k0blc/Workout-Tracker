@@ -8,6 +8,7 @@ import ExerciseCard from '@/components/workout/exercise-card';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import WorkoutTimer from '@/components/workout/workout-timer';
 import { RestTimerDisplay } from '@/components/workout/rest-timer-display';
+import toast from 'react-hot-toast';
 import {
   DndContext,
   closestCenter,
@@ -98,11 +99,27 @@ export default function ActiveWorkoutScreen() {
   };
 
   const handleAddExercise = async (exerciseId: string) => {
+    // Check if exercise already exists in workout
+    const isDuplicate = activeWorkout.exercises.some(
+      (ex) => ex.exerciseId === exerciseId
+    );
+
+    if (isDuplicate) {
+      toast.error(
+        'Diese Übung ist bereits im Workout. Füge stattdessen Sätze zur bestehenden Übung hinzu.',
+        {
+          duration: 4000,
+        }
+      );
+      return; // Don't add, keep modal open
+    }
+
     try {
       await addExercise(exerciseId);
       setShowExerciseModal(false);
     } catch (error) {
       console.error('Failed to add exercise:', error);
+      toast.error('Fehler beim Hinzufügen der Übung');
     }
   };
 

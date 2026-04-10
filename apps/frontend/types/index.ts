@@ -79,6 +79,30 @@ export interface UpdateExerciseDto {
   isDoubleWeight?: boolean;
 }
 
+export interface ExerciseBenchmark {
+  id: string;
+  cycleId: string;
+  workoutDayId: string;
+  exerciseId: string;
+  ormBenchmark: number;
+  setAtWorkoutId: string;
+  createdAt: string;
+}
+
+export interface ORMAnalytics {
+  workouts: {
+    workoutId: string;
+    date: string;
+    exercises: {
+      exerciseId: string;
+      exerciseName: string;
+      benchmark: number;
+      percentORM: number | null;
+      wasBenchmarkSet: boolean;
+    }[];
+  }[];
+}
+
 // Workout Types
 export enum WorkoutStatus {
   IN_PROGRESS = 'IN_PROGRESS',
@@ -246,6 +270,36 @@ export interface PersonalRecord {
 export interface PersonalRecordsResponse {
   recentPRs: PersonalRecord[];
   allTimePRs: PersonalRecord[];
+}
+
+export interface CycleListItem {
+  id: string;
+  name: string;
+  duration: number;
+  startDate: string;
+  status: 'ACTIVE' | 'COMPLETED';
+  completedAt?: string;
+  createdAt: string;
+}
+
+export interface CycleList {
+  activeCycle?: CycleListItem;
+  completedCycles: CycleListItem[];
+}
+
+export interface ORMDataPoint {
+  date: string;
+  trainingDay: number;
+  percentORM: number;
+  workoutId: string;
+}
+
+export interface ORMByCycleAnalytics {
+  cycleId: string;
+  cycleName: string;
+  dataPoints: ORMDataPoint[];
+  averagePercentORM: number;
+  totalWorkouts: number;
 }
 
 // Workout Template Types

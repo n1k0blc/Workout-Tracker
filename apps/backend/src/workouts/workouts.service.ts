@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ORMService } from '../orm/orm.service';
+import { getCurrentDate } from '../common/utils/date.util';
 import {
   StartWorkoutDto,
   LogSetDto,
@@ -14,7 +16,10 @@ import {
 
 @Injectable()
 export class WorkoutsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private ormService: ORMService,
+  ) {}
 
   async findAll(
     userId: string,
@@ -225,7 +230,7 @@ export class WorkoutsService {
     const workout = await this.prisma.workout.create({
       data: {
         userId,
-        date: isPastWorkout && pastWorkoutDate ? new Date(pastWorkoutDate) : new Date(),
+        date: isPastWorkout && pastWorkoutDate ? new Date(pastWorkoutDate) : getCurrentDate(),
         status: 'IN_PROGRESS' as any,
         isFreeWorkout: isFreeWorkout ?? false,
         homeGymId: homeGymId || null,
@@ -630,14 +635,27 @@ export class WorkoutsService {
       throw new BadRequestException('Workout is not in progress');
     }
 
-    // Update workout status
-    await this.prisma.workout.update({
+    // Update workout status and get full workout data with exercises and sets
+    const updatedWorkout = await this.prisma.workout.update({
       where: { id: workoutId },
       data: {
         status: 'COMPLETED' as any,
         totalDuration: completeWorkoutDto.totalDuration,
       },
+      include: {
+        exercises: {
+          include: {
+            exercise: true,
+            sets: true,
+          },
+        },
+      },
     });
+
+    // Set ORM benchmarks for cycle workouts
+    if (updatedWorkout.cycleId && updatedWorkout.workoutDayId) {
+      await this.setORMBenchmarks(updatedWorkout);
+    }
 
     // Update blueprint if requested (only for home gym workouts)
     if (completeWorkoutDto.updateBlueprint && workout.workoutDayId && workout.homeGymId !== null) {
@@ -683,6 +701,62 @@ export class WorkoutsService {
     }
 
     return this.findById(workoutId, userId);
+  }
+
+  /**
+   * Set ORM benchmarks for exercises in cycle workout (if not already set)
+   * Only for Home Gym workouts to ensure consistent equipment/weights
+   */
+  private async setORMBenchmarks(workout: any): Promise<void> {
+    const { cycleId, workoutDayId, homeGymId, id: workoutId } = workout;
+
+    // Only track ORM for Home Gym workouts (consistent equipment)
+    if (!homeGymId) {
+      return; // Skip ORM tracking for non-home gym workouts
+    }
+
+    for (const exerciseLog of workout.exercises) {
+      const { exerciseId, exercise, sets } = exerciseLog;
+
+      // Check if benchmark already exists
+      const shouldSet = await this.ormService.shouldSetBenchmark(
+        cycleId,
+        workoutDayId,
+        exerciseId,
+      );
+
+      if (!shouldSet) {
+        continue; // Benchmark already set in previous workout
+      }
+
+      // Calculate benchmark from working sets
+      const workingSets = sets.filter((s: any) => s.setType === 'WORKING');
+      const benchmark = this.ormService.calculateExerciseBenchmark(
+        workingSets,
+        exercise,
+      );
+
+      if (benchmark === null) {
+        console.warn(
+          `⚠️  No working sets for exercise ${exercise.name} in workout ${workoutId}. ` +
+          `Benchmark not set. This may happen if only warmup sets were logged.`
+        );
+        continue; // Skip if no working sets
+      }
+
+      // Create benchmark
+      await this.ormService.createBenchmark(
+        cycleId,
+        workoutDayId,
+        exerciseId,
+        benchmark,
+        workoutId,
+      );
+
+      console.log(
+        `✅ Benchmark set: ${exercise.name} = ${benchmark.toFixed(2)}kg ORM (Workout ${workoutId})`,
+      );
+    }
   }
 
   private async updateBlueprintFromWorkout(
