@@ -5,3 +5,7 @@ export * from './muscle-distribution.dto';
 export * from './time-tracking.dto';
 export * from './cycle-list.dto';
 export * from './orm-by-cycle.dto';
+export * from './rir-by-cycle.dto';
+export * from './rir-analytics.dto';
+export * from './duration-analytics.dto';
+export * from './rest-time-analytics.dto';

@@ -9,6 +9,12 @@ import {
   TimeTrackingDto,
   CycleListDto,
   ORMByCycleDto,
+  RIRByCycleDto,
+  RIRAnalyticsDto,
+  DurationAnalyticsDto,
+  DurationByCycleDto,
+  RestTimeAnalyticsDto,
+  RestTimeByCycleDto,
 } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -105,5 +111,108 @@ export class AnalyticsController {
     @Query('equipment') equipment?: string,
   ): Promise<ORMByCycleDto> {
     return this.analyticsService.getORMByCycle(user.id, cycleId, muscleGroup, equipment);
+  }
+
+  @Get('rir-by-cycle/:cycleId')
+  async getRIRByCycle(
+    @Param('cycleId') cycleId: string,
+    @CurrentUser() user: { id: string },
+    @Query('gymId') gymId?: string,
+    @Query('muscleGroup') muscleGroup?: string,
+    @Query('equipment') equipment?: string,
+    @Query('timeOfDay') timeOfDay?: string,
+  ): Promise<RIRByCycleDto> {
+    return this.analyticsService.getRIRByCycle(user.id, cycleId, gymId, muscleGroup, equipment, timeOfDay);
+  }
+
+  @Get('rir')
+  async getRIRAnalytics(
+    @CurrentUser() user: { id: string },
+    @Query('period') period: 'week' | 'month' | 'all' = 'month',
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('gymId') gymId?: string,
+    @Query('muscleGroup') muscleGroup?: string,
+    @Query('equipment') equipment?: string,
+  ): Promise<RIRAnalyticsDto> {
+    const start = startDate ? new Date(startDate) : undefined;
+    const end = endDate ? new Date(endDate) : undefined;
+    return this.analyticsService.getRIRAnalytics(
+      user.id,
+      period,
+      start,
+      end,
+      gymId,
+      muscleGroup,
+      equipment,
+    );
+  }
+
+  @Get('duration')
+  async getDurationAnalytics(
+    @CurrentUser() user: { id: string },
+    @Query('period') period: 'week' | 'month' | 'all' = 'month',
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('gymId') gymId?: string,
+    @Query('muscleGroup') muscleGroup?: string,
+    @Query('equipment') equipment?: string,
+  ): Promise<DurationAnalyticsDto> {
+    const start = startDate ? new Date(startDate) : undefined;
+    const end = endDate ? new Date(endDate) : undefined;
+    return this.analyticsService.getDurationAnalytics(
+      user.id,
+      period,
+      start,
+      end,
+      gymId,
+      muscleGroup,
+      equipment,
+    );
+  }
+
+  @Get('duration-by-cycle/:cycleId')
+  async getDurationByCycle(
+    @Param('cycleId') cycleId: string,
+    @CurrentUser() user: { id: string },
+    @Query('gymId') gymId?: string,
+    @Query('muscleGroup') muscleGroup?: string,
+    @Query('equipment') equipment?: string,
+  ): Promise<DurationByCycleDto> {
+    return this.analyticsService.getDurationByCycle(user.id, cycleId, gymId, muscleGroup, equipment);
+  }
+
+  @Get('rest-time')
+  async getRestTimeAnalytics(
+    @CurrentUser() user: { id: string },
+    @Query('period') period: 'week' | 'month' | 'all' = 'month',
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('gymId') gymId?: string,
+    @Query('muscleGroup') muscleGroup?: string,
+    @Query('equipment') equipment?: string,
+  ): Promise<RestTimeAnalyticsDto> {
+    const start = startDate ? new Date(startDate) : undefined;
+    const end = endDate ? new Date(endDate) : undefined;
+    return this.analyticsService.getRestTimeAnalytics(
+      user.id,
+      period,
+      start,
+      end,
+      gymId,
+      muscleGroup,
+      equipment,
+    );
+  }
+
+  @Get('rest-time-by-cycle/:cycleId')
+  async getRestTimeByCycle(
+    @Param('cycleId') cycleId: string,
+    @CurrentUser() user: { id: string },
+    @Query('gymId') gymId?: string,
+    @Query('muscleGroup') muscleGroup?: string,
+    @Query('equipment') equipment?: string,
+  ): Promise<RestTimeByCycleDto> {
+    return this.analyticsService.getRestTimeByCycle(user.id, cycleId, gymId, muscleGroup, equipment);
   }
 }

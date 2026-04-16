@@ -2,6 +2,7 @@ export class VolumeDataPoint {
   date: string;
   volume: number;
   workoutId?: string;
+  trainingDay?: number; // Added for cycle mode
 }
 
 export class VolumeByMuscleGroup {
