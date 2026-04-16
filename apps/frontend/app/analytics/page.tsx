@@ -12,10 +12,18 @@ import {
   HomeGym,
   CycleList,
   ORMByCycleAnalytics,
+  RIRByCycleAnalytics,
+  RIRAnalytics,
+  DurationAnalytics,
+  DurationByCycleAnalytics,
+  RestTimeAnalytics,
+  RestTimeByCycleAnalytics,
 } from '@/types';
 import {
   LineChart,
   Line,
+  BarChart,
+  Bar,
   PieChart,
   Pie,
   Cell,
@@ -32,6 +40,9 @@ export default function AnalyticsPage() {
   // Data states
   const [volumeData, setVolumeData] = useState<VolumeAnalytics | null>(null);
   const [ormData, setOrmData] = useState<ORMByCycleAnalytics | null>(null);
+  const [rirData, setRirData] = useState<RIRByCycleAnalytics | RIRAnalytics | null>(null);
+  const [durationData, setDurationData] = useState<DurationByCycleAnalytics | DurationAnalytics | null>(null);
+  const [restTimeData, setRestTimeData] = useState<RestTimeByCycleAnalytics | RestTimeAnalytics | null>(null);
   const [prs, setPrs] = useState<PersonalRecord[]>([]);
   const [homeGyms, setHomeGyms] = useState<HomeGym[]>([]);
   const [cycles, setCycles] = useState<CycleList | null>(null);
@@ -39,7 +50,7 @@ export default function AnalyticsPage() {
   // UI states
   const [loading, setLoading] = useState(true);
   const [cycleMode, setCycleMode] = useState(false);
-  const [viewMode, setViewMode] = useState<'volume' | 'orm'>('volume');
+  const [viewMode, setViewMode] = useState<'volume' | 'orm' | 'rir' | 'duration' | 'restTime'>('volume');
   
   // Filter states
   const [timeFilter, setTimeFilter] = useState('7');
@@ -103,23 +114,85 @@ export default function AnalyticsPage() {
       ? undefined
       : new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
-    const [volume, records] = await Promise.all([
-      apiClient.getVolumeAnalytics({
-        startDate,
-        endDate,
-        gymId: gymFilter,
-        muscleGroup: muscleFilter,
-        equipment: equipmentFilter,
-      }),
-      apiClient.getPersonalRecords({
-        muscleGroup: muscleFilter,
-        equipment: equipmentFilter,
-        gymId: gymFilter,
-      }),
-    ]);
+    if (viewMode === 'volume') {
+      const [volume, records] = await Promise.all([
+        apiClient.getVolumeAnalytics({
+          startDate,
+          endDate,
+          gymId: gymFilter,
+          muscleGroup: muscleFilter,
+          equipment: equipmentFilter,
+        }),
+        apiClient.getPersonalRecords({
+          muscleGroup: muscleFilter,
+          equipment: equipmentFilter,
+          gymId: gymFilter,
+        }),
+      ]);
 
-    setVolumeData(volume);
-    setPrs(records.allTimePRs || []);
+      // Filter out empty days (volume = 0)
+      const filteredVolume = {
+        ...volume,
+        dataPoints: volume.dataPoints.filter(point => point.volume > 0),
+      };
+
+      setVolumeData(filteredVolume);
+      setPrs(records.allTimePRs || []);
+    } else if (viewMode === 'rir') {
+      const [rir, records] = await Promise.all([
+        apiClient.getRIRAnalytics({
+          startDate,
+          endDate,
+          gymId: gymFilter,
+          muscleGroup: muscleFilter,
+          equipment: equipmentFilter,
+        }),
+        apiClient.getPersonalRecords({
+          muscleGroup: muscleFilter,
+          equipment: equipmentFilter,
+          gymId: gymFilter,
+        }),
+      ]);
+
+      setRirData(rir);
+      setPrs(records.allTimePRs || []);
+    } else if (viewMode === 'duration') {
+      const [duration, records] = await Promise.all([
+        apiClient.getDurationAnalytics({
+          startDate,
+          endDate,
+          gymId: gymFilter,
+          muscleGroup: muscleFilter,
+          equipment: equipmentFilter,
+        }),
+        apiClient.getPersonalRecords({
+          muscleGroup: muscleFilter,
+          equipment: equipmentFilter,
+          gymId: gymFilter,
+        }),
+      ]);
+
+      setDurationData(duration);
+      setPrs(records.allTimePRs || []);
+    } else if (viewMode === 'restTime') {
+      const [restTime, records] = await Promise.all([
+        apiClient.getRestTimeAnalytics({
+          startDate,
+          endDate,
+          gymId: gymFilter,
+          muscleGroup: muscleFilter,
+          equipment: equipmentFilter,
+        }),
+        apiClient.getPersonalRecords({
+          muscleGroup: muscleFilter,
+          equipment: equipmentFilter,
+          gymId: gymFilter,
+        }),
+      ]);
+
+      setRestTimeData(restTime);
+      setPrs(records.allTimePRs || []);
+    }
   };
 
   const loadCycleModeData = async () => {
@@ -159,18 +232,15 @@ export default function AnalyticsPage() {
         }),
       ]);
 
-      // Add trainingDay to dataPoints for cycle mode
-      const volumeWithTrainingDays = {
+      // Filter out empty days (volume = 0)
+      const filteredVolume = {
         ...volume,
-        dataPoints: volume.dataPoints.map((point, index) => ({
-          ...point,
-          trainingDay: index + 1,
-        })),
+        dataPoints: volume.dataPoints.filter(point => point.volume > 0),
       };
 
-      setVolumeData(volumeWithTrainingDays as any);
+      setVolumeData(filteredVolume);
       setPrs(records.allTimePRs || []);
-    } else {
+    } else if (viewMode === 'orm') {
       // Load ORM data for cycle
       const [orm, records] = await Promise.all([
         apiClient.getORMByCycle(
@@ -186,6 +256,61 @@ export default function AnalyticsPage() {
       ]);
 
       setOrmData(orm);
+      setPrs(records.allTimePRs || []);
+    } else if (viewMode === 'rir') {
+      // Load RIR data for cycle
+      const [rir, records] = await Promise.all([
+        apiClient.getRIRByCycle(
+          selectedCycle.id,
+          gymFilter,
+          muscleFilter,
+          equipmentFilter,
+          timeFilter === '7' ? undefined : timeFilter === '30' ? undefined : undefined, // timeOfDay filter
+        ),
+        apiClient.getPersonalRecords({
+          muscleGroup: muscleFilter,
+          equipment: equipmentFilter,
+          gymId: gymFilter,
+        }),
+      ]);
+
+      setRirData(rir);
+      setPrs(records.allTimePRs || []);
+    } else if (viewMode === 'duration') {
+      // Load Duration data for cycle
+      const [duration, records] = await Promise.all([
+        apiClient.getDurationByCycle(
+          selectedCycle.id,
+          gymFilter,
+          muscleFilter,
+          equipmentFilter,
+        ),
+        apiClient.getPersonalRecords({
+          muscleGroup: muscleFilter,
+          equipment: equipmentFilter,
+          gymId: gymFilter,
+        }),
+      ]);
+
+      setDurationData(duration);
+      setPrs(records.allTimePRs || []);
+    } else if (viewMode === 'restTime') {
+      // Load RestTime data for cycle
+      const [restTime, records] = await Promise.all([
+        apiClient.getRestTimeByCycle(
+          selectedCycle.id,
+          gymFilter,
+          muscleFilter,
+          equipmentFilter,
+        ),
+        apiClient.getPersonalRecords({
+          muscleGroup: muscleFilter,
+          equipment: equipmentFilter,
+          gymId: gymFilter,
+        }),
+      ]);
+
+      setRestTimeData(restTime);
       setPrs(records.allTimePRs || []);
     }
   };
@@ -317,25 +442,27 @@ export default function AnalyticsPage() {
                     </div>
                   )}
 
-                  {/* Gym Filter */}
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700">
-                      Gym:
-                    </label>
-                    <select
-                      value={gymFilter}
-                      onChange={(e) => setGymFilter(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="alle">Alle</option>
-                      {homeGyms.map((gym) => (
-                        <option key={gym.id} value={gym.id}>
-                          {gym.name}
-                        </option>
-                      ))}
-                      <option value="andere">Andere Gyms</option>
-                    </select>
-                  </div>
+                  {/* Gym Filter (hidden in Cycle Mode when ORM is selected) */}
+                  {!(cycleMode && viewMode === 'orm') && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm font-medium text-gray-700">
+                        Gym:
+                      </label>
+                      <select
+                        value={gymFilter}
+                        onChange={(e) => setGymFilter(e.target.value)}
+                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="alle">Alle</option>
+                        {homeGyms.map((gym) => (
+                          <option key={gym.id} value={gym.id}>
+                            {gym.name}
+                          </option>
+                        ))}
+                        <option value="andere">Andere Gyms</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 {/* Row 2: Cycle Navigation (only in Cycle Mode) */}
@@ -374,19 +501,19 @@ export default function AnalyticsPage() {
                   </div>
                 )}
 
-                {/* Row 3: Volume/ORM Toggle (only in Cycle Mode) */}
-                {cycleMode && (
-                  <div className="flex items-center gap-2 border-t pt-4">
-                    <button
-                      onClick={() => setViewMode('volume')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                        viewMode === 'volume'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      Volumen
-                    </button>
+                {/* Row 3: Volume/ORM/RIR/Duration Toggle */}
+                <div className="flex items-center gap-2 border-t pt-4">
+                  <button
+                    onClick={() => setViewMode('volume')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                      viewMode === 'volume'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Volumen
+                  </button>
+                  {cycleMode && (
                     <button
                       onClick={() => setViewMode('orm')}
                       className={`px-4 py-2 rounded-lg text-sm font-medium ${
@@ -397,8 +524,38 @@ export default function AnalyticsPage() {
                     >
                       %ORM
                     </button>
-                  </div>
-                )}
+                  )}
+                  <button
+                    onClick={() => setViewMode('rir')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                      viewMode === 'rir'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    RIR
+                  </button>
+                  <button
+                    onClick={() => setViewMode('duration')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                      viewMode === 'duration'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Dauer
+                  </button>
+                  <button
+                    onClick={() => setViewMode('restTime')}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                      viewMode === 'restTime'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    Satzpause
+                  </button>
+                </div>
 
                 {/* Row 4: Muscle Group Filter */}
                 <div className="border-t pt-4">
@@ -473,7 +630,7 @@ export default function AnalyticsPage() {
             ) : (
               <div className="space-y-6">
                 {/* Volume Chart */}
-                {(!cycleMode || viewMode === 'volume') && volumeData && volumeData.dataPoints.length > 0 && (
+                {viewMode === 'volume' && volumeData && volumeData.dataPoints.length > 0 && (
                   <div className="bg-white rounded-lg shadow p-6">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">
                       Volumen-Entwicklung
@@ -482,8 +639,8 @@ export default function AnalyticsPage() {
                       <LineChart data={volumeData.dataPoints}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis
-                          dataKey={cycleMode ? "trainingDay" : "date"}
-                          tickFormatter={cycleMode ? (val) => `Tag ${val}` : formatDate}
+                          dataKey={cycleMode ? "date" : "date"}
+                          tickFormatter={formatDate}
                           style={{ fontSize: '12px' }}
                         />
                         <YAxis
@@ -495,9 +652,7 @@ export default function AnalyticsPage() {
                             `${formatNumber(value as number)} kg`,
                             'Volumen',
                           ]}
-                          labelFormatter={(label: any) =>
-                            cycleMode ? `Tag ${label}` : formatDate(label as string)
-                          }
+                          labelFormatter={(label: any) => formatDate(label as string)}
                         />
                         <Legend />
                         <Line
@@ -542,8 +697,8 @@ export default function AnalyticsPage() {
                           <LineChart data={ormData.dataPoints}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis
-                              dataKey="trainingDay"
-                              tickFormatter={(val) => `Tag ${val}`}
+                              dataKey="date"
+                              tickFormatter={formatDate}
                               style={{ fontSize: '12px' }}
                             />
                             <YAxis
@@ -552,7 +707,7 @@ export default function AnalyticsPage() {
                             />
                             <Tooltip
                               formatter={(value: any) => [`${value}%`, '%ORM']}
-                              labelFormatter={(label: any) => `Tag ${label}`}
+                              labelFormatter={(label: any) => formatDate(label as string)}
                             />
                             <Legend />
                             <Line
@@ -584,8 +739,344 @@ export default function AnalyticsPage() {
                   </div>
                 )}
 
+                {/* RIR Chart (Cycle Mode) */}
+                {cycleMode && viewMode === 'rir' && (
+                  <div className="bg-white rounded-lg shadow p-6">
+                    {rirData && rirData.dataPoints.length > 0 ? (
+                      <>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                          RIR-Verteilung
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart data={rirData.dataPoints}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis
+                              dataKey="date"
+                              tickFormatter={formatDate}
+                              style={{ fontSize: '12px' }}
+                            />
+                            <YAxis
+                              label={{ value: 'Anzahl Sätze', angle: -90, position: 'insideLeft' }}
+                              style={{ fontSize: '12px' }}
+                            />
+                            <Tooltip
+                              labelFormatter={(label: any) => formatDate(label as string)}
+                            />
+                            <Legend />
+                            <Bar dataKey="rir0Count" fill="#ef4444" name="RIR 0" />
+                            <Bar dataKey="rir1Count" fill="#eab308" name="RIR 1" />
+                            <Bar dataKey="rir2Count" fill="#22c55e" name="RIR 2" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                        <div className="mt-4 text-center">
+                          <div className="text-sm text-gray-600">
+                            Gesamte Sets
+                          </div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {rirData.totalSets}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center py-12">
+                        <p className="text-gray-600">
+                          Keine RIR Daten verfügbar für die ausgewählten Filter.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* RIR Chart (Time Mode) */}
+                {!cycleMode && viewMode === 'rir' && (
+                  <div className="bg-white rounded-lg shadow p-6">
+                    {rirData && rirData.dataPoints.length > 0 ? (
+                      <>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                          RIR-Verteilung
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart data={rirData.dataPoints}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis
+                              dataKey="date"
+                              tickFormatter={formatDate}
+                              style={{ fontSize: '12px' }}
+                            />
+                            <YAxis
+                              label={{ value: 'Anzahl Sätze', angle: -90, position: 'insideLeft' }}
+                              style={{ fontSize: '12px' }}
+                            />
+                            <Tooltip
+                              labelFormatter={(label: any) => formatDate(label as string)}
+                            />
+                            <Legend />
+                            <Bar dataKey="rir0Count" fill="#ef4444" name="RIR 0" />
+                            <Bar dataKey="rir1Count" fill="#eab308" name="RIR 1" />
+                            <Bar dataKey="rir2Count" fill="#22c55e" name="RIR 2" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                        <div className="mt-4 text-center">
+                          <div className="text-sm text-gray-600">
+                            Gesamte Sets
+                          </div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {rirData.totalSets}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center py-12">
+                        <p className="text-gray-600">
+                          Keine RIR Daten verfügbar für die ausgewählten Filter.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Duration Chart (Time Mode) */}
+                {!cycleMode && viewMode === 'duration' && (
+                  <div className="bg-white rounded-lg shadow p-6">
+                    {muscleFilter || equipmentFilter ? (
+                      <div className="text-center py-12">
+                        <p className="text-gray-600">
+                          Workout-Dauer bezieht sich auf das gesamte Training.
+                        </p>
+                        <p className="text-sm text-gray-500 mt-2">
+                          Bitte wähle "Alle" bei Muskelgruppe und Equipment aus.
+                        </p>
+                      </div>
+                    ) : durationData && durationData.dataPoints.length > 0 ? (
+                      <>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                          Workout-Dauer
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={durationData.dataPoints}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis
+                              dataKey="date"
+                              tickFormatter={formatDate}
+                              style={{ fontSize: '12px' }}
+                            />
+                            <YAxis
+                              label={{ value: 'Minuten', angle: -90, position: 'insideLeft' }}
+                              style={{ fontSize: '12px' }}
+                            />
+                            <Tooltip
+                              formatter={(value: any) => [`${value} min`, 'Dauer']}
+                              labelFormatter={(label: any) => formatDate(label as string)}
+                            />
+                            <Legend />
+                            <Line
+                              type="monotone"
+                              dataKey="duration"
+                              stroke="#8b5cf6"
+                              strokeWidth={2}
+                              dot={{ r: 4 }}
+                              name="Dauer"
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                        <div className="mt-4 text-center">
+                          <div className="text-sm text-gray-600">
+                            Durchschnittliche Dauer
+                          </div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {Math.round(
+                              durationData.dataPoints.reduce((sum, point) => sum + point.duration, 0) /
+                                durationData.dataPoints.length
+                            )} min
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center py-12">
+                        <p className="text-gray-600">
+                          Keine Dauer-Daten verfügbar für die ausgewählten Filter.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Duration Chart (Cycle Mode) */}
+                {cycleMode && viewMode === 'duration' && (
+                  <div className="bg-white rounded-lg shadow p-6">
+                    {muscleFilter || equipmentFilter ? (
+                      <div className="text-center py-12">
+                        <p className="text-gray-600">
+                          Workout-Dauer bezieht sich auf das gesamte Training.
+                        </p>
+                        <p className="text-sm text-gray-500 mt-2">
+                          Bitte wähle "Alle" bei Muskelgruppe und Equipment aus.
+                        </p>
+                      </div>
+                    ) : durationData && durationData.dataPoints.length > 0 ? (
+                      <>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                          Workout-Dauer
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={durationData.dataPoints}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis
+                              dataKey="date"
+                              tickFormatter={formatDate}
+                              style={{ fontSize: '12px' }}
+                            />
+                            <YAxis
+                              label={{ value: 'Minuten', angle: -90, position: 'insideLeft' }}
+                              style={{ fontSize: '12px' }}
+                            />
+                            <Tooltip
+                              formatter={(value: any) => [`${value} min`, 'Dauer']}
+                              labelFormatter={(label: any) => formatDate(label as string)}
+                            />
+                            <Legend />
+                            <Line
+                              type="monotone"
+                              dataKey="duration"
+                              stroke="#8b5cf6"
+                              strokeWidth={2}
+                              dot={{ r: 4 }}
+                              name="Dauer"
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                        <div className="mt-4 text-center">
+                          <div className="text-sm text-gray-600">
+                            Durchschnittliche Dauer
+                          </div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {Math.round(
+                              durationData.dataPoints.reduce((sum, point) => sum + point.duration, 0) /
+                                durationData.dataPoints.length
+                            )} min
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center py-12">
+                        <p className="text-gray-600">
+                          Keine Dauer-Daten verfügbar für die ausgewählten Filter.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* RestTime Chart (Time Mode) */}
+                {!cycleMode && viewMode === 'restTime' && (
+                  <div className="bg-white rounded-lg shadow p-6">
+                    {restTimeData && restTimeData.dataPoints.length > 0 ? (
+                      <>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                          Durchschnittliche Satzpause
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={restTimeData.dataPoints}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis
+                              dataKey="date"
+                              tickFormatter={formatDate}
+                              style={{ fontSize: '12px' }}
+                            />
+                            <YAxis
+                              label={{ value: 'Sekunden', angle: -90, position: 'insideLeft' }}
+                              style={{ fontSize: '12px' }}
+                            />
+                            <Tooltip
+                              formatter={(value: any) => [`${value}s`, 'Satzpause']}
+                              labelFormatter={(label: any) => formatDate(label as string)}
+                            />
+                            <Legend />
+                            <Line
+                              type="monotone"
+                              dataKey="averageRestTime"
+                              stroke="#f59e0b"
+                              strokeWidth={2}
+                              dot={{ r: 4 }}
+                              name="Satzpause"
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                        <div className="mt-4 text-center">
+                          <div className="text-sm text-gray-600">
+                            Durchschnittliche Pause
+                          </div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {restTimeData.overallAverage}s
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center py-12">
+                        <p className="text-gray-600">
+                          Keine Satzpausen-Daten verfügbar für die ausgewählten Filter.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* RestTime Chart (Cycle Mode) */}
+                {cycleMode && viewMode === 'restTime' && (
+                  <div className="bg-white rounded-lg shadow p-6">
+                    {restTimeData && restTimeData.dataPoints.length > 0 ? (
+                      <>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                          Durchschnittliche Satzpause
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={restTimeData.dataPoints}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis
+                              dataKey="date"
+                              tickFormatter={formatDate}
+                              style={{ fontSize: '12px' }}
+                            />
+                            <YAxis
+                              label={{ value: 'Sekunden', angle: -90, position: 'insideLeft' }}
+                              style={{ fontSize: '12px' }}
+                            />
+                            <Tooltip
+                              formatter={(value: any) => [`${value}s`, 'Satzpause']}
+                              labelFormatter={(label: any) => formatDate(label as string)}
+                            />
+                            <Legend />
+                            <Line
+                              type="monotone"
+                              dataKey="averageRestTime"
+                              stroke="#f59e0b"
+                              strokeWidth={2}
+                              dot={{ r: 4 }}
+                              name="Satzpause"
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                        <div className="mt-4 text-center">
+                          <div className="text-sm text-gray-600">
+                            Durchschnittliche Pause
+                          </div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {restTimeData.overallAverage}s
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center py-12">
+                        <p className="text-gray-600">
+                          Keine Satzpausen-Daten verfügbar für die ausgewählten Filter.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Muscle Distribution Chart */}
-                {volumeData && volumeData.byMuscleGroup && volumeData.byMuscleGroup.length > 0 && (
+                {viewMode === 'volume' && volumeData && volumeData.byMuscleGroup && volumeData.byMuscleGroup.length > 0 && (
                   <div className="bg-white rounded-lg shadow p-6">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">
                       Muskelgruppen-Verteilung

@@ -17,6 +17,16 @@ import {
   CycleListItem,
   ORMByCycleDto,
   ORMDataPoint,
+  RIRByCycleDto,
+  RIRDataPoint,
+  RIRAnalyticsDto,
+  RIRAnalyticsDataPoint,
+  DurationAnalyticsDto,
+  DurationDataPoint,
+  DurationByCycleDto,
+  RestTimeAnalyticsDto,
+  RestTimeDataPoint,
+  RestTimeByCycleDto,
 } from './dto';
 
 @Injectable()
@@ -78,6 +88,7 @@ export class AnalyticsService {
     const dataPoints: VolumeDataPoint[] = [];
     const volumeByMuscleGroup: Map<string, number> = new Map();
     let totalVolume = 0;
+    let trainingDayCounter = 1; // For cycle mode
 
     for (const workout of workouts) {
       let workoutVolume = 0;
@@ -110,11 +121,19 @@ export class AnalyticsService {
       }
 
       totalVolume += workoutVolume;
-      dataPoints.push({
+      const dataPoint: VolumeDataPoint = {
         date: workout.date.toISOString().split('T')[0],
         volume: workoutVolume,
         workoutId: workout.id,
-      });
+      };
+      
+      // Add trainingDay for cycle mode
+      if (cycleId) {
+        dataPoint.trainingDay = trainingDayCounter;
+      }
+      
+      dataPoints.push(dataPoint);
+      trainingDayCounter++;
     }
 
     // Calculate percentages for muscle groups
@@ -489,6 +508,22 @@ export class AnalyticsService {
   }
 
   /**
+   * Match workout hour against time of day filter
+   */
+  private matchesTimeOfDay(hour: number, timeOfDayFilter: string): boolean {
+    switch (timeOfDayFilter) {
+      case 'morning':
+        return hour >= 6 && hour < 12;
+      case 'afternoon':
+        return hour >= 12 && hour < 18;
+      case 'evening':
+        return hour >= 18 && hour < 24;
+      default:
+        return true; // No filter or unknown filter: include all
+    }
+  }
+
+  /**
    * ORM Analytics for a specific cycle workout day
    */
   async getORMAnalytics(
@@ -724,6 +759,618 @@ export class AnalyticsService {
       dataPoints,
       averagePercentORM,
       totalWorkouts: workouts.length,
+    };
+  }
+
+  /**
+   * RIR Analytics for entire cycle
+   * Counts working sets by RIR (0, 1, 2) per training day
+   */
+  async getRIRByCycle(
+    userId: string,
+    cycleId: string,
+    gymId?: string,
+    muscleGroup?: string,
+    equipment?: string,
+    timeOfDay?: string,
+  ): Promise<RIRByCycleDto> {
+    // 1. Verify user owns this cycle
+    const cycle = await this.prisma.workoutCycle.findFirst({
+      where: { id: cycleId, userId },
+    });
+
+    if (!cycle) {
+      throw new NotFoundException('Cycle not found');
+    }
+
+    // 2. Build where clause for workouts
+    // Gym filter logic (same as volume analytics)
+    const gymFilter = gymId === 'andere'
+      ? null // "andere" = workouts without homeGymId
+      : gymId === 'alle' || gymId === undefined
+      ? undefined // "alle" or undefined = keine Filterung
+      : gymId; // specific gym ID
+    
+    const whereClause: any = {
+      cycleId,
+      status: 'COMPLETED' as any,
+    };
+
+    // Apply gym filter only if it's not undefined
+    if (gymFilter !== undefined) {
+      whereClause.homeGymId = gymFilter;
+    }
+
+    // 3. Get all completed workouts for this cycle
+    const workouts = await this.prisma.workout.findMany({
+      where: whereClause,
+      include: {
+        exercises: {
+          include: {
+            exercise: {
+              select: {
+                id: true,
+                name: true,
+                muscleGroup: true,
+                equipment: true,
+              },
+            },
+            sets: {
+              where: { setType: 'WORKING' },
+            },
+          },
+        },
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    // 4. Calculate RIR data per workout
+    const dataPoints: RIRDataPoint[] = [];
+    let trainingDayCounter = 1;
+    let totalSets = 0;
+
+    for (const workout of workouts) {
+      // Apply time of day filter
+      if (timeOfDay) {
+        const workoutHour = workout.date.getHours();
+        const isMatch = this.matchesTimeOfDay(workoutHour, timeOfDay);
+        if (!isMatch) {
+          trainingDayCounter++;
+          continue;
+        }
+      }
+
+      let rir0Count = 0;
+      let rir1Count = 0;
+      let rir2Count = 0;
+
+      for (const exerciseLog of workout.exercises) {
+        const { exercise, sets } = exerciseLog;
+
+        // Apply filters
+        if (muscleGroup && exercise.muscleGroup !== muscleGroup) continue;
+        if (equipment && exercise.equipment !== equipment) continue;
+
+        // Count sets by RIR (only 0, 1, 2)
+        for (const set of sets) {
+          if (set.rir === 0) rir0Count++;
+          else if (set.rir === 1) rir1Count++;
+          else if (set.rir === 2) rir2Count++;
+          // Ignore RIR > 2
+        }
+      }
+
+      const totalSetsThisWorkout = rir0Count + rir1Count + rir2Count;
+
+      // Only add data point if we have sets matching filters
+      if (totalSetsThisWorkout > 0) {
+        dataPoints.push({
+          date: workout.date.toISOString().split('T')[0],
+          trainingDay: trainingDayCounter,
+          rir0Count,
+          rir1Count,
+          rir2Count,
+          workoutId: workout.id,
+        });
+
+        totalSets += totalSetsThisWorkout;
+      }
+
+      trainingDayCounter++;
+    }
+
+    return {
+      cycleId: cycle.id,
+      cycleName: cycle.name,
+      dataPoints,
+      totalSets,
+      totalWorkouts: workouts.length,
+    };
+  }
+
+  /**
+   * RIR Analytics (time-based, not cycle-specific)
+   * Counts working sets by RIR (0, 1, 2) over a time period
+   */
+  async getRIRAnalytics(
+    userId: string,
+    period: 'week' | 'month' | 'all' = 'month',
+    startDate?: Date,
+    endDate?: Date,
+    gymId?: string,
+    muscleGroup?: string,
+    equipment?: string,
+  ): Promise<RIRAnalyticsDto> {
+    const dateFilter = this.getDateFilter(period, startDate, endDate);
+
+    // Gym filter logic
+    const gymFilter = gymId === 'andere'
+      ? null
+      : gymId === 'alle' || gymId === undefined
+      ? undefined
+      : gymId;
+
+    const workouts = await this.prisma.workout.findMany({
+      where: {
+        userId,
+        status: 'COMPLETED' as any,
+        date: dateFilter,
+        ...(gymFilter !== undefined && { homeGymId: gymFilter }),
+      },
+      include: {
+        exercises: {
+          include: {
+            exercise: {
+              select: {
+                muscleGroup: true,
+                equipment: true,
+              },
+            },
+            sets: {
+              where: { setType: 'WORKING' },
+            },
+          },
+        },
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    const dataPoints: RIRAnalyticsDataPoint[] = [];
+    let totalSets = 0;
+
+    for (const workout of workouts) {
+      let rir0Count = 0;
+      let rir1Count = 0;
+      let rir2Count = 0;
+
+      for (const exerciseLog of workout.exercises) {
+        // Apply filters
+        if (muscleGroup && exerciseLog.exercise.muscleGroup !== muscleGroup) continue;
+        if (equipment && exerciseLog.exercise.equipment !== equipment) continue;
+
+        // Count sets by RIR
+        for (const set of exerciseLog.sets) {
+          if (set.rir === 0) rir0Count++;
+          else if (set.rir === 1) rir1Count++;
+          else if (set.rir === 2) rir2Count++;
+        }
+      }
+
+      const totalSetsThisWorkout = rir0Count + rir1Count + rir2Count;
+
+      if (totalSetsThisWorkout > 0) {
+        dataPoints.push({
+          date: workout.date.toISOString().split('T')[0],
+          rir0Count,
+          rir1Count,
+          rir2Count,
+          workoutId: workout.id,
+        });
+
+        totalSets += totalSetsThisWorkout;
+      }
+    }
+
+    return {
+      totalSets,
+      period,
+      dataPoints,
+    };
+  }
+
+  /**
+   * Duration Analytics (time-based)
+   * Shows workout duration over time
+   */
+  async getDurationAnalytics(
+    userId: string,
+    period: 'week' | 'month' | 'all' = 'month',
+    startDate?: Date,
+    endDate?: Date,
+    gymId?: string,
+    muscleGroup?: string,
+    equipment?: string,
+  ): Promise<DurationAnalyticsDto> {
+    const dateFilter = this.getDateFilter(period, startDate, endDate);
+
+    // Gym filter logic
+    const gymFilter = gymId === 'andere'
+      ? null
+      : gymId === 'alle' || gymId === undefined
+      ? undefined
+      : gymId;
+
+    const workouts = await this.prisma.workout.findMany({
+      where: {
+        userId,
+        status: 'COMPLETED' as any,
+        date: dateFilter,
+        ...(gymFilter !== undefined && { homeGymId: gymFilter }),
+        totalDuration: { not: null }, // Only workouts with duration
+      },
+      include: {
+        exercises: {
+          include: {
+            exercise: {
+              select: {
+                muscleGroup: true,
+                equipment: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    const dataPoints: DurationDataPoint[] = [];
+    let totalDuration = 0;
+    let validWorkoutsCount = 0;
+
+    for (const workout of workouts) {
+      // Check if workout has exercises matching filters
+      if (muscleGroup || equipment) {
+        const hasMatchingExercise = workout.exercises.some(exerciseLog => {
+          if (muscleGroup && exerciseLog.exercise.muscleGroup !== muscleGroup) return false;
+          if (equipment && exerciseLog.exercise.equipment !== equipment) return false;
+          return true;
+        });
+
+        if (!hasMatchingExercise) continue;
+      }
+
+      const durationInMinutes = Math.round(workout.totalDuration / 60);
+
+      dataPoints.push({
+        date: workout.date.toISOString().split('T')[0],
+        duration: durationInMinutes,
+        workoutId: workout.id,
+      });
+
+      totalDuration += durationInMinutes;
+      validWorkoutsCount++;
+    }
+
+    const averageDuration = validWorkoutsCount > 0
+      ? Math.round(totalDuration / validWorkoutsCount)
+      : 0;
+
+    return {
+      averageDuration,
+      period,
+      dataPoints,
+    };
+  }
+
+  /**
+   * Duration Analytics for entire cycle
+   */
+  async getDurationByCycle(
+    userId: string,
+    cycleId: string,
+    gymId?: string,
+    muscleGroup?: string,
+    equipment?: string,
+  ): Promise<DurationByCycleDto> {
+    // 1. Verify user owns this cycle
+    const cycle = await this.prisma.workoutCycle.findFirst({
+      where: { id: cycleId, userId },
+    });
+
+    if (!cycle) {
+      throw new NotFoundException('Cycle not found');
+    }
+
+    // 2. Build where clause
+    const gymFilter = gymId === 'andere'
+      ? null
+      : gymId === 'alle' || gymId === undefined
+      ? undefined
+      : gymId;
+    
+    const whereClause: any = {
+      cycleId,
+      status: 'COMPLETED' as any,
+      totalDuration: { not: null },
+    };
+
+    if (gymFilter !== undefined) {
+      whereClause.homeGymId = gymFilter;
+    }
+
+    // 3. Get all completed workouts
+    const workouts = await this.prisma.workout.findMany({
+      where: whereClause,
+      include: {
+        exercises: {
+          include: {
+            exercise: {
+              select: {
+                muscleGroup: true,
+                equipment: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    // 4. Calculate duration data per workout
+    const dataPoints: DurationDataPoint[] = [];
+    let trainingDayCounter = 1;
+    let totalDuration = 0;
+    let validWorkoutsCount = 0;
+
+    for (const workout of workouts) {
+      // Check if workout has exercises matching filters
+      if (muscleGroup || equipment) {
+        const hasMatchingExercise = workout.exercises.some(exerciseLog => {
+          if (muscleGroup && exerciseLog.exercise.muscleGroup !== muscleGroup) return false;
+          if (equipment && exerciseLog.exercise.equipment !== equipment) return false;
+          return true;
+        });
+
+        if (!hasMatchingExercise) {
+          trainingDayCounter++;
+          continue;
+        }
+      }
+
+      const durationInMinutes = Math.round(workout.totalDuration / 60);
+
+      dataPoints.push({
+        date: workout.date.toISOString().split('T')[0],
+        duration: durationInMinutes,
+        workoutId: workout.id,
+        trainingDay: trainingDayCounter,
+      });
+
+      totalDuration += durationInMinutes;
+      validWorkoutsCount++;
+      trainingDayCounter++;
+    }
+
+    const averageDuration = validWorkoutsCount > 0
+      ? Math.round(totalDuration / validWorkoutsCount)
+      : 0;
+
+    return {
+      cycleId: cycle.id,
+      cycleName: cycle.name,
+      dataPoints,
+      averageDuration,
+      totalWorkouts: validWorkoutsCount,
+    };
+  }
+
+  /**
+   * Rest Time Analytics (time-based)
+   * Shows average rest time between sets over time
+   */
+  async getRestTimeAnalytics(
+    userId: string,
+    period: 'week' | 'month' | 'all' = 'month',
+    startDate?: Date,
+    endDate?: Date,
+    gymId?: string,
+    muscleGroup?: string,
+    equipment?: string,
+  ): Promise<RestTimeAnalyticsDto> {
+    const dateFilter = this.getDateFilter(period, startDate, endDate);
+
+    // Gym filter logic
+    const gymFilter = gymId === 'andere'
+      ? null
+      : gymId === 'alle' || gymId === undefined
+      ? undefined
+      : gymId;
+
+    const workouts = await this.prisma.workout.findMany({
+      where: {
+        userId,
+        status: 'COMPLETED' as any,
+        date: dateFilter,
+        ...(gymFilter !== undefined && { homeGymId: gymFilter }),
+      },
+      include: {
+        exercises: {
+          include: {
+            exercise: {
+              select: {
+                muscleGroup: true,
+                equipment: true,
+              },
+            },
+            sets: {
+              where: {
+                actualRestDuration: { not: null },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    const dataPoints: RestTimeDataPoint[] = [];
+    let totalRestTime = 0;
+    let totalRestTimeCounts = 0;
+
+    for (const workout of workouts) {
+      let workoutRestTimeSum = 0;
+      let workoutRestTimeCount = 0;
+
+      for (const exerciseLog of workout.exercises) {
+        // Apply muscle group and equipment filters
+        if (muscleGroup && exerciseLog.exercise.muscleGroup !== muscleGroup) continue;
+        if (equipment && exerciseLog.exercise.equipment !== equipment) continue;
+
+        // Sum up actual rest durations from sets
+        for (const set of exerciseLog.sets) {
+          if (set.actualRestDuration !== null) {
+            workoutRestTimeSum += set.actualRestDuration;
+            workoutRestTimeCount++;
+          }
+        }
+      }
+
+      // Only add datapoint if we have rest time data
+      if (workoutRestTimeCount > 0) {
+        const avgRestTime = Math.round(workoutRestTimeSum / workoutRestTimeCount);
+
+        dataPoints.push({
+          date: workout.date.toISOString().split('T')[0],
+          averageRestTime: avgRestTime,
+          workoutId: workout.id,
+        });
+
+        totalRestTime += avgRestTime;
+        totalRestTimeCounts++;
+      }
+    }
+
+    const overallAverage = totalRestTimeCounts > 0
+      ? Math.round(totalRestTime / totalRestTimeCounts)
+      : 0;
+
+    return {
+      overallAverage,
+      period,
+      dataPoints,
+    };
+  }
+
+  /**
+   * Rest Time Analytics for entire cycle
+   */
+  async getRestTimeByCycle(
+    userId: string,
+    cycleId: string,
+    gymId?: string,
+    muscleGroup?: string,
+    equipment?: string,
+  ): Promise<RestTimeByCycleDto> {
+    // 1. Verify user owns this cycle
+    const cycle = await this.prisma.workoutCycle.findFirst({
+      where: { id: cycleId, userId },
+    });
+
+    if (!cycle) {
+      throw new NotFoundException('Cycle not found');
+    }
+
+    // 2. Build where clause
+    const gymFilter = gymId === 'andere'
+      ? null
+      : gymId === 'alle' || gymId === undefined
+      ? undefined
+      : gymId;
+    
+    const whereClause: any = {
+      cycleId,
+      status: 'COMPLETED' as any,
+    };
+
+    if (gymFilter !== undefined) {
+      whereClause.homeGymId = gymFilter;
+    }
+
+    // 3. Get all completed workouts
+    const workouts = await this.prisma.workout.findMany({
+      where: whereClause,
+      include: {
+        exercises: {
+          include: {
+            exercise: {
+              select: {
+                muscleGroup: true,
+                equipment: true,
+              },
+            },
+            sets: {
+              where: {
+                actualRestDuration: { not: null },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    // 4. Calculate rest time data per workout
+    const dataPoints: RestTimeDataPoint[] = [];
+    let trainingDayCounter = 1;
+    let totalRestTime = 0;
+    let totalRestTimeCounts = 0;
+
+    for (const workout of workouts) {
+      let workoutRestTimeSum = 0;
+      let workoutRestTimeCount = 0;
+
+      for (const exerciseLog of workout.exercises) {
+        // Apply muscle group and equipment filters
+        if (muscleGroup && exerciseLog.exercise.muscleGroup !== muscleGroup) continue;
+        if (equipment && exerciseLog.exercise.equipment !== equipment) continue;
+
+        // Sum up actual rest durations from sets
+        for (const set of exerciseLog.sets) {
+          if (set.actualRestDuration !== null) {
+            workoutRestTimeSum += set.actualRestDuration;
+            workoutRestTimeCount++;
+          }
+        }
+      }
+
+      // Only add datapoint if we have rest time data
+      if (workoutRestTimeCount > 0) {
+        const avgRestTime = Math.round(workoutRestTimeSum / workoutRestTimeCount);
+
+        dataPoints.push({
+          date: workout.date.toISOString().split('T')[0],
+          averageRestTime: avgRestTime,
+          workoutId: workout.id,
+          trainingDay: trainingDayCounter,
+        });
+
+        totalRestTime += avgRestTime;
+        totalRestTimeCounts++;
+      }
+
+      trainingDayCounter++;
+    }
+
+    const overallAverage = totalRestTimeCounts > 0
+      ? Math.round(totalRestTime / totalRestTimeCounts)
+      : 0;
+
+    return {
+      cycleId: cycle.id,
+      cycleName: cycle.name,
+      dataPoints,
+      overallAverage,
+      totalWorkouts: totalRestTimeCounts,
     };
   }
 }

@@ -14,6 +14,12 @@ import {
   ORMAnalytics,
   CycleList,
   ORMByCycleAnalytics,
+  RIRByCycleAnalytics,
+  RIRAnalytics,
+  DurationAnalytics,
+  DurationByCycleAnalytics,
+  RestTimeAnalytics,
+  RestTimeByCycleAnalytics,
   MuscleGroup,
   Equipment,
   HomeGym,
@@ -575,6 +581,119 @@ class ApiClient {
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<ORMByCycleAnalytics>(
       `/analytics/orm-by-cycle/${cycleId}${queryString}`
+    );
+  }
+
+  async getRIRByCycle(
+    cycleId: string,
+    gymId?: string,
+    muscleGroup?: string,
+    equipment?: string,
+    timeOfDay?: string,
+  ): Promise<RIRByCycleAnalytics> {
+    const query = new URLSearchParams();
+    if (gymId) query.append('gymId', gymId);
+    if (muscleGroup) query.append('muscleGroup', muscleGroup);
+    if (equipment) query.append('equipment', equipment);
+    if (timeOfDay) query.append('timeOfDay', timeOfDay);
+
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    return this.request<RIRByCycleAnalytics>(
+      `/analytics/rir-by-cycle/${cycleId}${queryString}`
+    );
+  }
+
+  async getRIRAnalytics(params: {
+    period?: 'week' | 'month' | 'all';
+    startDate?: string;
+    endDate?: string;
+    gymId?: string;
+    muscleGroup?: string;
+    equipment?: string;
+  }): Promise<RIRAnalytics> {
+    const query = new URLSearchParams();
+    if (params.period) query.append('period', params.period);
+    if (params.startDate) query.append('startDate', params.startDate);
+    if (params.endDate) query.append('endDate', params.endDate);
+    if (params.gymId) query.append('gymId', params.gymId);
+    if (params.muscleGroup) query.append('muscleGroup', params.muscleGroup);
+    if (params.equipment) query.append('equipment', params.equipment);
+
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    return this.request<RIRAnalytics>(`/analytics/rir${queryString}`);
+  }
+
+  async getDurationAnalytics(params: {
+    period?: 'week' | 'month' | 'all';
+    startDate?: string;
+    endDate?: string;
+    gymId?: string;
+    muscleGroup?: string;
+    equipment?: string;
+  }): Promise<DurationAnalytics> {
+    const query = new URLSearchParams();
+    if (params.period) query.append('period', params.period);
+    if (params.startDate) query.append('startDate', params.startDate);
+    if (params.endDate) query.append('endDate', params.endDate);
+    if (params.gymId) query.append('gymId', params.gymId);
+    if (params.muscleGroup) query.append('muscleGroup', params.muscleGroup);
+    if (params.equipment) query.append('equipment', params.equipment);
+
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    return this.request<DurationAnalytics>(`/analytics/duration${queryString}`);
+  }
+
+  async getDurationByCycle(
+    cycleId: string,
+    gymId?: string,
+    muscleGroup?: string,
+    equipment?: string,
+  ): Promise<DurationByCycleAnalytics> {
+    const query = new URLSearchParams();
+    if (gymId) query.append('gymId', gymId);
+    if (muscleGroup) query.append('muscleGroup', muscleGroup);
+    if (equipment) query.append('equipment', equipment);
+
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    return this.request<DurationByCycleAnalytics>(
+      `/analytics/duration-by-cycle/${cycleId}${queryString}`
+    );
+  }
+
+  async getRestTimeAnalytics(params: {
+    period?: 'week' | 'month' | 'all';
+    startDate?: string;
+    endDate?: string;
+    gymId?: string;
+    muscleGroup?: string;
+    equipment?: string;
+  }): Promise<RestTimeAnalytics> {
+    const query = new URLSearchParams();
+    if (params.period) query.append('period', params.period);
+    if (params.startDate) query.append('startDate', params.startDate);
+    if (params.endDate) query.append('endDate', params.endDate);
+    if (params.gymId) query.append('gymId', params.gymId);
+    if (params.muscleGroup) query.append('muscleGroup', params.muscleGroup);
+    if (params.equipment) query.append('equipment', params.equipment);
+
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    return this.request<RestTimeAnalytics>(`/analytics/rest-time${queryString}`);
+  }
+
+  async getRestTimeByCycle(
+    cycleId: string,
+    gymId?: string,
+    muscleGroup?: string,
+    equipment?: string,
+  ): Promise<RestTimeByCycleAnalytics> {
+    const query = new URLSearchParams();
+    if (gymId) query.append('gymId', gymId);
+    if (muscleGroup) query.append('muscleGroup', muscleGroup);
+    if (equipment) query.append('equipment', equipment);
+
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    return this.request<RestTimeByCycleAnalytics>(
+      `/analytics/rest-time-by-cycle/${cycleId}${queryString}`
     );
   }
 

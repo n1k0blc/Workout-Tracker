@@ -236,6 +236,7 @@ export interface VolumeDataPoint {
   date: string;
   volume: number;
   workoutId?: string;
+  trainingDay?: number;
 }
 
 export interface VolumeByMuscleGroup {
@@ -299,6 +300,79 @@ export interface ORMByCycleAnalytics {
   cycleName: string;
   dataPoints: ORMDataPoint[];
   averagePercentORM: number;
+  totalWorkouts: number;
+}
+
+export interface RIRDataPoint {
+  date: string;
+  trainingDay: number;
+  rir0Count: number;
+  rir1Count: number;
+  rir2Count: number;
+  workoutId: string;
+}
+
+export interface RIRByCycleAnalytics {
+  cycleId: string;
+  cycleName: string;
+  dataPoints: RIRDataPoint[];
+  totalSets: number;
+  totalWorkouts: number;
+}
+
+export interface RIRAnalyticsDataPoint {
+  date: string;
+  rir0Count: number;
+  rir1Count: number;
+  rir2Count: number;
+  workoutId: string;
+}
+
+export interface RIRAnalytics {
+  totalSets: number;
+  period: string;
+  dataPoints: RIRAnalyticsDataPoint[];
+}
+
+export interface DurationDataPoint {
+  date: string;
+  duration: number;
+  workoutId: string;
+  trainingDay?: number;
+}
+
+export interface DurationAnalytics {
+  averageDuration: number;
+  period: string;
+  dataPoints: DurationDataPoint[];
+}
+
+export interface DurationByCycleAnalytics {
+  cycleId: string;
+  cycleName: string;
+  dataPoints: DurationDataPoint[];
+  averageDuration: number;
+  totalWorkouts: number;
+}
+
+export interface RestTimeDataPoint {
+  date: string;
+  averageRestTime: number;
+  workoutId: string;
+  trainingDay?: number;
+}
+
+export interface RestTimeAnalytics {
+  overallAverage: number;
+  period: string;
+  dataPoints: RestTimeDataPoint[];
+}
+
+export interface RestTimeByCycleAnalytics {
+  cycleId: string;
+  cycleName: string;
+  dataPoints: RestTimeDataPoint[];
+  overallAverage: number;
   totalWorkouts: number;
 }
 
