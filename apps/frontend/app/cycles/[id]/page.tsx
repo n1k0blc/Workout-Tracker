@@ -344,9 +344,9 @@ export default function CycleDetailPage() {
                               ? workout.templateName || 'Freies Workout'
                               : workout.workoutDayName || 'Workout'}
                           </h3>
-                          {workout.cycleWorkoutDay?.trainingDay && (
+                          {workout.workoutDayWeekday && (
                             <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                              Tag {workout.cycleWorkoutDay.trainingDay}
+                              Tag {workout.workoutDayWeekday}
                             </span>
                           )}
                           {workout.homeGym ? (
