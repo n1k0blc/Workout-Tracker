@@ -26,6 +26,9 @@ import {
   WorkoutTemplate,
   CreateWorkoutTemplate,
   UpdateWorkoutTemplate,
+  DashboardStats,
+  NextPlannedWorkout,
+  CycleProgress,
 } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
@@ -695,6 +698,19 @@ class ApiClient {
     return this.request<RestTimeByCycleAnalytics>(
       `/analytics/rest-time-by-cycle/${cycleId}${queryString}`
     );
+  }
+
+  // Dashboard Methods
+  async getCurrentWeekStats(): Promise<DashboardStats> {
+    return this.request<DashboardStats>('/dashboard/stats/current-week');
+  }
+
+  async getNextPlannedWorkout(): Promise<NextPlannedWorkout | null> {
+    return this.request<NextPlannedWorkout | null>('/dashboard/next-planned-workout');
+  }
+
+  async getCycleProgress(): Promise<CycleProgress | null> {
+    return this.request<CycleProgress | null>('/dashboard/cycle-progress');
   }
 
   // Workout Template Methods

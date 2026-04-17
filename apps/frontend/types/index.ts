@@ -432,3 +432,36 @@ export interface UpdateWorkoutTemplate {
   recommendedGymId?: string;
   exercises?: CreateWorkoutTemplateExercise[];
 }
+
+// Dashboard Types
+export interface CurrentWeekStats {
+  workouts: number;
+  volume: number;
+  averageDuration: number | null;
+}
+
+export interface LastWeekStats {
+  volume: number;
+}
+
+export interface DashboardStats {
+  currentWeek: CurrentWeekStats;
+  lastWeek: LastWeekStats;
+  volumeChange: number;
+}
+
+export interface NextPlannedWorkout {
+  workoutDayId: string;
+  workoutDayName: string;
+  cycleName: string;
+  templateName: string | null;
+  dayOfWeek: number;
+  suggestedDate: string;
+}
+
+export interface CycleProgress {
+  currentWeek: number;
+  totalWeeks: number;
+  percentage: number;
+  cycleName: string;
+}
