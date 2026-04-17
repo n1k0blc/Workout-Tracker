@@ -29,7 +29,7 @@ interface WorkoutContextType {
   completeWorkout: (data?: {
     totalDuration?: number;
     updateBlueprint?: boolean;
-  }) => Promise<void>;
+  }) => Promise<Workout | null>;
   discardWorkout: () => Promise<void>;
   addExercise: (exerciseId: string) => Promise<void>;
   removeExercise: (exerciseLogId: string) => Promise<void>;
@@ -297,12 +297,12 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const completeWorkout = async (data?: {
     totalDuration?: number;
     updateBlueprint?: boolean;
-  }) => {
-    if (!activeWorkout) return;
+  }): Promise<Workout | null> => {
+    if (!activeWorkout) return null;
 
     setLoading(true);
     try {
-      await apiClient.completeWorkout(activeWorkout.id, data);
+      const completedWorkout = await apiClient.completeWorkout(activeWorkout.id, data);
       setActiveWorkout(null);
       setWorkoutDuration(0);
       setRestTimer(0);
@@ -318,6 +318,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem('restStartTime');
         localStorage.removeItem('restTimerTarget');
       }
+      
+      return completedWorkout;
     } catch (error) {
       console.error('Failed to complete workout:', error);
       throw error;

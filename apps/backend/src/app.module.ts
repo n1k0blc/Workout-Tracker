@@ -10,6 +10,7 @@ import { WorkoutTemplatesModule } from './workout-templates/workout-templates.mo
 import { AnalyticsModule } from './analytics/analytics.module';
 import { HealthModule } from './health/health.module';
 import { ORMModule } from './orm/orm.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { ORMModule } from './orm/orm.module';
     AnalyticsModule,
     HealthModule,
     ORMModule,
+    DashboardModule,
   ],
   controllers: [],
   providers: [],

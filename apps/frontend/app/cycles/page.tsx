@@ -138,7 +138,8 @@ export default function CyclesPage() {
                       {activeCycles.map((cycle) => (
                         <div
                           key={cycle.id}
-                          className="bg-white rounded-lg shadow overflow-hidden"
+                          onClick={() => router.push(`/cycles/${cycle.id}`)}
+                          className="bg-white rounded-lg shadow overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
                         >
                           <div className="p-6">
                             <div className="flex items-start justify-between">
@@ -161,7 +162,10 @@ export default function CyclesPage() {
                               </div>
                               <div className="flex gap-2">
                                 <button
-                                  onClick={() => setCompleteConfirm(cycle.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setCompleteConfirm(cycle.id);
+                                  }}
                                   disabled={completing === cycle.id}
                                   className="p-2 text-green-600 hover:text-green-800 hover:bg-green-50 rounded-md disabled:opacity-50 transition-colors"
                                   title="Zyklus beenden"
@@ -170,7 +174,10 @@ export default function CyclesPage() {
                                   <CheckCircle className="h-5 w-5" />
                                 </button>
                                 <button
-                                  onClick={() => setDeleteConfirm(cycle.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeleteConfirm(cycle.id);
+                                  }}
                                   className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
                                   title="Zyklus löschen"
                                   aria-label="Zyklus löschen"
@@ -255,7 +262,8 @@ export default function CyclesPage() {
                           {completedCycles.map((cycle) => (
                             <div
                               key={cycle.id}
-                              className="bg-white rounded-lg shadow overflow-hidden opacity-75"
+                              onClick={() => router.push(`/cycles/${cycle.id}`)}
+                              className="bg-white rounded-lg shadow overflow-hidden opacity-75 cursor-pointer hover:opacity-100 hover:shadow-lg transition-all"
                             >
                               <div className="p-6">
                                 <div className="flex items-start justify-between">
@@ -287,7 +295,10 @@ export default function CyclesPage() {
                                     </div>
                                   </div>
                                   <button
-                                    onClick={() => setDeleteConfirm(cycle.id)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeleteConfirm(cycle.id);
+                                    }}
                                     className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
                                     title="Zyklus löschen"
                                     aria-label="Zyklus löschen"

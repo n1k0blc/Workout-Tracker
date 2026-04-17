@@ -1,7 +1,7 @@
 'use client';
 
 import { ProtectedRoute } from '@/components/protected-route';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
@@ -9,7 +9,14 @@ import { Workout, SetType } from '@/types';
 
 export default function WorkoutDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const workoutId = params?.id as string;
+  
+  // Check if coming from cycle detail page
+  const fromCycle = searchParams.get('from') === 'cycle';
+  const cycleId = searchParams.get('cycleId');
+  
   const [workout, setWorkout] = useState<Workout | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -84,15 +91,27 @@ export default function WorkoutDetailPage() {
             ) : workout ? (
               <div className="space-y-6">
                 {/* Back Button */}
-                <Link
-                  href="/history"
-                  className="inline-flex items-center text-blue-600 hover:text-blue-800"
-                >
-                  <svg className="w-5 h-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  Zurück zum Verlauf
-                </Link>
+                {fromCycle && cycleId ? (
+                  <button
+                    onClick={() => router.push(`/cycles/${cycleId}`)}
+                    className="inline-flex items-center text-blue-600 hover:text-blue-800"
+                  >
+                    <svg className="w-5 h-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Zurück zu Zyklusdetails
+                  </button>
+                ) : (
+                  <Link
+                    href="/history"
+                    className="inline-flex items-center text-blue-600 hover:text-blue-800"
+                  >
+                    <svg className="w-5 h-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Zurück zum Verlauf
+                  </Link>
+                )}
 
                 {/* Header */}
                 <div className="bg-white rounded-lg shadow p-6">

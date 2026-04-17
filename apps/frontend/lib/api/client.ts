@@ -8,6 +8,7 @@ import {
   Workout,
   WorkoutListItem,
   WorkoutCycle,
+  CycleDetails,
   VolumeAnalytics,
   PersonalRecord,
   PersonalRecordsResponse,
@@ -20,12 +21,17 @@ import {
   DurationByCycleAnalytics,
   RestTimeAnalytics,
   RestTimeByCycleAnalytics,
+  RepsAnalytics,
+  RepsByCycleAnalytics,
   MuscleGroup,
   Equipment,
   HomeGym,
   WorkoutTemplate,
   CreateWorkoutTemplate,
   UpdateWorkoutTemplate,
+  DashboardStats,
+  NextPlannedWorkout,
+  CycleProgress,
 } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
@@ -414,6 +420,10 @@ class ApiClient {
     return this.request<WorkoutCycle>(`/cycles/${id}`);
   }
 
+  async getCycleDetails(id: string): Promise<CycleDetails> {
+    return this.request<CycleDetails>(`/cycles/${id}/details`);
+  }
+
   async createCycle(data: {
     name: string;
     duration: number;
@@ -695,6 +705,54 @@ class ApiClient {
     return this.request<RestTimeByCycleAnalytics>(
       `/analytics/rest-time-by-cycle/${cycleId}${queryString}`
     );
+  }
+
+  async getRepsAnalytics(params: {
+    period?: 'week' | 'month' | 'all';
+    startDate?: string;
+    endDate?: string;
+    gymId?: string;
+    muscleGroup?: string;
+    equipment?: string;
+  }): Promise<RepsAnalytics> {
+    const query = new URLSearchParams();
+    if (params.period) query.append('period', params.period);
+    if (params.startDate) query.append('startDate', params.startDate);
+    if (params.endDate) query.append('endDate', params.endDate);
+    if (params.gymId) query.append('gymId', params.gymId);
+    if (params.muscleGroup) query.append('muscleGroup', params.muscleGroup);
+    if (params.equipment) query.append('equipment', params.equipment);
+
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    return this.request<RepsAnalytics>(`/analytics/reps${queryString}`);
+  }
+
+  async getRepsByCycle(
+    cycleId: string,
+    muscleGroup?: string,
+    equipment?: string,
+  ): Promise<RepsByCycleAnalytics> {
+    const query = new URLSearchParams();
+    if (muscleGroup) query.append('muscleGroup', muscleGroup);
+    if (equipment) query.append('equipment', equipment);
+
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    return this.request<RepsByCycleAnalytics>(
+      `/analytics/reps-by-cycle/${cycleId}${queryString}`
+    );
+  }
+
+  // Dashboard Methods
+  async getCurrentWeekStats(): Promise<DashboardStats> {
+    return this.request<DashboardStats>('/dashboard/stats/current-week');
+  }
+
+  async getNextPlannedWorkout(): Promise<NextPlannedWorkout | null> {
+    return this.request<NextPlannedWorkout | null>('/dashboard/next-planned-workout');
+  }
+
+  async getCycleProgress(): Promise<CycleProgress | null> {
+    return this.request<CycleProgress | null>('/dashboard/cycle-progress');
   }
 
   // Workout Template Methods

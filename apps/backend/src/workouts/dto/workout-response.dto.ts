@@ -70,6 +70,7 @@ export class WorkoutListItemDto {
   status: WorkoutStatus;
   isFreeWorkout: boolean;
   totalDuration?: number;
+  totalVolume: number;
   homeGymId?: string | null;
   homeGym?: {
     id: string;

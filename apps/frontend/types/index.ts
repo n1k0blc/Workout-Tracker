@@ -175,6 +175,7 @@ export interface WorkoutListItem {
   status: WorkoutStatus;
   isFreeWorkout: boolean;
   totalDuration?: number;
+  totalVolume: number;
   homeGymId?: string | null;
   homeGym?: HomeGym;
   cycleName?: string;
@@ -229,6 +230,33 @@ export interface WorkoutCycle {
   status: 'ACTIVE' | 'COMPLETED';
   completedAt?: string;
   workoutDays: WorkoutDay[];
+}
+
+export interface WorkoutsByGym {
+  gymName: string;
+  count: number;
+  isHome: boolean;
+}
+
+export interface CycleDetails {
+  // Basic cycle info
+  id: string;
+  name: string;
+  duration: number;
+  startDate: string;
+  endDate: string;
+  status: 'ACTIVE' | 'COMPLETED';
+  completedAt?: string;
+
+  // Statistics
+  totalVolume: number;
+  workoutCount: number;
+  workoutsByGym: WorkoutsByGym[];
+
+  // Current week (for active cycles)
+  currentWeek?: number;
+  totalWeeks?: number;
+  percentage?: number;
 }
 
 // Analytics Types
@@ -376,6 +404,29 @@ export interface RestTimeByCycleAnalytics {
   totalWorkouts: number;
 }
 
+export interface RepsDataPoint {
+  date: string;
+  reps: number;
+  workoutId: string;
+  trainingDay?: number;
+}
+
+export interface RepsAnalytics {
+  totalReps: number;
+  averageReps: number;
+  period: string;
+  dataPoints: RepsDataPoint[];
+}
+
+export interface RepsByCycleAnalytics {
+  cycleId: string;
+  cycleName: string;
+  dataPoints: RepsDataPoint[];
+  totalReps: number;
+  averageReps: number;
+  totalWorkouts: number;
+}
+
 // Workout Template Types
 export interface WorkoutTemplateSet {
   id: string;
@@ -431,4 +482,37 @@ export interface UpdateWorkoutTemplate {
   name?: string;
   recommendedGymId?: string;
   exercises?: CreateWorkoutTemplateExercise[];
+}
+
+// Dashboard Types
+export interface CurrentWeekStats {
+  workouts: number;
+  volume: number;
+  averageDuration: number | null;
+}
+
+export interface LastWeekStats {
+  volume: number;
+}
+
+export interface DashboardStats {
+  currentWeek: CurrentWeekStats;
+  lastWeek: LastWeekStats;
+  volumeChange: number;
+}
+
+export interface NextPlannedWorkout {
+  workoutDayId: string;
+  workoutDayName: string;
+  cycleName: string;
+  templateName: string | null;
+  dayOfWeek: number;
+  suggestedDate: string;
+}
+
+export interface CycleProgress {
+  currentWeek: number;
+  totalWeeks: number;
+  percentage: number;
+  cycleName: string;
 }

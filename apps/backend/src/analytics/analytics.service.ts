@@ -27,6 +27,9 @@ import {
   RestTimeAnalyticsDto,
   RestTimeDataPoint,
   RestTimeByCycleDto,
+  RepsAnalyticsDto,
+  RepsDataPoint,
+  RepsByCycleDto,
 } from './dto';
 
 @Injectable()
@@ -1371,6 +1374,192 @@ export class AnalyticsService {
       dataPoints,
       overallAverage,
       totalWorkouts: totalRestTimeCounts,
+    };
+  }
+
+  /**
+   * Reps Analytics (time-based)
+   * Shows total repetitions per workout over time
+   */
+  async getRepsAnalytics(
+    userId: string,
+    period: 'week' | 'month' | 'all' = 'month',
+    startDate?: Date,
+    endDate?: Date,
+    gymId?: string,
+    muscleGroup?: string,
+    equipment?: string,
+  ): Promise<RepsAnalyticsDto> {
+    const dateFilter = this.getDateFilter(period, startDate, endDate);
+
+    // Gym filter logic
+    const gymFilter = gymId === 'andere'
+      ? null
+      : gymId === 'alle' || gymId === undefined
+      ? undefined
+      : gymId;
+
+    const workouts = await this.prisma.workout.findMany({
+      where: {
+        userId,
+        status: 'COMPLETED' as any,
+        date: dateFilter,
+        ...(gymFilter !== undefined && { homeGymId: gymFilter }),
+      },
+      include: {
+        exercises: {
+          include: {
+            exercise: {
+              select: {
+                muscleGroup: true,
+                equipment: true,
+              },
+            },
+            sets: true,
+          },
+        },
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    const dataPoints: RepsDataPoint[] = [];
+    let totalReps = 0;
+    let validWorkoutsCount = 0;
+
+    for (const workout of workouts) {
+      let workoutReps = 0;
+
+      for (const exerciseLog of workout.exercises) {
+        // Apply muscle group and equipment filters
+        if (muscleGroup && exerciseLog.exercise.muscleGroup !== muscleGroup) {
+          continue;
+        }
+        if (equipment && exerciseLog.exercise.equipment !== equipment) {
+          continue;
+        }
+
+        for (const set of exerciseLog.sets) {
+          // Skip warmup sets - only count working sets
+          if (set.setType === 'WARMUP') continue;
+          workoutReps += set.reps;
+        }
+      }
+
+      // Only add data point if workout has reps
+      if (workoutReps > 0 || (!muscleGroup && !equipment)) {
+        dataPoints.push({
+          date: workout.date.toISOString().split('T')[0],
+          reps: workoutReps,
+          workoutId: workout.id,
+        });
+
+        totalReps += workoutReps;
+        validWorkoutsCount++;
+      }
+    }
+
+    const averageReps = validWorkoutsCount > 0
+      ? Math.round(totalReps / validWorkoutsCount)
+      : 0;
+
+    return {
+      totalReps,
+      averageReps,
+      period,
+      dataPoints,
+    };
+  }
+
+  /**
+   * Reps Analytics for entire cycle
+   */
+  async getRepsByCycle(
+    userId: string,
+    cycleId: string,
+    muscleGroup?: string,
+    equipment?: string,
+  ): Promise<RepsByCycleDto> {
+    const cycle = await this.prisma.workoutCycle.findUnique({
+      where: { id: cycleId },
+      include: {
+        workouts: {
+          where: {
+            userId,
+            status: 'COMPLETED' as any,
+          },
+          include: {
+            exercises: {
+              include: {
+                exercise: {
+                  select: {
+                    muscleGroup: true,
+                    equipment: true,
+                  },
+                },
+                sets: true,
+              },
+            },
+          },
+          orderBy: { date: 'asc' },
+        },
+      },
+    });
+
+    if (!cycle) {
+      throw new NotFoundException(`Cycle with ID ${cycleId} not found`);
+    }
+
+    const dataPoints: RepsDataPoint[] = [];
+    let totalReps = 0;
+    let validWorkoutsCount = 0;
+    let trainingDayCounter = 1;
+
+    for (const workout of cycle.workouts) {
+      let workoutReps = 0;
+
+      for (const exerciseLog of workout.exercises) {
+        // Apply muscle group and equipment filters
+        if (muscleGroup && exerciseLog.exercise.muscleGroup !== muscleGroup) {
+          continue;
+        }
+        if (equipment && exerciseLog.exercise.equipment !== equipment) {
+          continue;
+        }
+
+        for (const set of exerciseLog.sets) {
+          // Skip warmup sets - only count working sets
+          if (set.setType === 'WARMUP') continue;
+          workoutReps += set.reps;
+        }
+      }
+
+      // Only add data point if workout has reps
+      if (workoutReps > 0 || (!muscleGroup && !equipment)) {
+        dataPoints.push({
+          date: workout.date.toISOString().split('T')[0],
+          reps: workoutReps,
+          workoutId: workout.id,
+          trainingDay: trainingDayCounter,
+        });
+
+        totalReps += workoutReps;
+        validWorkoutsCount++;
+      }
+
+      trainingDayCounter++;
+    }
+
+    const averageReps = validWorkoutsCount > 0
+      ? Math.round(totalReps / validWorkoutsCount)
+      : 0;
+
+    return {
+      cycleId: cycle.id,
+      cycleName: cycle.name,
+      dataPoints,
+      totalReps,
+      averageReps,
+      totalWorkouts: validWorkoutsCount,
     };
   }
 }

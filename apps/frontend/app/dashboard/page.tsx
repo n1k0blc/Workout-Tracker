@@ -3,55 +3,69 @@
 import { ProtectedRoute } from '@/components/protected-route';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
-import { WorkoutListItem, PersonalRecord, WorkoutCycle } from '@/types';
+import { 
+  WorkoutListItem, 
+  PersonalRecord, 
+  DashboardStats,
+  NextPlannedWorkout,
+  CycleProgress,
+} from '@/types';
+import CircularProgress from '@/components/CircularProgress';
+import TrendIndicator from '@/components/TrendIndicator';
 
 export default function DashboardPage() {
-  const [recentWorkouts, setRecentWorkouts] = useState<WorkoutListItem[]>([]);
+  const router = useRouter();
+  const [weekStats, setWeekStats] = useState<DashboardStats | null>(null);
+  const [cycleProgress, setCycleProgress] = useState<CycleProgress | null>(null);
+  const [nextWorkout, setNextWorkout] = useState<NextPlannedWorkout | null>(null);
+  const [weekWorkouts, setWeekWorkouts] = useState<WorkoutListItem[]>([]);
   const [prs, setPrs] = useState<PersonalRecord[]>([]);
-  const [cycles, setCycles] = useState<WorkoutCycle[]>([]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalWorkouts: 0,
-    totalVolume: 0,
-    activeCycle: null as WorkoutCycle | null,
-  });
+  
+  // State for recently completed cycle
+  const [showCycleCompletion, setShowCycleCompletion] = useState(false);
+  const [completedCycle, setCompletedCycle] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     const loadDashboardData = async () => {
       try {
-        // Load recent workouts (last 5)
-        const endDate = new Date().toISOString();
-        const startDate = new Date(
-          Date.now() - 30 * 24 * 60 * 60 * 1000
-        ).toISOString();
+        // Get Monday 00:00:00 of current week
+        const getWeekStart = (): Date => {
+          const d = new Date();
+          const day = d.getDay();
+          const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+          const monday = new Date(d.setDate(diff));
+          monday.setHours(0, 0, 0, 0);
+          return monday;
+        };
 
-        const [workouts, records, cyclesList, volumeData] = await Promise.all([
-          apiClient.getWorkoutHistory({ startDate, endDate }),
+        // Get Sunday 23:59:59 of current week
+        const getWeekEnd = (): Date => {
+          const weekStart = getWeekStart();
+          const sunday = new Date(weekStart);
+          sunday.setDate(weekStart.getDate() + 6);
+          sunday.setHours(23, 59, 59, 999);
+          return sunday;
+        };
+
+        const weekStart = getWeekStart().toISOString();
+        const weekEnd = getWeekEnd().toISOString();
+
+        const [stats, progress, planned, workouts, records] = await Promise.all([
+          apiClient.getCurrentWeekStats(),
+          apiClient.getCycleProgress(),
+          apiClient.getNextPlannedWorkout(),
+          apiClient.getWorkoutHistory({ startDate: weekStart, endDate: weekEnd }),
           apiClient.getPersonalRecords(),
-          apiClient.getCycles(),
-          apiClient.getVolumeAnalytics({ startDate, endDate }),
         ]);
 
-        setRecentWorkouts(workouts.slice(0, 5));
+        setWeekStats(stats);
+        setCycleProgress(progress);
+        setNextWorkout(planned);
+        setWeekWorkouts(workouts);
         setPrs((records.recentPRs || []).slice(0, 3));
-        setCycles(cyclesList);
-
-        // Calculate stats
-        const activeCycle = cyclesList.find((c) => {
-          const now = new Date();
-          const start = new Date(c.startDate);
-          const end = new Date(
-            start.getTime() + c.duration * 7 * 24 * 60 * 60 * 1000
-          );
-          return now >= start && now <= end;
-        });
-
-        setStats({
-          totalWorkouts: workouts.length,
-          totalVolume: volumeData.totalVolume,
-          activeCycle: activeCycle || null,
-        });
       } catch (error) {
         console.error('Failed to load dashboard data:', error);
       } finally {
@@ -60,6 +74,36 @@ export default function DashboardPage() {
     };
 
     loadDashboardData();
+  }, []);
+
+  // Check for recently completed cycles
+  useEffect(() => {
+    const checkRecentlyCompletedCycle = async () => {
+      try {
+        const cycles = await apiClient.getCycles();
+        const completedCycles = cycles
+          .filter(c => c.status === 'COMPLETED' && c.completedAt)
+          .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime());
+        
+        if (completedCycles.length > 0) {
+          const mostRecent = completedCycles[0];
+          const daysSinceCompletion = 
+            (Date.now() - new Date(mostRecent.completedAt!).getTime()) / (1000 * 60 * 60 * 24);
+          
+          const acknowledged = localStorage.getItem(`cycle-${mostRecent.id}-acknowledged`);
+          
+          // Show completion card if completed within last 7 days and not yet acknowledged
+          if (daysSinceCompletion <= 7 && !acknowledged) {
+            setCompletedCycle({ id: mostRecent.id, name: mostRecent.name });
+            setShowCycleCompletion(true);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to check for completed cycles:', error);
+      }
+    };
+
+    checkRecentlyCompletedCycle();
   }, []);
 
   const formatDate = (dateStr: string) => {
@@ -75,6 +119,11 @@ export default function DashboardPage() {
     return new Intl.NumberFormat('de-DE').format(Math.round(num));
   };
 
+  const getDayName = (dayOfWeek: number): string => {
+    const days = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+    return days[dayOfWeek];
+  };
+
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50">
@@ -86,37 +135,106 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="space-y-6">
-                {/* Quick Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Stats Grid - 2x2 Layout */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Workouts dieser Woche */}
                   <div className="bg-white rounded-lg shadow p-6">
                     <div className="text-sm font-medium text-gray-600 mb-1">
-                      Workouts (30 Tage)
+                      Workouts (diese Woche)
                     </div>
                     <div className="text-3xl font-bold text-gray-900">
-                      {stats.totalWorkouts}
+                      {weekStats?.currentWeek.workouts || 0}
                     </div>
                   </div>
 
+                  {/* Volumen dieser Woche mit Trend */}
                   <div className="bg-white rounded-lg shadow p-6">
                     <div className="text-sm font-medium text-gray-600 mb-1">
-                      Gesamtes Volumen
+                      Volumen (diese Woche)
                     </div>
-                    <div className="text-3xl font-bold text-gray-900">
-                      {formatNumber(stats.totalVolume)}
-                      <span className="text-lg text-gray-600 ml-1">kg</span>
+                    <div className="flex items-end gap-3">
+                      <div className="text-3xl font-bold text-gray-900">
+                        {formatNumber(weekStats?.currentWeek.volume || 0)}
+                        <span className="text-lg text-gray-600 ml-1">kg</span>
+                      </div>
+                      {weekStats && (
+                        <div className="pb-1">
+                          <TrendIndicator change={weekStats.volumeChange} />
+                        </div>
+                      )}
                     </div>
                   </div>
 
+                  {/* Zyklus-Fortschritt / Completion / No Cycle */}
                   <div className="bg-white rounded-lg shadow p-6">
-                    <div className="text-sm font-medium text-gray-600 mb-1">
-                      Aktiver Zyklus
+                    <div className="text-sm font-medium text-gray-600 mb-3">
+                      Zyklus-Status
                     </div>
-                    {stats.activeCycle ? (
-                      <div className="text-lg font-semibold text-gray-900 truncate">
-                        {stats.activeCycle.name}
+                    
+                    {/* Show cycle completion card if recently completed */}
+                    {showCycleCompletion && completedCycle ? (
+                      <div 
+                        onClick={() => {
+                          localStorage.setItem(`cycle-${completedCycle.id}-acknowledged`, 'true');
+                          router.push(`/cycles/${completedCycle.id}?celebration=true`);
+                        }}
+                        className="bg-gradient-to-br from-gray-900 to-gray-700 text-white rounded-lg p-6 cursor-pointer hover:from-gray-800 hover:to-gray-600 transition-all"
+                      >
+                        <div className="text-center">
+                          <div className="text-6xl mb-3">🎉</div>
+                          <div className="text-sm font-medium mb-1 text-gray-300">
+                            Zyklus beendet
+                          </div>
+                          <div className="text-xl font-bold">
+                            {completedCycle.name}
+                          </div>
+                          <div className="text-xs text-gray-400 mt-2">
+                            Klicken für Details
+                          </div>
+                        </div>
+                      </div>
+                    ) : cycleProgress ? (
+                      /* Active cycle - show progress */
+                      <div className="flex flex-col items-center">
+                        <CircularProgress
+                          current={cycleProgress.currentWeek}
+                          total={cycleProgress.totalWeeks}
+                          size={100}
+                        />
+                        <div className="text-sm text-gray-600 mt-3 text-center">
+                          {cycleProgress.cycleName}
+                        </div>
                       </div>
                     ) : (
-                      <div className="text-lg text-gray-500">Kein aktiver Zyklus</div>
+                      /* No active cycle - show placeholder */
+                      <div className="text-center py-4">
+                        <div className="text-gray-500 mb-4 text-sm">
+                          Kein aktiver Zyklus
+                        </div>
+                        <button
+                          onClick={() => router.push('/cycles/new')}
+                          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          Neuen Zyklus anlegen
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Durchschnittliche Workout-Dauer */}
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <div className="text-sm font-medium text-gray-600 mb-1">
+                      Ø Dauer (diese Woche)
+                    </div>
+                    {weekStats?.currentWeek.averageDuration !== null ? (
+                      <div className="text-3xl font-bold text-gray-900">
+                        {weekStats?.currentWeek.averageDuration || 0}
+                        <span className="text-lg text-gray-600 ml-1">min</span>
+                      </div>
+                    ) : (
+                      <div className="text-lg text-gray-500 py-2">
+                        Keine Daten
+                      </div>
                     )}
                   </div>
                 </div>
@@ -160,22 +278,23 @@ export default function DashboardPage() {
                   </Link>
                 </div>
 
-                {/* Recent Workouts & PRs */}
+                {/* Content Grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Recent Workouts */}
+                  {/* Workouts dieser Woche (Liste) */}
                   <div className="bg-white rounded-lg shadow">
                     <div className="px-6 py-4 border-b border-gray-200">
                       <h2 className="text-lg font-semibold text-gray-900">
-                        Letzte Workouts
+                        Workouts dieser Woche
                       </h2>
                     </div>
                     <div className="p-6">
-                      {recentWorkouts.length > 0 ? (
+                      {weekWorkouts.length > 0 ? (
                         <div className="space-y-3">
-                          {recentWorkouts.map((workout) => (
+                          {weekWorkouts.map((workout) => (
                             <div
                               key={workout.id}
-                              className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                              onClick={() => router.push(`/history/${workout.id}`)}
+                              className="border border-gray-200 rounded-lg p-4 hover:bg-blue-50 hover:border-blue-300 transition-colors cursor-pointer"
                             >
                               <div className="flex items-start justify-between">
                                 <div className="flex-1">
@@ -200,14 +319,62 @@ export default function DashboardPage() {
                         </div>
                       ) : (
                         <p className="text-gray-500 text-center py-8">
-                          Noch keine Workouts vorhanden
+                          Noch keine Workouts diese Woche
                         </p>
                       )}
                     </div>
                   </div>
 
-                  {/* Personal Records */}
+                  {/* Nächstes geplantes Workout */}
                   <div className="bg-white rounded-lg shadow">
+                    <div className="px-6 py-4 border-b border-gray-200">
+                      <h2 className="text-lg font-semibold text-gray-900">
+                        Nächstes geplantes Workout
+                      </h2>
+                    </div>
+                    <div className="p-6">
+                      {nextWorkout ? (
+                        <div className="border border-blue-200 bg-blue-50 rounded-lg p-6">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-gray-900 mb-2">
+                              {nextWorkout.workoutDayName}
+                            </div>
+                            <div className="text-sm text-gray-600 mb-1">
+                              {nextWorkout.cycleName}
+                            </div>
+                            {nextWorkout.templateName && (
+                              <div className="text-sm text-gray-500 mb-3">
+                                {nextWorkout.templateName}
+                              </div>
+                            )}
+                            <div className="mt-4 pt-4 border-t border-blue-200">
+                              <div className="text-lg font-semibold text-blue-600">
+                                {getDayName(nextWorkout.dayOfWeek)}
+                              </div>
+                              <div className="text-sm text-gray-600 mt-1">
+                                {formatDate(nextWorkout.suggestedDate)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-12">
+                          <div className="text-gray-500">
+                            Kein aktiver Zyklus
+                          </div>
+                          <Link
+                            href="/cycles"
+                            className="inline-block mt-4 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                          >
+                            Zyklus erstellen →
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Personal Records */}
+                  <div className="bg-white rounded-lg shadow lg:col-span-2">
                     <div className="px-6 py-4 border-b border-gray-200">
                       <h2 className="text-lg font-semibold text-gray-900">
                         Persönliche Rekorde
@@ -215,27 +382,25 @@ export default function DashboardPage() {
                     </div>
                     <div className="p-6">
                       {prs.length > 0 ? (
-                        <div className="space-y-3">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           {prs.map((pr) => (
                             <div
                               key={`${pr.exerciseId}-${pr.type}`}
                               className="border border-gray-200 rounded-lg p-4"
                             >
-                              <div className="flex items-start justify-between">
-                                <div className="flex-1">
-                                  <div className="font-medium text-gray-900">
-                                    {pr.exerciseName}
-                                  </div>
-                                  <div className="text-sm text-gray-600 mt-1">
-                                    {pr.type === 'weight' && `Gewicht: ${pr.value}kg`}
-                                    {pr.type === 'reps' && pr.isUnilateral && pr.details?.reps && 
-                                      `Wiederholungen: ${pr.details.reps * 2} (${pr.details.reps}x2)`}
-                                    {pr.type === 'reps' && !pr.isUnilateral && `Wiederholungen: ${pr.value}`}
-                                    {pr.type === 'volume' && `Volumen: ${formatNumber(pr.value)}kg`}
-                                    {pr.type === 'one_rm' && `1RM: ${pr.value.toFixed(1)}kg`}
-                                  </div>
+                              <div className="flex flex-col">
+                                <div className="font-medium text-gray-900 mb-2">
+                                  {pr.exerciseName}
                                 </div>
-                                <div className="text-xs text-gray-500">
+                                <div className="text-sm text-gray-600">
+                                  {pr.type === 'weight' && `Gewicht: ${pr.value}kg`}
+                                  {pr.type === 'reps' && pr.isUnilateral && pr.details?.reps && 
+                                    `Wiederholungen: ${pr.details.reps * 2} (${pr.details.reps}x2)`}
+                                  {pr.type === 'reps' && !pr.isUnilateral && `Wiederholungen: ${pr.value}`}
+                                  {pr.type === 'volume' && `Volumen: ${formatNumber(pr.value)}kg`}
+                                  {pr.type === 'one_rm' && `1RM: ${pr.value.toFixed(1)}kg`}
+                                </div>
+                                <div className="text-xs text-gray-500 mt-2">
                                   {formatDate(pr.date)}
                                 </div>
                               </div>

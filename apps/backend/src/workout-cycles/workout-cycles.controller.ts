@@ -17,6 +17,7 @@ import {
   UpdateBlueprintDto,
   UpdateWorkoutDayDto,
   CycleResponseDto,
+  CycleDetailsDto,
 } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -37,6 +38,14 @@ export class WorkoutCyclesController {
     @CurrentUser() user: { id: string },
   ): Promise<CycleResponseDto> {
     return this.workoutCyclesService.findById(id, user.id);
+  }
+
+  @Get(':id/details')
+  async getCycleDetails(
+    @Param('id') id: string,
+    @CurrentUser() user: { id: string },
+  ): Promise<CycleDetailsDto> {
+    return this.workoutCyclesService.getCycleDetails(id, user.id);
   }
 
   @Post()
