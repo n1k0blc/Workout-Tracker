@@ -51,7 +51,10 @@ export class WorkoutsService {
           select: { name: true },
         },
         workoutDay: {
-          select: { name: true },
+          select: { 
+            name: true,
+            weekday: true,
+          },
         },
         homeGym: {
           select: { id: true, name: true, createdAt: true },
@@ -110,6 +113,7 @@ export class WorkoutsService {
         } : undefined,
         cycleName: workout.cycle?.name,
         workoutDayName: workout.workoutDay?.name,
+        workoutDayWeekday: workout.workoutDay?.weekday,
         templateId: workout.templateId,
         templateName: workout.templateName,
         exerciseCount: workout.exercises.length,

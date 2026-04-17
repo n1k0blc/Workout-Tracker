@@ -78,6 +78,7 @@ export class WorkoutListItemDto {
   };
   cycleName?: string;
   workoutDayName?: string;
+  workoutDayWeekday?: number;
   templateId?: string;
   templateName?: string;
   exerciseCount: number;
