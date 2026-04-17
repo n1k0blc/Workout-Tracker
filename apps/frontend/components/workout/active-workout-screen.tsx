@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWorkout } from '@/lib/workout-context';
 import { apiClient } from '@/lib/api';
+import { Workout, PersonalRecord } from '@/types';
 import ExerciseCard from '@/components/workout/exercise-card';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import WorkoutTimer from '@/components/workout/workout-timer';
@@ -24,7 +25,11 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 
-export default function ActiveWorkoutScreen() {
+interface ActiveWorkoutScreenProps {
+  onWorkoutComplete: (workout: Workout, prs: PersonalRecord[], saveAsTemplate: boolean) => void;
+}
+
+export default function ActiveWorkoutScreen({ onWorkoutComplete }: ActiveWorkoutScreenProps) {
   const router = useRouter();
   const {
     activeWorkout,
@@ -150,29 +155,31 @@ export default function ActiveWorkoutScreen() {
 
   const handleComplete = async () => {
     try {
-      // Store workout ID BEFORE completing (activeWorkout will be null after)
-      const workoutIdForTemplate = saveAsTemplate && activeWorkout ? activeWorkout.id : null;
-      
-      console.log('Completing workout:', {
-        saveAsTemplate,
-        activeWorkoutId: activeWorkout?.id,
-        workoutIdForTemplate,
-      });
-      
-      await completeWorkout({
+      const workout = await completeWorkout({
         totalDuration: isPastWorkout ? pastWorkoutDuration : workoutDuration,
         updateBlueprint: updateBlueprint,
       });
-      
-      // Show template modal if requested
-      if (workoutIdForTemplate) {
-        console.log('Initiating template save for workout:', workoutIdForTemplate);
-        initTemplateSave(workoutIdForTemplate);
-        setShowCompleteConfirm(false);
-      } else {
-        console.log('No template save requested, going to dashboard');
-        router.push('/dashboard');
+
+      if (!workout) {
+        throw new Error('No workout returned from completeWorkout');
       }
+
+      // Close confirmation modal
+      setShowCompleteConfirm(false);
+
+      // Load recent PRs to show if any were set in this workout
+      let prs: PersonalRecord[] = [];
+      try {
+        const prData = await apiClient.getPersonalRecords({});
+        prs = prData.recentPRs || [];
+      } catch (error) {
+        console.error('Failed to load PRs:', error);
+        // Continue anyway with empty array
+      }
+
+      // Call parent handler to show completion modal
+      onWorkoutComplete(workout, prs, saveAsTemplate);
+      
     } catch (error) {
       console.error('Failed to complete workout:', error);
     }

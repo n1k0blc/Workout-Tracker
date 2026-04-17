@@ -8,12 +8,27 @@ import { apiClient } from '@/lib/api';
 import WorkoutStartScreen from '@/components/workout/start-screen';
 import ActiveWorkoutScreen from '@/components/workout/active-workout-screen';
 import { RestAlertModal } from '@/components/workout/rest-alert-modal';
+import { WorkoutCompletionModal } from '@/components/WorkoutCompletionModal';
+import { Workout, PersonalRecord } from '@/types';
 
 export default function WorkoutPage() {
   const router = useRouter();
-  const { activeWorkout, loading, pendingTemplateSave, cancelTemplateSave, completeTemplateSave } = useWorkout();
+  const { 
+    activeWorkout, 
+    loading, 
+    pendingTemplateSave, 
+    cancelTemplateSave, 
+    completeTemplateSave,
+    initTemplateSave 
+  } = useWorkout();
   const [templateName, setTemplateName] = useState('');
   const [savingTemplate, setSavingTemplate] = useState(false);
+  
+  // Completion modal state
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [completedWorkout, setCompletedWorkout] = useState<Workout | null>(null);
+  const [personalRecords, setPersonalRecords] = useState<PersonalRecord[]>([]);
+  const [saveAsTemplateAfterModal, setSaveAsTemplateAfterModal] = useState(false);
 
   const handleSaveAsTemplate = async () => {
     if (!templateName.trim() || !pendingTemplateSave) {
@@ -46,6 +61,26 @@ export default function WorkoutPage() {
     router.push('/dashboard');
   };
 
+  // Handler for when workout is completed - called from ActiveWorkoutScreen
+  const handleWorkoutComplete = async (workout: Workout, prs: PersonalRecord[], saveAsTemplate: boolean) => {
+    setCompletedWorkout(workout);
+    setPersonalRecords(prs);
+    setSaveAsTemplateAfterModal(saveAsTemplate);
+    setShowCompletionModal(true);
+  };
+
+  // Handler for when completion modal is closed
+  const handleCompletionModalClose = () => {
+    setShowCompletionModal(false);
+    
+    if (saveAsTemplateAfterModal && completedWorkout) {
+      // Trigger template save flow
+      initTemplateSave(completedWorkout.id);
+    } else {
+      router.push('/dashboard');
+    }
+  };
+
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-gray-50">
@@ -55,7 +90,7 @@ export default function WorkoutPage() {
           </div>
         ) : activeWorkout?.status === 'IN_PROGRESS' ? (
           <>
-            <ActiveWorkoutScreen />
+            <ActiveWorkoutScreen onWorkoutComplete={handleWorkoutComplete} />
             <RestAlertModal />
           </>
         ) : (
@@ -104,6 +139,15 @@ export default function WorkoutPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Workout Completion Modal */}
+        {showCompletionModal && completedWorkout && (
+          <WorkoutCompletionModal
+            workout={completedWorkout}
+            personalRecords={personalRecords}
+            onClose={handleCompletionModalClose}
+          />
         )}
       </div>
     </ProtectedRoute>
