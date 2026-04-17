@@ -20,6 +20,8 @@ import {
   DurationByCycleAnalytics,
   RestTimeAnalytics,
   RestTimeByCycleAnalytics,
+  RepsAnalytics,
+  RepsByCycleAnalytics,
   MuscleGroup,
   Equipment,
   HomeGym,
@@ -697,6 +699,41 @@ class ApiClient {
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<RestTimeByCycleAnalytics>(
       `/analytics/rest-time-by-cycle/${cycleId}${queryString}`
+    );
+  }
+
+  async getRepsAnalytics(params: {
+    period?: 'week' | 'month' | 'all';
+    startDate?: string;
+    endDate?: string;
+    gymId?: string;
+    muscleGroup?: string;
+    equipment?: string;
+  }): Promise<RepsAnalytics> {
+    const query = new URLSearchParams();
+    if (params.period) query.append('period', params.period);
+    if (params.startDate) query.append('startDate', params.startDate);
+    if (params.endDate) query.append('endDate', params.endDate);
+    if (params.gymId) query.append('gymId', params.gymId);
+    if (params.muscleGroup) query.append('muscleGroup', params.muscleGroup);
+    if (params.equipment) query.append('equipment', params.equipment);
+
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    return this.request<RepsAnalytics>(`/analytics/reps${queryString}`);
+  }
+
+  async getRepsByCycle(
+    cycleId: string,
+    muscleGroup?: string,
+    equipment?: string,
+  ): Promise<RepsByCycleAnalytics> {
+    const query = new URLSearchParams();
+    if (muscleGroup) query.append('muscleGroup', muscleGroup);
+    if (equipment) query.append('equipment', equipment);
+
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    return this.request<RepsByCycleAnalytics>(
+      `/analytics/reps-by-cycle/${cycleId}${queryString}`
     );
   }
 

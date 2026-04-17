@@ -376,6 +376,29 @@ export interface RestTimeByCycleAnalytics {
   totalWorkouts: number;
 }
 
+export interface RepsDataPoint {
+  date: string;
+  reps: number;
+  workoutId: string;
+  trainingDay?: number;
+}
+
+export interface RepsAnalytics {
+  totalReps: number;
+  averageReps: number;
+  period: string;
+  dataPoints: RepsDataPoint[];
+}
+
+export interface RepsByCycleAnalytics {
+  cycleId: string;
+  cycleName: string;
+  dataPoints: RepsDataPoint[];
+  totalReps: number;
+  averageReps: number;
+  totalWorkouts: number;
+}
+
 // Workout Template Types
 export interface WorkoutTemplateSet {
   id: string;

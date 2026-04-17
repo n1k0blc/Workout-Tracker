@@ -18,6 +18,8 @@ import {
   DurationByCycleAnalytics,
   RestTimeAnalytics,
   RestTimeByCycleAnalytics,
+  RepsAnalytics,
+  RepsByCycleAnalytics,
 } from '@/types';
 import {
   LineChart,
@@ -43,6 +45,7 @@ export default function AnalyticsPage() {
   const [rirData, setRirData] = useState<RIRByCycleAnalytics | RIRAnalytics | null>(null);
   const [durationData, setDurationData] = useState<DurationByCycleAnalytics | DurationAnalytics | null>(null);
   const [restTimeData, setRestTimeData] = useState<RestTimeByCycleAnalytics | RestTimeAnalytics | null>(null);
+  const [repsData, setRepsData] = useState<RepsByCycleAnalytics | RepsAnalytics | null>(null);
   const [prs, setPrs] = useState<PersonalRecord[]>([]);
   const [homeGyms, setHomeGyms] = useState<HomeGym[]>([]);
   const [cycles, setCycles] = useState<CycleList | null>(null);
@@ -50,7 +53,7 @@ export default function AnalyticsPage() {
   // UI states
   const [loading, setLoading] = useState(true);
   const [cycleMode, setCycleMode] = useState(false);
-  const [viewMode, setViewMode] = useState<'volume' | 'orm' | 'rir' | 'duration' | 'restTime'>('volume');
+  const [viewMode, setViewMode] = useState<'volume' | 'orm' | 'rir' | 'duration' | 'restTime' | 'reps'>('volume');
   
   // Filter states
   const [timeFilter, setTimeFilter] = useState('7');
@@ -192,6 +195,24 @@ export default function AnalyticsPage() {
 
       setRestTimeData(restTime);
       setPrs(records.allTimePRs || []);
+    } else if (viewMode === 'reps') {
+      const [reps, records] = await Promise.all([
+        apiClient.getRepsAnalytics({
+          startDate,
+          endDate,
+          gymId: gymFilter,
+          muscleGroup: muscleFilter,
+          equipment: equipmentFilter,
+        }),
+        apiClient.getPersonalRecords({
+          muscleGroup: muscleFilter,
+          equipment: equipmentFilter,
+          gymId: gymFilter,
+        }),
+      ]);
+
+      setRepsData(reps);
+      setPrs(records.allTimePRs || []);
     }
   };
 
@@ -311,6 +332,23 @@ export default function AnalyticsPage() {
       ]);
 
       setRestTimeData(restTime);
+      setPrs(records.allTimePRs || []);
+    } else if (viewMode === 'reps') {
+      // Load Reps data for cycle
+      const [reps, records] = await Promise.all([
+        apiClient.getRepsByCycle(
+          selectedCycle.id,
+          muscleFilter,
+          equipmentFilter,
+        ),
+        apiClient.getPersonalRecords({
+          muscleGroup: muscleFilter,
+          equipment: equipmentFilter,
+          gymId: gymFilter,
+        }),
+      ]);
+
+      setRepsData(reps);
       setPrs(records.allTimePRs || []);
     }
   };
@@ -467,7 +505,7 @@ export default function AnalyticsPage() {
 
                 {/* Row 2: Cycle Navigation (only in Cycle Mode) */}
                 {cycleMode && allCycles.length > 0 && (
-                  <div className="flex items-center justify-between border-t pt-4">
+                  <div className="flex items-center justify-between">
                     <button
                       onClick={() => setSelectedCycleIndex(Math.min(allCycles.length - 1, selectedCycleIndex + 1))}
                       disabled={selectedCycleIndex === allCycles.length - 1}
@@ -501,123 +539,63 @@ export default function AnalyticsPage() {
                   </div>
                 )}
 
-                {/* Row 3: Volume/ORM/RIR/Duration Toggle */}
-                <div className="flex items-center gap-2 border-t pt-4">
-                  <button
-                    onClick={() => setViewMode('volume')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                      viewMode === 'volume'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    Volumen
-                  </button>
-                  {cycleMode && (
-                    <button
-                      onClick={() => setViewMode('orm')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                        viewMode === 'orm'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
+                {/* Row 3: View Mode, Muscle Group & Equipment Dropdowns */}
+                <div className="flex flex-col md:flex-row md:items-center gap-4">
+                  {/* View Mode Dropdown */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                      Ansicht:
+                    </label>
+                    <select
+                      value={viewMode}
+                      onChange={(e) => setViewMode(e.target.value as typeof viewMode)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
                     >
-                      %ORM
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setViewMode('rir')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                      viewMode === 'rir'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    RIR
-                  </button>
-                  <button
-                    onClick={() => setViewMode('duration')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                      viewMode === 'duration'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    Dauer
-                  </button>
-                  <button
-                    onClick={() => setViewMode('restTime')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                      viewMode === 'restTime'
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    Satzpause
-                  </button>
-                </div>
-
-                {/* Row 4: Muscle Group Filter */}
-                <div className="border-t pt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Muskelgruppe
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => setMuscleFilter(undefined)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
-                        !muscleFilter
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      Alle
-                    </button>
-                    {muscleGroups.map((mg) => (
-                      <button
-                        key={mg}
-                        onClick={() => setMuscleFilter(mg)}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
-                          muscleFilter === mg
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                      >
-                        {translateMuscleGroup(mg)}
-                      </button>
-                    ))}
+                      <option value="volume">Volumen</option>
+                      {cycleMode && <option value="orm">%ORM</option>}
+                      <option value="rir">RIR</option>
+                      <option value="duration">Dauer</option>
+                      <option value="restTime">Satzpause</option>
+                      <option value="reps">Wiederholungen</option>
+                    </select>
                   </div>
-                </div>
 
-                {/* Row 5: Equipment Filter */}
-                <div className="border-t pt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Equipment
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => setEquipmentFilter(undefined)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
-                        !equipmentFilter
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
+                  {/* Muscle Group Dropdown */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                      Muskelgruppe:
+                    </label>
+                    <select
+                      value={muscleFilter || ''}
+                      onChange={(e) => setMuscleFilter(e.target.value ? e.target.value as MuscleGroup : undefined)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
                     >
-                      Alle
-                    </button>
-                    {equipments.map((eq) => (
-                      <button
-                        key={eq}
-                        onClick={() => setEquipmentFilter(eq)}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
-                          equipmentFilter === eq
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                      >
-                        {translateEquipment(eq)}
-                      </button>
-                    ))}
+                      <option value="">Alle</option>
+                      {muscleGroups.map((mg) => (
+                        <option key={mg} value={mg}>
+                          {translateMuscleGroup(mg)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Equipment Dropdown */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                      Equipment:
+                    </label>
+                    <select
+                      value={equipmentFilter || ''}
+                      onChange={(e) => setEquipmentFilter(e.target.value ? e.target.value as Equipment : undefined)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Alle</option>
+                      {equipments.map((eq) => (
+                        <option key={eq} value={eq}>
+                          {translateEquipment(eq)}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
@@ -1075,8 +1053,132 @@ export default function AnalyticsPage() {
                   </div>
                 )}
 
+                {/* Reps Chart (Time Mode) */}
+                {!cycleMode && viewMode === 'reps' && (
+                  <div className="bg-white rounded-lg shadow p-6">
+                    {repsData && repsData.dataPoints.length > 0 ? (
+                      <>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                          Wiederholungen pro Workout
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={repsData.dataPoints}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis
+                              dataKey="date"
+                              tickFormatter={formatDate}
+                              style={{ fontSize: '12px' }}
+                            />
+                            <YAxis
+                              label={{ value: 'Wiederholungen', angle: -90, position: 'insideLeft' }}
+                              style={{ fontSize: '12px' }}
+                            />
+                            <Tooltip
+                              formatter={(value: any) => [value, 'Wiederholungen']}
+                              labelFormatter={(label: any) => formatDate(label as string)}
+                            />
+                            <Legend />
+                            <Line
+                              dataKey="reps"
+                              stroke="#10b981"
+                              strokeWidth={2}
+                              name="Wiederholungen"
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                        <div className="mt-4 grid grid-cols-2 gap-4 text-center">
+                          <div>
+                            <div className="text-sm text-gray-600">
+                              Gesamt
+                            </div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {formatNumber(repsData.totalReps)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-sm text-gray-600">
+                              Ø pro Workout
+                            </div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {formatNumber(repsData.averageReps)}
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center py-12">
+                        <p className="text-gray-600">
+                          Keine Wiederholungs-Daten verfügbar für die ausgewählten Filter.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Reps Chart (Cycle Mode) */}
+                {cycleMode && viewMode === 'reps' && (
+                  <div className="bg-white rounded-lg shadow p-6">
+                    {repsData && repsData.dataPoints.length > 0 ? (
+                      <>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                          Wiederholungen pro Workout
+                        </h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={repsData.dataPoints}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis
+                              dataKey="date"
+                              tickFormatter={formatDate}
+                              style={{ fontSize: '12px' }}
+                            />
+                            <YAxis
+                              label={{ value: 'Wiederholungen', angle: -90, position: 'insideLeft' }}
+                              style={{ fontSize: '12px' }}
+                            />
+                            <Tooltip
+                              formatter={(value: any) => [value, 'Wiederholungen']}
+                              labelFormatter={(label: any) => formatDate(label as string)}
+                            />
+                            <Legend />
+                            <Line
+                              dataKey="reps"
+                              stroke="#10b981"
+                              strokeWidth={2}
+                              name="Wiederholungen"
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                        <div className="mt-4 grid grid-cols-2 gap-4 text-center">
+                          <div>
+                            <div className="text-sm text-gray-600">
+                              Gesamt
+                            </div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {formatNumber(repsData.totalReps)}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-sm text-gray-600">
+                              Ø pro Workout
+                            </div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {formatNumber(repsData.averageReps)}
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-center py-12">
+                        <p className="text-gray-600">
+                          Keine Wiederholungs-Daten verfügbar für die ausgewählten Filter.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Muscle Distribution Chart */}
-                {viewMode === 'volume' && volumeData && volumeData.byMuscleGroup && volumeData.byMuscleGroup.length > 0 && (
+                {viewMode === 'volume' && !muscleFilter && volumeData && volumeData.byMuscleGroup && volumeData.byMuscleGroup.length > 0 && (
                   <div className="bg-white rounded-lg shadow p-6">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">
                       Muskelgruppen-Verteilung

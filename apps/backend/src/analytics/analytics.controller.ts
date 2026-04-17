@@ -15,6 +15,8 @@ import {
   DurationByCycleDto,
   RestTimeAnalyticsDto,
   RestTimeByCycleDto,
+  RepsAnalyticsDto,
+  RepsByCycleDto,
 } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -214,5 +216,36 @@ export class AnalyticsController {
     @Query('equipment') equipment?: string,
   ): Promise<RestTimeByCycleDto> {
     return this.analyticsService.getRestTimeByCycle(user.id, cycleId, gymId, muscleGroup, equipment);
+  }
+
+  @Get('reps')
+  async getRepsAnalytics(
+    @CurrentUser() user: { id: string },
+    @Query('period') period?: 'week' | 'month' | 'all',
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('gymId') gymId?: string,
+    @Query('muscleGroup') muscleGroup?: string,
+    @Query('equipment') equipment?: string,
+  ): Promise<RepsAnalyticsDto> {
+    return this.analyticsService.getRepsAnalytics(
+      user.id,
+      period,
+      startDate ? new Date(startDate) : undefined,
+      endDate ? new Date(endDate) : undefined,
+      gymId,
+      muscleGroup,
+      equipment,
+    );
+  }
+
+  @Get('reps-by-cycle/:cycleId')
+  async getRepsByCycle(
+    @Param('cycleId') cycleId: string,
+    @CurrentUser() user: { id: string },
+    @Query('muscleGroup') muscleGroup?: string,
+    @Query('equipment') equipment?: string,
+  ): Promise<RepsByCycleDto> {
+    return this.analyticsService.getRepsByCycle(user.id, cycleId, muscleGroup, equipment);
   }
 }
