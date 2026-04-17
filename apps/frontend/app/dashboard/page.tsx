@@ -23,6 +23,10 @@ export default function DashboardPage() {
   const [weekWorkouts, setWeekWorkouts] = useState<WorkoutListItem[]>([]);
   const [prs, setPrs] = useState<PersonalRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // State for recently completed cycle
+  const [showCycleCompletion, setShowCycleCompletion] = useState(false);
+  const [completedCycle, setCompletedCycle] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -70,6 +74,36 @@ export default function DashboardPage() {
     };
 
     loadDashboardData();
+  }, []);
+
+  // Check for recently completed cycles
+  useEffect(() => {
+    const checkRecentlyCompletedCycle = async () => {
+      try {
+        const cycles = await apiClient.getCycles();
+        const completedCycles = cycles
+          .filter(c => c.status === 'COMPLETED' && c.completedAt)
+          .sort((a, b) => new Date(b.completedAt!).getTime() - new Date(a.completedAt!).getTime());
+        
+        if (completedCycles.length > 0) {
+          const mostRecent = completedCycles[0];
+          const daysSinceCompletion = 
+            (Date.now() - new Date(mostRecent.completedAt!).getTime()) / (1000 * 60 * 60 * 24);
+          
+          const acknowledged = localStorage.getItem(`cycle-${mostRecent.id}-acknowledged`);
+          
+          // Show completion card if completed within last 7 days and not yet acknowledged
+          if (daysSinceCompletion <= 7 && !acknowledged) {
+            setCompletedCycle({ id: mostRecent.id, name: mostRecent.name });
+            setShowCycleCompletion(true);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to check for completed cycles:', error);
+      }
+    };
+
+    checkRecentlyCompletedCycle();
   }, []);
 
   const formatDate = (dateStr: string) => {
@@ -131,12 +165,36 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  {/* Zyklus-Fortschritt */}
+                  {/* Zyklus-Fortschritt / Completion / No Cycle */}
                   <div className="bg-white rounded-lg shadow p-6">
                     <div className="text-sm font-medium text-gray-600 mb-3">
-                      Zyklus-Fortschritt
+                      Zyklus-Status
                     </div>
-                    {cycleProgress ? (
+                    
+                    {/* Show cycle completion card if recently completed */}
+                    {showCycleCompletion && completedCycle ? (
+                      <div 
+                        onClick={() => {
+                          localStorage.setItem(`cycle-${completedCycle.id}-acknowledged`, 'true');
+                          router.push(`/cycles/${completedCycle.id}?celebration=true`);
+                        }}
+                        className="bg-gradient-to-br from-gray-900 to-gray-700 text-white rounded-lg p-6 cursor-pointer hover:from-gray-800 hover:to-gray-600 transition-all"
+                      >
+                        <div className="text-center">
+                          <div className="text-6xl mb-3">🎉</div>
+                          <div className="text-sm font-medium mb-1 text-gray-300">
+                            Zyklus beendet
+                          </div>
+                          <div className="text-xl font-bold">
+                            {completedCycle.name}
+                          </div>
+                          <div className="text-xs text-gray-400 mt-2">
+                            Klicken für Details
+                          </div>
+                        </div>
+                      </div>
+                    ) : cycleProgress ? (
+                      /* Active cycle - show progress */
                       <div className="flex flex-col items-center">
                         <CircularProgress
                           current={cycleProgress.currentWeek}
@@ -148,8 +206,17 @@ export default function DashboardPage() {
                         </div>
                       </div>
                     ) : (
-                      <div className="flex items-center justify-center h-24">
-                        <div className="text-gray-500">Kein aktiver Zyklus</div>
+                      /* No active cycle - show placeholder */
+                      <div className="text-center py-4">
+                        <div className="text-gray-500 mb-4 text-sm">
+                          Kein aktiver Zyklus
+                        </div>
+                        <button
+                          onClick={() => router.push('/cycles/new')}
+                          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          Neuen Zyklus anlegen
+                        </button>
                       </div>
                     )}
                   </div>

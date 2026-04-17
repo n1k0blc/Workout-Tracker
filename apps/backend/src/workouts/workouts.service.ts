@@ -26,6 +26,7 @@ export class WorkoutsService {
     status?: WorkoutStatus,
     startDate?: Date,
     endDate?: Date,
+    cycleId?: string,
   ): Promise<WorkoutListItemDto[]> {
     const dateFilter: any = {};
     if (startDate && endDate) {
@@ -43,6 +44,7 @@ export class WorkoutsService {
         // If no status specified, exclude DISCARDED workouts by default
         ...(status ? { status: status as any } : { status: { not: 'DISCARDED' as any } }),
         ...(Object.keys(dateFilter).length > 0 ? { date: dateFilter } : {}),
+        ...(cycleId ? { cycleId } : {}),
       },
       include: {
         cycle: {
@@ -55,31 +57,65 @@ export class WorkoutsService {
           select: { id: true, name: true, createdAt: true },
         },
         exercises: {
-          select: { id: true },
+          include: {
+            exercise: {
+              select: {
+                isUnilateral: true,
+                isDoubleWeight: true,
+              },
+            },
+            sets: true,
+          },
         },
       },
       orderBy: { date: 'desc' },
     });
 
-    return workouts.map((workout) => ({
-      id: workout.id,
-      date: workout.date,
-      status: workout.status as WorkoutStatus,
-      isFreeWorkout: workout.isFreeWorkout,
-      totalDuration: workout.totalDuration,
-      homeGymId: workout.homeGymId,
-      homeGym: workout.homeGym ? {
-        id: workout.homeGym.id,
-        name: workout.homeGym.name,
-        createdAt: workout.homeGym.createdAt,
-      } : undefined,
-      cycleName: workout.cycle?.name,
-      workoutDayName: workout.workoutDay?.name,
-      templateId: workout.templateId,
-      templateName: workout.templateName,
-      exerciseCount: workout.exercises.length,
-      createdAt: workout.createdAt,
-    }));
+    return workouts.map((workout) => {
+      // Calculate total volume (excluding warmup sets)
+      let totalVolume = 0;
+      for (const exercise of workout.exercises) {
+        const isUnilateral = exercise.exercise?.isUnilateral || false;
+        const isDoubleWeight = exercise.exercise?.isDoubleWeight || false;
+
+        for (const set of exercise.sets) {
+          if (set.setType !== 'WARMUP') {
+            let weight = set.weight;
+            
+            // Apply multipliers
+            if (isUnilateral) {
+              weight *= 2;
+            }
+            if (isDoubleWeight) {
+              weight *= 2;
+            }
+            
+            totalVolume += weight * set.reps;
+          }
+        }
+      }
+
+      return {
+        id: workout.id,
+        date: workout.date,
+        status: workout.status as WorkoutStatus,
+        isFreeWorkout: workout.isFreeWorkout,
+        totalDuration: workout.totalDuration,
+        totalVolume,
+        homeGymId: workout.homeGymId,
+        homeGym: workout.homeGym ? {
+          id: workout.homeGym.id,
+          name: workout.homeGym.name,
+          createdAt: workout.homeGym.createdAt,
+        } : undefined,
+        cycleName: workout.cycle?.name,
+        workoutDayName: workout.workoutDay?.name,
+        templateId: workout.templateId,
+        templateName: workout.templateName,
+        exerciseCount: workout.exercises.length,
+        createdAt: workout.createdAt,
+      };
+    });
   }
 
   async findActive(userId: string): Promise<WorkoutResponseDto | null> {

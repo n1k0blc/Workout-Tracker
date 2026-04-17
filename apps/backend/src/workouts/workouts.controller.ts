@@ -65,10 +65,11 @@ export class WorkoutsController {
     @Query('status') status?: WorkoutStatus,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('cycleId') cycleId?: string,
   ): Promise<WorkoutListItemDto[]> {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
-    return this.workoutsService.findAll(user.id, status, start, end);
+    return this.workoutsService.findAll(user.id, status, start, end, cycleId);
   }
 
   @Get(':id')

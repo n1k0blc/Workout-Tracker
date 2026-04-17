@@ -8,6 +8,7 @@ import {
   Workout,
   WorkoutListItem,
   WorkoutCycle,
+  CycleDetails,
   VolumeAnalytics,
   PersonalRecord,
   PersonalRecordsResponse,
@@ -417,6 +418,10 @@ class ApiClient {
 
   async getCycle(id: string): Promise<WorkoutCycle> {
     return this.request<WorkoutCycle>(`/cycles/${id}`);
+  }
+
+  async getCycleDetails(id: string): Promise<CycleDetails> {
+    return this.request<CycleDetails>(`/cycles/${id}/details`);
   }
 
   async createCycle(data: {

@@ -6,6 +6,8 @@ import {
   UpdateBlueprintDto,
   UpdateWorkoutDayDto,
   CycleResponseDto,
+  CycleDetailsDto,
+  WorkoutsByGymDto,
 } from './dto';
 
 @Injectable()
@@ -401,6 +403,150 @@ export class WorkoutCyclesService {
     await this.prisma.workoutCycle.delete({
       where: { id },
     });
+  }
+
+  /**
+   * Get detailed statistics and data for a cycle
+   */
+  async getCycleDetails(id: string, userId: string): Promise<CycleDetailsDto> {
+    // Check ownership and get cycle
+    const cycle = await this.prisma.workoutCycle.findUnique({
+      where: { id },
+      include: {
+        workoutDays: true,
+      },
+    });
+
+    if (!cycle) {
+      throw new NotFoundException('Zyklus nicht gefunden');
+    }
+
+    if (cycle.userId !== userId) {
+      throw new ForbiddenException('Zugriff verweigert');
+    }
+
+    // Calculate end date
+    const endDate = new Date(cycle.startDate);
+    endDate.setDate(endDate.getDate() + cycle.duration * 7);
+
+    // Get all workouts that belong to this cycle
+    const workouts = await this.prisma.workout.findMany({
+      where: {
+        userId,
+        cycleId: id,
+        status: 'COMPLETED',
+      },
+      include: {
+        exercises: {
+          include: {
+            exercise: {
+              select: {
+                isUnilateral: true,
+                isDoubleWeight: true,
+              },
+            },
+            sets: true,
+          },
+        },
+        homeGym: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        date: 'asc',
+      },
+    });
+
+    // Calculate total volume (excluding warmup sets)
+    let totalVolume = 0;
+    for (const workout of workouts) {
+      for (const exercise of workout.exercises) {
+        const isUnilateral = exercise.exercise?.isUnilateral || false;
+        const isDoubleWeight = exercise.exercise?.isDoubleWeight || false;
+
+        for (const set of exercise.sets) {
+          if (set.setType !== 'WARMUP') {
+            let weight = set.weight;
+            
+            // Apply multipliers
+            if (isUnilateral) {
+              weight *= 2;
+            }
+            if (isDoubleWeight) {
+              weight *= 2;
+            }
+            
+            totalVolume += weight * set.reps;
+          }
+        }
+      }
+    }
+
+    // Group workouts by gym
+    const gymMap = new Map<string, { gymName: string; count: number; isHome: boolean }>();
+    
+    for (const workout of workouts) {
+      if (workout.homeGym) {
+        const key = workout.homeGym.id;
+        if (gymMap.has(key)) {
+          gymMap.get(key)!.count++;
+        } else {
+          gymMap.set(key, {
+            gymName: workout.homeGym.name,
+            count: 1,
+            isHome: true,
+          });
+        }
+      } else {
+        // Other gyms
+        const key = 'other';
+        if (gymMap.has(key)) {
+          gymMap.get(key)!.count++;
+        } else {
+          gymMap.set(key, {
+            gymName: 'Andere Gyms',
+            count: 1,
+            isHome: false,
+          });
+        }
+      }
+    }
+
+    const workoutsByGym: WorkoutsByGymDto[] = Array.from(gymMap.values());
+
+    // Calculate current week for active cycles
+    let currentWeek: number | undefined;
+    let totalWeeks: number | undefined;
+    let percentage: number | undefined;
+
+    if (cycle.status === 'ACTIVE') {
+      const now = new Date();
+      const diffTime = now.getTime() - cycle.startDate.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      currentWeek = Math.min(Math.floor(diffDays / 7) + 1, cycle.duration);
+      totalWeeks = cycle.duration;
+      percentage = Math.min((currentWeek / totalWeeks) * 100, 100);
+      percentage = Math.round(percentage * 100) / 100; // 2 decimals
+    }
+
+    return {
+      id: cycle.id,
+      name: cycle.name,
+      duration: cycle.duration,
+      startDate: cycle.startDate,
+      endDate,
+      status: cycle.status,
+      completedAt: cycle.completedAt,
+      totalVolume: Math.round(totalVolume),
+      workoutCount: workouts.length,
+      workoutsByGym,
+      currentWeek,
+      totalWeeks,
+      percentage,
+    };
   }
 
   private mapCycleToResponse(cycle: any): CycleResponseDto {

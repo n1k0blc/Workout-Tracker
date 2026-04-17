@@ -175,6 +175,7 @@ export interface WorkoutListItem {
   status: WorkoutStatus;
   isFreeWorkout: boolean;
   totalDuration?: number;
+  totalVolume: number;
   homeGymId?: string | null;
   homeGym?: HomeGym;
   cycleName?: string;
@@ -229,6 +230,33 @@ export interface WorkoutCycle {
   status: 'ACTIVE' | 'COMPLETED';
   completedAt?: string;
   workoutDays: WorkoutDay[];
+}
+
+export interface WorkoutsByGym {
+  gymName: string;
+  count: number;
+  isHome: boolean;
+}
+
+export interface CycleDetails {
+  // Basic cycle info
+  id: string;
+  name: string;
+  duration: number;
+  startDate: string;
+  endDate: string;
+  status: 'ACTIVE' | 'COMPLETED';
+  completedAt?: string;
+
+  // Statistics
+  totalVolume: number;
+  workoutCount: number;
+  workoutsByGym: WorkoutsByGym[];
+
+  // Current week (for active cycles)
+  currentWeek?: number;
+  totalWeeks?: number;
+  percentage?: number;
 }
 
 // Analytics Types
