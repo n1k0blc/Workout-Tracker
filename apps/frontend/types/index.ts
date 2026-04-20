@@ -486,19 +486,19 @@ export interface UpdateWorkoutTemplate {
 }
 
 // Dashboard Types
-export interface CurrentWeekStats {
+export interface LastSevenDaysStats {
   workouts: number;
   volume: number;
   averageDuration: number | null;
 }
 
-export interface LastWeekStats {
+export interface PreviousSevenDaysStats {
   volume: number;
 }
 
 export interface DashboardStats {
-  currentWeek: CurrentWeekStats;
-  lastWeek: LastWeekStats;
+  lastSevenDays: LastSevenDaysStats;
+  previousSevenDays: PreviousSevenDaysStats;
   volumeChange: number;
 }
 

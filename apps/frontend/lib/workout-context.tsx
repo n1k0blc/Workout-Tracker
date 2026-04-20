@@ -9,6 +9,8 @@ interface WorkoutContextType {
   loading: boolean;
   isPaused: boolean;
   togglePause: () => void;
+  isRestTimerPaused: boolean;
+  toggleRestTimerPause: () => void;
   isPastWorkout: boolean;
   pastWorkoutDuration: number;
   setPastWorkoutDuration: (duration: number) => void;
@@ -74,6 +76,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const [activeWorkout, setActiveWorkout] = useState<Workout | null>(null);
   const [loading, setLoading] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [isRestTimerPaused, setIsRestTimerPaused] = useState(false);
   const [isPastWorkout, setIsPastWorkout] = useState(false);
   const [pastWorkoutDuration, setPastWorkoutDuration] = useState(0);
   const [removedPlannedSets, setRemovedPlannedSets] = useState<Map<string, Set<number>>>(new Map());
@@ -89,11 +92,68 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const [workoutStartTime, setWorkoutStartTime] = useState<number | null>(null);
   const [restStartTime, setRestStartTime] = useState<number | null>(null);
 
+  // Pause state - stores elapsed time when paused
+  const [pausedWorkoutDuration, setPausedWorkoutDuration] = useState<number | null>(null);
+  const [pausedRestTimer, setPausedRestTimer] = useState<number | null>(null);
+  const [pausedRestTimerValue, setPausedRestTimerValue] = useState<number | null>(null);
+
   const workoutTimerRef = useRef<NodeJS.Timeout | null>(null);
   const restTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const togglePause = () => {
-    setIsPaused(prev => !prev);
+    setIsPaused(prev => {
+      const newPausedState = !prev;
+      
+      if (newPausedState) {
+        // Pausing: Freeze current elapsed times
+        setPausedWorkoutDuration(workoutDuration);
+        setPausedRestTimer(restTimer);
+      } else {
+        // Resuming: Adjust start times to account for paused duration
+        if (pausedWorkoutDuration !== null && workoutStartTime !== null) {
+          const newStartTime = Date.now() - (pausedWorkoutDuration * 1000);
+          setWorkoutStartTime(newStartTime);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('workoutStartTime', newStartTime.toString());
+          }
+          setPausedWorkoutDuration(null);
+        }
+        
+        if (pausedRestTimer !== null && restStartTime !== null) {
+          const newRestStartTime = Date.now() - (pausedRestTimer * 1000);
+          setRestStartTime(newRestStartTime);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('restStartTime', newRestStartTime.toString());
+          }
+          setPausedRestTimer(null);
+        }
+      }
+      
+      return newPausedState;
+    });
+  };
+
+  const toggleRestTimerPause = () => {
+    setIsRestTimerPaused(prev => {
+      const newPausedState = !prev;
+      
+      if (newPausedState) {
+        // Pausing rest timer only: Freeze current rest time
+        setPausedRestTimerValue(restTimer);
+      } else {
+        // Resuming rest timer: Adjust start time to account for paused duration
+        if (pausedRestTimerValue !== null && restStartTime !== null) {
+          const newRestStartTime = Date.now() - (pausedRestTimerValue * 1000);
+          setRestStartTime(newRestStartTime);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('restStartTime', newRestStartTime.toString());
+          }
+          setPausedRestTimerValue(null);
+        }
+      }
+      
+      return newPausedState;
+    });
   };
 
   const markPlannedSetAsRemoved = (exerciseLogId: string, setNumber: number) => {
@@ -158,10 +218,17 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         clearInterval(workoutTimerRef.current);
         workoutTimerRef.current = null;
       }
+      
+      // When paused, keep displaying the frozen duration
+      if (isPaused && pausedWorkoutDuration !== null) {
+        setWorkoutDuration(pausedWorkoutDuration);
+      }
+      
       // Reset timer when no active workout
       if (!activeWorkout) {
         setWorkoutDuration(0);
         setWorkoutStartTime(null);
+        setPausedWorkoutDuration(null);
         if (typeof window !== 'undefined') {
           localStorage.removeItem('workoutStartTime');
         }
@@ -173,11 +240,11 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         clearInterval(workoutTimerRef.current);
       }
     };
-  }, [activeWorkout, isPaused, isPastWorkout, workoutStartTime]);
+  }, [activeWorkout, isPaused, isPastWorkout, workoutStartTime, pausedWorkoutDuration]);
 
   // Rest Timer (timestamp-based, persists across tab switches)
   useEffect(() => {
-    if (restTimerStartedAt !== null && !isPaused && !isPastWorkout) {
+    if (restTimerStartedAt !== null && !isPaused && !isRestTimerPaused && !isPastWorkout) {
       // Set start time if not already set
       if (restStartTime === null) {
         setRestStartTime(restTimerStartedAt);
@@ -204,10 +271,24 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         clearInterval(restTimerRef.current);
         restTimerRef.current = null;
       }
+      
+      // When globally paused, keep displaying the frozen rest timer
+      if (isPaused && pausedRestTimer !== null) {
+        setRestTimer(pausedRestTimer);
+      }
+      
+      // When rest timer is individually paused, keep displaying the frozen value
+      if (isRestTimerPaused && pausedRestTimerValue !== null) {
+        setRestTimer(pausedRestTimerValue);
+      }
+      
       // Reset rest timer when stopped
       if (restTimerStartedAt === null) {
         setRestTimer(0);
         setRestStartTime(null);
+        setPausedRestTimer(null);
+        setPausedRestTimerValue(null);
+        setIsRestTimerPaused(false);
         if (typeof window !== 'undefined') {
           localStorage.removeItem('restStartTime');
           localStorage.removeItem('restTimerTarget');
@@ -220,7 +301,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         clearInterval(restTimerRef.current);
       }
     };
-  }, [restTimerStartedAt, restTimerTarget, isPaused, isPastWorkout, restStartTime, showRestAlert]);
+  }, [restTimerStartedAt, restTimerTarget, isPaused, isRestTimerPaused, isPastWorkout, restStartTime, showRestAlert, pausedRestTimer, pausedRestTimerValue]);
 
   const refreshActiveWorkout = async () => {
     // Only try to load active workout if user is logged in (has token)
@@ -248,6 +329,11 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setPastWorkoutDuration(pastDuration ?? 0);
     setRemovedPlannedSets(new Map());
     setUnplannedSets(new Map());
+    setPausedWorkoutDuration(null);
+    setPausedRestTimer(null);
+    setPausedRestTimerValue(null);
+    setIsPaused(false);
+    setIsRestTimerPaused(false);
     
     // Initialize workout timer only for non-past workouts
     if (!isPast) {
@@ -277,6 +363,11 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       setPastWorkoutDuration(data.pastWorkoutDuration ?? 0);
       setRemovedPlannedSets(new Map()); // Reset removed sets for new workout
       setUnplannedSets(new Map()); // Reset unplanned sets for new workout
+      setPausedWorkoutDuration(null);
+      setPausedRestTimer(null);
+      setPausedRestTimerValue(null);
+      setIsPaused(false);
+      setIsRestTimerPaused(false);
       
       // Initialize workout timer
       if (!data.isPastWorkout) {
@@ -311,6 +402,11 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       setShowRestAlert(false);
       setWorkoutStartTime(null);
       setRestStartTime(null);
+      setPausedWorkoutDuration(null);
+      setPausedRestTimer(null);
+      setPausedRestTimerValue(null);
+      setIsPaused(false);
+      setIsRestTimerPaused(false);
       
       // Clear localStorage
       if (typeof window !== 'undefined') {
@@ -342,6 +438,11 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       setShowRestAlert(false);
       setWorkoutStartTime(null);
       setRestStartTime(null);
+      setPausedWorkoutDuration(null);
+      setPausedRestTimer(null);
+      setPausedRestTimerValue(null);
+      setIsPaused(false);
+      setIsRestTimerPaused(false);
       
       // Clear localStorage
       if (typeof window !== 'undefined') {
@@ -479,6 +580,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         setRestTimerTarget(data.plannedRestAfterSet);
         setRestTimer(0);
         setShowRestAlert(false);
+        setIsRestTimerPaused(false);
+        setPausedRestTimerValue(null);
         
         // Persist to localStorage
         if (typeof window !== 'undefined') {
@@ -587,6 +690,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         loading,
         isPaused,
         togglePause,
+        isRestTimerPaused,
+        toggleRestTimerPause,
         isPastWorkout,
         pastWorkoutDuration,
         setPastWorkoutDuration,
