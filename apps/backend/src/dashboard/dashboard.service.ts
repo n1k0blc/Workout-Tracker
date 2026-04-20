@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { 
   DashboardStatsDto, 
-  CurrentWeekStatsDto, 
-  LastWeekStatsDto 
+  LastSevenDaysStatsDto, 
+  PreviousSevenDaysStatsDto 
 } from './dto/dashboard-stats.dto';
 import { NextPlannedWorkoutDto } from './dto/next-planned-workout.dto';
 import { CycleProgressDto } from './dto/cycle-progress.dto';
@@ -13,41 +13,46 @@ export class DashboardService {
   constructor(private prisma: PrismaService) {}
 
   /**
-   * Get Monday 00:00:00 of current week
+   * Get date range for last 7 days (today - 6 days to today)
+   */
+  private getLastSevenDaysRange(): { start: Date; end: Date } {
+    const now = new Date();
+    const end = new Date(now);
+    end.setHours(23, 59, 59, 999);
+    
+    const start = new Date(now);
+    start.setDate(now.getDate() - 6);
+    start.setHours(0, 0, 0, 0);
+
+    return { start, end };
+  }
+
+  /**
+   * Get date range for previous 7 days (today - 13 days to today - 7 days)
+   */
+  private getPreviousSevenDaysRange(): { start: Date; end: Date } {
+    const now = new Date();
+    const end = new Date(now);
+    end.setDate(now.getDate() - 7);
+    end.setHours(23, 59, 59, 999);
+    
+    const start = new Date(now);
+    start.setDate(now.getDate() - 13);
+    start.setHours(0, 0, 0, 0);
+
+    return { start, end };
+  }
+
+  /**
+   * Get Monday 00:00:00 of current week (kept for cycle week calculation)
    */
   private getWeekStart(date: Date = new Date()): Date {
     const d = new Date(date);
     const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
     const monday = new Date(d.setDate(diff));
     monday.setHours(0, 0, 0, 0);
     return monday;
-  }
-
-  /**
-   * Get Sunday 23:59:59 of current week
-   */
-  private getWeekEnd(date: Date = new Date()): Date {
-    const weekStart = this.getWeekStart(date);
-    const sunday = new Date(weekStart);
-    sunday.setDate(weekStart.getDate() + 6);
-    sunday.setHours(23, 59, 59, 999);
-    return sunday;
-  }
-
-  /**
-   * Get date range for last week
-   */
-  private getLastWeekRange(): { start: Date; end: Date } {
-    const thisWeekStart = this.getWeekStart();
-    const lastWeekStart = new Date(thisWeekStart);
-    lastWeekStart.setDate(thisWeekStart.getDate() - 7);
-    
-    const lastWeekEnd = new Date(lastWeekStart);
-    lastWeekEnd.setDate(lastWeekStart.getDate() + 6);
-    lastWeekEnd.setHours(23, 59, 59, 999);
-
-    return { start: lastWeekStart, end: lastWeekEnd };
   }
 
   /**
@@ -62,20 +67,20 @@ export class DashboardService {
   }
 
   /**
-   * Get stats for current week vs last week
+   * Get stats for last 7 days vs previous 7 days
    */
-  async getCurrentWeekStats(userId: string): Promise<DashboardStatsDto> {
-    const weekStart = this.getWeekStart();
-    const weekEnd = this.getWeekEnd();
-    const lastWeek = this.getLastWeekRange();
+  async getLastSevenDaysStats(userId: string): Promise<DashboardStatsDto> {
+    const lastSevenDays = this.getLastSevenDaysRange();
+    const previousSevenDays = this.getPreviousSevenDaysRange();
 
-    // Current week workouts
-    const currentWeekWorkouts = await this.prisma.workout.findMany({
+    // Last 7 days workouts (only COMPLETED)
+    const lastSevenDaysWorkouts = await this.prisma.workout.findMany({
       where: {
         userId,
+        status: 'COMPLETED',
         date: {
-          gte: weekStart,
-          lte: weekEnd,
+          gte: lastSevenDays.start,
+          lte: lastSevenDays.end,
         },
       },
       include: {
@@ -87,13 +92,14 @@ export class DashboardService {
       },
     });
 
-    // Last week workouts
-    const lastWeekWorkouts = await this.prisma.workout.findMany({
+    // Previous 7 days workouts (only COMPLETED)
+    const previousSevenDaysWorkouts = await this.prisma.workout.findMany({
       where: {
         userId,
+        status: 'COMPLETED',
         date: {
-          gte: lastWeek.start,
-          lte: lastWeek.end,
+          gte: previousSevenDays.start,
+          lte: previousSevenDays.end,
         },
       },
       include: {
@@ -105,27 +111,27 @@ export class DashboardService {
       },
     });
 
-    // Calculate current week stats
-    const currentWeekStats: CurrentWeekStatsDto = {
-      workouts: currentWeekWorkouts.length,
-      volume: this.calculateTotalVolume(currentWeekWorkouts),
-      averageDuration: this.calculateAverageDuration(currentWeekWorkouts),
+    // Calculate last 7 days stats
+    const lastSevenDaysStats: LastSevenDaysStatsDto = {
+      workouts: lastSevenDaysWorkouts.length,
+      volume: this.calculateTotalVolume(lastSevenDaysWorkouts),
+      averageDuration: this.calculateAverageDuration(lastSevenDaysWorkouts),
     };
 
-    // Calculate last week stats
-    const lastWeekStats: LastWeekStatsDto = {
-      volume: this.calculateTotalVolume(lastWeekWorkouts),
+    // Calculate previous 7 days stats
+    const previousSevenDaysStats: PreviousSevenDaysStatsDto = {
+      volume: this.calculateTotalVolume(previousSevenDaysWorkouts),
     };
 
     // Calculate volume change percentage
     const volumeChange = this.calculatePercentageChange(
-      lastWeekStats.volume,
-      currentWeekStats.volume,
+      previousSevenDaysStats.volume,
+      lastSevenDaysStats.volume,
     );
 
     return {
-      currentWeek: currentWeekStats,
-      lastWeek: lastWeekStats,
+      lastSevenDays: lastSevenDaysStats,
+      previousSevenDays: previousSevenDaysStats,
       volumeChange,
     };
   }

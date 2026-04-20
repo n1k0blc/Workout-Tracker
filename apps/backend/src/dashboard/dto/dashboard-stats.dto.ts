@@ -1,15 +1,15 @@
-export class CurrentWeekStatsDto {
+export class LastSevenDaysStatsDto {
   workouts: number;
   volume: number;
   averageDuration: number | null;
 }
 
-export class LastWeekStatsDto {
+export class PreviousSevenDaysStatsDto {
   volume: number;
 }
 
 export class DashboardStatsDto {
-  currentWeek: CurrentWeekStatsDto;
-  lastWeek: LastWeekStatsDto;
+  lastSevenDays: LastSevenDaysStatsDto;
+  previousSevenDays: PreviousSevenDaysStatsDto;
   volumeChange: number;
 }

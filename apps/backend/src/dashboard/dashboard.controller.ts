@@ -15,7 +15,7 @@ export class DashboardController {
   async getCurrentWeekStats(
     @CurrentUser() user: { id: string },
   ): Promise<DashboardStatsDto> {
-    return this.dashboardService.getCurrentWeekStats(user.id);
+    return this.dashboardService.getLastSevenDaysStats(user.id);
   }
 
   @Get('next-planned-workout')

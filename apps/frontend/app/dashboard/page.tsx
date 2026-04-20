@@ -137,24 +137,24 @@ export default function DashboardPage() {
               <div className="space-y-6">
                 {/* Stats Grid - 2x2 Layout */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Workouts dieser Woche */}
+                  {/* Workouts der letzten 7 Tage */}
                   <div className="bg-white rounded-lg shadow p-6">
                     <div className="text-sm font-medium text-gray-600 mb-1">
-                      Workouts (diese Woche)
+                      Workouts (letzte 7 Tage)
                     </div>
                     <div className="text-3xl font-bold text-gray-900">
-                      {weekStats?.currentWeek.workouts || 0}
+                      {weekStats?.lastSevenDays.workouts || 0}
                     </div>
                   </div>
 
-                  {/* Volumen dieser Woche mit Trend */}
+                  {/* Volumen der letzten 7 Tage mit Trend */}
                   <div className="bg-white rounded-lg shadow p-6">
                     <div className="text-sm font-medium text-gray-600 mb-1">
-                      Volumen (diese Woche)
+                      Volumen (letzte 7 Tage)
                     </div>
                     <div className="flex items-end gap-3">
                       <div className="text-3xl font-bold text-gray-900">
-                        {formatNumber(weekStats?.currentWeek.volume || 0)}
+                        {formatNumber(weekStats?.lastSevenDays.volume || 0)}
                         <span className="text-lg text-gray-600 ml-1">kg</span>
                       </div>
                       {weekStats && (
@@ -224,11 +224,11 @@ export default function DashboardPage() {
                   {/* Durchschnittliche Workout-Dauer */}
                   <div className="bg-white rounded-lg shadow p-6">
                     <div className="text-sm font-medium text-gray-600 mb-1">
-                      Ø Dauer (diese Woche)
+                      Ø Dauer (letzte 7 Tage)
                     </div>
-                    {weekStats?.currentWeek.averageDuration !== null ? (
+                    {weekStats?.lastSevenDays.averageDuration !== null ? (
                       <div className="text-3xl font-bold text-gray-900">
-                        {weekStats?.currentWeek.averageDuration || 0}
+                        {weekStats?.lastSevenDays.averageDuration || 0}
                         <span className="text-lg text-gray-600 ml-1">min</span>
                       </div>
                     ) : (

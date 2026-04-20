@@ -286,7 +286,7 @@ export class AnalyticsService {
           },
         },
       },
-      orderBy: { date: 'desc' },
+      orderBy: { date: 'asc' }, // Ascending order to track first PR occurrence
     });
 
     const prsByExercise: Map<string, PersonalRecord> = new Map();

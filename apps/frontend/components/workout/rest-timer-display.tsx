@@ -1,9 +1,10 @@
 'use client';
 
 import { useWorkout } from '@/lib/workout-context';
+import { Pause, Play } from 'lucide-react';
 
 export function RestTimerDisplay() {
-  const { restTimer, restTimerTarget } = useWorkout();
+  const { restTimer, restTimerTarget, isRestTimerPaused, toggleRestTimerPause } = useWorkout();
 
   if (restTimer === 0 && restTimerTarget === 0) {
     return null;
@@ -16,16 +17,25 @@ export function RestTimerDisplay() {
   const targetSeconds = restTimerTarget % 60;
 
   return (
-    <div
-      className={`px-3 py-1.5 rounded-lg ${
-        isOvertime
+    <button
+      onClick={toggleRestTimerPause}
+      className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer hover:opacity-90 ${
+        isRestTimerPaused
+          ? 'bg-gray-500 text-white'
+          : isOvertime
           ? 'bg-red-600 text-white'
           : 'bg-blue-600 text-white'
       }`}
+      title={isRestTimerPaused ? 'Satzpause fortsetzen' : 'Satzpause anhalten'}
     >
       <div className="flex items-center gap-2">
+        {isRestTimerPaused ? (
+          <Play className="w-3 h-3" fill="currentColor" />
+        ) : (
+          <Pause className="w-3 h-3" fill="currentColor" />
+        )}
         <div className="text-xs font-medium">
-          Pause
+          Pause {isRestTimerPaused && '(pausiert)'}
         </div>
         <div className="text-lg font-bold tabular-nums">
           {minutes}:{seconds.toString().padStart(2, '0')}
@@ -36,6 +46,6 @@ export function RestTimerDisplay() {
           </div>
         )}
       </div>
-    </div>
+    </button>
   );
 }
