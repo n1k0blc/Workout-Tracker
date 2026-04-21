@@ -23,6 +23,8 @@ import {
   RestTimeByCycleAnalytics,
   RepsAnalytics,
   RepsByCycleAnalytics,
+  SetsAnalytics,
+  SetsByCycleAnalytics,
   MuscleGroup,
   Equipment,
   HomeGym,
@@ -104,6 +106,17 @@ class ApiClient {
     } catch (e) {
       console.error('Failed to parse response:', text);
       throw new Error('Invalid JSON response');
+    }
+  }
+
+  // Helper function to add query parameters (supports arrays)
+  private addQueryParam(query: URLSearchParams, key: string, value: string | string[] | undefined): void {
+    if (!value) return;
+    
+    if (Array.isArray(value)) {
+      value.forEach(v => query.append(key, v));
+    } else {
+      query.append(key, value);
     }
   }
 
@@ -534,16 +547,16 @@ class ApiClient {
     startDate?: string;
     endDate?: string;
     gymId?: string;
-    muscleGroup?: string;
-    equipment?: string;
+    muscleGroup?: string | string[];
+    equipment?: string | string[];
     cycleId?: string;
   }): Promise<VolumeAnalytics> {
     const query = new URLSearchParams();
     if (params?.startDate) query.append('startDate', params.startDate);
     if (params?.endDate) query.append('endDate', params.endDate);
     if (params?.gymId) query.append('gymId', params.gymId);
-    if (params?.muscleGroup) query.append('muscleGroup', params.muscleGroup);
-    if (params?.equipment) query.append('equipment', params.equipment);
+    this.addQueryParam(query, 'muscleGroup', params?.muscleGroup);
+    this.addQueryParam(query, 'equipment', params?.equipment);
     if (params?.cycleId) query.append('cycleId', params.cycleId);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
@@ -552,14 +565,14 @@ class ApiClient {
 
   async getPersonalRecords(params?: {
     exerciseId?: string;
-    muscleGroup?: string;
-    equipment?: string;
+    muscleGroup?: string | string[];
+    equipment?: string | string[];
     gymId?: string;
   }): Promise<PersonalRecordsResponse> {
     const query = new URLSearchParams();
     if (params?.exerciseId) query.append('exerciseId', params.exerciseId);
-    if (params?.muscleGroup) query.append('muscleGroup', params.muscleGroup);
-    if (params?.equipment) query.append('equipment', params.equipment);
+    this.addQueryParam(query, 'muscleGroup', params?.muscleGroup);
+    this.addQueryParam(query, 'equipment', params?.equipment);
     if (params?.gymId) query.append('gymId', params.gymId);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
@@ -581,12 +594,12 @@ class ApiClient {
 
   async getORMByCycle(
     cycleId: string,
-    muscleGroup?: string,
-    equipment?: string,
+    muscleGroup?: string | string[],
+    equipment?: string | string[],
   ): Promise<ORMByCycleAnalytics> {
     const query = new URLSearchParams();
-    if (muscleGroup) query.append('muscleGroup', muscleGroup);
-    if (equipment) query.append('equipment', equipment);
+    this.addQueryParam(query, 'muscleGroup', muscleGroup);
+    this.addQueryParam(query, 'equipment', equipment);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<ORMByCycleAnalytics>(
@@ -597,14 +610,14 @@ class ApiClient {
   async getRIRByCycle(
     cycleId: string,
     gymId?: string,
-    muscleGroup?: string,
-    equipment?: string,
+    muscleGroup?: string | string[],
+    equipment?: string | string[],
     timeOfDay?: string,
   ): Promise<RIRByCycleAnalytics> {
     const query = new URLSearchParams();
     if (gymId) query.append('gymId', gymId);
-    if (muscleGroup) query.append('muscleGroup', muscleGroup);
-    if (equipment) query.append('equipment', equipment);
+    this.addQueryParam(query, 'muscleGroup', muscleGroup);
+    this.addQueryParam(query, 'equipment', equipment);
     if (timeOfDay) query.append('timeOfDay', timeOfDay);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
@@ -618,16 +631,16 @@ class ApiClient {
     startDate?: string;
     endDate?: string;
     gymId?: string;
-    muscleGroup?: string;
-    equipment?: string;
+    muscleGroup?: string | string[];
+    equipment?: string | string[];
   }): Promise<RIRAnalytics> {
     const query = new URLSearchParams();
     if (params.period) query.append('period', params.period);
     if (params.startDate) query.append('startDate', params.startDate);
     if (params.endDate) query.append('endDate', params.endDate);
     if (params.gymId) query.append('gymId', params.gymId);
-    if (params.muscleGroup) query.append('muscleGroup', params.muscleGroup);
-    if (params.equipment) query.append('equipment', params.equipment);
+    this.addQueryParam(query, 'muscleGroup', params.muscleGroup);
+    this.addQueryParam(query, 'equipment', params.equipment);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<RIRAnalytics>(`/analytics/rir${queryString}`);
@@ -638,16 +651,16 @@ class ApiClient {
     startDate?: string;
     endDate?: string;
     gymId?: string;
-    muscleGroup?: string;
-    equipment?: string;
+    muscleGroup?: string | string[];
+    equipment?: string | string[];
   }): Promise<DurationAnalytics> {
     const query = new URLSearchParams();
     if (params.period) query.append('period', params.period);
     if (params.startDate) query.append('startDate', params.startDate);
     if (params.endDate) query.append('endDate', params.endDate);
     if (params.gymId) query.append('gymId', params.gymId);
-    if (params.muscleGroup) query.append('muscleGroup', params.muscleGroup);
-    if (params.equipment) query.append('equipment', params.equipment);
+    this.addQueryParam(query, 'muscleGroup', params.muscleGroup);
+    this.addQueryParam(query, 'equipment', params.equipment);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<DurationAnalytics>(`/analytics/duration${queryString}`);
@@ -656,13 +669,13 @@ class ApiClient {
   async getDurationByCycle(
     cycleId: string,
     gymId?: string,
-    muscleGroup?: string,
-    equipment?: string,
+    muscleGroup?: string | string[],
+    equipment?: string | string[],
   ): Promise<DurationByCycleAnalytics> {
     const query = new URLSearchParams();
     if (gymId) query.append('gymId', gymId);
-    if (muscleGroup) query.append('muscleGroup', muscleGroup);
-    if (equipment) query.append('equipment', equipment);
+    this.addQueryParam(query, 'muscleGroup', muscleGroup);
+    this.addQueryParam(query, 'equipment', equipment);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<DurationByCycleAnalytics>(
@@ -675,16 +688,16 @@ class ApiClient {
     startDate?: string;
     endDate?: string;
     gymId?: string;
-    muscleGroup?: string;
-    equipment?: string;
+    muscleGroup?: string | string[];
+    equipment?: string | string[];
   }): Promise<RestTimeAnalytics> {
     const query = new URLSearchParams();
     if (params.period) query.append('period', params.period);
     if (params.startDate) query.append('startDate', params.startDate);
     if (params.endDate) query.append('endDate', params.endDate);
     if (params.gymId) query.append('gymId', params.gymId);
-    if (params.muscleGroup) query.append('muscleGroup', params.muscleGroup);
-    if (params.equipment) query.append('equipment', params.equipment);
+    this.addQueryParam(query, 'muscleGroup', params.muscleGroup);
+    this.addQueryParam(query, 'equipment', params.equipment);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<RestTimeAnalytics>(`/analytics/rest-time${queryString}`);
@@ -693,13 +706,13 @@ class ApiClient {
   async getRestTimeByCycle(
     cycleId: string,
     gymId?: string,
-    muscleGroup?: string,
-    equipment?: string,
+    muscleGroup?: string | string[],
+    equipment?: string | string[],
   ): Promise<RestTimeByCycleAnalytics> {
     const query = new URLSearchParams();
     if (gymId) query.append('gymId', gymId);
-    if (muscleGroup) query.append('muscleGroup', muscleGroup);
-    if (equipment) query.append('equipment', equipment);
+    this.addQueryParam(query, 'muscleGroup', muscleGroup);
+    this.addQueryParam(query, 'equipment', equipment);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<RestTimeByCycleAnalytics>(
@@ -712,16 +725,16 @@ class ApiClient {
     startDate?: string;
     endDate?: string;
     gymId?: string;
-    muscleGroup?: string;
-    equipment?: string;
+    muscleGroup?: string | string[];
+    equipment?: string | string[];
   }): Promise<RepsAnalytics> {
     const query = new URLSearchParams();
     if (params.period) query.append('period', params.period);
     if (params.startDate) query.append('startDate', params.startDate);
     if (params.endDate) query.append('endDate', params.endDate);
     if (params.gymId) query.append('gymId', params.gymId);
-    if (params.muscleGroup) query.append('muscleGroup', params.muscleGroup);
-    if (params.equipment) query.append('equipment', params.equipment);
+    this.addQueryParam(query, 'muscleGroup', params.muscleGroup);
+    this.addQueryParam(query, 'equipment', params.equipment);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<RepsAnalytics>(`/analytics/reps${queryString}`);
@@ -729,16 +742,51 @@ class ApiClient {
 
   async getRepsByCycle(
     cycleId: string,
-    muscleGroup?: string,
-    equipment?: string,
+    muscleGroup?: string | string[],
+    equipment?: string | string[],
   ): Promise<RepsByCycleAnalytics> {
     const query = new URLSearchParams();
-    if (muscleGroup) query.append('muscleGroup', muscleGroup);
-    if (equipment) query.append('equipment', equipment);
+    this.addQueryParam(query, 'muscleGroup', muscleGroup);
+    this.addQueryParam(query, 'equipment', equipment);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<RepsByCycleAnalytics>(
       `/analytics/reps-by-cycle/${cycleId}${queryString}`
+    );
+  }
+
+  async getSetsAnalytics(params: {
+    period?: 'week' | 'month' | 'all';
+    startDate?: string;
+    endDate?: string;
+    gymId?: string;
+    muscleGroup?: string | string[];
+    equipment?: string | string[];
+  }): Promise<SetsAnalytics> {
+    const query = new URLSearchParams();
+    if (params.period) query.append('period', params.period);
+    if (params.startDate) query.append('startDate', params.startDate);
+    if (params.endDate) query.append('endDate', params.endDate);
+    if (params.gymId) query.append('gymId', params.gymId);
+    this.addQueryParam(query, 'muscleGroup', params.muscleGroup);
+    this.addQueryParam(query, 'equipment', params.equipment);
+
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    return this.request<SetsAnalytics>(`/analytics/sets${queryString}`);
+  }
+
+  async getSetsByCycle(
+    cycleId: string,
+    muscleGroup?: string | string[],
+    equipment?: string | string[],
+  ): Promise<SetsByCycleAnalytics> {
+    const query = new URLSearchParams();
+    this.addQueryParam(query, 'muscleGroup', muscleGroup);
+    this.addQueryParam(query, 'equipment', equipment);
+
+    const queryString = query.toString() ? `?${query.toString()}` : '';
+    return this.request<SetsByCycleAnalytics>(
+      `/analytics/sets-by-cycle/${cycleId}${queryString}`
     );
   }
 

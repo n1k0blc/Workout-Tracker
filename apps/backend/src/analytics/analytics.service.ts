@@ -30,6 +30,9 @@ import {
   RepsAnalyticsDto,
   RepsDataPoint,
   RepsByCycleDto,
+  SetsAnalyticsDto,
+  SetsDataPoint,
+  SetsByCycleDto,
 } from './dto';
 
 @Injectable()
@@ -38,6 +41,30 @@ export class AnalyticsService {
     private prisma: PrismaService,
     private ormService: ORMService,
   ) {}
+
+  /**
+   * Helper: Normalize filter parameters to arrays
+   */
+  private normalizeFilterArray(value: string | string[] | undefined): string[] {
+    if (!value) return [];
+    return Array.isArray(value) ? value : [value];
+  }
+
+  /**
+   * Helper: Check if exercise matches muscle group filter
+   */
+  private matchesMuscleFilter(muscleGroup: string, filter: string[]): boolean {
+    if (filter.length === 0) return true; // No filter = match all
+    return filter.includes(muscleGroup);
+  }
+
+  /**
+   * Helper: Check if exercise matches equipment filter
+   */
+  private matchesEquipmentFilter(equipment: string, filter: string[]): boolean {
+    if (filter.length === 0) return true; // No filter = match all
+    return filter.includes(equipment);
+  }
 
   /**
    * Volume Analytics
@@ -49,11 +76,15 @@ export class AnalyticsService {
     startDate?: Date,
     endDate?: Date,
     gymId?: string, // Filter by gym: null = "andere", undefined = "alle", specific ID = that gym
-    muscleGroup?: string,
-    equipment?: string,
+    muscleGroup?: string | string[],
+    equipment?: string | string[],
     cycleId?: string, // Filter by cycle (only workouts in this cycle)
   ): Promise<VolumeAnalyticsDto> {
     const dateFilter = this.getDateFilter(period, startDate, endDate);
+
+    // Normalize filter arrays
+    const muscleGroups = this.normalizeFilterArray(muscleGroup);
+    const equipments = this.normalizeFilterArray(equipment);
 
     // Gym filter logic
     const gymFilter = gymId === 'andere'
@@ -98,10 +129,10 @@ export class AnalyticsService {
 
       for (const exerciseLog of workout.exercises) {
         // Apply muscle group and equipment filters
-        if (muscleGroup && exerciseLog.exercise.muscleGroup !== muscleGroup) {
+        if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) {
           continue;
         }
-        if (equipment && exerciseLog.exercise.equipment !== equipment) {
+        if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) {
           continue;
         }
 
@@ -253,10 +284,14 @@ export class AnalyticsService {
    */
   async getPersonalRecords(
     userId: string,
-    muscleGroup?: string,
-    equipment?: string,
+    muscleGroup?: string | string[],
+    equipment?: string | string[],
     gymId?: string,
   ): Promise<PersonalRecordsDto> {
+    // Normalize filter arrays
+    const muscleGroups = this.normalizeFilterArray(muscleGroup);
+    const equipments = this.normalizeFilterArray(equipment);
+
     // Gym filter logic
     const gymFilter = gymId === 'andere'
       ? null
@@ -297,10 +332,10 @@ export class AnalyticsService {
         const exerciseName = exerciseLog.exercise.name;
 
         // Apply filters
-        if (muscleGroup && exerciseLog.exercise.muscleGroup !== muscleGroup) {
+        if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) {
           continue;
         }
-        if (equipment && exerciseLog.exercise.equipment !== equipment) {
+        if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) {
           continue;
         }
 
@@ -646,8 +681,8 @@ export class AnalyticsService {
   async getORMByCycle(
     userId: string,
     cycleId: string,
-    muscleGroup?: string,
-    equipment?: string,
+    muscleGroup?: string | string[],
+    equipment?: string | string[],
   ): Promise<ORMByCycleDto> {
     // 1. Verify user owns this cycle
     const cycle = await this.prisma.workoutCycle.findFirst({
@@ -773,8 +808,8 @@ export class AnalyticsService {
     userId: string,
     cycleId: string,
     gymId?: string,
-    muscleGroup?: string,
-    equipment?: string,
+    muscleGroup?: string | string[],
+    equipment?: string | string[],
     timeOfDay?: string,
   ): Promise<RIRByCycleDto> {
     // 1. Verify user owns this cycle
@@ -901,9 +936,12 @@ export class AnalyticsService {
     startDate?: Date,
     endDate?: Date,
     gymId?: string,
-    muscleGroup?: string,
-    equipment?: string,
+    muscleGroup?: string | string[],
+    equipment?: string | string[],
   ): Promise<RIRAnalyticsDto> {
+    const muscleGroups = this.normalizeFilterArray(muscleGroup);
+    const equipments = this.normalizeFilterArray(equipment);
+
     const dateFilter = this.getDateFilter(period, startDate, endDate);
 
     // Gym filter logic
@@ -948,8 +986,8 @@ export class AnalyticsService {
 
       for (const exerciseLog of workout.exercises) {
         // Apply filters
-        if (muscleGroup && exerciseLog.exercise.muscleGroup !== muscleGroup) continue;
-        if (equipment && exerciseLog.exercise.equipment !== equipment) continue;
+        if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) continue;
+        if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) continue;
 
         // Count sets by RIR
         for (const set of exerciseLog.sets) {
@@ -991,9 +1029,12 @@ export class AnalyticsService {
     startDate?: Date,
     endDate?: Date,
     gymId?: string,
-    muscleGroup?: string,
-    equipment?: string,
+    muscleGroup?: string | string[],
+    equipment?: string | string[],
   ): Promise<DurationAnalyticsDto> {
+    const muscleGroups = this.normalizeFilterArray(muscleGroup);
+    const equipments = this.normalizeFilterArray(equipment);
+
     const dateFilter = this.getDateFilter(period, startDate, endDate);
 
     // Gym filter logic
@@ -1034,8 +1075,8 @@ export class AnalyticsService {
       // Check if workout has exercises matching filters
       if (muscleGroup || equipment) {
         const hasMatchingExercise = workout.exercises.some(exerciseLog => {
-          if (muscleGroup && exerciseLog.exercise.muscleGroup !== muscleGroup) return false;
-          if (equipment && exerciseLog.exercise.equipment !== equipment) return false;
+          if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) return false;
+          if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) return false;
           return true;
         });
 
@@ -1072,9 +1113,12 @@ export class AnalyticsService {
     userId: string,
     cycleId: string,
     gymId?: string,
-    muscleGroup?: string,
-    equipment?: string,
+    muscleGroup?: string | string[],
+    equipment?: string | string[],
   ): Promise<DurationByCycleDto> {
+    const muscleGroups = this.normalizeFilterArray(muscleGroup);
+    const equipments = this.normalizeFilterArray(equipment);
+
     // 1. Verify user owns this cycle
     const cycle = await this.prisma.workoutCycle.findFirst({
       where: { id: cycleId, userId },
@@ -1129,8 +1173,8 @@ export class AnalyticsService {
       // Check if workout has exercises matching filters
       if (muscleGroup || equipment) {
         const hasMatchingExercise = workout.exercises.some(exerciseLog => {
-          if (muscleGroup && exerciseLog.exercise.muscleGroup !== muscleGroup) return false;
-          if (equipment && exerciseLog.exercise.equipment !== equipment) return false;
+          if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) return false;
+          if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) return false;
           return true;
         });
 
@@ -1177,9 +1221,12 @@ export class AnalyticsService {
     startDate?: Date,
     endDate?: Date,
     gymId?: string,
-    muscleGroup?: string,
-    equipment?: string,
+    muscleGroup?: string | string[],
+    equipment?: string | string[],
   ): Promise<RestTimeAnalyticsDto> {
+    const muscleGroups = this.normalizeFilterArray(muscleGroup);
+    const equipments = this.normalizeFilterArray(equipment);
+
     const dateFilter = this.getDateFilter(period, startDate, endDate);
 
     // Gym filter logic
@@ -1226,8 +1273,8 @@ export class AnalyticsService {
 
       for (const exerciseLog of workout.exercises) {
         // Apply muscle group and equipment filters
-        if (muscleGroup && exerciseLog.exercise.muscleGroup !== muscleGroup) continue;
-        if (equipment && exerciseLog.exercise.equipment !== equipment) continue;
+        if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) continue;
+        if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) continue;
 
         // Sum up actual rest durations from sets
         for (const set of exerciseLog.sets) {
@@ -1271,9 +1318,12 @@ export class AnalyticsService {
     userId: string,
     cycleId: string,
     gymId?: string,
-    muscleGroup?: string,
-    equipment?: string,
+    muscleGroup?: string | string[],
+    equipment?: string | string[],
   ): Promise<RestTimeByCycleDto> {
+    const muscleGroups = this.normalizeFilterArray(muscleGroup);
+    const equipments = this.normalizeFilterArray(equipment);
+
     // 1. Verify user owns this cycle
     const cycle = await this.prisma.workoutCycle.findFirst({
       where: { id: cycleId, userId },
@@ -1334,8 +1384,8 @@ export class AnalyticsService {
 
       for (const exerciseLog of workout.exercises) {
         // Apply muscle group and equipment filters
-        if (muscleGroup && exerciseLog.exercise.muscleGroup !== muscleGroup) continue;
-        if (equipment && exerciseLog.exercise.equipment !== equipment) continue;
+        if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) continue;
+        if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) continue;
 
         // Sum up actual rest durations from sets
         for (const set of exerciseLog.sets) {
@@ -1387,9 +1437,12 @@ export class AnalyticsService {
     startDate?: Date,
     endDate?: Date,
     gymId?: string,
-    muscleGroup?: string,
-    equipment?: string,
+    muscleGroup?: string | string[],
+    equipment?: string | string[],
   ): Promise<RepsAnalyticsDto> {
+    const muscleGroups = this.normalizeFilterArray(muscleGroup);
+    const equipments = this.normalizeFilterArray(equipment);
+
     const dateFilter = this.getDateFilter(period, startDate, endDate);
 
     // Gym filter logic
@@ -1431,10 +1484,10 @@ export class AnalyticsService {
 
       for (const exerciseLog of workout.exercises) {
         // Apply muscle group and equipment filters
-        if (muscleGroup && exerciseLog.exercise.muscleGroup !== muscleGroup) {
+        if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) {
           continue;
         }
-        if (equipment && exerciseLog.exercise.equipment !== equipment) {
+        if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) {
           continue;
         }
 
@@ -1476,9 +1529,12 @@ export class AnalyticsService {
   async getRepsByCycle(
     userId: string,
     cycleId: string,
-    muscleGroup?: string,
-    equipment?: string,
+    muscleGroup?: string | string[],
+    equipment?: string | string[],
   ): Promise<RepsByCycleDto> {
+    const muscleGroups = this.normalizeFilterArray(muscleGroup);
+    const equipments = this.normalizeFilterArray(equipment);
+
     const cycle = await this.prisma.workoutCycle.findUnique({
       where: { id: cycleId },
       include: {
@@ -1519,10 +1575,10 @@ export class AnalyticsService {
 
       for (const exerciseLog of workout.exercises) {
         // Apply muscle group and equipment filters
-        if (muscleGroup && exerciseLog.exercise.muscleGroup !== muscleGroup) {
+        if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) {
           continue;
         }
-        if (equipment && exerciseLog.exercise.equipment !== equipment) {
+        if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) {
           continue;
         }
 
@@ -1559,6 +1615,197 @@ export class AnalyticsService {
       dataPoints,
       totalReps,
       averageReps,
+      totalWorkouts: validWorkoutsCount,
+    };
+  }
+
+  /**
+   * Sets Analytics for time-based view
+   */
+  async getSetsAnalytics(
+    userId: string,
+    period: 'week' | 'month' | 'all' = 'month',
+    startDate?: Date,
+    endDate?: Date,
+    gymId?: string,
+    muscleGroup?: string | string[],
+    equipment?: string | string[],
+  ): Promise<SetsAnalyticsDto> {
+    const muscleGroups = this.normalizeFilterArray(muscleGroup);
+    const equipments = this.normalizeFilterArray(equipment);
+
+    const dateFilter = this.getDateFilter(period, startDate, endDate);
+
+    // Gym filter logic
+    const gymFilter = gymId === 'andere'
+      ? null
+      : gymId === 'alle' || gymId === undefined
+      ? undefined
+      : gymId;
+
+    const workouts = await this.prisma.workout.findMany({
+      where: {
+        userId,
+        status: 'COMPLETED' as any,
+        date: dateFilter,
+        ...(gymFilter !== undefined && { homeGymId: gymFilter }),
+      },
+      include: {
+        exercises: {
+          include: {
+            exercise: {
+              select: {
+                muscleGroup: true,
+                equipment: true,
+              },
+            },
+            sets: true,
+          },
+        },
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    const dataPoints: SetsDataPoint[] = [];
+    let totalSets = 0;
+    let validWorkoutsCount = 0;
+
+    for (const workout of workouts) {
+      let workoutSets = 0;
+
+      for (const exerciseLog of workout.exercises) {
+        // Apply muscle group and equipment filters
+        if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) {
+          continue;
+        }
+        if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) {
+          continue;
+        }
+
+        for (const set of exerciseLog.sets) {
+          // Skip warmup sets - only count working sets
+          if (set.setType === 'WARMUP') continue;
+          workoutSets++;
+        }
+      }
+
+      // Only add data point if workout has sets
+      if (workoutSets > 0 || (!muscleGroup && !equipment)) {
+        dataPoints.push({
+          date: workout.date.toISOString().split('T')[0],
+          sets: workoutSets,
+          workoutId: workout.id,
+        });
+
+        totalSets += workoutSets;
+        validWorkoutsCount++;
+      }
+    }
+
+    const averageSets = validWorkoutsCount > 0
+      ? Math.round(totalSets / validWorkoutsCount)
+      : 0;
+
+    return {
+      totalSets,
+      averageSets,
+      period,
+      dataPoints,
+    };
+  }
+
+  /**
+   * Sets Analytics for entire cycle
+   */
+  async getSetsByCycle(
+    userId: string,
+    cycleId: string,
+    muscleGroup?: string | string[],
+    equipment?: string | string[],
+  ): Promise<SetsByCycleDto> {
+    const muscleGroups = this.normalizeFilterArray(muscleGroup);
+    const equipments = this.normalizeFilterArray(equipment);
+
+    const cycle = await this.prisma.workoutCycle.findUnique({
+      where: { id: cycleId },
+      include: {
+        workouts: {
+          where: {
+            userId,
+            status: 'COMPLETED' as any,
+          },
+          include: {
+            exercises: {
+              include: {
+                exercise: {
+                  select: {
+                    muscleGroup: true,
+                    equipment: true,
+                  },
+                },
+                sets: true,
+              },
+            },
+          },
+          orderBy: { date: 'asc' },
+        },
+      },
+    });
+
+    if (!cycle) {
+      throw new NotFoundException(`Cycle with ID ${cycleId} not found`);
+    }
+
+    const dataPoints: SetsDataPoint[] = [];
+    let totalSets = 0;
+    let validWorkoutsCount = 0;
+    let trainingDayCounter = 1;
+
+    for (const workout of cycle.workouts) {
+      let workoutSets = 0;
+
+      for (const exerciseLog of workout.exercises) {
+        // Apply muscle group and equipment filters
+        if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) {
+          continue;
+        }
+        if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) {
+          continue;
+        }
+
+        for (const set of exerciseLog.sets) {
+          // Skip warmup sets - only count working sets
+          if (set.setType === 'WARMUP') continue;
+          workoutSets++;
+        }
+      }
+
+      // Only add data point if workout has sets
+      if (workoutSets > 0 || (!muscleGroup && !equipment)) {
+        dataPoints.push({
+          date: workout.date.toISOString().split('T')[0],
+          sets: workoutSets,
+          workoutId: workout.id,
+          trainingDay: trainingDayCounter,
+        });
+
+        totalSets += workoutSets;
+        validWorkoutsCount++;
+      }
+
+      trainingDayCounter++;
+    }
+
+    const averageSets = validWorkoutsCount > 0
+      ? Math.round(totalSets / validWorkoutsCount)
+      : 0;
+
+    return {
+      cycleId: cycle.id,
+      cycleName: cycle.name,
+      dataPoints,
+      totalSets,
+      averageSets,
       totalWorkouts: validWorkoutsCount,
     };
   }
