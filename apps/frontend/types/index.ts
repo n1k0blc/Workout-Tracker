@@ -428,6 +428,29 @@ export interface RepsByCycleAnalytics {
   totalWorkouts: number;
 }
 
+export interface SetsDataPoint {
+  date: string;
+  sets: number;
+  workoutId: string;
+  trainingDay?: number;
+}
+
+export interface SetsAnalytics {
+  totalSets: number;
+  averageSets: number;
+  period: string;
+  dataPoints: SetsDataPoint[];
+}
+
+export interface SetsByCycleAnalytics {
+  cycleId: string;
+  cycleName: string;
+  dataPoints: SetsDataPoint[];
+  totalSets: number;
+  averageSets: number;
+  totalWorkouts: number;
+}
+
 // Workout Template Types
 export interface WorkoutTemplateSet {
   id: string;

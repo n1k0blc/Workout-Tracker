@@ -10,3 +10,4 @@ export * from './rir-analytics.dto';
 export * from './duration-analytics.dto';
 export * from './rest-time-analytics.dto';
 export * from './reps-analytics.dto';
+export * from './sets-analytics.dto';

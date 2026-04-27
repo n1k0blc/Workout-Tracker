@@ -17,6 +17,8 @@ import {
   RestTimeByCycleDto,
   RepsAnalyticsDto,
   RepsByCycleDto,
+  SetsAnalyticsDto,
+  SetsByCycleDto,
 } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -36,8 +38,8 @@ export class AnalyticsController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('gymId') gymId?: string,
-    @Query('muscleGroup') muscleGroup?: string,
-    @Query('equipment') equipment?: string,
+    @Query('muscleGroup') muscleGroup?: string | string[],
+    @Query('equipment') equipment?: string | string[],
     @Query('cycleId') cycleId?: string,
   ): Promise<VolumeAnalyticsDto> {
     const start = startDate ? new Date(startDate) : undefined;
@@ -65,8 +67,8 @@ export class AnalyticsController {
   @Get('prs')
   async getPersonalRecords(
     @CurrentUser() user: { id: string },
-    @Query('muscleGroup') muscleGroup?: string,
-    @Query('equipment') equipment?: string,
+    @Query('muscleGroup') muscleGroup?: string | string[],
+    @Query('equipment') equipment?: string | string[],
     @Query('gymId') gymId?: string,
   ): Promise<PersonalRecordsDto> {
     return this.analyticsService.getPersonalRecords(user.id, muscleGroup, equipment, gymId);
@@ -109,8 +111,8 @@ export class AnalyticsController {
   async getORMByCycle(
     @Param('cycleId') cycleId: string,
     @CurrentUser() user: { id: string },
-    @Query('muscleGroup') muscleGroup?: string,
-    @Query('equipment') equipment?: string,
+    @Query('muscleGroup') muscleGroup?: string | string[],
+    @Query('equipment') equipment?: string | string[],
   ): Promise<ORMByCycleDto> {
     return this.analyticsService.getORMByCycle(user.id, cycleId, muscleGroup, equipment);
   }
@@ -120,8 +122,8 @@ export class AnalyticsController {
     @Param('cycleId') cycleId: string,
     @CurrentUser() user: { id: string },
     @Query('gymId') gymId?: string,
-    @Query('muscleGroup') muscleGroup?: string,
-    @Query('equipment') equipment?: string,
+    @Query('muscleGroup') muscleGroup?: string | string[],
+    @Query('equipment') equipment?: string | string[],
     @Query('timeOfDay') timeOfDay?: string,
   ): Promise<RIRByCycleDto> {
     return this.analyticsService.getRIRByCycle(user.id, cycleId, gymId, muscleGroup, equipment, timeOfDay);
@@ -134,8 +136,8 @@ export class AnalyticsController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('gymId') gymId?: string,
-    @Query('muscleGroup') muscleGroup?: string,
-    @Query('equipment') equipment?: string,
+    @Query('muscleGroup') muscleGroup?: string | string[],
+    @Query('equipment') equipment?: string | string[],
   ): Promise<RIRAnalyticsDto> {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
@@ -157,8 +159,8 @@ export class AnalyticsController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('gymId') gymId?: string,
-    @Query('muscleGroup') muscleGroup?: string,
-    @Query('equipment') equipment?: string,
+    @Query('muscleGroup') muscleGroup?: string | string[],
+    @Query('equipment') equipment?: string | string[],
   ): Promise<DurationAnalyticsDto> {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
@@ -178,8 +180,8 @@ export class AnalyticsController {
     @Param('cycleId') cycleId: string,
     @CurrentUser() user: { id: string },
     @Query('gymId') gymId?: string,
-    @Query('muscleGroup') muscleGroup?: string,
-    @Query('equipment') equipment?: string,
+    @Query('muscleGroup') muscleGroup?: string | string[],
+    @Query('equipment') equipment?: string | string[],
   ): Promise<DurationByCycleDto> {
     return this.analyticsService.getDurationByCycle(user.id, cycleId, gymId, muscleGroup, equipment);
   }
@@ -191,8 +193,8 @@ export class AnalyticsController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('gymId') gymId?: string,
-    @Query('muscleGroup') muscleGroup?: string,
-    @Query('equipment') equipment?: string,
+    @Query('muscleGroup') muscleGroup?: string | string[],
+    @Query('equipment') equipment?: string | string[],
   ): Promise<RestTimeAnalyticsDto> {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
@@ -212,8 +214,8 @@ export class AnalyticsController {
     @Param('cycleId') cycleId: string,
     @CurrentUser() user: { id: string },
     @Query('gymId') gymId?: string,
-    @Query('muscleGroup') muscleGroup?: string,
-    @Query('equipment') equipment?: string,
+    @Query('muscleGroup') muscleGroup?: string | string[],
+    @Query('equipment') equipment?: string | string[],
   ): Promise<RestTimeByCycleDto> {
     return this.analyticsService.getRestTimeByCycle(user.id, cycleId, gymId, muscleGroup, equipment);
   }
@@ -225,8 +227,8 @@ export class AnalyticsController {
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('gymId') gymId?: string,
-    @Query('muscleGroup') muscleGroup?: string,
-    @Query('equipment') equipment?: string,
+    @Query('muscleGroup') muscleGroup?: string | string[],
+    @Query('equipment') equipment?: string | string[],
   ): Promise<RepsAnalyticsDto> {
     return this.analyticsService.getRepsAnalytics(
       user.id,
@@ -243,9 +245,40 @@ export class AnalyticsController {
   async getRepsByCycle(
     @Param('cycleId') cycleId: string,
     @CurrentUser() user: { id: string },
-    @Query('muscleGroup') muscleGroup?: string,
-    @Query('equipment') equipment?: string,
+    @Query('muscleGroup') muscleGroup?: string | string[],
+    @Query('equipment') equipment?: string | string[],
   ): Promise<RepsByCycleDto> {
     return this.analyticsService.getRepsByCycle(user.id, cycleId, muscleGroup, equipment);
+  }
+
+  @Get('sets')
+  async getSetsAnalytics(
+    @CurrentUser() user: { id: string },
+    @Query('period') period?: 'week' | 'month' | 'all',
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('gymId') gymId?: string,
+    @Query('muscleGroup') muscleGroup?: string | string[],
+    @Query('equipment') equipment?: string | string[],
+  ): Promise<SetsAnalyticsDto> {
+    return this.analyticsService.getSetsAnalytics(
+      user.id,
+      period,
+      startDate ? new Date(startDate) : undefined,
+      endDate ? new Date(endDate) : undefined,
+      gymId,
+      muscleGroup,
+      equipment,
+    );
+  }
+
+  @Get('sets-by-cycle/:cycleId')
+  async getSetsByCycle(
+    @Param('cycleId') cycleId: string,
+    @CurrentUser() user: { id: string },
+    @Query('muscleGroup') muscleGroup?: string | string[],
+    @Query('equipment') equipment?: string | string[],
+  ): Promise<SetsByCycleDto> {
+    return this.analyticsService.getSetsByCycle(user.id, cycleId, muscleGroup, equipment);
   }
 }

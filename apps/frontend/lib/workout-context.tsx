@@ -62,8 +62,6 @@ interface WorkoutContextType {
   workoutDuration: number;
   restTimer: number; // Elapsed seconds since rest started
   restTimerTarget: number; // Target rest duration in seconds
-  showRestAlert: boolean;
-  dismissRestAlert: () => void;
   pendingTemplateSave: { workoutId: string } | null;
   initTemplateSave: (workoutId: string) => void;
   cancelTemplateSave: () => void;
@@ -85,7 +83,6 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const [restTimer, setRestTimer] = useState(0); // Elapsed seconds
   const [restTimerTarget, setRestTimerTarget] = useState(0); // Target seconds
   const [restTimerStartedAt, setRestTimerStartedAt] = useState<number | null>(null);
-  const [showRestAlert, setShowRestAlert] = useState(false);
   const [pendingTemplateSave, setPendingTemplateSave] = useState<{ workoutId: string } | null>(null);
   
   // Timestamp-based timers (stored in localStorage for persistence)
@@ -259,11 +256,6 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         if (restStartTime !== null) {
           const elapsed = Math.floor((Date.now() - restStartTime) / 1000);
           setRestTimer(elapsed);
-          
-          // Show alert when target time is reached
-          if (elapsed === restTimerTarget && restTimerTarget > 0 && !showRestAlert) {
-            setShowRestAlert(true);
-          }
         }
       }, 100);
     } else {
@@ -301,7 +293,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         clearInterval(restTimerRef.current);
       }
     };
-  }, [restTimerStartedAt, restTimerTarget, isPaused, isRestTimerPaused, isPastWorkout, restStartTime, showRestAlert, pausedRestTimer, pausedRestTimerValue]);
+  }, [restTimerStartedAt, restTimerTarget, isPaused, isRestTimerPaused, isPastWorkout, restStartTime, pausedRestTimer, pausedRestTimerValue]);
 
   const refreshActiveWorkout = async () => {
     // Only try to load active workout if user is logged in (has token)
@@ -399,7 +391,6 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       setRestTimer(0);
       setRestTimerStartedAt(null);
       setRestTimerTarget(0);
-      setShowRestAlert(false);
       setWorkoutStartTime(null);
       setRestStartTime(null);
       setPausedWorkoutDuration(null);
@@ -435,7 +426,6 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       setRestTimer(0);
       setRestTimerStartedAt(null);
       setRestTimerTarget(0);
-      setShowRestAlert(false);
       setWorkoutStartTime(null);
       setRestStartTime(null);
       setPausedWorkoutDuration(null);
@@ -579,7 +569,6 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         setRestStartTime(now);
         setRestTimerTarget(data.plannedRestAfterSet);
         setRestTimer(0);
-        setShowRestAlert(false);
         setIsRestTimerPaused(false);
         setPausedRestTimerValue(null);
         
@@ -639,10 +628,6 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
-
-  const dismissRestAlert = () => {
-    setShowRestAlert(false);
   };
 
   const initTemplateSave = (workoutId: string) => {
@@ -715,8 +700,6 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         workoutDuration,
         restTimer,
         restTimerTarget,
-        showRestAlert,
-        dismissRestAlert,
         pendingTemplateSave,
         initTemplateSave,
         cancelTemplateSave,

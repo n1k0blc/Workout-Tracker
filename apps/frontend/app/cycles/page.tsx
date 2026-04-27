@@ -210,6 +210,7 @@ export default function CyclesPage() {
                                         </div>
                                         <Link
                                           href={`/cycles/${cycle.id}/edit/${day.id}`}
+                                          onClick={(e) => e.stopPropagation()}
                                           className="text-blue-600 hover:text-blue-800"
                                         >
                                           <svg

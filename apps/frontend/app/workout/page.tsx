@@ -7,7 +7,6 @@ import { useWorkout } from '@/lib/workout-context';
 import { apiClient } from '@/lib/api';
 import WorkoutStartScreen from '@/components/workout/start-screen';
 import ActiveWorkoutScreen from '@/components/workout/active-workout-screen';
-import { RestAlertModal } from '@/components/workout/rest-alert-modal';
 import { WorkoutCompletionModal } from '@/components/WorkoutCompletionModal';
 import { Workout, PersonalRecord } from '@/types';
 
@@ -89,10 +88,7 @@ export default function WorkoutPage() {
             <div className="text-lg text-gray-600">Lädt...</div>
           </div>
         ) : activeWorkout?.status === 'IN_PROGRESS' ? (
-          <>
-            <ActiveWorkoutScreen onWorkoutComplete={handleWorkoutComplete} />
-            <RestAlertModal />
-          </>
+          <ActiveWorkoutScreen onWorkoutComplete={handleWorkoutComplete} />
         ) : (
           <WorkoutStartScreen />
         )}
