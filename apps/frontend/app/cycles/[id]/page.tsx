@@ -4,7 +4,21 @@ import { ProtectedRoute } from '@/components/protected-route';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
-import { CycleDetails, PersonalRecord, WorkoutListItem } from '@/types';
+import { 
+  CycleDetails, 
+  PersonalRecord, 
+  WorkoutListItem,
+  MuscleGroup,
+  Equipment,
+  HomeGym,
+  VolumeAnalytics,
+  ORMByCycleAnalytics,
+  RIRByCycleAnalytics,
+  DurationByCycleAnalytics,
+  RestTimeByCycleAnalytics,
+  RepsByCycleAnalytics,
+  SetsByCycleAnalytics,
+} from '@/types';
 import Link from 'next/link';
 import { 
   ArrowLeft, 
@@ -16,6 +30,18 @@ import {
 } from 'lucide-react';
 import Confetti from 'react-confetti';
 import CircularProgress from '@/components/CircularProgress';
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 
 export default function CycleDetailPage() {
   const params = useParams();
@@ -31,9 +57,43 @@ export default function CycleDetailPage() {
   const [showConfetti, setShowConfetti] = useState(showCelebration);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
 
+  // Analytics state
+  const [homeGyms, setHomeGyms] = useState<HomeGym[]>([]);
+  const [volumeData, setVolumeData] = useState<VolumeAnalytics | null>(null);
+  const [ormData, setOrmData] = useState<ORMByCycleAnalytics | null>(null);
+  const [rirData, setRirData] = useState<RIRByCycleAnalytics | null>(null);
+  const [durationData, setDurationData] = useState<DurationByCycleAnalytics | null>(null);
+  const [restTimeData, setRestTimeData] = useState<RestTimeByCycleAnalytics | null>(null);
+  const [repsData, setRepsData] = useState<RepsByCycleAnalytics | null>(null);
+  const [setsData, setSetsData] = useState<SetsByCycleAnalytics | null>(null);
+
+  // Multi-line chart data
+  type ChartLineConfig = {
+    dataKey: string;
+    name: string;
+    color: string;
+    yAxisId: string;
+    unit: string;
+  };
+  const [mergedChartData, setMergedChartData] = useState<any[]>([]);
+  const [chartLineConfigs, setChartLineConfigs] = useState<ChartLineConfig[]>([]);
+
+  // Multi-select filter states
+  const [selectedViews, setSelectedViews] = useState<Array<'volume' | 'orm' | 'rir' | 'duration' | 'restTime' | 'reps' | 'sets'>>(['volume']);
+  const [selectedMuscles, setSelectedMuscles] = useState<(MuscleGroup | 'ALL')[]>(['ALL']);
+  const [selectedEquipment, setSelectedEquipment] = useState<(Equipment | 'ALL')[]>(['ALL']);
+  const [gymFilter, setGymFilter] = useState('alle');
+
   useEffect(() => {
     loadData();
   }, [cycleId]);
+
+  // Reload analytics when filters change
+  useEffect(() => {
+    if (!loading && cycleDetails) {
+      loadAnalyticsData();
+    }
+  }, [selectedViews, selectedMuscles, selectedEquipment, gymFilter, cycleDetails]);
 
   useEffect(() => {
     // Set window size for confetti
@@ -54,14 +114,16 @@ export default function CycleDetailPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [details, cycleWorkouts, prs] = await Promise.all([
+      const [details, cycleWorkouts, prs, gyms] = await Promise.all([
         apiClient.getCycleDetails(cycleId),
         apiClient.getWorkoutHistory({ cycleId: cycleId, status: 'COMPLETED' }),
         apiClient.getPersonalRecords({}),
+        apiClient.getHomeGyms(),
       ]);
 
       setCycleDetails(details);
       setWorkouts(cycleWorkouts);
+      setHomeGyms(gyms);
 
       // Create a Set of cycle workout IDs for efficient lookup
       const cycleWorkoutIds = new Set(cycleWorkouts.map(w => w.id));
@@ -75,6 +137,300 @@ export default function CycleDetailPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Calculate dynamic max allowed selections for each filter type
+  const calculateMaxAllowed = (filterType: 'view' | 'muscle' | 'equipment'): number => {
+    if (filterType === 'view') {
+      return 2;
+    } else {
+      return 1;
+    }
+  };
+
+  // Toggle handlers for multi-select filters
+  const toggleView = (view: 'volume' | 'orm' | 'rir' | 'duration' | 'restTime' | 'reps' | 'sets') => {
+    const maxAllowed = calculateMaxAllowed('view');
+    
+    if (view === 'rir') {
+      if (selectedViews.includes('rir')) {
+        if (selectedViews.length > 1) {
+          setSelectedViews(selectedViews.filter(v => v !== 'rir'));
+        }
+      } else {
+        setSelectedViews(['rir']);
+      }
+      return;
+    }
+    
+    if (view === 'duration') {
+      if (!selectedMuscles.includes('ALL') || !selectedEquipment.includes('ALL')) {
+        return;
+      }
+    }
+    
+    if (selectedViews.includes(view)) {
+      if (selectedViews.length > 1) {
+        setSelectedViews(selectedViews.filter(v => v !== view));
+      }
+    } else {
+      const viewsWithoutRir = selectedViews.filter(v => v !== 'rir');
+      if (viewsWithoutRir.length < maxAllowed) {
+        setSelectedViews([...viewsWithoutRir, view]);
+      }
+    }
+  };
+
+  const toggleMuscle = (muscle: MuscleGroup | 'ALL') => {
+    if (muscle === 'ALL') {
+      setSelectedMuscles(['ALL']);
+    } else {
+      setSelectedMuscles([muscle]);
+    }
+  };
+
+  const toggleEquipment = (equipment: Equipment | 'ALL') => {
+    if (equipment === 'ALL') {
+      setSelectedEquipment(['ALL']);
+    } else {
+      setSelectedEquipment([equipment]);
+    }
+  };
+
+  // Auto-deselect duration when muscle or equipment is not "ALL"
+  useEffect(() => {
+    if (selectedViews.includes('duration')) {
+      if (!selectedMuscles.includes('ALL') || !selectedEquipment.includes('ALL')) {
+        const newViews = selectedViews.filter(v => v !== 'duration');
+        if (newViews.length === 0) {
+          setSelectedViews(['volume']);
+        } else {
+          setSelectedViews(newViews);
+        }
+      }
+    }
+  }, [selectedMuscles, selectedEquipment]);
+
+  // Color palette for chart lines
+  const COLORS = [
+    '#3b82f6', '#ef4444', '#10b981', '#f59e0b',
+    '#8b5cf6', '#ec4899', '#06b6d4', '#6366f1',
+  ];
+
+  // Translation helpers
+  const translateMuscleGroup = (mg: string): string => {
+    const translations: Record<string, string> = {
+      CHEST: 'Brust', BACK: 'Rücken', LEGS: 'Beine', SHOULDERS: 'Schultern',
+      BICEPS: 'Bizeps', TRICEPS: 'Trizeps', ABS: 'Bauch', FOREARMS: 'Unterarme',
+    };
+    return translations[mg] || mg;
+  };
+
+  const translateEquipment = (eq: Equipment): string => {
+    const translations: Record<Equipment, string> = {
+      CABLE: 'Kabel', MACHINE: 'Maschine', DUMBBELL: 'Kurzhantel',
+      BARBELL: 'Langhantel', BODYWEIGHT: 'Körpergewicht',
+      SMITH_MACHINE: 'Smith-Maschine', EZ_BAR: 'SZ-Stange',
+    };
+    return translations[eq];
+  };
+
+  // Helper function to generate line name
+  const generateLineName = (
+    view: string,
+    muscle?: MuscleGroup,
+    equipment?: Equipment
+  ): string => {
+    const viewNames: Record<string, string> = {
+      volume: 'Volumen', orm: 'ORM%', rir: 'RIR', duration: 'Dauer',
+      restTime: 'Pause', reps: 'Wdh', sets: 'Sätze',
+    };
+    
+    const parts = [viewNames[view] || view];
+    if (muscle) parts.push(translateMuscleGroup(muscle));
+    if (equipment) parts.push(translateEquipment(equipment));
+    
+    return parts.join(' - ');
+  };
+
+  // Helper function to get unit and Y-axis config for a view
+  const getViewConfig = (view: string): { unit: string; yAxisId: string } => {
+    const configs: Record<string, { unit: string; yAxisId: string }> = {
+      volume: { unit: 'kg', yAxisId: 'left' },
+      orm: { unit: '%', yAxisId: 'left' },
+      rir: { unit: 'RIR', yAxisId: 'left' },
+      duration: { unit: 'min', yAxisId: 'left' },
+      restTime: { unit: 's', yAxisId: 'left' },
+      reps: { unit: 'Wdh', yAxisId: 'left' },
+      sets: { unit: 'Sätze', yAxisId: 'left' },
+    };
+    return configs[view] || { unit: '', yAxisId: 'left' };
+  };
+
+  // Helper function to merge data from multiple API results
+  const mergeChartData = (
+    results: any[],
+    filterCombinations: Array<{ view: string; muscle?: MuscleGroup; equipment?: Equipment }>
+  ) => {
+    const dateSet = new Set<string>();
+    results.forEach((result) => {
+      if (result?.dataPoints) {
+        result.dataPoints.forEach((point: any) => {
+          dateSet.add(point.date);
+        });
+      }
+    });
+
+    const sortedDates = Array.from(dateSet).sort();
+    const uniqueViews = Array.from(new Set(filterCombinations.map(c => c.view)));
+    const viewToYAxis: Record<string, string> = {};
+    uniqueViews.forEach((view, index) => {
+      viewToYAxis[view] = index === 0 ? 'left' : 'right';
+    });
+
+    const mergedData: any[] = sortedDates.map((date) => ({ date }));
+    const lineConfigs: ChartLineConfig[] = [];
+
+    results.forEach((result, index) => {
+      if (!result?.dataPoints) return;
+
+      const combo = filterCombinations[index];
+      const lineName = generateLineName(combo.view, combo.muscle, combo.equipment);
+      const viewConfig = getViewConfig(combo.view);
+      const color = COLORS[index % COLORS.length];
+
+      lineConfigs.push({
+        dataKey: lineName,
+        name: lineName,
+        color,
+        yAxisId: viewToYAxis[combo.view],
+        unit: viewConfig.unit,
+      });
+
+      result.dataPoints.forEach((point: any) => {
+        const dateEntry = mergedData.find((d) => d.date === point.date);
+        if (dateEntry) {
+          let value = 0;
+          if (combo.view === 'volume') value = point.volume;
+          else if (combo.view === 'orm') value = point.percentORM || point.averageOrmPercentage;
+          else if (combo.view === 'rir') value = point.rir0Count || 0;
+          else if (combo.view === 'duration') value = point.duration;
+          else if (combo.view === 'restTime') value = point.averageRestTime;
+          else if (combo.view === 'reps') value = point.reps;
+          else if (combo.view === 'sets') value = point.sets;
+
+          dateEntry[lineName] = value;
+        }
+      });
+    });
+
+    const filteredData = mergedData.filter((entry) => {
+      return lineConfigs.some(config => {
+        const value = entry[config.dataKey];
+        return value !== undefined && value !== 0;
+      });
+    });
+
+    setMergedChartData(filteredData);
+    setChartLineConfigs(lineConfigs);
+  };
+
+  // Load analytics data for the current cycle
+  const loadAnalyticsData = async () => {
+    if (!cycleDetails) return;
+
+    try {
+      const muscles = selectedMuscles.includes('ALL') ? [undefined] : selectedMuscles.filter(m => m !== 'ALL') as MuscleGroup[];
+      const equipment = selectedEquipment.includes('ALL') ? [undefined] : selectedEquipment.filter(e => e !== 'ALL') as Equipment[];
+
+      const allPromises: Promise<any>[] = [];
+      const filterCombinations: Array<{
+        view: string;
+        muscle?: MuscleGroup;
+        equipment?: Equipment;
+      }> = [];
+
+      for (const view of selectedViews) {
+        for (const muscle of muscles) {
+          for (const equip of equipment) {
+            filterCombinations.push({ view, muscle: muscle as MuscleGroup | undefined, equipment: equip as Equipment | undefined });
+
+            if (view === 'volume') {
+              const cycleStart = new Date(cycleDetails.startDate).toISOString();
+              const cycleEnd = cycleDetails.completedAt
+                ? new Date(cycleDetails.completedAt).toISOString()
+                : undefined;
+
+              allPromises.push(
+                apiClient.getVolumeAnalytics({
+                  startDate: cycleStart,
+                  endDate: cycleEnd,
+                  gymId: gymFilter,
+                  muscleGroup: muscle,
+                  equipment: equip,
+                  cycleId: cycleId,
+                })
+              );
+            } else if (view === 'orm') {
+              allPromises.push(apiClient.getORMByCycle(cycleId, muscle, equip));
+            } else if (view === 'rir') {
+              allPromises.push(apiClient.getRIRByCycle(cycleId, gymFilter, muscle, equip));
+            } else if (view === 'duration') {
+              allPromises.push(apiClient.getDurationByCycle(cycleId, gymFilter, muscle, equip));
+            } else if (view === 'restTime') {
+              allPromises.push(apiClient.getRestTimeByCycle(cycleId, gymFilter, muscle, equip));
+            } else if (view === 'reps') {
+              allPromises.push(apiClient.getRepsByCycle(cycleId, muscle, equip));
+            } else if (view === 'sets') {
+              allPromises.push(apiClient.getSetsByCycle(cycleId, muscle, equip));
+            }
+          }
+        }
+      }
+
+      const results = await Promise.all(allPromises);
+      mergeChartData(results, filterCombinations);
+
+      if (selectedViews.includes('volume') && results.length > 0) {
+        const volumeResult = results.find((r, i) => filterCombinations[i].view === 'volume');
+        if (volumeResult) {
+          setVolumeData({
+            ...volumeResult,
+            dataPoints: volumeResult.dataPoints.filter((point: any) => point.volume > 0),
+          });
+        }
+      }
+      if (selectedViews.includes('orm')) {
+        const ormResult = results.find((r, i) => filterCombinations[i].view === 'orm');
+        if (ormResult) setOrmData(ormResult);
+      }
+      if (selectedViews.includes('rir')) {
+        const rirResult = results.find((r, i) => filterCombinations[i].view === 'rir');
+        if (rirResult) setRirData(rirResult);
+      }
+      if (selectedViews.includes('duration')) {
+        const durationResult = results.find((r, i) => filterCombinations[i].view === 'duration');
+        if (durationResult) setDurationData(durationResult);
+      }
+      if (selectedViews.includes('restTime')) {
+        const restTimeResult = results.find((r, i) => filterCombinations[i].view === 'restTime');
+        if (restTimeResult) setRestTimeData(restTimeResult);
+      }
+      if (selectedViews.includes('reps')) {
+        const repsResult = results.find((r, i) => filterCombinations[i].view === 'reps');
+        if (repsResult) setRepsData(repsResult);
+      }
+      if (selectedViews.includes('sets')) {
+        const setsResult = results.find((r, i) => filterCombinations[i].view === 'sets');
+        if (setsResult) setSetsData(setsResult);
+      }
+    } catch (error) {
+      console.error('Failed to load analytics data:', error);
+    }
+  };
+
+  const formatNumber = (num: number) => {
+    return new Intl.NumberFormat('de-DE').format(Math.round(num));
   };
 
   const formatDate = (dateStr: string) => {
@@ -277,6 +633,698 @@ export default function CycleDetailPage() {
               </div>
             </div>
 
+            {/* Analytics Section */}
+            <div className="space-y-6">
+              {/* Analytics Header */}
+              <div>
+                <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+                  Statistiken
+                </h2>
+                <p className="text-sm text-gray-600">
+                  Analysiere deine Performance während dieses Zyklus
+                </p>
+              </div>
+
+              {/* Filters */}
+              <div className="bg-white rounded-lg shadow p-6 space-y-6">
+                {/* Views Filter */}
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Ansichten (max. 2 für Vergleich)</h3>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => toggleView('volume')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedViews.includes('volume')
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Volumen
+                    </button>
+                    <button
+                      onClick={() => toggleView('orm')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedViews.includes('orm')
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      } ${gymFilter === 'andere' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      disabled={gymFilter === 'andere'}
+                      title={gymFilter === 'andere' ? 'ORM nur für Home Gyms verfügbar' : ''}
+                    >
+                      ORM%
+                    </button>
+                    <button
+                      onClick={() => toggleView('rir')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedViews.includes('rir')
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      RIR
+                    </button>
+                    <button
+                      onClick={() => toggleView('duration')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedViews.includes('duration')
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      } ${!selectedMuscles.includes('ALL') || !selectedEquipment.includes('ALL') ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      title={!selectedMuscles.includes('ALL') || !selectedEquipment.includes('ALL') ? 'Dauer nur mit Alle/Alle verfügbar' : ''}
+                    >
+                      Dauer
+                    </button>
+                    <button
+                      onClick={() => toggleView('restTime')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedViews.includes('restTime')
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Satzpause
+                    </button>
+                    <button
+                      onClick={() => toggleView('reps')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedViews.includes('reps')
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Wiederholungen
+                    </button>
+                    <button
+                      onClick={() => toggleView('sets')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedViews.includes('sets')
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Sätze
+                    </button>
+                  </div>
+                </div>
+
+                {/* Muscle Group Filter */}
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Muskelgruppe</h3>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => toggleMuscle('ALL')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedMuscles.includes('ALL')
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Alle
+                    </button>
+                    {['CHEST', 'BACK', 'LEGS', 'SHOULDERS', 'BICEPS', 'TRICEPS', 'ABS', 'FOREARMS'].map((muscle) => (
+                      <button
+                        key={muscle}
+                        onClick={() => toggleMuscle(muscle as MuscleGroup)}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          selectedMuscles.includes(muscle as MuscleGroup)
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {translateMuscleGroup(muscle)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Equipment Filter */}
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Equipment</h3>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => toggleEquipment('ALL')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedEquipment.includes('ALL')
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Alle
+                    </button>
+                    {(['CABLE', 'MACHINE', 'DUMBBELL', 'BARBELL', 'BODYWEIGHT', 'SMITH_MACHINE', 'EZ_BAR'] as Equipment[]).map((equip) => (
+                      <button
+                        key={equip}
+                        onClick={() => toggleEquipment(equip)}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          selectedEquipment.includes(equip)
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {translateEquipment(equip)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Gym Filter */}
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Gym</h3>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setGymFilter('alle')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        gymFilter === 'alle'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Alle
+                    </button>
+                    {homeGyms.map((gym) => (
+                      <button
+                        key={gym.id}
+                        onClick={() => setGymFilter(gym.id)}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          gymFilter === gym.id
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {gym.name}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setGymFilter('andere')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        gymFilter === 'andere'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Andere
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Charts */}
+              {selectedViews.length > 0 && (
+                <div className="space-y-6">
+                  {/* Comparison Chart (Multi-line) */}
+                  {selectedViews.length > 1 && mergedChartData.length > 0 && (
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        Vergleich
+                      </h3>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={mergedChartData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="date"
+                            tickFormatter={(dateStr: string) => {
+                              const date = new Date(dateStr);
+                              return new Intl.DateTimeFormat('de-DE', {
+                                day: '2-digit',
+                                month: '2-digit',
+                              }).format(date);
+                            }}
+                            style={{ fontSize: '12px' }}
+                          />
+                          {/* Left Y-Axis */}
+                          {chartLineConfigs.some(config => config.yAxisId === 'left') && (
+                            <YAxis
+                              yAxisId="left"
+                              label={{
+                                value: chartLineConfigs.find(c => c.yAxisId === 'left')?.unit || '',
+                                angle: -90,
+                                position: 'insideLeft',
+                              }}
+                              style={{ fontSize: '12px' }}
+                            />
+                          )}
+                          {/* Right Y-Axis */}
+                          {chartLineConfigs.some(config => config.yAxisId === 'right') && (
+                            <YAxis
+                              yAxisId="right"
+                              orientation="right"
+                              label={{
+                                value: chartLineConfigs.find(c => c.yAxisId === 'right')?.unit || '',
+                                angle: 90,
+                                position: 'insideRight',
+                              }}
+                              style={{ fontSize: '12px' }}
+                            />
+                          )}
+                          <Tooltip
+                            labelFormatter={(label: any) => {
+                              const date = new Date(label as string);
+                              return new Intl.DateTimeFormat('de-DE', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              }).format(date);
+                            }}
+                          />
+                          <Legend />
+                          {chartLineConfigs.map((config) => (
+                            <Line
+                              key={config.dataKey}
+                              type="monotone"
+                              dataKey={config.dataKey}
+                              name={config.name}
+                              stroke={config.color}
+                              yAxisId={config.yAxisId}
+                              strokeWidth={2}
+                              dot={{ r: 3 }}
+                              activeDot={{ r: 5 }}
+                            />
+                          ))}
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+
+                  {/* Volume Chart */}
+                  {selectedViews.length === 1 && selectedViews.includes('volume') && volumeData && volumeData.dataPoints.length > 0 && (
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        Volumen-Entwicklung
+                      </h3>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={volumeData.dataPoints}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="date"
+                            tickFormatter={(dateStr: string) => {
+                              const date = new Date(dateStr);
+                              return new Intl.DateTimeFormat('de-DE', {
+                                day: '2-digit',
+                                month: '2-digit',
+                              }).format(date);
+                            }}
+                            style={{ fontSize: '12px' }}
+                          />
+                          <YAxis
+                            tickFormatter={(value) => `${formatNumber(value)}kg`}
+                            style={{ fontSize: '12px' }}
+                          />
+                          <Tooltip
+                            formatter={(value: any) => [
+                              `${formatNumber(value as number)} kg`,
+                              'Volumen',
+                            ]}
+                            labelFormatter={(label: any) => {
+                              const date = new Date(label as string);
+                              return new Intl.DateTimeFormat('de-DE', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              }).format(date);
+                            }}
+                          />
+                          <Legend />
+                          <Line
+                            type="monotone"
+                            dataKey="volume"
+                            stroke="#3b82f6"
+                            strokeWidth={2}
+                            dot={{ r: 4 }}
+                            name="Volumen"
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                      <div className="mt-4 text-center">
+                        <div className="text-sm text-gray-600">
+                          Gesamtes Volumen
+                        </div>
+                        <div className="text-2xl font-bold text-gray-900">
+                          {formatNumber(volumeData.totalVolume)} kg
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ORM Chart */}
+                  {selectedViews.length === 1 && selectedViews.includes('orm') && (
+                    <div className="bg-white rounded-lg shadow p-6">
+                      {gymFilter === 'andere' ? (
+                        <div className="text-center py-12">
+                          <p className="text-gray-600">
+                            %ORM Tracking ist nur für Home Gym Workouts verfügbar.
+                          </p>
+                          <p className="text-sm text-gray-500 mt-2">
+                            Bitte wähle ein Home Gym oder "Alle" aus.
+                          </p>
+                        </div>
+                      ) : ormData && ormData.dataPoints.length > 0 ? (
+                        <>
+                          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                            %ORM-Entwicklung
+                          </h3>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={ormData.dataPoints}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis
+                                dataKey="date"
+                                tickFormatter={(dateStr: string) => {
+                                  const date = new Date(dateStr);
+                                  return new Intl.DateTimeFormat('de-DE', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                  }).format(date);
+                                }}
+                                style={{ fontSize: '12px' }}
+                              />
+                              <YAxis
+                                tickFormatter={(value) => `${value}%`}
+                                style={{ fontSize: '12px' }}
+                              />
+                              <Tooltip
+                                formatter={(value: any) => [`${value}%`, '%ORM']}
+                                labelFormatter={(label: any) => {
+                                  const date = new Date(label as string);
+                                  return new Intl.DateTimeFormat('de-DE', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric',
+                                  }).format(date);
+                                }}
+                              />
+                              <Legend />
+                              <Line
+                                type="monotone"
+                                dataKey="percentORM"
+                                stroke="#10b981"
+                                strokeWidth={2}
+                                dot={{ r: 4 }}
+                                name="%ORM"
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                          <div className="mt-4 text-center">
+                            <div className="text-sm text-gray-600">
+                              Durchschnitt %ORM
+                            </div>
+                            <div className="text-2xl font-bold text-gray-900">
+                              {ormData.averagePercentORM}%
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-center py-12">
+                          <p className="text-gray-600">
+                            Keine ORM Daten verfügbar für die ausgewählten Filter.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* RIR Chart */}
+                  {selectedViews.length === 1 && selectedViews.includes('rir') && (
+                    <div className="bg-white rounded-lg shadow p-6">
+                      {rirData && rirData.dataPoints.length > 0 ? (
+                        <>
+                          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                            RIR-Verteilung
+                          </h3>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={rirData.dataPoints}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis
+                                dataKey="date"
+                                tickFormatter={(dateStr: string) => {
+                                  const date = new Date(dateStr);
+                                  return new Intl.DateTimeFormat('de-DE', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                  }).format(date);
+                                }}
+                                style={{ fontSize: '12px' }}
+                              />
+                              <YAxis
+                                label={{ value: 'Anzahl Sätze', angle: -90, position: 'insideLeft' }}
+                                style={{ fontSize: '12px' }}
+                              />
+                              <Tooltip
+                                labelFormatter={(label: any) => {
+                                  const date = new Date(label as string);
+                                  return new Intl.DateTimeFormat('de-DE', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric',
+                                  }).format(date);
+                                }}
+                              />
+                              <Legend />
+                              <Bar dataKey="rir0Count" fill="#ef4444" name="RIR 0" />
+                              <Bar dataKey="rir1Count" fill="#eab308" name="RIR 1" />
+                              <Bar dataKey="rir2Count" fill="#22c55e" name="RIR 2" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </>
+                      ) : (
+                        <div className="text-center py-12">
+                          <p className="text-gray-600">
+                            Keine RIR Daten verfügbar für die ausgewählten Filter.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Duration Chart */}
+                  {selectedViews.length === 1 && selectedViews.includes('duration') && durationData && durationData.dataPoints.length > 0 && (
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        Dauer-Entwicklung
+                      </h3>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={durationData.dataPoints}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="date"
+                            tickFormatter={(dateStr: string) => {
+                              const date = new Date(dateStr);
+                              return new Intl.DateTimeFormat('de-DE', {
+                                day: '2-digit',
+                                month: '2-digit',
+                              }).format(date);
+                            }}
+                            style={{ fontSize: '12px' }}
+                          />
+                          <YAxis
+                            tickFormatter={(value) => `${value}min`}
+                            style={{ fontSize: '12px' }}
+                          />
+                          <Tooltip
+                            formatter={(value: any) => [`${value} min`, 'Dauer']}
+                            labelFormatter={(label: any) => {
+                              const date = new Date(label as string);
+                              return new Intl.DateTimeFormat('de-DE', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              }).format(date);
+                            }}
+                          />
+                          <Legend />
+                          <Line
+                            type="monotone"
+                            dataKey="duration"
+                            stroke="#f59e0b"
+                            strokeWidth={2}
+                            dot={{ r: 4 }}
+                            name="Dauer"
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                      <div className="mt-4 text-center">
+                        <div className="text-sm text-gray-600">
+                          Durchschnittliche Dauer
+                        </div>
+                        <div className="text-2xl font-bold text-gray-900">
+                          {Math.round(durationData.averageDuration)} min
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Rest Time Chart */}
+                  {selectedViews.length === 1 && selectedViews.includes('restTime') && restTimeData && restTimeData.dataPoints.length > 0 && (
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        Satzpausen-Entwicklung
+                      </h3>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={restTimeData.dataPoints}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="date"
+                            tickFormatter={(dateStr: string) => {
+                              const date = new Date(dateStr);
+                              return new Intl.DateTimeFormat('de-DE', {
+                                day: '2-digit',
+                                month: '2-digit',
+                              }).format(date);
+                            }}
+                            style={{ fontSize: '12px' }}
+                          />
+                          <YAxis
+                            tickFormatter={(value) => `${value}s`}
+                            style={{ fontSize: '12px' }}
+                          />
+                          <Tooltip
+                            formatter={(value: any) => [`${value} s`, 'Pause']}
+                            labelFormatter={(label: any) => {
+                              const date = new Date(label as string);
+                              return new Intl.DateTimeFormat('de-DE', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              }).format(date);
+                            }}
+                          />
+                          <Legend />
+                          <Line
+                            type="monotone"
+                            dataKey="averageRestTime"
+                            stroke="#8b5cf6"
+                            strokeWidth={2}
+                            dot={{ r: 4 }}
+                            name="Satzpause"
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                      <div className="mt-4 text-center">
+                        <div className="text-sm text-gray-600">
+                          Durchschnittliche Satzpause
+                        </div>
+                        <div className="text-2xl font-bold text-gray-900">
+                          {Math.round(restTimeData.overallAverage)} s
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Reps Chart */}
+                  {selectedViews.length === 1 && selectedViews.includes('reps') && repsData && repsData.dataPoints.length > 0 && (
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        Wiederholungen-Entwicklung
+                      </h3>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={repsData.dataPoints}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="date"
+                            tickFormatter={(dateStr: string) => {
+                              const date = new Date(dateStr);
+                              return new Intl.DateTimeFormat('de-DE', {
+                                day: '2-digit',
+                                month: '2-digit',
+                              }).format(date);
+                            }}
+                            style={{ fontSize: '12px' }}
+                          />
+                          <YAxis
+                            tickFormatter={(value) => `${value}`}
+                            style={{ fontSize: '12px' }}
+                          />
+                          <Tooltip
+                            formatter={(value: any) => [`${value}`, 'Wiederholungen']}
+                            labelFormatter={(label: any) => {
+                              const date = new Date(label as string);
+                              return new Intl.DateTimeFormat('de-DE', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              }).format(date);
+                            }}
+                          />
+                          <Legend />
+                          <Line
+                            type="monotone"
+                            dataKey="reps"
+                            stroke="#ec4899"
+                            strokeWidth={2}
+                            dot={{ r: 4 }}
+                            name="Wiederholungen"
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                      <div className="mt-4 text-center">
+                        <div className="text-sm text-gray-600">
+                          Gesamte Wiederholungen
+                        </div>
+                        <div className="text-2xl font-bold text-gray-900">
+                          {formatNumber(repsData.totalReps)}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sets Chart */}
+                  {selectedViews.length === 1 && selectedViews.includes('sets') && setsData && setsData.dataPoints.length > 0 && (
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        Sätze-Entwicklung
+                      </h3>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={setsData.dataPoints}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="date"
+                            tickFormatter={(dateStr: string) => {
+                              const date = new Date(dateStr);
+                              return new Intl.DateTimeFormat('de-DE', {
+                                day: '2-digit',
+                                month: '2-digit',
+                              }).format(date);
+                            }}
+                            style={{ fontSize: '12px' }}
+                          />
+                          <YAxis
+                            tickFormatter={(value) => `${value}`}
+                            style={{ fontSize: '12px' }}
+                          />
+                          <Tooltip
+                            formatter={(value: any) => [`${value}`, 'Sätze']}
+                            labelFormatter={(label: any) => {
+                              const date = new Date(label as string);
+                              return new Intl.DateTimeFormat('de-DE', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              }).format(date);
+                            }}
+                          />
+                          <Legend />
+                          <Line
+                            type="monotone"
+                            dataKey="sets"
+                            stroke="#06b6d4"
+                            strokeWidth={2}
+                            dot={{ r: 4 }}
+                            name="Sätze"
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                      <div className="mt-4 text-center">
+                        <div className="text-sm text-gray-600">
+                          Gesamte Sätze
+                        </div>
+                        <div className="text-2xl font-bold text-gray-900">
+                          {setsData.totalSets}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* PRs List */}
             {personalRecords.length > 0 && (
               <div className="bg-white rounded-lg shadow">
@@ -344,11 +1392,6 @@ export default function CycleDetailPage() {
                               ? workout.templateName || 'Freies Workout'
                               : workout.workoutDayName || 'Workout'}
                           </h3>
-                          {workout.workoutDayWeekday && (
-                            <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                              Tag {workout.workoutDayWeekday}
-                            </span>
-                          )}
                           {workout.homeGym ? (
                             <span className="text-xs bg-violet-100 text-violet-800 px-2 py-1 rounded">
                               {workout.homeGym.name}

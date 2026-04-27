@@ -1,7 +1,6 @@
 'use client';
 
 import { useWorkout } from '@/lib/workout-context';
-import { Pause, Play } from 'lucide-react';
 
 export function RestTimerDisplay() {
   const { restTimer, restTimerTarget, isRestTimerPaused, toggleRestTimerPause } = useWorkout();
@@ -29,13 +28,8 @@ export function RestTimerDisplay() {
       title={isRestTimerPaused ? 'Satzpause fortsetzen' : 'Satzpause anhalten'}
     >
       <div className="flex items-center gap-2">
-        {isRestTimerPaused ? (
-          <Play className="w-3 h-3" fill="currentColor" />
-        ) : (
-          <Pause className="w-3 h-3" fill="currentColor" />
-        )}
         <div className="text-xs font-medium">
-          Pause {isRestTimerPaused && '(pausiert)'}
+          Pause
         </div>
         <div className="text-lg font-bold tabular-nums">
           {minutes}:{seconds.toString().padStart(2, '0')}

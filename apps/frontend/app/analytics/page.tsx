@@ -94,26 +94,40 @@ export default function AnalyticsPage() {
 
   // Calculate dynamic max allowed selections for each filter type
   const calculateMaxAllowed = (filterType: 'view' | 'muscle' | 'equipment'): number => {
-    const viewCount = selectedViews.length;
-    const muscleCount = selectedMuscles.filter(m => m !== 'ALL').length || 1;
-    const equipmentCount = selectedEquipment.filter(e => e !== 'ALL').length || 1;
-    
     if (filterType === 'view') {
-      // Max 2 views always
+      // Max 2 views for comparison
       return 2;
-    } else if (filterType === 'muscle') {
-      // Max based on views and equipment: max 3, but limited by total 6 lines
-      return Math.min(3, Math.floor(6 / (viewCount * equipmentCount)));
-    } else if (filterType === 'equipment') {
-      // Max based on views and muscles: max 3, but limited by total 6 lines
-      return Math.min(3, Math.floor(6 / (viewCount * muscleCount)));
+    } else {
+      // Muscle and Equipment are single-select only
+      return 1;
     }
-    return 3;
   };
 
   // Toggle handlers for multi-select filters
   const toggleView = (view: 'volume' | 'orm' | 'rir' | 'duration' | 'restTime' | 'reps' | 'sets') => {
     const maxAllowed = calculateMaxAllowed('view');
+    
+    // RIR special case: always single-select (bar chart incompatible with multi-line)
+    if (view === 'rir') {
+      if (selectedViews.includes('rir')) {
+        // Deselect RIR - ensure at least one view remains
+        if (selectedViews.length > 1) {
+          setSelectedViews(selectedViews.filter(v => v !== 'rir'));
+        }
+      } else {
+        // Select RIR as only view
+        setSelectedViews(['rir']);
+      }
+      return;
+    }
+    
+    // Duration special case: only compatible with muscle="ALL" AND equipment="ALL"
+    if (view === 'duration') {
+      if (!selectedMuscles.includes('ALL') || !selectedEquipment.includes('ALL')) {
+        // Cannot select duration without ALL filters
+        return;
+      }
+    }
     
     if (selectedViews.includes(view)) {
       // Deselect - ensure at least one view remains
@@ -121,54 +135,49 @@ export default function AnalyticsPage() {
         setSelectedViews(selectedViews.filter(v => v !== view));
       }
     } else {
+      // Deselect RIR if selecting another view
+      const viewsWithoutRir = selectedViews.filter(v => v !== 'rir');
+      
       // Select - check limit
-      if (selectedViews.length < maxAllowed) {
-        setSelectedViews([...selectedViews, view]);
+      if (viewsWithoutRir.length < maxAllowed) {
+        setSelectedViews([...viewsWithoutRir, view]);
       }
     }
   };
 
   const toggleMuscle = (muscle: MuscleGroup | 'ALL') => {
-    const maxAllowed = calculateMaxAllowed('muscle');
-    
+    // Radio-button behavior: always select the clicked muscle
     if (muscle === 'ALL') {
       setSelectedMuscles(['ALL']);
     } else {
-      const currentMuscles = selectedMuscles.filter(m => m !== 'ALL');
-      
-      if (currentMuscles.includes(muscle)) {
-        // Deselect
-        const newMuscles = currentMuscles.filter(m => m !== muscle);
-        setSelectedMuscles(newMuscles.length === 0 ? ['ALL'] : newMuscles);
-      } else {
-        // Select - check limit
-        if (currentMuscles.length < maxAllowed) {
-          setSelectedMuscles([...currentMuscles, muscle]);
-        }
-      }
+      setSelectedMuscles([muscle]);
     }
   };
 
   const toggleEquipment = (equipment: Equipment | 'ALL') => {
-    const maxAllowed = calculateMaxAllowed('equipment');
-    
+    // Radio-button behavior: always select the clicked equipment
     if (equipment === 'ALL') {
       setSelectedEquipment(['ALL']);
     } else {
-      const currentEquipment = selectedEquipment.filter(e => e !== 'ALL');
-      
-      if (currentEquipment.includes(equipment)) {
-        // Deselect
-        const newEquipment = currentEquipment.filter(e => e !== equipment);
-        setSelectedEquipment(newEquipment.length === 0 ? ['ALL'] : newEquipment);
-      } else {
-        // Select - check limit
-        if (currentEquipment.length < maxAllowed) {
-          setSelectedEquipment([...currentEquipment, equipment]);
+      setSelectedEquipment([equipment]);
+    }
+  };
+  
+  // Auto-deselect duration when muscle or equipment is not "ALL"
+  useEffect(() => {
+    if (selectedViews.includes('duration')) {
+      if (!selectedMuscles.includes('ALL') || !selectedEquipment.includes('ALL')) {
+        // Remove duration from selected views
+        const newViews = selectedViews.filter(v => v !== 'duration');
+        if (newViews.length === 0) {
+          // Fallback to volume if no views left
+          setSelectedViews(['volume']);
+        } else {
+          setSelectedViews(newViews);
         }
       }
     }
-  };
+  }, [selectedMuscles, selectedEquipment]);
 
   // Color palette for chart lines
   const COLORS = [
@@ -237,7 +246,7 @@ export default function AnalyticsPage() {
   const getViewConfig = (view: string): { unit: string; yAxisId: string } => {
     const configs: Record<string, { unit: string; yAxisId: string }> = {
       volume: { unit: 'kg', yAxisId: 'left' },
-      orm: { unit: '%', yAxisId: 'right' },
+      orm: { unit: '%', yAxisId: 'left' }, // Y-axis assigned dynamically in mergeChartData
       rir: { unit: 'RIR', yAxisId: 'left' },
       duration: { unit: 'min', yAxisId: 'left' },
       restTime: { unit: 's', yAxisId: 'left' },
@@ -264,6 +273,14 @@ export default function AnalyticsPage() {
 
     const sortedDates = Array.from(dateSet).sort();
 
+    // Identify unique view types for Y-axis assignment
+    const uniqueViews = Array.from(new Set(filterCombinations.map(c => c.view)));
+    const viewToYAxis: Record<string, string> = {};
+    uniqueViews.forEach((view, index) => {
+      // Assign first view type to 'left', second to 'right'
+      viewToYAxis[view] = index === 0 ? 'left' : 'right';
+    });
+
     // Build merged data structure
     const mergedData: any[] = sortedDates.map((date) => ({ date }));
     const lineConfigs: ChartLineConfig[] = [];
@@ -280,7 +297,7 @@ export default function AnalyticsPage() {
         dataKey: lineName,
         name: lineName,
         color,
-        yAxisId: viewConfig.yAxisId,
+        yAxisId: viewToYAxis[combo.view], // Dynamic Y-axis assignment
         unit: viewConfig.unit,
       });
 
@@ -291,7 +308,7 @@ export default function AnalyticsPage() {
           // Determine the value key based on view type
           let value = 0;
           if (combo.view === 'volume') value = point.volume;
-          else if (combo.view === 'orm') value = point.averageOrmPercentage;
+          else if (combo.view === 'orm') value = point.percentORM || point.averageOrmPercentage; // Cycle mode uses percentORM
           else if (combo.view === 'rir') value = point.rir0Count || 0;
           else if (combo.view === 'duration') value = point.duration;
           else if (combo.view === 'restTime') value = point.averageRestTime;
@@ -303,7 +320,16 @@ export default function AnalyticsPage() {
       });
     });
 
-    setMergedChartData(mergedData);
+    // Filter out dates where all values are 0
+    const filteredData = mergedData.filter((entry) => {
+      // Check if at least one value (excluding 'date') is non-zero
+      return lineConfigs.some(config => {
+        const value = entry[config.dataKey];
+        return value !== undefined && value !== 0;
+      });
+    });
+
+    setMergedChartData(filteredData);
     setChartLineConfigs(lineConfigs);
   };
 
@@ -784,12 +810,15 @@ export default function AnalyticsPage() {
                   {/* View Mode Buttons */}
                   <div>
                     <label className="text-sm font-medium text-gray-700 mb-2 block">
-                      Ansicht (max. {calculateMaxAllowed('view')}):
+                      Ansicht (max. 2):
                     </label>
                     <div className="flex flex-wrap gap-2">
                       <button
                         onClick={() => toggleView('volume')}
-                        disabled={!selectedViews.includes('volume') && selectedViews.length >= calculateMaxAllowed('view')}
+                        disabled={
+                          !selectedViews.includes('volume') && 
+                          selectedViews.length >= calculateMaxAllowed('view')
+                        }
                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                           selectedViews.includes('volume')
                             ? 'bg-blue-600 text-white'
@@ -801,7 +830,10 @@ export default function AnalyticsPage() {
                       {cycleMode && (
                         <button
                           onClick={() => toggleView('orm')}
-                          disabled={!selectedViews.includes('orm') && selectedViews.length >= calculateMaxAllowed('view')}
+                          disabled={
+                            !selectedViews.includes('orm') && 
+                            selectedViews.length >= calculateMaxAllowed('view')
+                          }
                           className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                             selectedViews.includes('orm')
                               ? 'bg-blue-600 text-white'
@@ -813,18 +845,21 @@ export default function AnalyticsPage() {
                       )}
                       <button
                         onClick={() => toggleView('rir')}
-                        disabled={!selectedViews.includes('rir') && selectedViews.length >= calculateMaxAllowed('view')}
                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                           selectedViews.includes('rir')
                             ? 'bg-blue-600 text-white'
-                            : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
+                            : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                         }`}
                       >
                         RIR
                       </button>
                       <button
                         onClick={() => toggleView('duration')}
-                        disabled={!selectedViews.includes('duration') && selectedViews.length >= calculateMaxAllowed('view')}
+                        disabled={
+                          (!selectedViews.includes('duration') && selectedViews.length >= calculateMaxAllowed('view')) ||
+                          !selectedMuscles.includes('ALL') || 
+                          !selectedEquipment.includes('ALL')
+                        }
                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                           selectedViews.includes('duration')
                             ? 'bg-blue-600 text-white'
@@ -835,7 +870,10 @@ export default function AnalyticsPage() {
                       </button>
                       <button
                         onClick={() => toggleView('restTime')}
-                        disabled={!selectedViews.includes('restTime') && selectedViews.length >= calculateMaxAllowed('view')}
+                        disabled={
+                          !selectedViews.includes('restTime') && 
+                          selectedViews.length >= calculateMaxAllowed('view')
+                        }
                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                           selectedViews.includes('restTime')
                             ? 'bg-blue-600 text-white'
@@ -846,7 +884,10 @@ export default function AnalyticsPage() {
                       </button>
                       <button
                         onClick={() => toggleView('reps')}
-                        disabled={!selectedViews.includes('reps') && selectedViews.length >= calculateMaxAllowed('view')}
+                        disabled={
+                          !selectedViews.includes('reps') && 
+                          selectedViews.length >= calculateMaxAllowed('view')
+                        }
                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                           selectedViews.includes('reps')
                             ? 'bg-blue-600 text-white'
@@ -857,7 +898,10 @@ export default function AnalyticsPage() {
                       </button>
                       <button
                         onClick={() => toggleView('sets')}
-                        disabled={!selectedViews.includes('sets') && selectedViews.length >= calculateMaxAllowed('view')}
+                        disabled={
+                          !selectedViews.includes('sets') && 
+                          selectedViews.length >= calculateMaxAllowed('view')
+                        }
                         className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                           selectedViews.includes('sets')
                             ? 'bg-blue-600 text-white'
@@ -872,7 +916,7 @@ export default function AnalyticsPage() {
                   {/* Muscle Group Buttons */}
                   <div>
                     <label className="text-sm font-medium text-gray-700 mb-2 block">
-                      Muskelgruppe (max. {calculateMaxAllowed('muscle')}):
+                      Muskelgruppe:
                     </label>
                     <div className="flex flex-wrap gap-2">
                       <button
@@ -887,18 +931,15 @@ export default function AnalyticsPage() {
                       </button>
                       {muscleGroups.map((mg) => {
                         const isSelected = selectedMuscles.includes(mg);
-                        const currentMuscleCount = selectedMuscles.filter(m => m !== 'ALL').length;
-                        const isDisabled = !isSelected && currentMuscleCount >= calculateMaxAllowed('muscle');
                         
                         return (
                           <button
                             key={mg}
                             onClick={() => toggleMuscle(mg)}
-                            disabled={isDisabled}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                               isSelected
                                 ? 'bg-blue-600 text-white'
-                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
+                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                             }`}
                           >
                             {translateMuscleGroup(mg)}
@@ -911,7 +952,7 @@ export default function AnalyticsPage() {
                   {/* Equipment Buttons */}
                   <div>
                     <label className="text-sm font-medium text-gray-700 mb-2 block">
-                      Equipment (max. {calculateMaxAllowed('equipment')}):
+                      Equipment:
                     </label>
                     <div className="flex flex-wrap gap-2">
                       <button
@@ -926,18 +967,15 @@ export default function AnalyticsPage() {
                       </button>
                       {equipments.map((eq) => {
                         const isSelected = selectedEquipment.includes(eq);
-                        const currentEquipmentCount = selectedEquipment.filter(e => e !== 'ALL').length;
-                        const isDisabled = !isSelected && currentEquipmentCount >= calculateMaxAllowed('equipment');
                         
                         return (
                           <button
                             key={eq}
                             onClick={() => toggleEquipment(eq)}
-                            disabled={isDisabled}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                               isSelected
                                 ? 'bg-blue-600 text-white'
-                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
+                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                             }`}
                           >
                             {translateEquipment(eq)}
@@ -956,11 +994,11 @@ export default function AnalyticsPage() {
               </div>
             ) : (
               <div className="space-y-6">
-                {/* Multi-Line Chart (when multiple filters are selected) */}
-                {mergedChartData.length > 0 && chartLineConfigs.length > 0 && (
+                {/* Multi-Line Chart (when multiple views are selected) */}
+                {selectedViews.length > 1 && mergedChartData.length > 0 && chartLineConfigs.length > 0 && (
                   <div className="bg-white rounded-lg shadow p-6">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      {chartLineConfigs.length > 1 ? 'Vergleichsansicht' : chartLineConfigs[0]?.name || 'Auswertung'}
+                      Vergleichsansicht
                     </h3>
                     <ResponsiveContainer width="100%" height={400}>
                       <LineChart data={mergedChartData}>
@@ -971,20 +1009,26 @@ export default function AnalyticsPage() {
                           style={{ fontSize: '12px' }}
                         />
                         
-                        {/* Left Y-Axis (for most metrics) */}
+                        {/* Left Y-Axis (for first view type) */}
                         <YAxis
                           yAxisId="left"
                           style={{ fontSize: '12px' }}
-                          tickFormatter={(value) => formatNumber(value)}
+                          tickFormatter={(value) => {
+                            const leftConfig = chartLineConfigs.find(c => c.yAxisId === 'left');
+                            return `${formatNumber(value)} ${leftConfig?.unit || ''}`;
+                          }}
                         />
                         
-                        {/* Right Y-Axis (for ORM% if selected) */}
+                        {/* Right Y-Axis (for second view type if exists) */}
                         {chartLineConfigs.some(config => config.yAxisId === 'right') && (
                           <YAxis
                             yAxisId="right"
                             orientation="right"
                             style={{ fontSize: '12px' }}
-                            tickFormatter={(value) => `${value}%`}
+                            tickFormatter={(value) => {
+                              const rightConfig = chartLineConfigs.find(c => c.yAxisId === 'right');
+                              return `${formatNumber(value)} ${rightConfig?.unit || ''}`;
+                            }}
                           />
                         )}
                         
@@ -1017,7 +1061,7 @@ export default function AnalyticsPage() {
                 )}
                 
                 {/* Volume Chart */}
-                {selectedViews.includes('volume') && volumeData && volumeData.dataPoints.length > 0 && (
+                {selectedViews.length === 1 && selectedViews.includes('volume') && volumeData && volumeData.dataPoints.length > 0 && (
                   <div className="bg-white rounded-lg shadow p-6">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">
                       Volumen-Entwicklung
@@ -1064,7 +1108,7 @@ export default function AnalyticsPage() {
                 )}
 
                 {/* ORM Chart (only in Cycle Mode) */}
-                {cycleMode && selectedViews.includes('orm') && (
+                {selectedViews.length === 1 && cycleMode && selectedViews.includes('orm') && (
                   <div className="bg-white rounded-lg shadow p-6">
                     {gymFilter === 'andere' ? (
                       <div className="text-center py-12">
@@ -1127,7 +1171,7 @@ export default function AnalyticsPage() {
                 )}
 
                 {/* RIR Chart (Cycle Mode) */}
-                {cycleMode && selectedViews.includes('rir') && (
+                {selectedViews.length === 1 && cycleMode && selectedViews.includes('rir') && (
                   <div className="bg-white rounded-lg shadow p-6">
                     {rirData && rirData.dataPoints.length > 0 ? (
                       <>
@@ -1175,7 +1219,7 @@ export default function AnalyticsPage() {
                 )}
 
                 {/* RIR Chart (Time Mode) */}
-                {!cycleMode && selectedViews.includes('rir') && (
+                {selectedViews.length === 1 && !cycleMode && selectedViews.includes('rir') && (
                   <div className="bg-white rounded-lg shadow p-6">
                     {rirData && rirData.dataPoints.length > 0 ? (
                       <>
@@ -1223,7 +1267,7 @@ export default function AnalyticsPage() {
                 )}
 
                 {/* Duration Chart (Time Mode) */}
-                {!cycleMode && selectedViews.includes('duration') && (
+                {selectedViews.length === 1 && !cycleMode && selectedViews.includes('duration') && (
                   <div className="bg-white rounded-lg shadow p-6">
                     {!selectedMuscles.includes('ALL') || !selectedEquipment.includes('ALL') ? (
                       <div className="text-center py-12">
@@ -1289,7 +1333,7 @@ export default function AnalyticsPage() {
                 )}
 
                 {/* Duration Chart (Cycle Mode) */}
-                {cycleMode && selectedViews.includes('duration') && (
+                {selectedViews.length === 1 && cycleMode && selectedViews.includes('duration') && (
                   <div className="bg-white rounded-lg shadow p-6">
                     {!selectedMuscles.includes('ALL') || !selectedEquipment.includes('ALL') ? (
                       <div className="text-center py-12">
@@ -1355,7 +1399,7 @@ export default function AnalyticsPage() {
                 )}
 
                 {/* RestTime Chart (Time Mode) */}
-                {!cycleMode && selectedViews.includes('restTime') && (
+                {selectedViews.length === 1 && !cycleMode && selectedViews.includes('restTime') && (
                   <div className="bg-white rounded-lg shadow p-6">
                     {restTimeData && restTimeData.dataPoints.length > 0 ? (
                       <>
@@ -1409,7 +1453,7 @@ export default function AnalyticsPage() {
                 )}
 
                 {/* RestTime Chart (Cycle Mode) */}
-                {cycleMode && selectedViews.includes('restTime') && (
+                {selectedViews.length === 1 && cycleMode && selectedViews.includes('restTime') && (
                   <div className="bg-white rounded-lg shadow p-6">
                     {restTimeData && restTimeData.dataPoints.length > 0 ? (
                       <>
@@ -1463,7 +1507,7 @@ export default function AnalyticsPage() {
                 )}
 
                 {/* Reps Chart (Time Mode) */}
-                {!cycleMode && selectedViews.includes('reps') && (
+                {selectedViews.length === 1 && !cycleMode && selectedViews.includes('reps') && (
                   <div className="bg-white rounded-lg shadow p-6">
                     {repsData && repsData.dataPoints.length > 0 ? (
                       <>
@@ -1525,7 +1569,7 @@ export default function AnalyticsPage() {
                 )}
 
                 {/* Sets Chart (Time Mode) */}
-                {!cycleMode && selectedViews.includes('sets') && (
+                {selectedViews.length === 1 && !cycleMode && selectedViews.includes('sets') && (
                   <div className="bg-white rounded-lg shadow p-6">
                     {setsData && setsData.dataPoints.length > 0 ? (
                       <>
@@ -1587,7 +1631,7 @@ export default function AnalyticsPage() {
                 )}
 
                 {/* Reps Chart (Cycle Mode) */}
-                {cycleMode && selectedViews.includes('reps') && (
+                {selectedViews.length === 1 && cycleMode && selectedViews.includes('reps') && (
                   <div className="bg-white rounded-lg shadow p-6">
                     {repsData && repsData.dataPoints.length > 0 ? (
                       <>
@@ -1649,7 +1693,7 @@ export default function AnalyticsPage() {
                 )}
 
                 {/* Sets Chart (Cycle Mode) */}
-                {cycleMode && selectedViews.includes('sets') && (
+                {selectedViews.length === 1 && cycleMode && selectedViews.includes('sets') && (
                   <div className="bg-white rounded-lg shadow p-6">
                     {setsData && setsData.dataPoints.length > 0 ? (
                       <>
@@ -1778,53 +1822,55 @@ export default function AnalyticsPage() {
                   </div>
                 )}
 
-                {/* Personal Records */}
-                <div className="bg-white rounded-lg shadow">
-                  <div className="px-6 py-4 border-b border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Persönliche Rekorde
-                    </h3>
-                  </div>
+                {/* Personal Records (only for Home Gyms) */}
+                {gymFilter !== 'andere' && (
+                  <div className="bg-white rounded-lg shadow">
+                    <div className="px-6 py-4 border-b border-gray-200">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Persönliche Rekorde
+                      </h3>
+                    </div>
 
-                  <div className="p-6">
-                    {prs.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {prs.map((pr) => (
-                          <div
-                            key={`${pr.exerciseId}-${pr.type}`}
-                            className="border border-gray-200 rounded-lg p-4"
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
-                                <div className="font-semibold text-gray-900">
-                                  {pr.exerciseName}
-                                </div>
-                                <div className="text-sm text-gray-600 mt-1">
-                                  <span className="font-medium">Gewicht:</span>{' '}
-                                  {pr.value}kg
-                                </div>
-                                {pr.details && pr.details.weight && pr.details.reps && (
-                                  <div className="text-xs text-gray-500 mt-1">
-                                    {pr.details.weight}kg × {pr.isUnilateral ? `${pr.details.reps * 2} (${pr.details.reps}x2)` : pr.details.reps} Wdh.
+                    <div className="p-6">
+                      {prs.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {prs.map((pr) => (
+                            <div
+                              key={`${pr.exerciseId}-${pr.type}`}
+                              className="border border-gray-200 rounded-lg p-4"
+                            >
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="font-semibold text-gray-900">
+                                    {pr.exerciseName}
                                   </div>
-                                )}
-                              </div>
-                              <div className="text-xs text-gray-500 ml-4">
-                                {formatDate(pr.date)}
+                                  <div className="text-sm text-gray-600 mt-1">
+                                    <span className="font-medium">Gewicht:</span>{' '}
+                                    {pr.value}kg
+                                  </div>
+                                  {pr.details && pr.details.weight && pr.details.reps && (
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      {pr.details.weight}kg × {pr.isUnilateral ? `${pr.details.reps * 2} (${pr.details.reps}x2)` : pr.details.reps} Wdh.
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="text-xs text-gray-500 ml-4">
+                                  {formatDate(pr.date)}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-gray-500 text-center py-8">
-                        {!selectedMuscles.includes('ALL') || !selectedEquipment.includes('ALL')
-                          ? 'Keine persönlichen Rekorde für die ausgewählten Filter gefunden'
-                          : 'Noch keine persönlichen Rekorde vorhanden'}
-                      </p>
-                    )}
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 text-center py-8">
+                          {!selectedMuscles.includes('ALL') || !selectedEquipment.includes('ALL')
+                            ? 'Keine persönlichen Rekorde für die ausgewählten Filter gefunden'
+                            : 'Noch keine persönlichen Rekorde vorhanden'}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Empty State */}
                 {(!volumeData || volumeData.dataPoints.length === 0) && (
