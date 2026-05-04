@@ -67,6 +67,126 @@ export class AnalyticsService {
   }
 
   /**
+   * Helper: Get cycle week number (1-based) from cycle start date
+   * Week 1 starts on cycle start date and lasts 7 days
+   */
+  private getCycleWeekNumber(date: Date, cycleStartDate: Date): number {
+    const diffTime = date.getTime() - cycleStartDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    return Math.floor(diffDays / 7) + 1;
+  }
+
+  /**
+   * Helper: Get calendar week number (ISO 8601)
+   */
+  private getCalendarWeek(date: Date): number {
+    const tempDate = new Date(date.valueOf());
+    const dayNum = (tempDate.getDay() + 6) % 7;
+    tempDate.setDate(tempDate.getDate() - dayNum + 3);
+    const firstThursday = tempDate.valueOf();
+    tempDate.setMonth(0, 1);
+    if (tempDate.getDay() !== 4) {
+      tempDate.setMonth(0, 1 + ((4 - tempDate.getDay()) + 7) % 7);
+    }
+    return 1 + Math.ceil((firstThursday - tempDate.valueOf()) / 604800000);
+  }
+
+  /**
+   * Helper: Get start and end of week for a given date and cycle start
+   */
+  private getWeekBounds(date: Date, cycleStartDate?: Date): { start: Date; end: Date } {
+    if (cycleStartDate) {
+      // Cycle mode: weeks start on cycle start day of week
+      const cycleDay = cycleStartDate.getDay();
+      const currentDay = date.getDay();
+      const daysSinceWeekStart = (currentDay - cycleDay + 7) % 7;
+      const weekStart = new Date(date);
+      weekStart.setDate(date.getDate() - daysSinceWeekStart);
+      weekStart.setHours(0, 0, 0, 0);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+      return { start: weekStart, end: weekEnd };
+    } else {
+      // Calendar mode: weeks start on Monday
+      const currentDay = date.getDay();
+      const daysSinceMonday = (currentDay + 6) % 7;
+      const weekStart = new Date(date);
+      weekStart.setDate(date.getDate() - daysSinceMonday);
+      weekStart.setHours(0, 0, 0, 0);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+      return { start: weekStart, end: weekEnd };
+    }
+  }
+
+  /**
+   * Helper: Aggregate data points by week
+   */
+  private aggregateByWeek<T extends { date: string; workoutId?: string }>(
+    dataPoints: T[],
+    aggregationType: 'sum' | 'average',
+    metricKey: keyof T,
+    cycleStartDate?: Date,
+  ): T[] {
+    if (dataPoints.length === 0) return [];
+
+    // Group by week
+    const weekMap = new Map<string, T[]>();
+
+    for (const point of dataPoints) {
+      const pointDate = new Date(point.date);
+      const weekBounds = this.getWeekBounds(pointDate, cycleStartDate);
+      const weekKey = weekBounds.start.toISOString();
+      
+      if (!weekMap.has(weekKey)) {
+        weekMap.set(weekKey, []);
+      }
+      weekMap.get(weekKey)!.push(point);
+    }
+
+    // Aggregate each week
+    const aggregated: T[] = [];
+    for (const [weekKey, points] of weekMap.entries()) {
+      const weekStart = new Date(weekKey);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+
+      let metricValue: number;
+      if (aggregationType === 'sum') {
+        metricValue = points.reduce((sum, p) => sum + (p[metricKey] as number), 0);
+      } else {
+        const sum = points.reduce((sum, p) => sum + (p[metricKey] as number), 0);
+        metricValue = sum / points.length;
+      }
+
+      const weekNumber = cycleStartDate 
+        ? this.getCycleWeekNumber(weekStart, cycleStartDate)
+        : this.getCalendarWeek(weekStart);
+
+      const weekLabel = cycleStartDate
+        ? `Woche ${weekNumber}`
+        : `KW${weekNumber}`;
+
+      const aggregatedPoint: T = {
+        ...points[0],
+        date: weekStart.toISOString().split('T')[0],
+        [metricKey]: metricValue,
+        weekNumber,
+        weekLabel,
+        weekStartDate: weekStart.toISOString().split('T')[0],
+        weekEndDate: weekEnd.toISOString().split('T')[0],
+        workoutCount: points.length,
+      };
+
+      aggregated.push(aggregatedPoint);
+    }
+
+    return aggregated.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }
+
+  /**
    * Volume Analytics
    * Volume = sets × reps × weight
    */
@@ -79,6 +199,8 @@ export class AnalyticsService {
     muscleGroup?: string | string[],
     equipment?: string | string[],
     cycleId?: string, // Filter by cycle (only workouts in this cycle)
+    aggregation?: 'day' | 'week',
+    exerciseId?: string, // Filter by specific exercise (overrides muscleGroup/equipment)
   ): Promise<VolumeAnalyticsDto> {
     const dateFilter = this.getDateFilter(period, startDate, endDate);
 
@@ -115,6 +237,7 @@ export class AnalyticsService {
             sets: true,
           },
         },
+        cycle: cycleId ? { select: { startDate: true } } : false,
       },
       orderBy: { date: 'asc' },
     });
@@ -123,17 +246,25 @@ export class AnalyticsService {
     const volumeByMuscleGroup: Map<string, number> = new Map();
     let totalVolume = 0;
     let trainingDayCounter = 1; // For cycle mode
+    const cycleStartDate = workouts[0]?.cycle?.startDate;
 
     for (const workout of workouts) {
       let workoutVolume = 0;
 
       for (const exerciseLog of workout.exercises) {
-        // Apply muscle group and equipment filters
-        if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) {
-          continue;
-        }
-        if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) {
-          continue;
+        // If exerciseId is provided, filter by exercise ID only (ignore muscle/equipment filters)
+        if (exerciseId) {
+          if (exerciseLog.exerciseId !== exerciseId) {
+            continue;
+          }
+        } else {
+          // Apply muscle group and equipment filters
+          if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) {
+            continue;
+          }
+          if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) {
+            continue;
+          }
         }
 
         for (const set of exerciseLog.sets) {
@@ -170,6 +301,11 @@ export class AnalyticsService {
       trainingDayCounter++;
     }
 
+    // Apply week aggregation if requested
+    const finalDataPoints = aggregation === 'week'
+      ? this.aggregateByWeek(dataPoints, 'sum', 'volume', cycleStartDate)
+      : dataPoints;
+
     // Calculate percentages for muscle groups
     const byMuscleGroup: VolumeByMuscleGroup[] = Array.from(volumeByMuscleGroup.entries()).map(
       ([muscleGroup, volume]) => ({
@@ -182,7 +318,7 @@ export class AnalyticsService {
     return {
       totalVolume,
       period,
-      dataPoints,
+      dataPoints: finalDataPoints,
       byMuscleGroup,
     };
   }
@@ -683,6 +819,8 @@ export class AnalyticsService {
     cycleId: string,
     muscleGroup?: string | string[],
     equipment?: string | string[],
+    aggregation?: 'day' | 'week',
+    exerciseId?: string,
   ): Promise<ORMByCycleDto> {
     // 1. Verify user owns this cycle
     const cycle = await this.prisma.workoutCycle.findFirst({
@@ -744,11 +882,18 @@ export class AnalyticsService {
       const exerciseORMs: number[] = [];
 
       for (const exerciseLog of workout.exercises) {
-        const { exercise, sets, exerciseId } = exerciseLog;
+        const { exercise, sets, exerciseId: logExerciseId } = exerciseLog;
 
-        // Apply filters
-        if (muscleGroup && exercise.muscleGroup !== muscleGroup) continue;
-        if (equipment && exercise.equipment !== equipment) continue;
+        // If exerciseId is provided, filter by exercise ID only (ignore muscle/equipment filters)
+        if (exerciseId) {
+          if (logExerciseId !== exerciseId) {
+            continue;
+          }
+        } else {
+          // Apply muscle group and equipment filters
+          if (muscleGroup && exercise.muscleGroup !== muscleGroup) continue;
+          if (equipment && exercise.equipment !== equipment) continue;
+        }
 
         // Get benchmark
         const benchmark = await this.ormService.getBenchmark(
@@ -787,6 +932,11 @@ export class AnalyticsService {
       trainingDayCounter++;
     }
 
+    // Apply week aggregation if requested
+    const finalDataPoints = aggregation === 'week'
+      ? this.aggregateByWeek(dataPoints, 'average', 'percentORM', cycle.startDate)
+      : dataPoints;
+
     const averagePercentORM = dataPointCount > 0
       ? Math.round((totalPercentORM / dataPointCount) * 10) / 10
       : 0;
@@ -794,7 +944,7 @@ export class AnalyticsService {
     return {
       cycleId: cycle.id,
       cycleName: cycle.name,
-      dataPoints,
+      dataPoints: finalDataPoints,
       averagePercentORM,
       totalWorkouts: workouts.length,
     };
@@ -811,6 +961,8 @@ export class AnalyticsService {
     muscleGroup?: string | string[],
     equipment?: string | string[],
     timeOfDay?: string,
+    aggregation?: 'day' | 'week',
+    exerciseId?: string,
   ): Promise<RIRByCycleDto> {
     // 1. Verify user owns this cycle
     const cycle = await this.prisma.workoutCycle.findFirst({
@@ -885,9 +1037,16 @@ export class AnalyticsService {
       for (const exerciseLog of workout.exercises) {
         const { exercise, sets } = exerciseLog;
 
-        // Apply filters
-        if (muscleGroup && exercise.muscleGroup !== muscleGroup) continue;
-        if (equipment && exercise.equipment !== equipment) continue;
+        // If exerciseId is provided, filter by exercise ID only (ignore muscle/equipment filters)
+        if (exerciseId) {
+          if (exerciseLog.exerciseId !== exerciseId) {
+            continue;
+          }
+        } else {
+          // Apply muscle group and equipment filters
+          if (muscleGroup && exercise.muscleGroup !== muscleGroup) continue;
+          if (equipment && exercise.equipment !== equipment) continue;
+        }
 
         // Count sets by RIR (only 0, 1, 2)
         for (const set of sets) {
@@ -917,10 +1076,56 @@ export class AnalyticsService {
       trainingDayCounter++;
     }
 
+    // Apply week aggregation if requested
+    let finalDataPoints = dataPoints;
+    if (aggregation === 'week' && dataPoints.length > 0) {
+      // For RIR, we need to sum all 3 counts separately
+      const weekMap = new Map<string, RIRDataPoint[]>();
+
+      for (const point of dataPoints) {
+        const pointDate = new Date(point.date);
+        const weekBounds = this.getWeekBounds(pointDate, cycle.startDate);
+        const weekKey = weekBounds.start.toISOString();
+        
+        if (!weekMap.has(weekKey)) {
+          weekMap.set(weekKey, []);
+        }
+        weekMap.get(weekKey)!.push(point);
+      }
+
+      finalDataPoints = [];
+      for (const [weekKey, points] of weekMap.entries()) {
+        const weekStart = new Date(weekKey);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+
+        const weekNumber = this.getCycleWeekNumber(weekStart, cycle.startDate);
+        const weekLabel = `Woche ${weekNumber}`;
+
+        const aggregatedPoint: RIRDataPoint = {
+          date: weekStart.toISOString().split('T')[0],
+          trainingDay: points[0].trainingDay,
+          rir0Count: points.reduce((sum, p) => sum + p.rir0Count, 0),
+          rir1Count: points.reduce((sum, p) => sum + p.rir1Count, 0),
+          rir2Count: points.reduce((sum, p) => sum + p.rir2Count, 0),
+          workoutId: points[0].workoutId,
+          weekNumber,
+          weekLabel,
+          weekStartDate: weekStart.toISOString().split('T')[0],
+          weekEndDate: weekEnd.toISOString().split('T')[0],
+          workoutCount: points.length,
+        };
+
+        finalDataPoints.push(aggregatedPoint);
+      }
+
+      finalDataPoints.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    }
+
     return {
       cycleId: cycle.id,
       cycleName: cycle.name,
-      dataPoints,
+      dataPoints: finalDataPoints,
       totalSets,
       totalWorkouts: workouts.length,
     };
@@ -938,6 +1143,8 @@ export class AnalyticsService {
     gymId?: string,
     muscleGroup?: string | string[],
     equipment?: string | string[],
+    aggregation?: 'day' | 'week',
+    exerciseId?: string,
   ): Promise<RIRAnalyticsDto> {
     const muscleGroups = this.normalizeFilterArray(muscleGroup);
     const equipments = this.normalizeFilterArray(equipment);
@@ -985,9 +1192,16 @@ export class AnalyticsService {
       let rir2Count = 0;
 
       for (const exerciseLog of workout.exercises) {
-        // Apply filters
-        if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) continue;
-        if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) continue;
+        // If exerciseId is provided, filter by exercise ID only (ignore muscle/equipment filters)
+        if (exerciseId) {
+          if (exerciseLog.exerciseId !== exerciseId) {
+            continue;
+          }
+        } else {
+          // Apply muscle group and equipment filters
+          if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) continue;
+          if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) continue;
+        }
 
         // Count sets by RIR
         for (const set of exerciseLog.sets) {
@@ -1012,10 +1226,55 @@ export class AnalyticsService {
       }
     }
 
+    // Apply week aggregation if requested
+    let finalDataPoints = dataPoints;
+    if (aggregation === 'week' && dataPoints.length > 0) {
+      // For RIR, we need to sum all 3 counts separately
+      const weekMap = new Map<string, RIRAnalyticsDataPoint[]>();
+
+      for (const point of dataPoints) {
+        const pointDate = new Date(point.date);
+        const weekBounds = this.getWeekBounds(pointDate, undefined);
+        const weekKey = weekBounds.start.toISOString();
+        
+        if (!weekMap.has(weekKey)) {
+          weekMap.set(weekKey, []);
+        }
+        weekMap.get(weekKey)!.push(point);
+      }
+
+      finalDataPoints = [];
+      for (const [weekKey, points] of weekMap.entries()) {
+        const weekStart = new Date(weekKey);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+
+        const weekNumber = this.getCalendarWeek(weekStart);
+        const weekLabel = `KW${weekNumber}`;
+
+        const aggregatedPoint: RIRAnalyticsDataPoint = {
+          date: weekStart.toISOString().split('T')[0],
+          rir0Count: points.reduce((sum, p) => sum + p.rir0Count, 0),
+          rir1Count: points.reduce((sum, p) => sum + p.rir1Count, 0),
+          rir2Count: points.reduce((sum, p) => sum + p.rir2Count, 0),
+          workoutId: points[0].workoutId,
+          weekNumber,
+          weekLabel,
+          weekStartDate: weekStart.toISOString().split('T')[0],
+          weekEndDate: weekEnd.toISOString().split('T')[0],
+          workoutCount: points.length,
+        };
+
+        finalDataPoints.push(aggregatedPoint);
+      }
+
+      finalDataPoints.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    }
+
     return {
       totalSets,
       period,
-      dataPoints,
+      dataPoints: finalDataPoints,
     };
   }
 
@@ -1031,6 +1290,7 @@ export class AnalyticsService {
     gymId?: string,
     muscleGroup?: string | string[],
     equipment?: string | string[],
+    aggregation?: 'day' | 'week',
   ): Promise<DurationAnalyticsDto> {
     const muscleGroups = this.normalizeFilterArray(muscleGroup);
     const equipments = this.normalizeFilterArray(equipment);
@@ -1095,6 +1355,11 @@ export class AnalyticsService {
       validWorkoutsCount++;
     }
 
+    // Apply week aggregation if requested
+    const finalDataPoints = aggregation === 'week'
+      ? this.aggregateByWeek(dataPoints, 'average', 'duration', undefined)
+      : dataPoints;
+
     const averageDuration = validWorkoutsCount > 0
       ? Math.round(totalDuration / validWorkoutsCount)
       : 0;
@@ -1102,7 +1367,7 @@ export class AnalyticsService {
     return {
       averageDuration,
       period,
-      dataPoints,
+      dataPoints: finalDataPoints,
     };
   }
 
@@ -1115,6 +1380,7 @@ export class AnalyticsService {
     gymId?: string,
     muscleGroup?: string | string[],
     equipment?: string | string[],
+    aggregation?: 'day' | 'week',
   ): Promise<DurationByCycleDto> {
     const muscleGroups = this.normalizeFilterArray(muscleGroup);
     const equipments = this.normalizeFilterArray(equipment);
@@ -1198,6 +1464,11 @@ export class AnalyticsService {
       trainingDayCounter++;
     }
 
+    // Apply week aggregation if requested
+    const finalDataPoints = aggregation === 'week'
+      ? this.aggregateByWeek(dataPoints, 'average', 'duration', cycle.startDate)
+      : dataPoints;
+
     const averageDuration = validWorkoutsCount > 0
       ? Math.round(totalDuration / validWorkoutsCount)
       : 0;
@@ -1205,7 +1476,7 @@ export class AnalyticsService {
     return {
       cycleId: cycle.id,
       cycleName: cycle.name,
-      dataPoints,
+      dataPoints: finalDataPoints,
       averageDuration,
       totalWorkouts: validWorkoutsCount,
     };
@@ -1223,6 +1494,8 @@ export class AnalyticsService {
     gymId?: string,
     muscleGroup?: string | string[],
     equipment?: string | string[],
+    aggregation?: 'day' | 'week',
+    exerciseId?: string,
   ): Promise<RestTimeAnalyticsDto> {
     const muscleGroups = this.normalizeFilterArray(muscleGroup);
     const equipments = this.normalizeFilterArray(equipment);
@@ -1272,9 +1545,16 @@ export class AnalyticsService {
       let workoutRestTimeCount = 0;
 
       for (const exerciseLog of workout.exercises) {
-        // Apply muscle group and equipment filters
-        if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) continue;
-        if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) continue;
+        // If exerciseId is provided, filter by exercise ID only (ignore muscle/equipment filters)
+        if (exerciseId) {
+          if (exerciseLog.exerciseId !== exerciseId) {
+            continue;
+          }
+        } else {
+          // Apply muscle group and equipment filters
+          if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) continue;
+          if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) continue;
+        }
 
         // Sum up actual rest durations from sets
         for (const set of exerciseLog.sets) {
@@ -1300,6 +1580,11 @@ export class AnalyticsService {
       }
     }
 
+    // Apply week aggregation if requested
+    const finalDataPoints = aggregation === 'week'
+      ? this.aggregateByWeek(dataPoints, 'average', 'averageRestTime', undefined)
+      : dataPoints;
+
     const overallAverage = totalRestTimeCounts > 0
       ? Math.round(totalRestTime / totalRestTimeCounts)
       : 0;
@@ -1307,7 +1592,7 @@ export class AnalyticsService {
     return {
       overallAverage,
       period,
-      dataPoints,
+      dataPoints: finalDataPoints,
     };
   }
 
@@ -1320,6 +1605,8 @@ export class AnalyticsService {
     gymId?: string,
     muscleGroup?: string | string[],
     equipment?: string | string[],
+    aggregation?: 'day' | 'week',
+    exerciseId?: string,
   ): Promise<RestTimeByCycleDto> {
     const muscleGroups = this.normalizeFilterArray(muscleGroup);
     const equipments = this.normalizeFilterArray(equipment);
@@ -1383,9 +1670,16 @@ export class AnalyticsService {
       let workoutRestTimeCount = 0;
 
       for (const exerciseLog of workout.exercises) {
-        // Apply muscle group and equipment filters
-        if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) continue;
-        if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) continue;
+        // If exerciseId is provided, filter by exercise ID only (ignore muscle/equipment filters)
+        if (exerciseId) {
+          if (exerciseLog.exerciseId !== exerciseId) {
+            continue;
+          }
+        } else {
+          // Apply muscle group and equipment filters
+          if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) continue;
+          if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) continue;
+        }
 
         // Sum up actual rest durations from sets
         for (const set of exerciseLog.sets) {
@@ -1414,6 +1708,11 @@ export class AnalyticsService {
       trainingDayCounter++;
     }
 
+    // Apply week aggregation if requested
+    const finalDataPoints = aggregation === 'week'
+      ? this.aggregateByWeek(dataPoints, 'average', 'averageRestTime', cycle.startDate)
+      : dataPoints;
+
     const overallAverage = totalRestTimeCounts > 0
       ? Math.round(totalRestTime / totalRestTimeCounts)
       : 0;
@@ -1421,7 +1720,7 @@ export class AnalyticsService {
     return {
       cycleId: cycle.id,
       cycleName: cycle.name,
-      dataPoints,
+      dataPoints: finalDataPoints,
       overallAverage,
       totalWorkouts: totalRestTimeCounts,
     };
@@ -1439,6 +1738,8 @@ export class AnalyticsService {
     gymId?: string,
     muscleGroup?: string | string[],
     equipment?: string | string[],
+    aggregation?: 'day' | 'week',
+    exerciseId?: string,
   ): Promise<RepsAnalyticsDto> {
     const muscleGroups = this.normalizeFilterArray(muscleGroup);
     const equipments = this.normalizeFilterArray(equipment);
@@ -1483,12 +1784,19 @@ export class AnalyticsService {
       let workoutReps = 0;
 
       for (const exerciseLog of workout.exercises) {
-        // Apply muscle group and equipment filters
-        if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) {
-          continue;
-        }
-        if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) {
-          continue;
+        // If exerciseId is provided, filter by exercise ID only (ignore muscle/equipment filters)
+        if (exerciseId) {
+          if (exerciseLog.exerciseId !== exerciseId) {
+            continue;
+          }
+        } else {
+          // Apply muscle group and equipment filters
+          if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) {
+            continue;
+          }
+          if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) {
+            continue;
+          }
         }
 
         for (const set of exerciseLog.sets) {
@@ -1511,6 +1819,11 @@ export class AnalyticsService {
       }
     }
 
+    // Apply week aggregation if requested
+    const finalDataPoints = aggregation === 'week'
+      ? this.aggregateByWeek(dataPoints, 'sum', 'reps', undefined)
+      : dataPoints;
+
     const averageReps = validWorkoutsCount > 0
       ? Math.round(totalReps / validWorkoutsCount)
       : 0;
@@ -1519,7 +1832,7 @@ export class AnalyticsService {
       totalReps,
       averageReps,
       period,
-      dataPoints,
+      dataPoints: finalDataPoints,
     };
   }
 
@@ -1531,6 +1844,8 @@ export class AnalyticsService {
     cycleId: string,
     muscleGroup?: string | string[],
     equipment?: string | string[],
+    aggregation?: 'day' | 'week',
+    exerciseId?: string,
   ): Promise<RepsByCycleDto> {
     const muscleGroups = this.normalizeFilterArray(muscleGroup);
     const equipments = this.normalizeFilterArray(equipment);
@@ -1574,12 +1889,19 @@ export class AnalyticsService {
       let workoutReps = 0;
 
       for (const exerciseLog of workout.exercises) {
-        // Apply muscle group and equipment filters
-        if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) {
-          continue;
-        }
-        if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) {
-          continue;
+        // If exerciseId is provided, filter by exercise ID only (ignore muscle/equipment filters)
+        if (exerciseId) {
+          if (exerciseLog.exerciseId !== exerciseId) {
+            continue;
+          }
+        } else {
+          // Apply muscle group and equipment filters
+          if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) {
+            continue;
+          }
+          if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) {
+            continue;
+          }
         }
 
         for (const set of exerciseLog.sets) {
@@ -1605,6 +1927,11 @@ export class AnalyticsService {
       trainingDayCounter++;
     }
 
+    // Apply week aggregation if requested
+    const finalDataPoints = aggregation === 'week'
+      ? this.aggregateByWeek(dataPoints, 'sum', 'reps', cycle.startDate)
+      : dataPoints;
+
     const averageReps = validWorkoutsCount > 0
       ? Math.round(totalReps / validWorkoutsCount)
       : 0;
@@ -1612,7 +1939,7 @@ export class AnalyticsService {
     return {
       cycleId: cycle.id,
       cycleName: cycle.name,
-      dataPoints,
+      dataPoints: finalDataPoints,
       totalReps,
       averageReps,
       totalWorkouts: validWorkoutsCount,
@@ -1630,6 +1957,8 @@ export class AnalyticsService {
     gymId?: string,
     muscleGroup?: string | string[],
     equipment?: string | string[],
+    aggregation?: 'day' | 'week',
+    exerciseId?: string,
   ): Promise<SetsAnalyticsDto> {
     const muscleGroups = this.normalizeFilterArray(muscleGroup);
     const equipments = this.normalizeFilterArray(equipment);
@@ -1674,12 +2003,19 @@ export class AnalyticsService {
       let workoutSets = 0;
 
       for (const exerciseLog of workout.exercises) {
-        // Apply muscle group and equipment filters
-        if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) {
-          continue;
-        }
-        if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) {
-          continue;
+        // If exerciseId is provided, filter by exercise ID only (ignore muscle/equipment filters)
+        if (exerciseId) {
+          if (exerciseLog.exerciseId !== exerciseId) {
+            continue;
+          }
+        } else {
+          // Apply muscle group and equipment filters
+          if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) {
+            continue;
+          }
+          if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) {
+            continue;
+          }
         }
 
         for (const set of exerciseLog.sets) {
@@ -1702,6 +2038,11 @@ export class AnalyticsService {
       }
     }
 
+    // Apply week aggregation if requested
+    const finalDataPoints = aggregation === 'week'
+      ? this.aggregateByWeek(dataPoints, 'sum', 'sets', undefined)
+      : dataPoints;
+
     const averageSets = validWorkoutsCount > 0
       ? Math.round(totalSets / validWorkoutsCount)
       : 0;
@@ -1710,7 +2051,7 @@ export class AnalyticsService {
       totalSets,
       averageSets,
       period,
-      dataPoints,
+      dataPoints: finalDataPoints,
     };
   }
 
@@ -1722,6 +2063,8 @@ export class AnalyticsService {
     cycleId: string,
     muscleGroup?: string | string[],
     equipment?: string | string[],
+    aggregation?: 'day' | 'week',
+    exerciseId?: string,
   ): Promise<SetsByCycleDto> {
     const muscleGroups = this.normalizeFilterArray(muscleGroup);
     const equipments = this.normalizeFilterArray(equipment);
@@ -1765,12 +2108,19 @@ export class AnalyticsService {
       let workoutSets = 0;
 
       for (const exerciseLog of workout.exercises) {
-        // Apply muscle group and equipment filters
-        if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) {
-          continue;
-        }
-        if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) {
-          continue;
+        // If exerciseId is provided, filter by exercise ID only (ignore muscle/equipment filters)
+        if (exerciseId) {
+          if (exerciseLog.exerciseId !== exerciseId) {
+            continue;
+          }
+        } else {
+          // Apply muscle group and equipment filters
+          if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) {
+            continue;
+          }
+          if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) {
+            continue;
+          }
         }
 
         for (const set of exerciseLog.sets) {
@@ -1796,6 +2146,11 @@ export class AnalyticsService {
       trainingDayCounter++;
     }
 
+    // Apply week aggregation if requested
+    const finalDataPoints = aggregation === 'week'
+      ? this.aggregateByWeek(dataPoints, 'sum', 'sets', cycle.startDate)
+      : dataPoints;
+
     const averageSets = validWorkoutsCount > 0
       ? Math.round(totalSets / validWorkoutsCount)
       : 0;
@@ -1803,7 +2158,7 @@ export class AnalyticsService {
     return {
       cycleId: cycle.id,
       cycleName: cycle.name,
-      dataPoints,
+      dataPoints: finalDataPoints,
       totalSets,
       averageSets,
       totalWorkouts: validWorkoutsCount,

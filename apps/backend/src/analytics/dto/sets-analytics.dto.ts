@@ -3,6 +3,11 @@ export class SetsDataPoint {
   sets: number; // Total working sets for workout
   workoutId: string;
   trainingDay?: number; // For cycle mode
+  weekNumber?: number;
+  weekLabel?: string;
+  weekStartDate?: string;
+  weekEndDate?: string;
+  workoutCount?: number;
 }
 
 export class SetsAnalyticsDto {

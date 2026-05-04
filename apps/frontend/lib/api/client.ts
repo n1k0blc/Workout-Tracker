@@ -203,6 +203,10 @@ class ApiClient {
     return this.request<Exercise[]>(`/exercises${queryString}`);
   }
 
+  async getExercise(id: string): Promise<Exercise> {
+    return this.request<Exercise>(`/exercises/${id}`);
+  }
+
   async createExercise(data: {
     name: string;
     muscleGroup: MuscleGroup;
@@ -550,6 +554,8 @@ class ApiClient {
     muscleGroup?: string | string[];
     equipment?: string | string[];
     cycleId?: string;
+    aggregation?: 'day' | 'week';
+    exerciseId?: string;
   }): Promise<VolumeAnalytics> {
     const query = new URLSearchParams();
     if (params?.startDate) query.append('startDate', params.startDate);
@@ -558,6 +564,8 @@ class ApiClient {
     this.addQueryParam(query, 'muscleGroup', params?.muscleGroup);
     this.addQueryParam(query, 'equipment', params?.equipment);
     if (params?.cycleId) query.append('cycleId', params.cycleId);
+    if (params?.aggregation) query.append('aggregation', params.aggregation);
+    if (params?.exerciseId) query.append('exerciseId', params.exerciseId);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<VolumeAnalytics>(`/analytics/volume${queryString}`);
@@ -596,10 +604,14 @@ class ApiClient {
     cycleId: string,
     muscleGroup?: string | string[],
     equipment?: string | string[],
+    aggregation?: 'day' | 'week',
+    exerciseId?: string,
   ): Promise<ORMByCycleAnalytics> {
     const query = new URLSearchParams();
     this.addQueryParam(query, 'muscleGroup', muscleGroup);
     this.addQueryParam(query, 'equipment', equipment);
+    if (aggregation) query.append('aggregation', aggregation);
+    if (exerciseId) query.append('exerciseId', exerciseId);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<ORMByCycleAnalytics>(
@@ -613,12 +625,16 @@ class ApiClient {
     muscleGroup?: string | string[],
     equipment?: string | string[],
     timeOfDay?: string,
+    aggregation?: 'day' | 'week',
+    exerciseId?: string,
   ): Promise<RIRByCycleAnalytics> {
     const query = new URLSearchParams();
     if (gymId) query.append('gymId', gymId);
     this.addQueryParam(query, 'muscleGroup', muscleGroup);
     this.addQueryParam(query, 'equipment', equipment);
     if (timeOfDay) query.append('timeOfDay', timeOfDay);
+    if (aggregation) query.append('aggregation', aggregation);
+    if (exerciseId) query.append('exerciseId', exerciseId);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<RIRByCycleAnalytics>(
@@ -633,6 +649,8 @@ class ApiClient {
     gymId?: string;
     muscleGroup?: string | string[];
     equipment?: string | string[];
+    aggregation?: 'day' | 'week';
+    exerciseId?: string;
   }): Promise<RIRAnalytics> {
     const query = new URLSearchParams();
     if (params.period) query.append('period', params.period);
@@ -641,6 +659,8 @@ class ApiClient {
     if (params.gymId) query.append('gymId', params.gymId);
     this.addQueryParam(query, 'muscleGroup', params.muscleGroup);
     this.addQueryParam(query, 'equipment', params.equipment);
+    if (params.aggregation) query.append('aggregation', params.aggregation);
+    if (params.exerciseId) query.append('exerciseId', params.exerciseId);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<RIRAnalytics>(`/analytics/rir${queryString}`);
@@ -653,6 +673,7 @@ class ApiClient {
     gymId?: string;
     muscleGroup?: string | string[];
     equipment?: string | string[];
+    aggregation?: 'day' | 'week';
   }): Promise<DurationAnalytics> {
     const query = new URLSearchParams();
     if (params.period) query.append('period', params.period);
@@ -661,6 +682,7 @@ class ApiClient {
     if (params.gymId) query.append('gymId', params.gymId);
     this.addQueryParam(query, 'muscleGroup', params.muscleGroup);
     this.addQueryParam(query, 'equipment', params.equipment);
+    if (params.aggregation) query.append('aggregation', params.aggregation);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<DurationAnalytics>(`/analytics/duration${queryString}`);
@@ -671,11 +693,13 @@ class ApiClient {
     gymId?: string,
     muscleGroup?: string | string[],
     equipment?: string | string[],
+    aggregation?: 'day' | 'week',
   ): Promise<DurationByCycleAnalytics> {
     const query = new URLSearchParams();
     if (gymId) query.append('gymId', gymId);
     this.addQueryParam(query, 'muscleGroup', muscleGroup);
     this.addQueryParam(query, 'equipment', equipment);
+    if (aggregation) query.append('aggregation', aggregation);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<DurationByCycleAnalytics>(
@@ -690,6 +714,8 @@ class ApiClient {
     gymId?: string;
     muscleGroup?: string | string[];
     equipment?: string | string[];
+    aggregation?: 'day' | 'week';
+    exerciseId?: string;
   }): Promise<RestTimeAnalytics> {
     const query = new URLSearchParams();
     if (params.period) query.append('period', params.period);
@@ -698,6 +724,8 @@ class ApiClient {
     if (params.gymId) query.append('gymId', params.gymId);
     this.addQueryParam(query, 'muscleGroup', params.muscleGroup);
     this.addQueryParam(query, 'equipment', params.equipment);
+    if (params.aggregation) query.append('aggregation', params.aggregation);
+    if (params.exerciseId) query.append('exerciseId', params.exerciseId);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<RestTimeAnalytics>(`/analytics/rest-time${queryString}`);
@@ -708,11 +736,15 @@ class ApiClient {
     gymId?: string,
     muscleGroup?: string | string[],
     equipment?: string | string[],
+    aggregation?: 'day' | 'week',
+    exerciseId?: string,
   ): Promise<RestTimeByCycleAnalytics> {
     const query = new URLSearchParams();
     if (gymId) query.append('gymId', gymId);
     this.addQueryParam(query, 'muscleGroup', muscleGroup);
     this.addQueryParam(query, 'equipment', equipment);
+    if (aggregation) query.append('aggregation', aggregation);
+    if (exerciseId) query.append('exerciseId', exerciseId);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<RestTimeByCycleAnalytics>(
@@ -727,6 +759,8 @@ class ApiClient {
     gymId?: string;
     muscleGroup?: string | string[];
     equipment?: string | string[];
+    aggregation?: 'day' | 'week';
+    exerciseId?: string;
   }): Promise<RepsAnalytics> {
     const query = new URLSearchParams();
     if (params.period) query.append('period', params.period);
@@ -735,6 +769,8 @@ class ApiClient {
     if (params.gymId) query.append('gymId', params.gymId);
     this.addQueryParam(query, 'muscleGroup', params.muscleGroup);
     this.addQueryParam(query, 'equipment', params.equipment);
+    if (params.aggregation) query.append('aggregation', params.aggregation);
+    if (params.exerciseId) query.append('exerciseId', params.exerciseId);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<RepsAnalytics>(`/analytics/reps${queryString}`);
@@ -744,10 +780,14 @@ class ApiClient {
     cycleId: string,
     muscleGroup?: string | string[],
     equipment?: string | string[],
+    aggregation?: 'day' | 'week',
+    exerciseId?: string,
   ): Promise<RepsByCycleAnalytics> {
     const query = new URLSearchParams();
     this.addQueryParam(query, 'muscleGroup', muscleGroup);
     this.addQueryParam(query, 'equipment', equipment);
+    if (aggregation) query.append('aggregation', aggregation);
+    if (exerciseId) query.append('exerciseId', exerciseId);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<RepsByCycleAnalytics>(
@@ -762,6 +802,8 @@ class ApiClient {
     gymId?: string;
     muscleGroup?: string | string[];
     equipment?: string | string[];
+    aggregation?: 'day' | 'week';
+    exerciseId?: string;
   }): Promise<SetsAnalytics> {
     const query = new URLSearchParams();
     if (params.period) query.append('period', params.period);
@@ -770,6 +812,8 @@ class ApiClient {
     if (params.gymId) query.append('gymId', params.gymId);
     this.addQueryParam(query, 'muscleGroup', params.muscleGroup);
     this.addQueryParam(query, 'equipment', params.equipment);
+    if (params.aggregation) query.append('aggregation', params.aggregation);
+    if (params.exerciseId) query.append('exerciseId', params.exerciseId);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<SetsAnalytics>(`/analytics/sets${queryString}`);
@@ -779,10 +823,14 @@ class ApiClient {
     cycleId: string,
     muscleGroup?: string | string[],
     equipment?: string | string[],
+    aggregation?: 'day' | 'week',
+    exerciseId?: string,
   ): Promise<SetsByCycleAnalytics> {
     const query = new URLSearchParams();
     this.addQueryParam(query, 'muscleGroup', muscleGroup);
     this.addQueryParam(query, 'equipment', equipment);
+    if (aggregation) query.append('aggregation', aggregation);
+    if (exerciseId) query.append('exerciseId', exerciseId);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<SetsByCycleAnalytics>(

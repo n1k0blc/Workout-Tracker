@@ -3,6 +3,11 @@ export class DurationDataPoint {
   duration: number; // in minutes
   workoutId: string;
   trainingDay?: number; // For cycle mode
+  weekNumber?: number;
+  weekLabel?: string;
+  weekStartDate?: string;
+  weekEndDate?: string;
+  workoutCount?: number;
 }
 
 export class DurationAnalyticsDto {
