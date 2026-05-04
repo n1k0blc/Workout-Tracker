@@ -41,6 +41,8 @@ export class AnalyticsController {
     @Query('muscleGroup') muscleGroup?: string | string[],
     @Query('equipment') equipment?: string | string[],
     @Query('cycleId') cycleId?: string,
+    @Query('aggregation') aggregation?: 'day' | 'week',
+    @Query('exerciseId') exerciseId?: string,
   ): Promise<VolumeAnalyticsDto> {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
@@ -53,6 +55,8 @@ export class AnalyticsController {
       muscleGroup,
       equipment,
       cycleId,
+      aggregation,
+      exerciseId,
     );
   }
 
@@ -113,8 +117,10 @@ export class AnalyticsController {
     @CurrentUser() user: { id: string },
     @Query('muscleGroup') muscleGroup?: string | string[],
     @Query('equipment') equipment?: string | string[],
+    @Query('aggregation') aggregation?: 'day' | 'week',
+    @Query('exerciseId') exerciseId?: string,
   ): Promise<ORMByCycleDto> {
-    return this.analyticsService.getORMByCycle(user.id, cycleId, muscleGroup, equipment);
+    return this.analyticsService.getORMByCycle(user.id, cycleId, muscleGroup, equipment, aggregation, exerciseId);
   }
 
   @Get('rir-by-cycle/:cycleId')
@@ -125,8 +131,10 @@ export class AnalyticsController {
     @Query('muscleGroup') muscleGroup?: string | string[],
     @Query('equipment') equipment?: string | string[],
     @Query('timeOfDay') timeOfDay?: string,
+    @Query('aggregation') aggregation?: 'day' | 'week',
+    @Query('exerciseId') exerciseId?: string,
   ): Promise<RIRByCycleDto> {
-    return this.analyticsService.getRIRByCycle(user.id, cycleId, gymId, muscleGroup, equipment, timeOfDay);
+    return this.analyticsService.getRIRByCycle(user.id, cycleId, gymId, muscleGroup, equipment, timeOfDay, aggregation, exerciseId);
   }
 
   @Get('rir')
@@ -138,6 +146,8 @@ export class AnalyticsController {
     @Query('gymId') gymId?: string,
     @Query('muscleGroup') muscleGroup?: string | string[],
     @Query('equipment') equipment?: string | string[],
+    @Query('aggregation') aggregation?: 'day' | 'week',
+    @Query('exerciseId') exerciseId?: string,
   ): Promise<RIRAnalyticsDto> {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
@@ -149,6 +159,8 @@ export class AnalyticsController {
       gymId,
       muscleGroup,
       equipment,
+      aggregation,
+      exerciseId,
     );
   }
 
@@ -161,6 +173,7 @@ export class AnalyticsController {
     @Query('gymId') gymId?: string,
     @Query('muscleGroup') muscleGroup?: string | string[],
     @Query('equipment') equipment?: string | string[],
+    @Query('aggregation') aggregation?: 'day' | 'week',
   ): Promise<DurationAnalyticsDto> {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
@@ -172,6 +185,7 @@ export class AnalyticsController {
       gymId,
       muscleGroup,
       equipment,
+      aggregation,
     );
   }
 
@@ -182,8 +196,9 @@ export class AnalyticsController {
     @Query('gymId') gymId?: string,
     @Query('muscleGroup') muscleGroup?: string | string[],
     @Query('equipment') equipment?: string | string[],
+    @Query('aggregation') aggregation?: 'day' | 'week',
   ): Promise<DurationByCycleDto> {
-    return this.analyticsService.getDurationByCycle(user.id, cycleId, gymId, muscleGroup, equipment);
+    return this.analyticsService.getDurationByCycle(user.id, cycleId, gymId, muscleGroup, equipment, aggregation);
   }
 
   @Get('rest-time')
@@ -195,6 +210,8 @@ export class AnalyticsController {
     @Query('gymId') gymId?: string,
     @Query('muscleGroup') muscleGroup?: string | string[],
     @Query('equipment') equipment?: string | string[],
+    @Query('aggregation') aggregation?: 'day' | 'week',
+    @Query('exerciseId') exerciseId?: string,
   ): Promise<RestTimeAnalyticsDto> {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
@@ -206,6 +223,8 @@ export class AnalyticsController {
       gymId,
       muscleGroup,
       equipment,
+      aggregation,
+      exerciseId,
     );
   }
 
@@ -216,8 +235,10 @@ export class AnalyticsController {
     @Query('gymId') gymId?: string,
     @Query('muscleGroup') muscleGroup?: string | string[],
     @Query('equipment') equipment?: string | string[],
+    @Query('aggregation') aggregation?: 'day' | 'week',
+    @Query('exerciseId') exerciseId?: string,
   ): Promise<RestTimeByCycleDto> {
-    return this.analyticsService.getRestTimeByCycle(user.id, cycleId, gymId, muscleGroup, equipment);
+    return this.analyticsService.getRestTimeByCycle(user.id, cycleId, gymId, muscleGroup, equipment, aggregation, exerciseId);
   }
 
   @Get('reps')
@@ -229,6 +250,8 @@ export class AnalyticsController {
     @Query('gymId') gymId?: string,
     @Query('muscleGroup') muscleGroup?: string | string[],
     @Query('equipment') equipment?: string | string[],
+    @Query('aggregation') aggregation?: 'day' | 'week',
+    @Query('exerciseId') exerciseId?: string,
   ): Promise<RepsAnalyticsDto> {
     return this.analyticsService.getRepsAnalytics(
       user.id,
@@ -238,6 +261,8 @@ export class AnalyticsController {
       gymId,
       muscleGroup,
       equipment,
+      aggregation,
+      exerciseId,
     );
   }
 
@@ -247,8 +272,10 @@ export class AnalyticsController {
     @CurrentUser() user: { id: string },
     @Query('muscleGroup') muscleGroup?: string | string[],
     @Query('equipment') equipment?: string | string[],
+    @Query('aggregation') aggregation?: 'day' | 'week',
+    @Query('exerciseId') exerciseId?: string,
   ): Promise<RepsByCycleDto> {
-    return this.analyticsService.getRepsByCycle(user.id, cycleId, muscleGroup, equipment);
+    return this.analyticsService.getRepsByCycle(user.id, cycleId, muscleGroup, equipment, aggregation, exerciseId);
   }
 
   @Get('sets')
@@ -260,6 +287,8 @@ export class AnalyticsController {
     @Query('gymId') gymId?: string,
     @Query('muscleGroup') muscleGroup?: string | string[],
     @Query('equipment') equipment?: string | string[],
+    @Query('aggregation') aggregation?: 'day' | 'week',
+    @Query('exerciseId') exerciseId?: string,
   ): Promise<SetsAnalyticsDto> {
     return this.analyticsService.getSetsAnalytics(
       user.id,
@@ -269,6 +298,8 @@ export class AnalyticsController {
       gymId,
       muscleGroup,
       equipment,
+      aggregation,
+      exerciseId,
     );
   }
 
@@ -278,7 +309,9 @@ export class AnalyticsController {
     @CurrentUser() user: { id: string },
     @Query('muscleGroup') muscleGroup?: string | string[],
     @Query('equipment') equipment?: string | string[],
+    @Query('aggregation') aggregation?: 'day' | 'week',
+    @Query('exerciseId') exerciseId?: string,
   ): Promise<SetsByCycleDto> {
-    return this.analyticsService.getSetsByCycle(user.id, cycleId, muscleGroup, equipment);
+    return this.analyticsService.getSetsByCycle(user.id, cycleId, muscleGroup, equipment, aggregation, exerciseId);
   }
 }

@@ -18,7 +18,10 @@ import {
   RestTimeByCycleAnalytics,
   RepsByCycleAnalytics,
   SetsByCycleAnalytics,
+  Exercise,
 } from '@/types';
+import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
+import SelectedExerciseCard from '@/components/analytics/selected-exercise-card';
 import Link from 'next/link';
 import { 
   ArrowLeft, 
@@ -83,6 +86,11 @@ export default function CycleDetailPage() {
   const [selectedMuscles, setSelectedMuscles] = useState<(MuscleGroup | 'ALL')[]>(['ALL']);
   const [selectedEquipment, setSelectedEquipment] = useState<(Equipment | 'ALL')[]>(['ALL']);
   const [gymFilter, setGymFilter] = useState('alle');
+  const [aggregationMode, setAggregationMode] = useState<'day' | 'week'>('week');
+
+  // Exercise filter state
+  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
+  const [showExerciseModal, setShowExerciseModal] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -93,7 +101,7 @@ export default function CycleDetailPage() {
     if (!loading && cycleDetails) {
       loadAnalyticsData();
     }
-  }, [selectedViews, selectedMuscles, selectedEquipment, gymFilter, cycleDetails]);
+  }, [selectedViews, selectedMuscles, selectedEquipment, gymFilter, cycleDetails, aggregationMode, selectedExercise]);
 
   useEffect(() => {
     // Set window size for confetti
@@ -273,10 +281,20 @@ export default function CycleDetailPage() {
     filterCombinations: Array<{ view: string; muscle?: MuscleGroup; equipment?: Equipment }>
   ) => {
     const dateSet = new Set<string>();
+    const dateMetadata: Record<string, any> = {};
     results.forEach((result) => {
       if (result?.dataPoints) {
         result.dataPoints.forEach((point: any) => {
           dateSet.add(point.date);
+          // Store week metadata for this date (for week aggregation)
+          if (point.weekLabel && !dateMetadata[point.date]) {
+            dateMetadata[point.date] = {
+              weekLabel: point.weekLabel,
+              weekStartDate: point.weekStartDate,
+              weekEndDate: point.weekEndDate,
+              workoutCount: point.workoutCount,
+            };
+          }
         });
       }
     });
@@ -288,7 +306,10 @@ export default function CycleDetailPage() {
       viewToYAxis[view] = index === 0 ? 'left' : 'right';
     });
 
-    const mergedData: any[] = sortedDates.map((date) => ({ date }));
+    const mergedData: any[] = sortedDates.map((date) => ({
+      date,
+      ...dateMetadata[date], // Include week metadata if available
+    }));
     const lineConfigs: ChartLineConfig[] = [];
 
     results.forEach((result, index) => {
@@ -351,9 +372,21 @@ export default function CycleDetailPage() {
       }> = [];
 
       for (const view of selectedViews) {
-        for (const muscle of muscles) {
-          for (const equip of equipment) {
-            filterCombinations.push({ view, muscle: muscle as MuscleGroup | undefined, equipment: equip as Equipment | undefined });
+        if (selectedExercise) {
+          // Exercise filter mode: single iteration without muscle/equipment filters (except duration)
+          if (view === 'duration') {
+            // Duration analytics: keep existing logic unchanged
+            for (const muscle of muscles) {
+              for (const equip of equipment) {
+                filterCombinations.push({ view, muscle: muscle as MuscleGroup | undefined, equipment: equip as Equipment | undefined });
+                allPromises.push(
+                  apiClient.getDurationByCycle(cycleId, gymFilter, muscle, equip, aggregationMode)
+                );
+              }
+            }
+          } else {
+            // All other views: use exerciseId filter
+            filterCombinations.push({ view, muscle: undefined, equipment: undefined });
 
             if (view === 'volume') {
               const cycleStart = new Date(cycleDetails.startDate).toISOString();
@@ -366,23 +399,59 @@ export default function CycleDetailPage() {
                   startDate: cycleStart,
                   endDate: cycleEnd,
                   gymId: gymFilter,
-                  muscleGroup: muscle,
-                  equipment: equip,
+                  exerciseId: selectedExercise.id,
                   cycleId: cycleId,
+                  aggregation: aggregationMode,
                 })
               );
             } else if (view === 'orm') {
-              allPromises.push(apiClient.getORMByCycle(cycleId, muscle, equip));
+              allPromises.push(apiClient.getORMByCycle(cycleId, undefined, undefined, aggregationMode, selectedExercise.id));
             } else if (view === 'rir') {
-              allPromises.push(apiClient.getRIRByCycle(cycleId, gymFilter, muscle, equip));
-            } else if (view === 'duration') {
-              allPromises.push(apiClient.getDurationByCycle(cycleId, gymFilter, muscle, equip));
+              allPromises.push(apiClient.getRIRByCycle(cycleId, gymFilter, undefined, undefined, selectedExercise.id, aggregationMode));
             } else if (view === 'restTime') {
-              allPromises.push(apiClient.getRestTimeByCycle(cycleId, gymFilter, muscle, equip));
+              allPromises.push(apiClient.getRestTimeByCycle(cycleId, gymFilter, undefined, undefined, aggregationMode, selectedExercise.id));
             } else if (view === 'reps') {
-              allPromises.push(apiClient.getRepsByCycle(cycleId, muscle, equip));
+              allPromises.push(apiClient.getRepsByCycle(cycleId, undefined, undefined, aggregationMode, selectedExercise.id));
             } else if (view === 'sets') {
-              allPromises.push(apiClient.getSetsByCycle(cycleId, muscle, equip));
+              allPromises.push(apiClient.getSetsByCycle(cycleId, undefined, undefined, aggregationMode, selectedExercise.id));
+            }
+          }
+        } else {
+          // No exercise filter: use existing muscle/equipment logic
+          for (const muscle of muscles) {
+            for (const equip of equipment) {
+              filterCombinations.push({ view, muscle: muscle as MuscleGroup | undefined, equipment: equip as Equipment | undefined });
+
+              if (view === 'volume') {
+                const cycleStart = new Date(cycleDetails.startDate).toISOString();
+                const cycleEnd = cycleDetails.completedAt
+                  ? new Date(cycleDetails.completedAt).toISOString()
+                  : undefined;
+
+                allPromises.push(
+                  apiClient.getVolumeAnalytics({
+                    startDate: cycleStart,
+                    endDate: cycleEnd,
+                    gymId: gymFilter,
+                    muscleGroup: muscle,
+                    equipment: equip,
+                    cycleId: cycleId,
+                    aggregation: aggregationMode,
+                  })
+                );
+              } else if (view === 'orm') {
+                allPromises.push(apiClient.getORMByCycle(cycleId, muscle, equip, aggregationMode));
+              } else if (view === 'rir') {
+                allPromises.push(apiClient.getRIRByCycle(cycleId, gymFilter, muscle, equip, undefined, aggregationMode));
+              } else if (view === 'duration') {
+                allPromises.push(apiClient.getDurationByCycle(cycleId, gymFilter, muscle, equip, aggregationMode));
+              } else if (view === 'restTime') {
+                allPromises.push(apiClient.getRestTimeByCycle(cycleId, gymFilter, muscle, equip, aggregationMode));
+              } else if (view === 'reps') {
+                allPromises.push(apiClient.getRepsByCycle(cycleId, muscle, equip, aggregationMode));
+              } else if (view === 'sets') {
+                allPromises.push(apiClient.getSetsByCycle(cycleId, muscle, equip, aggregationMode));
+              }
             }
           }
         }
@@ -435,6 +504,41 @@ export default function CycleDetailPage() {
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
+    return new Intl.DateTimeFormat('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(date);
+  };
+
+  const formatXAxisLabel = (entry: any) => {
+    // If weekLabel exists, use it; otherwise format the date
+    if (entry.weekLabel) {
+      return entry.weekLabel;
+    }
+    const date = new Date(entry.date);
+    return new Intl.DateTimeFormat('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+    }).format(date);
+  };
+
+  const formatTooltipLabel = (entry: any) => {
+    // For week aggregation, show date range and workout count
+    if (entry.weekStartDate && entry.weekEndDate) {
+      const start = new Intl.DateTimeFormat('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+      }).format(new Date(entry.weekStartDate));
+      const end = new Intl.DateTimeFormat('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+      }).format(new Date(entry.weekEndDate));
+      const workoutCount = entry.workoutCount || 0;
+      return `${start} - ${end} (${workoutCount} Workout${workoutCount !== 1 ? 's' : ''})`;
+    }
+    // For day aggregation, just show the date
+    const date = new Date(entry.date);
     return new Intl.DateTimeFormat('de-DE', {
       day: '2-digit',
       month: '2-digit',
@@ -787,6 +891,28 @@ export default function CycleDetailPage() {
                   </div>
                 </div>
 
+                {/* Exercise Filter - Alternative to Muscle/Equipment */}
+                <div className="border-t border-gray-200 pt-4">
+                  <div className="text-center mb-3">
+                    <span className="text-sm text-gray-500 italic">ODER</span>
+                  </div>
+                  
+                  {selectedExercise ? (
+                    <SelectedExerciseCard
+                      exercise={selectedExercise}
+                      onRemove={() => setSelectedExercise(null)}
+                      onReplace={() => setShowExerciseModal(true)}
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setShowExerciseModal(true)}
+                      className="w-full px-4 py-3 rounded-lg text-sm font-medium text-blue-600 bg-blue-50 border-2 border-dashed border-blue-300 hover:bg-blue-100 transition-colors"
+                    >
+                      + Übung hinzufügen
+                    </button>
+                  )}
+                </div>
+
                 {/* Gym Filter */}
                 <div>
                   <h3 className="text-sm font-medium text-gray-700 mb-3">Gym</h3>
@@ -826,6 +952,33 @@ export default function CycleDetailPage() {
                     </button>
                   </div>
                 </div>
+
+                {/* Aggregation Mode Toggle */}
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Aggregation</h3>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setAggregationMode('day')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        aggregationMode === 'day'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      Tage
+                    </button>
+                    <button
+                      onClick={() => setAggregationMode('week')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        aggregationMode === 'week'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      Wochen
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {/* Charts */}
@@ -842,13 +995,7 @@ export default function CycleDetailPage() {
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
                             dataKey="date"
-                            tickFormatter={(dateStr: string) => {
-                              const date = new Date(dateStr);
-                              return new Intl.DateTimeFormat('de-DE', {
-                                day: '2-digit',
-                                month: '2-digit',
-                              }).format(date);
-                            }}
+                            tickFormatter={(date, index) => formatXAxisLabel(mergedChartData[index])}
                             style={{ fontSize: '12px' }}
                           />
                           {/* Left Y-Axis */}
@@ -877,7 +1024,10 @@ export default function CycleDetailPage() {
                             />
                           )}
                           <Tooltip
-                            labelFormatter={(label: any) => {
+                            labelFormatter={(label: any, payload: any[]) => {
+                              if (payload && payload.length > 0) {
+                                return formatTooltipLabel(payload[0].payload);
+                              }
                               const date = new Date(label as string);
                               return new Intl.DateTimeFormat('de-DE', {
                                 day: '2-digit',
@@ -916,13 +1066,7 @@ export default function CycleDetailPage() {
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
                             dataKey="date"
-                            tickFormatter={(dateStr: string) => {
-                              const date = new Date(dateStr);
-                              return new Intl.DateTimeFormat('de-DE', {
-                                day: '2-digit',
-                                month: '2-digit',
-                              }).format(date);
-                            }}
+                            tickFormatter={(date, index) => formatXAxisLabel(volumeData.dataPoints[index])}
                             style={{ fontSize: '12px' }}
                           />
                           <YAxis
@@ -934,7 +1078,10 @@ export default function CycleDetailPage() {
                               `${formatNumber(value as number)} kg`,
                               'Volumen',
                             ]}
-                            labelFormatter={(label: any) => {
+                            labelFormatter={(label: any, payload: any[]) => {
+                              if (payload && payload.length > 0) {
+                                return formatTooltipLabel(payload[0].payload);
+                              }
                               const date = new Date(label as string);
                               return new Intl.DateTimeFormat('de-DE', {
                                 day: '2-digit',
@@ -987,13 +1134,7 @@ export default function CycleDetailPage() {
                               <CartesianGrid strokeDasharray="3 3" />
                               <XAxis
                                 dataKey="date"
-                                tickFormatter={(dateStr: string) => {
-                                  const date = new Date(dateStr);
-                                  return new Intl.DateTimeFormat('de-DE', {
-                                    day: '2-digit',
-                                    month: '2-digit',
-                                  }).format(date);
-                                }}
+                                tickFormatter={(date, index) => formatXAxisLabel(ormData.dataPoints[index])}
                                 style={{ fontSize: '12px' }}
                               />
                               <YAxis
@@ -1002,7 +1143,10 @@ export default function CycleDetailPage() {
                               />
                               <Tooltip
                                 formatter={(value: any) => [`${value}%`, '%ORM']}
-                                labelFormatter={(label: any) => {
+                                labelFormatter={(label: any, payload: any[]) => {
+                                  if (payload && payload.length > 0) {
+                                    return formatTooltipLabel(payload[0].payload);
+                                  }
                                   const date = new Date(label as string);
                                   return new Intl.DateTimeFormat('de-DE', {
                                     day: '2-digit',
@@ -1054,13 +1198,7 @@ export default function CycleDetailPage() {
                               <CartesianGrid strokeDasharray="3 3" />
                               <XAxis
                                 dataKey="date"
-                                tickFormatter={(dateStr: string) => {
-                                  const date = new Date(dateStr);
-                                  return new Intl.DateTimeFormat('de-DE', {
-                                    day: '2-digit',
-                                    month: '2-digit',
-                                  }).format(date);
-                                }}
+                                tickFormatter={(date, index) => formatXAxisLabel(rirData.dataPoints[index])}
                                 style={{ fontSize: '12px' }}
                               />
                               <YAxis
@@ -1068,7 +1206,10 @@ export default function CycleDetailPage() {
                                 style={{ fontSize: '12px' }}
                               />
                               <Tooltip
-                                labelFormatter={(label: any) => {
+                                labelFormatter={(label: any, payload: any[]) => {
+                                  if (payload && payload.length > 0) {
+                                    return formatTooltipLabel(payload[0].payload);
+                                  }
                                   const date = new Date(label as string);
                                   return new Intl.DateTimeFormat('de-DE', {
                                     day: '2-digit',
@@ -1105,13 +1246,7 @@ export default function CycleDetailPage() {
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
                             dataKey="date"
-                            tickFormatter={(dateStr: string) => {
-                              const date = new Date(dateStr);
-                              return new Intl.DateTimeFormat('de-DE', {
-                                day: '2-digit',
-                                month: '2-digit',
-                              }).format(date);
-                            }}
+                            tickFormatter={(date, index) => formatXAxisLabel(durationData.dataPoints[index])}
                             style={{ fontSize: '12px' }}
                           />
                           <YAxis
@@ -1120,7 +1255,10 @@ export default function CycleDetailPage() {
                           />
                           <Tooltip
                             formatter={(value: any) => [`${value} min`, 'Dauer']}
-                            labelFormatter={(label: any) => {
+                            labelFormatter={(label: any, payload: any[]) => {
+                              if (payload && payload.length > 0) {
+                                return formatTooltipLabel(payload[0].payload);
+                              }
                               const date = new Date(label as string);
                               return new Intl.DateTimeFormat('de-DE', {
                                 day: '2-digit',
@@ -1162,13 +1300,7 @@ export default function CycleDetailPage() {
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
                             dataKey="date"
-                            tickFormatter={(dateStr: string) => {
-                              const date = new Date(dateStr);
-                              return new Intl.DateTimeFormat('de-DE', {
-                                day: '2-digit',
-                                month: '2-digit',
-                              }).format(date);
-                            }}
+                            tickFormatter={(date, index) => formatXAxisLabel(restTimeData.dataPoints[index])}
                             style={{ fontSize: '12px' }}
                           />
                           <YAxis
@@ -1177,7 +1309,10 @@ export default function CycleDetailPage() {
                           />
                           <Tooltip
                             formatter={(value: any) => [`${value} s`, 'Pause']}
-                            labelFormatter={(label: any) => {
+                            labelFormatter={(label: any, payload: any[]) => {
+                              if (payload && payload.length > 0) {
+                                return formatTooltipLabel(payload[0].payload);
+                              }
                               const date = new Date(label as string);
                               return new Intl.DateTimeFormat('de-DE', {
                                 day: '2-digit',
@@ -1219,13 +1354,7 @@ export default function CycleDetailPage() {
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
                             dataKey="date"
-                            tickFormatter={(dateStr: string) => {
-                              const date = new Date(dateStr);
-                              return new Intl.DateTimeFormat('de-DE', {
-                                day: '2-digit',
-                                month: '2-digit',
-                              }).format(date);
-                            }}
+                            tickFormatter={(date, index) => formatXAxisLabel(repsData.dataPoints[index])}
                             style={{ fontSize: '12px' }}
                           />
                           <YAxis
@@ -1234,7 +1363,10 @@ export default function CycleDetailPage() {
                           />
                           <Tooltip
                             formatter={(value: any) => [`${value}`, 'Wiederholungen']}
-                            labelFormatter={(label: any) => {
+                            labelFormatter={(label: any, payload: any[]) => {
+                              if (payload && payload.length > 0) {
+                                return formatTooltipLabel(payload[0].payload);
+                              }
                               const date = new Date(label as string);
                               return new Intl.DateTimeFormat('de-DE', {
                                 day: '2-digit',
@@ -1276,13 +1408,7 @@ export default function CycleDetailPage() {
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
                             dataKey="date"
-                            tickFormatter={(dateStr: string) => {
-                              const date = new Date(dateStr);
-                              return new Intl.DateTimeFormat('de-DE', {
-                                day: '2-digit',
-                                month: '2-digit',
-                              }).format(date);
-                            }}
+                            tickFormatter={(date, index) => formatXAxisLabel(setsData.dataPoints[index])}
                             style={{ fontSize: '12px' }}
                           />
                           <YAxis
@@ -1291,7 +1417,10 @@ export default function CycleDetailPage() {
                           />
                           <Tooltip
                             formatter={(value: any) => [`${value}`, 'Sätze']}
-                            labelFormatter={(label: any) => {
+                            labelFormatter={(label: any, payload: any[]) => {
+                              if (payload && payload.length > 0) {
+                                return formatTooltipLabel(payload[0].payload);
+                              }
                               const date = new Date(label as string);
                               return new Intl.DateTimeFormat('de-DE', {
                                 day: '2-digit',
@@ -1454,6 +1583,29 @@ export default function CycleDetailPage() {
           </div>
         </main>
       </div>
+
+      {/* Exercise Selection Modal */}
+      {showExerciseModal && (
+        <ExerciseSelectionModal
+          onClose={() => setShowExerciseModal(false)}
+          onSelect={async (exerciseId: string, exercise?: Exercise) => {
+            if (exercise) {
+              setSelectedExercise(exercise);
+            } else {
+              // Fetch exercise details if not provided
+              try {
+                const fetchedExercise = await apiClient.getExercise(exerciseId);
+                setSelectedExercise(fetchedExercise);
+              } catch (error) {
+                console.error('Failed to fetch exercise:', error);
+              }
+            }
+            setShowExerciseModal(false);
+          }}
+          equipmentFilter={undefined}
+          includeHomeGymOnly={false}
+        />
+      )}
     </ProtectedRoute>
   );
 }

@@ -22,6 +22,7 @@ import {
   RepsByCycleAnalytics,
   SetsAnalytics,
   SetsByCycleAnalytics,
+  Exercise,
 } from '@/types';
 import {
   LineChart,
@@ -39,6 +40,8 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
+import SelectedExerciseCard from '@/components/analytics/selected-exercise-card';
 
 export default function AnalyticsPage() {
   // Data states
@@ -67,6 +70,7 @@ export default function AnalyticsPage() {
   // UI states
   const [loading, setLoading] = useState(true);
   const [cycleMode, setCycleMode] = useState(false);
+  const [aggregationMode, setAggregationMode] = useState<'day' | 'week'>('week');
   
   // Multi-select filter states
   const [selectedViews, setSelectedViews] = useState<Array<'volume' | 'orm' | 'rir' | 'duration' | 'restTime' | 'reps' | 'sets'>>(['volume']);
@@ -76,6 +80,10 @@ export default function AnalyticsPage() {
   // Filter states
   const [timeFilter, setTimeFilter] = useState('7');
   const [gymFilter, setGymFilter] = useState('alle');
+  
+  // Exercise filter state
+  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
+  const [showExerciseModal, setShowExerciseModal] = useState(false);
   
   // Cycle navigation
   const [selectedCycleIndex, setSelectedCycleIndex] = useState<number>(0);
@@ -90,7 +98,7 @@ export default function AnalyticsPage() {
     if (!loading) {
       loadAnalyticsData();
     }
-  }, [cycleMode, timeFilter, gymFilter, selectedMuscles, selectedEquipment, selectedCycleIndex, selectedViews]);
+  }, [cycleMode, timeFilter, gymFilter, selectedMuscles, selectedEquipment, selectedCycleIndex, selectedViews, aggregationMode, selectedExercise]);
 
   // Calculate dynamic max allowed selections for each filter type
   const calculateMaxAllowed = (filterType: 'view' | 'muscle' | 'equipment'): number => {
@@ -263,10 +271,20 @@ export default function AnalyticsPage() {
   ) => {
     // Collect all unique dates
     const dateSet = new Set<string>();
+    const dateMetadata: Record<string, any> = {};
     results.forEach((result) => {
       if (result?.dataPoints) {
         result.dataPoints.forEach((point: any) => {
           dateSet.add(point.date);
+          // Store week metadata for this date (for week aggregation)
+          if (point.weekLabel && !dateMetadata[point.date]) {
+            dateMetadata[point.date] = {
+              weekLabel: point.weekLabel,
+              weekStartDate: point.weekStartDate,
+              weekEndDate: point.weekEndDate,
+              workoutCount: point.workoutCount,
+            };
+          }
         });
       }
     });
@@ -282,7 +300,10 @@ export default function AnalyticsPage() {
     });
 
     // Build merged data structure
-    const mergedData: any[] = sortedDates.map((date) => ({ date }));
+    const mergedData: any[] = sortedDates.map((date) => ({
+      date,
+      ...dateMetadata[date], // Include week metadata if available
+    }));
     const lineConfigs: ChartLineConfig[] = [];
 
     results.forEach((result, index) => {
@@ -387,19 +408,37 @@ export default function AnalyticsPage() {
     }> = [];
 
     for (const view of selectedViews) {
-      for (const muscle of muscles) {
-        for (const equip of equipment) {
-          filterCombinations.push({ view, muscle: muscle as MuscleGroup | undefined, equipment: equip as Equipment | undefined });
+      if (selectedExercise) {
+        // Exercise filter mode: single iteration without muscle/equipment filters (except duration)
+        if (view === 'duration') {
+          // Duration analytics: keep existing logic unchanged
+          for (const muscle of muscles) {
+            for (const equip of equipment) {
+              filterCombinations.push({ view, muscle: muscle as MuscleGroup | undefined, equipment: equip as Equipment | undefined });
+              allPromises.push(
+                apiClient.getDurationAnalytics({
+                  startDate,
+                  endDate,
+                  gymId: gymFilter,
+                  muscleGroup: muscle,
+                  equipment: equip,
+                  aggregation: aggregationMode,
+                })
+              );
+            }
+          }
+        } else {
+          // All other views: use exerciseId filter
+          filterCombinations.push({ view, muscle: undefined, equipment: undefined });
 
-          // Add API call based on view type
           if (view === 'volume') {
             allPromises.push(
               apiClient.getVolumeAnalytics({
                 startDate,
                 endDate,
                 gymId: gymFilter,
-                muscleGroup: muscle,
-                equipment: equip,
+                exerciseId: selectedExercise.id,
+                aggregation: aggregationMode,
               })
             );
           } else if (view === 'rir') {
@@ -408,18 +447,8 @@ export default function AnalyticsPage() {
                 startDate,
                 endDate,
                 gymId: gymFilter,
-                muscleGroup: muscle,
-                equipment: equip,
-              })
-            );
-          } else if (view === 'duration') {
-            allPromises.push(
-              apiClient.getDurationAnalytics({
-                startDate,
-                endDate,
-                gymId: gymFilter,
-                muscleGroup: muscle,
-                equipment: equip,
+                exerciseId: selectedExercise.id,
+                aggregation: aggregationMode,
               })
             );
           } else if (view === 'restTime') {
@@ -428,8 +457,8 @@ export default function AnalyticsPage() {
                 startDate,
                 endDate,
                 gymId: gymFilter,
-                muscleGroup: muscle,
-                equipment: equip,
+                exerciseId: selectedExercise.id,
+                aggregation: aggregationMode,
               })
             );
           } else if (view === 'reps') {
@@ -438,8 +467,8 @@ export default function AnalyticsPage() {
                 startDate,
                 endDate,
                 gymId: gymFilter,
-                muscleGroup: muscle,
-                equipment: equip,
+                exerciseId: selectedExercise.id,
+                aggregation: aggregationMode,
               })
             );
           } else if (view === 'sets') {
@@ -448,10 +477,86 @@ export default function AnalyticsPage() {
                 startDate,
                 endDate,
                 gymId: gymFilter,
-                muscleGroup: muscle,
-                equipment: equip,
+                exerciseId: selectedExercise.id,
+                aggregation: aggregationMode,
               })
             );
+          }
+        }
+      } else {
+        // No exercise filter: use existing muscle/equipment logic
+        for (const muscle of muscles) {
+          for (const equip of equipment) {
+            filterCombinations.push({ view, muscle: muscle as MuscleGroup | undefined, equipment: equip as Equipment | undefined });
+
+            // Add API call based on view type
+            if (view === 'volume') {
+              allPromises.push(
+                apiClient.getVolumeAnalytics({
+                  startDate,
+                  endDate,
+                  gymId: gymFilter,
+                  muscleGroup: muscle,
+                  equipment: equip,
+                  aggregation: aggregationMode,
+                })
+              );
+            } else if (view === 'rir') {
+              allPromises.push(
+                apiClient.getRIRAnalytics({
+                  startDate,
+                  endDate,
+                  gymId: gymFilter,
+                  muscleGroup: muscle,
+                  equipment: equip,
+                  aggregation: aggregationMode,
+                })
+              );
+            } else if (view === 'duration') {
+              allPromises.push(
+                apiClient.getDurationAnalytics({
+                  startDate,
+                  endDate,
+                  gymId: gymFilter,
+                  muscleGroup: muscle,
+                  equipment: equip,
+                  aggregation: aggregationMode,
+                })
+              );
+            } else if (view === 'restTime') {
+              allPromises.push(
+                apiClient.getRestTimeAnalytics({
+                  startDate,
+                  endDate,
+                  gymId: gymFilter,
+                  muscleGroup: muscle,
+                  equipment: equip,
+                  aggregation: aggregationMode,
+                })
+              );
+            } else if (view === 'reps') {
+              allPromises.push(
+                apiClient.getRepsAnalytics({
+                  startDate,
+                  endDate,
+                  gymId: gymFilter,
+                  muscleGroup: muscle,
+                  equipment: equip,
+                  aggregation: aggregationMode,
+                })
+              );
+            } else if (view === 'sets') {
+              allPromises.push(
+                apiClient.getSetsAnalytics({
+                  startDate,
+                  endDate,
+                  gymId: gymFilter,
+                  muscleGroup: muscle,
+                  equipment: equip,
+                  aggregation: aggregationMode,
+                })
+              );
+            }
           }
         }
       }
@@ -529,11 +634,28 @@ export default function AnalyticsPage() {
     }> = [];
 
     for (const view of selectedViews) {
-      for (const muscle of muscles) {
-        for (const equip of equipment) {
-          filterCombinations.push({ view, muscle: muscle as MuscleGroup | undefined, equipment: equip as Equipment | undefined });
+      if (selectedExercise) {
+        // Exercise filter mode: single iteration without muscle/equipment filters (except duration)
+        if (view === 'duration') {
+          // Duration analytics: keep existing logic unchanged
+          for (const muscle of muscles) {
+            for (const equip of equipment) {
+              filterCombinations.push({ view, muscle: muscle as MuscleGroup | undefined, equipment: equip as Equipment | undefined });
+              allPromises.push(
+                apiClient.getDurationByCycle(
+                  selectedCycle.id,
+                  gymFilter,
+                  muscle,
+                  equip,
+                  aggregationMode,
+                )
+              );
+            }
+          }
+        } else {
+          // All other views: use exerciseId filter
+          filterCombinations.push({ view, muscle: undefined, equipment: undefined });
 
-          // Add API call based on view type
           if (view === 'volume') {
             // For volume in cycle mode, use time-based with cycle date range
             const cycleStart = new Date(selectedCycle.startDate).toISOString();
@@ -546,17 +668,19 @@ export default function AnalyticsPage() {
                 startDate: cycleStart,
                 endDate: cycleEnd,
                 gymId: gymFilter,
-                muscleGroup: muscle,
-                equipment: equip,
+                exerciseId: selectedExercise.id,
                 cycleId: selectedCycle.id,
+                aggregation: aggregationMode,
               })
             );
           } else if (view === 'orm') {
             allPromises.push(
               apiClient.getORMByCycle(
                 selectedCycle.id,
-                muscle,
-                equip,
+                undefined,
+                undefined,
+                aggregationMode,
+                selectedExercise.id,
               )
             );
           } else if (view === 'rir') {
@@ -564,17 +688,10 @@ export default function AnalyticsPage() {
               apiClient.getRIRByCycle(
                 selectedCycle.id,
                 gymFilter,
-                muscle,
-                equip,
-              )
-            );
-          } else if (view === 'duration') {
-            allPromises.push(
-              apiClient.getDurationByCycle(
-                selectedCycle.id,
-                gymFilter,
-                muscle,
-                equip,
+                undefined,
+                undefined,
+                selectedExercise.id,
+                aggregationMode,
               )
             );
           } else if (view === 'restTime') {
@@ -582,26 +699,118 @@ export default function AnalyticsPage() {
               apiClient.getRestTimeByCycle(
                 selectedCycle.id,
                 gymFilter,
-                muscle,
-                equip,
+                undefined,
+                undefined,
+                aggregationMode,
+                selectedExercise.id,
               )
             );
           } else if (view === 'reps') {
             allPromises.push(
               apiClient.getRepsByCycle(
                 selectedCycle.id,
-                muscle,
-                equip,
+                undefined,
+                undefined,
+                aggregationMode,
+                selectedExercise.id,
               )
             );
           } else if (view === 'sets') {
             allPromises.push(
               apiClient.getSetsByCycle(
                 selectedCycle.id,
-                muscle,
-                equip,
+                undefined,
+                undefined,
+                aggregationMode,
+                selectedExercise.id,
               )
             );
+          }
+        }
+      } else {
+        // No exercise filter: use existing muscle/equipment logic
+        for (const muscle of muscles) {
+          for (const equip of equipment) {
+            filterCombinations.push({ view, muscle: muscle as MuscleGroup | undefined, equipment: equip as Equipment | undefined });
+
+            // Add API call based on view type
+            if (view === 'volume') {
+              // For volume in cycle mode, use time-based with cycle date range
+              const cycleStart = new Date(selectedCycle.startDate).toISOString();
+              const cycleEnd = selectedCycle.completedAt
+                ? new Date(selectedCycle.completedAt).toISOString()
+                : undefined;
+
+              allPromises.push(
+                apiClient.getVolumeAnalytics({
+                  startDate: cycleStart,
+                  endDate: cycleEnd,
+                  gymId: gymFilter,
+                  muscleGroup: muscle,
+                  equipment: equip,
+                  cycleId: selectedCycle.id,
+                  aggregation: aggregationMode,
+                })
+              );
+            } else if (view === 'orm') {
+              allPromises.push(
+                apiClient.getORMByCycle(
+                  selectedCycle.id,
+                  muscle,
+                  equip,
+                  aggregationMode,
+                )
+              );
+            } else if (view === 'rir') {
+              allPromises.push(
+                apiClient.getRIRByCycle(
+                  selectedCycle.id,
+                  gymFilter,
+                  muscle,
+                  equip,
+                  undefined,
+                  aggregationMode,
+                )
+              );
+            } else if (view === 'duration') {
+              allPromises.push(
+                apiClient.getDurationByCycle(
+                  selectedCycle.id,
+                  gymFilter,
+                  muscle,
+                  equip,
+                  aggregationMode,
+                )
+              );
+            } else if (view === 'restTime') {
+              allPromises.push(
+                apiClient.getRestTimeByCycle(
+                  selectedCycle.id,
+                  gymFilter,
+                  muscle,
+                  equip,
+                  aggregationMode,
+                )
+              );
+            } else if (view === 'reps') {
+              allPromises.push(
+                apiClient.getRepsByCycle(
+                  selectedCycle.id,
+                  muscle,
+                  equip,
+                  aggregationMode,
+                )
+              );
+            } else if (view === 'sets') {
+              allPromises.push(
+                apiClient.getSetsByCycle(
+                  selectedCycle.id,
+                  muscle,
+                  equip,
+                  aggregationMode,
+                )
+              );
+            }
           }
         }
       }
@@ -667,6 +876,26 @@ export default function AnalyticsPage() {
       day: '2-digit',
       month: '2-digit',
     }).format(date);
+  };
+
+  const formatXAxisLabel = (entry: any) => {
+    // If weekLabel exists, use it; otherwise format the date
+    if (entry.weekLabel) {
+      return entry.weekLabel;
+    }
+    return formatDate(entry.date);
+  };
+
+  const formatTooltipLabel = (entry: any) => {
+    // For week aggregation, show date range and workout count
+    if (entry.weekStartDate && entry.weekEndDate) {
+      const start = formatDate(entry.weekStartDate);
+      const end = formatDate(entry.weekEndDate);
+      const workoutCount = entry.workoutCount || 0;
+      return `${start} - ${end} (${workoutCount} Workout${workoutCount !== 1 ? 's' : ''})`;
+    }
+    // For day aggregation, just show the date
+    return formatDate(entry.date);
   };
 
   const muscleGroups = [
@@ -805,7 +1034,36 @@ export default function AnalyticsPage() {
                   </div>
                 )}
 
-                {/* Row 3: View Mode Buttons */}
+                {/* Row 3: Aggregation Mode Toggle */}
+                <div>
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">
+                    Aggregation:
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setAggregationMode('day')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        aggregationMode === 'day'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      Tage
+                    </button>
+                    <button
+                      onClick={() => setAggregationMode('week')}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        aggregationMode === 'week'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      Wochen
+                    </button>
+                  </div>
+                </div>
+
+                {/* Row 4: View Mode Buttons */}
                 <div className="space-y-4">
                   {/* View Mode Buttons */}
                   <div>
@@ -984,6 +1242,28 @@ export default function AnalyticsPage() {
                       })}
                     </div>
                   </div>
+
+                  {/* Exercise Filter - Alternative to Muscle/Equipment */}
+                  <div className="border-t border-gray-200 pt-4">
+                    <div className="text-center mb-3">
+                      <span className="text-sm text-gray-500 italic">ODER</span>
+                    </div>
+                    
+                    {selectedExercise ? (
+                      <SelectedExerciseCard
+                        exercise={selectedExercise}
+                        onRemove={() => setSelectedExercise(null)}
+                        onReplace={() => setShowExerciseModal(true)}
+                      />
+                    ) : (
+                      <button
+                        onClick={() => setShowExerciseModal(true)}
+                        className="w-full px-4 py-3 rounded-lg text-sm font-medium text-blue-600 bg-blue-50 border-2 border-dashed border-blue-300 hover:bg-blue-100 transition-colors"
+                      >
+                        + Übung hinzufügen
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1005,7 +1285,10 @@ export default function AnalyticsPage() {
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis
                           dataKey="date"
-                          tickFormatter={formatDate}
+                          tickFormatter={(date, index) => {
+                            const entry = mergedChartData[index];
+                            return formatXAxisLabel(entry);
+                          }}
                           style={{ fontSize: '12px' }}
                         />
                         
@@ -1037,7 +1320,12 @@ export default function AnalyticsPage() {
                             const config = chartLineConfigs.find(c => c.dataKey === name);
                             return [`${formatNumber(value as number)} ${config?.unit || ''}`, String(name || '')];
                           }}
-                          labelFormatter={(label) => formatDate(label as string)}
+                          labelFormatter={(label, payload) => {
+                            if (payload && payload.length > 0) {
+                              return formatTooltipLabel(payload[0].payload);
+                            }
+                            return formatDate(label as string);
+                          }}
                         />
                         <Legend />
                         
@@ -1071,7 +1359,7 @@ export default function AnalyticsPage() {
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis
                           dataKey={cycleMode ? "date" : "date"}
-                          tickFormatter={formatDate}
+                          tickFormatter={(date, index) => formatXAxisLabel(volumeData.dataPoints[index])}
                           style={{ fontSize: '12px' }}
                         />
                         <YAxis
@@ -1083,7 +1371,12 @@ export default function AnalyticsPage() {
                             `${formatNumber(value as number)} kg`,
                             'Volumen',
                           ]}
-                          labelFormatter={(label: any) => formatDate(label as string)}
+                          labelFormatter={(label, payload) => {
+                            if (payload && payload.length > 0) {
+                              return formatTooltipLabel(payload[0].payload);
+                            }
+                            return formatDate(label as string);
+                          }}
                         />
                         <Legend />
                         <Line
@@ -1129,7 +1422,7 @@ export default function AnalyticsPage() {
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis
                               dataKey="date"
-                              tickFormatter={formatDate}
+                              tickFormatter={(date, index) => formatXAxisLabel(ormData.dataPoints[index])}
                               style={{ fontSize: '12px' }}
                             />
                             <YAxis
@@ -1138,7 +1431,12 @@ export default function AnalyticsPage() {
                             />
                             <Tooltip
                               formatter={(value: any) => [`${value}%`, '%ORM']}
-                              labelFormatter={(label: any) => formatDate(label as string)}
+                              labelFormatter={(label, payload) => {
+                                if (payload && payload.length > 0) {
+                                  return formatTooltipLabel(payload[0].payload);
+                                }
+                                return formatDate(label as string);
+                              }}
                             />
                             <Legend />
                             <Line
@@ -1231,7 +1529,7 @@ export default function AnalyticsPage() {
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis
                               dataKey="date"
-                              tickFormatter={formatDate}
+                              tickFormatter={(date, index) => formatXAxisLabel(rirData.dataPoints[index])}
                               style={{ fontSize: '12px' }}
                             />
                             <YAxis
@@ -1239,7 +1537,12 @@ export default function AnalyticsPage() {
                               style={{ fontSize: '12px' }}
                             />
                             <Tooltip
-                              labelFormatter={(label: any) => formatDate(label as string)}
+                              labelFormatter={(label, payload) => {
+                                if (payload && payload.length > 0) {
+                                  return formatTooltipLabel(payload[0].payload);
+                                }
+                                return formatDate(label as string);
+                              }}
                             />
                             <Legend />
                             <Bar dataKey="rir0Count" fill="#ef4444" name="RIR 0" />
@@ -1354,7 +1657,7 @@ export default function AnalyticsPage() {
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis
                               dataKey="date"
-                              tickFormatter={formatDate}
+                              tickFormatter={(date, index) => formatXAxisLabel(durationData.dataPoints[index])}
                               style={{ fontSize: '12px' }}
                             />
                             <YAxis
@@ -1363,7 +1666,12 @@ export default function AnalyticsPage() {
                             />
                             <Tooltip
                               formatter={(value: any) => [`${value} min`, 'Dauer']}
-                              labelFormatter={(label: any) => formatDate(label as string)}
+                              labelFormatter={(label, payload) => {
+                                if (payload && payload.length > 0) {
+                                  return formatTooltipLabel(payload[0].payload);
+                                }
+                                return formatDate(label as string);
+                              }}
                             />
                             <Legend />
                             <Line
@@ -1465,7 +1773,7 @@ export default function AnalyticsPage() {
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis
                               dataKey="date"
-                              tickFormatter={formatDate}
+                              tickFormatter={(date, index) => formatXAxisLabel(restTimeData.dataPoints[index])}
                               style={{ fontSize: '12px' }}
                             />
                             <YAxis
@@ -1474,7 +1782,12 @@ export default function AnalyticsPage() {
                             />
                             <Tooltip
                               formatter={(value: any) => [`${value}s`, 'Satzpause']}
-                              labelFormatter={(label: any) => formatDate(label as string)}
+                              labelFormatter={(label, payload) => {
+                                if (payload && payload.length > 0) {
+                                  return formatTooltipLabel(payload[0].payload);
+                                }
+                                return formatDate(label as string);
+                              }}
                             />
                             <Legend />
                             <Line
@@ -1643,7 +1956,7 @@ export default function AnalyticsPage() {
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis
                               dataKey="date"
-                              tickFormatter={formatDate}
+                              tickFormatter={(date, index) => formatXAxisLabel(repsData.dataPoints[index])}
                               style={{ fontSize: '12px' }}
                             />
                             <YAxis
@@ -1652,7 +1965,12 @@ export default function AnalyticsPage() {
                             />
                             <Tooltip
                               formatter={(value: any) => [value, 'Wiederholungen']}
-                              labelFormatter={(label: any) => formatDate(label as string)}
+                              labelFormatter={(label, payload) => {
+                                if (payload && payload.length > 0) {
+                                  return formatTooltipLabel(payload[0].payload);
+                                }
+                                return formatDate(label as string);
+                              }}
                             />
                             <Legend />
                             <Line
@@ -1705,7 +2023,7 @@ export default function AnalyticsPage() {
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis
                               dataKey="date"
-                              tickFormatter={formatDate}
+                              tickFormatter={(date, index) => formatXAxisLabel(setsData.dataPoints[index])}
                               style={{ fontSize: '12px' }}
                             />
                             <YAxis
@@ -1714,7 +2032,12 @@ export default function AnalyticsPage() {
                             />
                             <Tooltip
                               formatter={(value: any) => [value, 'Sätze']}
-                              labelFormatter={(label: any) => formatDate(label as string)}
+                              labelFormatter={(label, payload) => {
+                                if (payload && payload.length > 0) {
+                                  return formatTooltipLabel(payload[0].payload);
+                                }
+                                return formatDate(label as string);
+                              }}
                             />
                             <Legend />
                             <Line
@@ -1892,6 +2215,27 @@ export default function AnalyticsPage() {
           </div>
         </main>
       </div>
+
+      {/* Exercise Selection Modal */}
+      {showExerciseModal && (
+        <ExerciseSelectionModal
+          onClose={() => setShowExerciseModal(false)}
+          onSelect={async (exerciseId: string, exercise?: Exercise) => {
+            if (exercise) {
+              setSelectedExercise(exercise);
+            } else {
+              // Fetch exercise details if not provided
+              try {
+                const fetchedExercise = await apiClient.getExercise(exerciseId);
+                setSelectedExercise(fetchedExercise);
+              } catch (error) {
+                console.error('Failed to fetch exercise:', error);
+              }
+            }
+            setShowExerciseModal(false);
+          }}
+        />
+      )}
     </ProtectedRoute>
   );
 }

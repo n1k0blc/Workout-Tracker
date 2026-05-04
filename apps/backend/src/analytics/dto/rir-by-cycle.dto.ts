@@ -5,6 +5,11 @@ export class RIRDataPoint {
   rir1Count: number; // Number of working sets with RIR 1
   rir2Count: number; // Number of working sets with RIR 2
   workoutId: string;
+  weekNumber?: number;
+  weekLabel?: string;
+  weekStartDate?: string;
+  weekEndDate?: string;
+  workoutCount?: number;
 }
 
 export class RIRByCycleDto {
