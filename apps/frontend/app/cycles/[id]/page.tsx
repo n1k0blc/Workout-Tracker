@@ -1024,7 +1024,7 @@ export default function CycleDetailPage() {
                             />
                           )}
                           <Tooltip
-                            labelFormatter={(label: any, payload: any[]) => {
+                            labelFormatter={(label: any, payload: readonly any[]) => {
                               if (payload && payload.length > 0) {
                                 return formatTooltipLabel(payload[0].payload);
                               }
@@ -1078,7 +1078,7 @@ export default function CycleDetailPage() {
                               `${formatNumber(value as number)} kg`,
                               'Volumen',
                             ]}
-                            labelFormatter={(label: any, payload: any[]) => {
+                            labelFormatter={(label: any, payload: readonly any[]) => {
                               if (payload && payload.length > 0) {
                                 return formatTooltipLabel(payload[0].payload);
                               }
@@ -1143,7 +1143,7 @@ export default function CycleDetailPage() {
                               />
                               <Tooltip
                                 formatter={(value: any) => [`${value}%`, '%ORM']}
-                                labelFormatter={(label: any, payload: any[]) => {
+                                labelFormatter={(label: any, payload: readonly any[]) => {
                                   if (payload && payload.length > 0) {
                                     return formatTooltipLabel(payload[0].payload);
                                   }
@@ -1206,7 +1206,7 @@ export default function CycleDetailPage() {
                                 style={{ fontSize: '12px' }}
                               />
                               <Tooltip
-                                labelFormatter={(label: any, payload: any[]) => {
+                                labelFormatter={(label: any, payload: readonly any[]) => {
                                   if (payload && payload.length > 0) {
                                     return formatTooltipLabel(payload[0].payload);
                                   }
@@ -1255,7 +1255,7 @@ export default function CycleDetailPage() {
                           />
                           <Tooltip
                             formatter={(value: any) => [`${value} min`, 'Dauer']}
-                            labelFormatter={(label: any, payload: any[]) => {
+                            labelFormatter={(label: any, payload: readonly any[]) => {
                               if (payload && payload.length > 0) {
                                 return formatTooltipLabel(payload[0].payload);
                               }
@@ -1309,7 +1309,7 @@ export default function CycleDetailPage() {
                           />
                           <Tooltip
                             formatter={(value: any) => [`${value} s`, 'Pause']}
-                            labelFormatter={(label: any, payload: any[]) => {
+                            labelFormatter={(label: any, payload: readonly any[]) => {
                               if (payload && payload.length > 0) {
                                 return formatTooltipLabel(payload[0].payload);
                               }
@@ -1363,7 +1363,7 @@ export default function CycleDetailPage() {
                           />
                           <Tooltip
                             formatter={(value: any) => [`${value}`, 'Wiederholungen']}
-                            labelFormatter={(label: any, payload: any[]) => {
+                            labelFormatter={(label: any, payload: readonly any[]) => {
                               if (payload && payload.length > 0) {
                                 return formatTooltipLabel(payload[0].payload);
                               }
@@ -1417,7 +1417,7 @@ export default function CycleDetailPage() {
                           />
                           <Tooltip
                             formatter={(value: any) => [`${value}`, 'Sätze']}
-                            labelFormatter={(label: any, payload: any[]) => {
+                            labelFormatter={(label: any, payload: readonly any[]) => {
                               if (payload && payload.length > 0) {
                                 return formatTooltipLabel(payload[0].payload);
                               }
@@ -1602,8 +1602,6 @@ export default function CycleDetailPage() {
             }
             setShowExerciseModal(false);
           }}
-          equipmentFilter={undefined}
-          includeHomeGymOnly={false}
         />
       )}
     </ProtectedRoute>
