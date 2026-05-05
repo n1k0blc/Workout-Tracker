@@ -899,7 +899,7 @@ export class AnalyticsService {
         const benchmark = await this.ormService.getBenchmark(
           cycleId,
           workout.workoutDay.id,
-          exerciseId,
+          logExerciseId,
         );
 
         if (!benchmark) continue;
