@@ -5,6 +5,7 @@ import { apiClient } from '@/lib/api';
 import { Exercise, MuscleGroup, Equipment } from '@/types';
 import CreateExerciseModal from '@/components/exercises/create-exercise-modal';
 import EditExerciseModal from '@/components/exercises/edit-exercise-modal';
+import ViewExerciseModal from '@/components/exercises/view-exercise-modal';
 import { Plus, Trash2, Pencil } from 'lucide-react';
 
 export default function ExercisesTab() {
@@ -15,6 +16,7 @@ export default function ExercisesTab() {
   const [equipmentFilter, setEquipmentFilter] = useState<Equipment | undefined>();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editExercise, setEditExercise] = useState<Exercise | null>(null);
+  const [viewExercise, setViewExercise] = useState<Exercise | null>(null);
   const [deleteExerciseId, setDeleteExerciseId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -64,13 +66,18 @@ export default function ExercisesTab() {
   };
 
   const muscleGroups = [
-    MuscleGroup.CHEST,
-    MuscleGroup.BACK,
-    MuscleGroup.BICEPS,
-    MuscleGroup.TRICEPS,
-    MuscleGroup.ABS,
+    MuscleGroup.ABDOMEN,
+    MuscleGroup.LATISSIMUS,
+    MuscleGroup.TRAPEZIUS,
+    MuscleGroup.LOWER_BACK,
+    MuscleGroup.HAMSTRINGS,
+    MuscleGroup.GLUTES,
     MuscleGroup.SHOULDERS,
-    MuscleGroup.LEGS,
+    MuscleGroup.BICEPS,
+    MuscleGroup.CHEST,
+    MuscleGroup.QUADRICEPS,
+    MuscleGroup.CALVES,
+    MuscleGroup.TRICEPS,
   ];
 
   const equipments = [
@@ -85,6 +92,7 @@ export default function ExercisesTab() {
 
   const translateMuscleGroup = (mg: MuscleGroup): string => {
     const translations: Record<MuscleGroup, string> = {
+      // Legacy groups (kept for backwards compatibility)
       CHEST: 'Brust',
       BACK: 'Rücken',
       BICEPS: 'Bizeps',
@@ -92,8 +100,17 @@ export default function ExercisesTab() {
       ABS: 'Bauch',
       SHOULDERS: 'Schultern',
       LEGS: 'Beine',
+      // New granular muscle groups
+      ABDOMEN: 'Bauch',
+      LATISSIMUS: 'Latissimus',
+      TRAPEZIUS: 'Trapez',
+      LOWER_BACK: 'Unterer Rücken',
+      HAMSTRINGS: 'Beinbeuger',
+      GLUTES: 'Glutes',
+      QUADRICEPS: 'Quadrizeps',
+      CALVES: 'Waden',
     };
-    return translations[mg];
+    return translations[mg] || mg;
   };
 
   const translateEquipment = (eq: Equipment): string => {
@@ -211,7 +228,10 @@ export default function ExercisesTab() {
           {exercises.map((exercise) => (
             <div
               key={exercise.id}
-              className="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-shadow"
+              onClick={() => !exercise.isCustom && setViewExercise(exercise)}
+              className={`bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-shadow ${
+                !exercise.isCustom ? 'cursor-pointer' : ''
+              }`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
@@ -247,7 +267,7 @@ export default function ExercisesTab() {
                       <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded whitespace-nowrap">
                         Custom
                       </span>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => setEditExercise(exercise)}
                           className="text-blue-600 hover:text-blue-800 transition-colors"
@@ -284,12 +304,20 @@ export default function ExercisesTab() {
         />
       )}
 
-      {/* Edit Exercise Modal */}
+      {/* Edit Exercise Modal (Custom Exercises) */}
       {editExercise && (
         <EditExerciseModal
           exercise={editExercise}
           onClose={() => setEditExercise(null)}
           onUpdated={handleExerciseUpdated}
+        />
+      )}
+
+      {/* View Exercise Modal (System Exercises) */}
+      {viewExercise && (
+        <ViewExerciseModal
+          exercise={viewExercise}
+          onClose={() => setViewExercise(null)}
         />
       )}
 

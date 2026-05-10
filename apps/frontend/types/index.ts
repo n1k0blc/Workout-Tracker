@@ -48,6 +48,14 @@ export enum MuscleGroup {
   ABS = 'ABS',
   SHOULDERS = 'SHOULDERS',
   LEGS = 'LEGS',
+  ABDOMEN = 'ABDOMEN',
+  LATISSIMUS = 'LATISSIMUS',
+  TRAPEZIUS = 'TRAPEZIUS',
+  LOWER_BACK = 'LOWER_BACK',
+  HAMSTRINGS = 'HAMSTRINGS',
+  GLUTES = 'GLUTES',
+  QUADRICEPS = 'QUADRICEPS',
+  CALVES = 'CALVES',
 }
 
 export enum Equipment {
@@ -69,6 +77,19 @@ export interface Exercise {
   isDoubleWeight: boolean;
   isCustom: boolean;
   userId?: string;
+  // Muscle group distribution percentages
+  abdomenPercent: number;
+  latissimusPercent: number;
+  trapeziusPercent: number;
+  lowerBackPercent: number;
+  hamstringsPercent: number;
+  glutesPercent: number;
+  shouldersPercent: number;
+  bicepsPercent: number;
+  chestPercent: number;
+  quadricepsPercent: number;
+  calvesPercent: number;
+  tricepsPercent: number;
 }
 
 export interface UpdateExerciseDto {
@@ -77,6 +98,19 @@ export interface UpdateExerciseDto {
   equipment: Equipment;
   isUnilateral?: boolean;
   isDoubleWeight?: boolean;
+  // Muscle group distribution percentages (optional for updates)
+  abdomenPercent?: number;
+  latissimusPercent?: number;
+  trapeziusPercent?: number;
+  lowerBackPercent?: number;
+  hamstringsPercent?: number;
+  glutesPercent?: number;
+  shouldersPercent?: number;
+  bicepsPercent?: number;
+  chestPercent?: number;
+  quadricepsPercent?: number;
+  calvesPercent?: number;
+  tricepsPercent?: number;
 }
 
 export interface ExerciseBenchmark {

@@ -93,24 +93,24 @@ model BlueprintSet {
 }
 
 model Workout {
-  id             String              @id @default(uuid())
-  date           DateTime            @default(now())
-  status         WorkoutStatus
-  isFreeWorkout  Boolean             @default(false)
-  totalDuration  Int?
-  userId         String
-  cycleId        String?
-  workoutDayId   String?
-  templateId     String?
-  templateName   String?
-  createdAt      DateTime            @default(now())
-  homeGymId      String?
-  exercises      ExerciseLog[]
-  cycle          WorkoutCycle?       @relation(fields: [cycleId], references: [id])
-  homeGym        HomeGym?            @relation(fields: [homeGymId], references: [id])
-  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workoutDay     WorkoutDay?         @relation(fields: [workoutDayId], references: [id])
-  benchmarksSet  ExerciseBenchmark[] @relation("BenchmarkWorkout")
+  id            String              @id @default(uuid())
+  date          DateTime            @default(now())
+  status        WorkoutStatus
+  isFreeWorkout Boolean             @default(false)
+  totalDuration Int?
+  userId        String
+  cycleId       String?
+  workoutDayId  String?
+  templateId    String?
+  templateName  String?
+  createdAt     DateTime            @default(now())
+  homeGymId     String?
+  exercises     ExerciseLog[]
+  cycle         WorkoutCycle?       @relation(fields: [cycleId], references: [id])
+  homeGym       HomeGym?            @relation(fields: [homeGymId], references: [id])
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutDay    WorkoutDay?         @relation(fields: [workoutDayId], references: [id])
+  benchmarksSet ExerciseBenchmark[] @relation("BenchmarkWorkout")
 }
 
 model Exercise {
@@ -124,6 +124,19 @@ model Exercise {
   isDoubleWeight          Boolean                   @default(false)
   isUnilateral            Boolean                   @default(false)
   deletedAt               DateTime?
+  // Muscle group distribution in percentages (must sum to 100)
+  abdomenPercent          Int                       @default(0)
+  latissimusPercent       Int                       @default(0)
+  trapeziusPercent        Int                       @default(0)
+  lowerBackPercent        Int                       @default(0)
+  hamstringsPercent       Int                       @default(0)
+  glutesPercent           Int                       @default(0)
+  shouldersPercent        Int                       @default(0)
+  bicepsPercent           Int                       @default(0)
+  chestPercent            Int                       @default(0)
+  quadricepsPercent       Int                       @default(0)
+  calvesPercent           Int                       @default(0)
+  tricepsPercent          Int                       @default(0)
   blueprintExercises      BlueprintExercise[]
   user                    User?                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   exerciseLogs            ExerciseLog[]
@@ -176,14 +189,14 @@ model SetLog {
 }
 
 model WorkoutTemplate {
-  id                 String                    @id @default(uuid())
-  name               String
-  isCustom           Boolean                   @default(false)
-  userId             String?
-  recommendedGymId   String?
-  createdAt          DateTime                  @default(now())
-  user               User?                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  exercises          WorkoutTemplateExercise[]
+  id               String                    @id @default(uuid())
+  name             String
+  isCustom         Boolean                   @default(false)
+  userId           String?
+  recommendedGymId String?
+  createdAt        DateTime                  @default(now())
+  user             User?                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercises        WorkoutTemplateExercise[]
 
   @@unique([userId, name])
 }
@@ -199,14 +212,14 @@ model WorkoutTemplateExercise {
 }
 
 model WorkoutTemplateSet {
-  id                  String                  @id @default(uuid())
-  templateExerciseId  String
-  order               Int
-  isWarmup            Boolean                 @default(false)
-  targetReps          Int
-  targetWeight        Float
-  targetRir           Int
-  templateExercise    WorkoutTemplateExercise @relation(fields: [templateExerciseId], references: [id], onDelete: Cascade)
+  id                 String                  @id @default(uuid())
+  templateExerciseId String
+  order              Int
+  isWarmup           Boolean                 @default(false)
+  targetReps         Int
+  targetWeight       Float
+  targetRir          Int
+  templateExercise   WorkoutTemplateExercise @relation(fields: [templateExerciseId], references: [id], onDelete: Cascade)
 }
 
 enum MuscleGroup {
@@ -217,6 +230,14 @@ enum MuscleGroup {
   ABS
   SHOULDERS
   LEGS
+  ABDOMEN
+  LATISSIMUS
+  TRAPEZIUS
+  LOWER_BACK
+  HAMSTRINGS
+  GLUTES
+  QUADRICEPS
+  CALVES
 }
 
 enum Equipment {
