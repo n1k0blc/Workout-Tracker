@@ -1,10 +1,98 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateExerciseDto, FilterExerciseDto, ExerciseDto, UpdateExerciseDto } from './dto';
 
 @Injectable()
 export class ExercisesService {
   constructor(private prisma: PrismaService) {}
+
+  /**
+   * Validates that muscle group percentages sum to 100
+   * If percentages are not provided, sets 100% on main muscle group
+   */
+  private validateAndNormalizeMusclePercentages(
+    dto: CreateExerciseDto | UpdateExerciseDto,
+  ): {
+    abdomenPercent: number;
+    latissimusPercent: number;
+    trapeziusPercent: number;
+    lowerBackPercent: number;
+    hamstringsPercent: number;
+    glutesPercent: number;
+    shouldersPercent: number;
+    bicepsPercent: number;
+    chestPercent: number;
+    quadricepsPercent: number;
+    calvesPercent: number;
+    tricepsPercent: number;
+  } {
+    const percentages = {
+      abdomenPercent: dto.abdomenPercent ?? 0,
+      latissimusPercent: dto.latissimusPercent ?? 0,
+      trapeziusPercent: dto.trapeziusPercent ?? 0,
+      lowerBackPercent: dto.lowerBackPercent ?? 0,
+      hamstringsPercent: dto.hamstringsPercent ?? 0,
+      glutesPercent: dto.glutesPercent ?? 0,
+      shouldersPercent: dto.shouldersPercent ?? 0,
+      bicepsPercent: dto.bicepsPercent ?? 0,
+      chestPercent: dto.chestPercent ?? 0,
+      quadricepsPercent: dto.quadricepsPercent ?? 0,
+      calvesPercent: dto.calvesPercent ?? 0,
+      tricepsPercent: dto.tricepsPercent ?? 0,
+    };
+
+    const sum =
+      percentages.abdomenPercent +
+      percentages.latissimusPercent +
+      percentages.trapeziusPercent +
+      percentages.lowerBackPercent +
+      percentages.hamstringsPercent +
+      percentages.glutesPercent +
+      percentages.shouldersPercent +
+      percentages.bicepsPercent +
+      percentages.chestPercent +
+      percentages.quadricepsPercent +
+      percentages.calvesPercent +
+      percentages.tricepsPercent;
+
+    // If no percentages provided, set 100% on main muscle group
+    if (sum === 0) {
+      const muscleGroup = dto.muscleGroup;
+      const muscleGroupToField: Record<string, keyof typeof percentages> = {
+        ABDOMEN: 'abdomenPercent',
+        ABS: 'abdomenPercent',
+        LATISSIMUS: 'latissimusPercent',
+        BACK: 'latissimusPercent',
+        TRAPEZIUS: 'trapeziusPercent',
+        LOWER_BACK: 'lowerBackPercent',
+        HAMSTRINGS: 'hamstringsPercent',
+        GLUTES: 'glutesPercent',
+        SHOULDERS: 'shouldersPercent',
+        BICEPS: 'bicepsPercent',
+        CHEST: 'chestPercent',
+        QUADRICEPS: 'quadricepsPercent',
+        LEGS: 'quadricepsPercent',
+        CALVES: 'calvesPercent',
+        TRICEPS: 'tricepsPercent',
+      };
+
+      const field = muscleGroupToField[muscleGroup];
+      if (field) {
+        percentages[field] = 100;
+      }
+
+      return percentages;
+    }
+
+    // If percentages provided, validate sum is 100
+    if (sum !== 100) {
+      throw new BadRequestException(
+        `Muscle group percentages must sum to 100%. Current sum: ${sum}%`,
+      );
+    }
+
+    return percentages;
+  }
 
   async findAll(filterDto: FilterExerciseDto, userId?: string): Promise<ExerciseDto[]> {
     const { search, muscleGroup, equipment, includeCustom } = filterDto;
@@ -47,6 +135,18 @@ export class ExercisesService {
         isDoubleWeight: true,
         isCustom: true,
         userId: true,
+        abdomenPercent: true,
+        latissimusPercent: true,
+        trapeziusPercent: true,
+        lowerBackPercent: true,
+        hamstringsPercent: true,
+        glutesPercent: true,
+        shouldersPercent: true,
+        bicepsPercent: true,
+        chestPercent: true,
+        quadricepsPercent: true,
+        calvesPercent: true,
+        tricepsPercent: true,
       },
       orderBy: [{ isCustom: 'asc' }, { name: 'asc' }],
     });
@@ -66,6 +166,18 @@ export class ExercisesService {
         isDoubleWeight: true,
         isCustom: true,
         userId: true,
+        abdomenPercent: true,
+        latissimusPercent: true,
+        trapeziusPercent: true,
+        lowerBackPercent: true,
+        hamstringsPercent: true,
+        glutesPercent: true,
+        shouldersPercent: true,
+        bicepsPercent: true,
+        chestPercent: true,
+        quadricepsPercent: true,
+        calvesPercent: true,
+        tricepsPercent: true,
       },
     });
 
@@ -103,6 +215,9 @@ export class ExercisesService {
       throw new ConflictException('You already have a custom exercise with this name');
     }
 
+    // Validate and normalize muscle percentages
+    const percentages = this.validateAndNormalizeMusclePercentages(createExerciseDto);
+
     const exercise = await this.prisma.exercise.create({
       data: {
         name,
@@ -112,6 +227,7 @@ export class ExercisesService {
         isDoubleWeight: isDoubleWeight ?? false,
         isCustom: true,
         userId,
+        ...percentages,
       },
       select: {
         id: true,
@@ -122,6 +238,18 @@ export class ExercisesService {
         isDoubleWeight: true,
         isCustom: true,
         userId: true,
+        abdomenPercent: true,
+        latissimusPercent: true,
+        trapeziusPercent: true,
+        lowerBackPercent: true,
+        hamstringsPercent: true,
+        glutesPercent: true,
+        shouldersPercent: true,
+        bicepsPercent: true,
+        chestPercent: true,
+        quadricepsPercent: true,
+        calvesPercent: true,
+        tricepsPercent: true,
       },
     });
 
@@ -163,6 +291,9 @@ export class ExercisesService {
       throw new ConflictException('You can only update your own custom exercises');
     }
 
+    // Validate and normalize muscle percentages
+    const percentages = this.validateAndNormalizeMusclePercentages(updateDto);
+
     const updated = await this.prisma.exercise.update({
       where: { id },
       data: {
@@ -171,6 +302,7 @@ export class ExercisesService {
         equipment: updateDto.equipment,
         isUnilateral: updateDto.isUnilateral,
         isDoubleWeight: updateDto.isDoubleWeight,
+        ...percentages,
       },
       select: {
         id: true,
@@ -181,6 +313,18 @@ export class ExercisesService {
         isDoubleWeight: true,
         isCustom: true,
         userId: true,
+        abdomenPercent: true,
+        latissimusPercent: true,
+        trapeziusPercent: true,
+        lowerBackPercent: true,
+        hamstringsPercent: true,
+        glutesPercent: true,
+        shouldersPercent: true,
+        bicepsPercent: true,
+        chestPercent: true,
+        quadricepsPercent: true,
+        calvesPercent: true,
+        tricepsPercent: true,
       },
     });
 

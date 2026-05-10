@@ -9,4 +9,17 @@ export class ExerciseDto {
   isDoubleWeight: boolean;
   isCustom: boolean;
   userId?: string;
+  // Muscle group distribution percentages
+  abdomenPercent: number;
+  latissimusPercent: number;
+  trapeziusPercent: number;
+  lowerBackPercent: number;
+  hamstringsPercent: number;
+  glutesPercent: number;
+  shouldersPercent: number;
+  bicepsPercent: number;
+  chestPercent: number;
+  quadricepsPercent: number;
+  calvesPercent: number;
+  tricepsPercent: number;
 }

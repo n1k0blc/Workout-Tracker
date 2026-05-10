@@ -202,6 +202,7 @@ export default function AnalyticsPage() {
   // Translation helpers
   const translateMuscleGroup = (mg: string): string => {
     const translations: Record<string, string> = {
+      // Legacy groups (kept for backwards compatibility)
       CHEST: 'Brust',
       BACK: 'Rücken',
       LEGS: 'Beine',
@@ -210,6 +211,15 @@ export default function AnalyticsPage() {
       TRICEPS: 'Trizeps',
       ABS: 'Bauch',
       FOREARMS: 'Unterarme',
+      // New granular muscle groups
+      ABDOMEN: 'Bauch',
+      LATISSIMUS: 'Latissimus',
+      TRAPEZIUS: 'Trapez',
+      LOWER_BACK: 'Unterer Rücken',
+      HAMSTRINGS: 'Beinbeuger',
+      GLUTES: 'Glutes',
+      QUADRICEPS: 'Quadrizeps',
+      CALVES: 'Waden',
     };
     return translations[mg] || mg;
   };
@@ -899,13 +909,18 @@ export default function AnalyticsPage() {
   };
 
   const muscleGroups = [
-    MuscleGroup.CHEST,
-    MuscleGroup.BACK,
-    MuscleGroup.BICEPS,
-    MuscleGroup.TRICEPS,
-    MuscleGroup.ABS,
+    MuscleGroup.ABDOMEN,
+    MuscleGroup.LATISSIMUS,
+    MuscleGroup.TRAPEZIUS,
+    MuscleGroup.LOWER_BACK,
+    MuscleGroup.HAMSTRINGS,
+    MuscleGroup.GLUTES,
     MuscleGroup.SHOULDERS,
-    MuscleGroup.LEGS,
+    MuscleGroup.BICEPS,
+    MuscleGroup.CHEST,
+    MuscleGroup.QUADRICEPS,
+    MuscleGroup.CALVES,
+    MuscleGroup.TRICEPS,
   ];
 
   const equipments = [

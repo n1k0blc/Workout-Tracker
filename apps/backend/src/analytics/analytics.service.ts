@@ -59,6 +59,54 @@ export class AnalyticsService {
   }
 
   /**
+   * Helper: Distribute volume across muscle groups based on percentages
+   * Returns a map of muscle group -> volume contribution
+   */
+  private distributeVolumeByMuscleGroups(
+    totalVolume: number,
+    exercise: {
+      abdomenPercent: number;
+      latissimusPercent: number;
+      trapeziusPercent: number;
+      lowerBackPercent: number;
+      hamstringsPercent: number;
+      glutesPercent: number;
+      shouldersPercent: number;
+      bicepsPercent: number;
+      chestPercent: number;
+      quadricepsPercent: number;
+      calvesPercent: number;
+      tricepsPercent: number;
+    },
+  ): Map<string, number> {
+    const distribution = new Map<string, number>();
+
+    // Map of percent field to muscle group enum value
+    const percentToMuscleGroup = [
+      { percent: exercise.abdomenPercent, group: 'ABDOMEN' },
+      { percent: exercise.latissimusPercent, group: 'LATISSIMUS' },
+      { percent: exercise.trapeziusPercent, group: 'TRAPEZIUS' },
+      { percent: exercise.lowerBackPercent, group: 'LOWER_BACK' },
+      { percent: exercise.hamstringsPercent, group: 'HAMSTRINGS' },
+      { percent: exercise.glutesPercent, group: 'GLUTES' },
+      { percent: exercise.shouldersPercent, group: 'SHOULDERS' },
+      { percent: exercise.bicepsPercent, group: 'BICEPS' },
+      { percent: exercise.chestPercent, group: 'CHEST' },
+      { percent: exercise.quadricepsPercent, group: 'QUADRICEPS' },
+      { percent: exercise.calvesPercent, group: 'CALVES' },
+      { percent: exercise.tricepsPercent, group: 'TRICEPS' },
+    ];
+
+    for (const { percent, group } of percentToMuscleGroup) {
+      if (percent > 0) {
+        distribution.set(group, (totalVolume * percent) / 100);
+      }
+    }
+
+    return distribution;
+  }
+
+  /**
    * Helper: Check if exercise matches equipment filter
    */
   private matchesEquipmentFilter(equipment: string, filter: string[]): boolean {
@@ -232,6 +280,18 @@ export class AnalyticsService {
                 equipment: true,
                 isUnilateral: true,
                 isDoubleWeight: true,
+                abdomenPercent: true,
+                latissimusPercent: true,
+                trapeziusPercent: true,
+                lowerBackPercent: true,
+                hamstringsPercent: true,
+                glutesPercent: true,
+                shouldersPercent: true,
+                bicepsPercent: true,
+                chestPercent: true,
+                quadricepsPercent: true,
+                calvesPercent: true,
+                tricepsPercent: true,
               },
             },
             sets: true,
@@ -250,6 +310,7 @@ export class AnalyticsService {
 
     for (const workout of workouts) {
       let workoutVolume = 0;
+      const workoutVolumeByMuscle: Map<string, number> = new Map();
 
       for (const exerciseLog of workout.exercises) {
         // If exerciseId is provided, filter by exercise ID only (ignore muscle/equipment filters)
@@ -258,10 +319,7 @@ export class AnalyticsService {
             continue;
           }
         } else {
-          // Apply muscle group and equipment filters
-          if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) {
-            continue;
-          }
+          // Apply equipment filter only (NOT muscle group - we distribute volume instead)
           if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) {
             continue;
           }
@@ -274,15 +332,35 @@ export class AnalyticsService {
           const setVolume = set.reps * set.weight * 
             (exerciseLog.exercise.isUnilateral ? 2 : 1) * 
             (exerciseLog.exercise.isDoubleWeight ? 2 : 1);
-          workoutVolume += setVolume;
 
-          // Track by muscle group
-          const mgKey = exerciseLog.exercise.muscleGroup;
-          volumeByMuscleGroup.set(
-            mgKey,
-            (volumeByMuscleGroup.get(mgKey) || 0) + setVolume,
-          );
+          // Distribute volume across muscle groups based on percentages
+          const distribution = this.distributeVolumeByMuscleGroups(setVolume, exerciseLog.exercise);
+          for (const [muscleGroup, volume] of distribution) {
+            // Add to global muscle group totals
+            volumeByMuscleGroup.set(
+              muscleGroup,
+              (volumeByMuscleGroup.get(muscleGroup) || 0) + volume,
+            );
+            
+            // Track per-workout volume by muscle for filtered display
+            workoutVolumeByMuscle.set(
+              muscleGroup,
+              (workoutVolumeByMuscle.get(muscleGroup) || 0) + volume,
+            );
+          }
         }
+      }
+
+      // Calculate workout volume: either filtered by muscle groups or total
+      if (muscleGroups.length > 0) {
+        // Sum only volumes for selected muscle groups
+        workoutVolume = Array.from(workoutVolumeByMuscle.entries())
+          .filter(([mg]) => muscleGroups.includes(mg))
+          .reduce((sum, [, vol]) => sum + vol, 0);
+      } else {
+        // No filter: sum all muscle groups
+        workoutVolume = Array.from(workoutVolumeByMuscle.values())
+          .reduce((sum, vol) => sum + vol, 0);
       }
 
       totalVolume += workoutVolume;
@@ -307,13 +385,18 @@ export class AnalyticsService {
       : dataPoints;
 
     // Calculate percentages for muscle groups
-    const byMuscleGroup: VolumeByMuscleGroup[] = Array.from(volumeByMuscleGroup.entries()).map(
+    let byMuscleGroup: VolumeByMuscleGroup[] = Array.from(volumeByMuscleGroup.entries()).map(
       ([muscleGroup, volume]) => ({
         muscleGroup,
         volume,
         percentage: totalVolume > 0 ? (volume / totalVolume) * 100 : 0,
       }),
     );
+
+    // Filter byMuscleGroup if muscle group filter is provided
+    if (muscleGroups.length > 0) {
+      byMuscleGroup = byMuscleGroup.filter(item => muscleGroups.includes(item.muscleGroup));
+    }
 
     return {
       totalVolume,
@@ -547,6 +630,18 @@ export class AnalyticsService {
                 muscleGroup: true,
                 isUnilateral: true,
                 isDoubleWeight: true,
+                abdomenPercent: true,
+                latissimusPercent: true,
+                trapeziusPercent: true,
+                lowerBackPercent: true,
+                hamstringsPercent: true,
+                glutesPercent: true,
+                shouldersPercent: true,
+                bicepsPercent: true,
+                chestPercent: true,
+                quadricepsPercent: true,
+                calvesPercent: true,
+                tricepsPercent: true,
               },
             },
             sets: true,
@@ -563,15 +658,6 @@ export class AnalyticsService {
 
     for (const workout of workouts) {
       for (const exerciseLog of workout.exercises) {
-        const muscleGroup = exerciseLog.exercise.muscleGroup;
-
-        if (!distributionMap.has(muscleGroup)) {
-          distributionMap.set(muscleGroup, { volume: 0, workoutCount: new Set() });
-        }
-
-        const data = distributionMap.get(muscleGroup);
-        data.workoutCount.add(workout.id);
-
         for (const set of exerciseLog.sets) {
           // Skip warmup sets - only count working sets for muscle distribution
           if (set.setType === 'WARMUP') continue;
@@ -579,8 +665,19 @@ export class AnalyticsService {
           const setVolume = set.reps * set.weight * 
             (exerciseLog.exercise.isUnilateral ? 2 : 1) * 
             (exerciseLog.exercise.isDoubleWeight ? 2 : 1);
-          data.volume += setVolume;
+          
           totalVolume += setVolume;
+
+          // Distribute volume across muscle groups based on percentages
+          const distribution = this.distributeVolumeByMuscleGroups(setVolume, exerciseLog.exercise);
+          for (const [muscleGroup, volume] of distribution) {
+            if (!distributionMap.has(muscleGroup)) {
+              distributionMap.set(muscleGroup, { volume: 0, workoutCount: new Set() });
+            }
+            const data = distributionMap.get(muscleGroup);
+            data.volume += volume;
+            data.workoutCount.add(workout.id);
+          }
         }
       }
     }
