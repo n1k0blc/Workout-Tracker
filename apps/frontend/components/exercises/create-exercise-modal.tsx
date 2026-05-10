@@ -224,7 +224,7 @@ export default function CreateExerciseModal({
             {/* Muscle Group Inputs */}
             <div className="grid grid-cols-2 gap-3 max-h-80 overflow-y-auto pr-2">
               {(Object.entries(MUSCLE_GROUP_LABELS) as [MuscleGroup, string][])
-                .filter(([key]) => !['ABS', 'BACK', 'LEGS'].includes(key)) // Filter legacy values
+                .filter(([key]) => ![MuscleGroup.ABS, MuscleGroup.BACK, MuscleGroup.LEGS].includes(key)) // Filter legacy values
                 .map(([key, label]) => {
                   const field = {
                     [MuscleGroup.ABDOMEN]: 'abdomenPercent',
@@ -239,6 +239,10 @@ export default function CreateExerciseModal({
                     [MuscleGroup.QUADRICEPS]: 'quadricepsPercent',
                     [MuscleGroup.CALVES]: 'calvesPercent',
                     [MuscleGroup.TRICEPS]: 'tricepsPercent',
+                    // Legacy values (filtered out, but needed for TypeScript)
+                    [MuscleGroup.ABS]: 'abdomenPercent',
+                    [MuscleGroup.BACK]: 'latissimusPercent',
+                    [MuscleGroup.LEGS]: 'quadricepsPercent',
                   }[key] as keyof typeof percentages;
 
                   const value = percentages[field];
