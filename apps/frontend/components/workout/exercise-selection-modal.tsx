@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Exercise, MuscleGroup, Equipment } from '@/types';
 import { apiClient } from '@/lib/api';
+import { MUSCLE_GROUP_LABELS } from '@/lib/exercise-utils';
 import CreateExerciseModal from '@/components/exercises/create-exercise-modal';
 
 interface ExerciseSelectionModalProps {
@@ -73,16 +74,7 @@ export default function ExerciseSelectionModal({
   ];
 
   const translateMuscleGroup = (mg: MuscleGroup): string => {
-    const translations: Record<MuscleGroup, string> = {
-      CHEST: 'Brust',
-      BACK: 'Rücken',
-      BICEPS: 'Bizeps',
-      TRICEPS: 'Trizeps',
-      ABS: 'Bauch',
-      SHOULDERS: 'Schultern',
-      LEGS: 'Beine',
-    };
-    return translations[mg];
+    return MUSCLE_GROUP_LABELS[mg] || mg;
   };
 
   const translateEquipment = (eq: Equipment): string => {
