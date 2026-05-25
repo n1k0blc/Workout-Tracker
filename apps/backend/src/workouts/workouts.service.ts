@@ -508,20 +508,44 @@ export class WorkoutsService {
       throw new NotFoundException('Exercise log not found');
     }
 
-    await this.prisma.setLog.create({
-      data: {
+    // Check if this set number is already logged for this exercise (defensive programming)
+    const existingSet = await this.prisma.setLog.findFirst({
+      where: {
         exerciseLogId,
         setNumber: logSetDto.setNumber,
-        reps: logSetDto.reps,
-        weight: logSetDto.weight,
-        rir: logSetDto.rir,
-        setType: logSetDto.setType,
-        targetReps: logSetDto.targetReps,
-        targetWeight: logSetDto.targetWeight,
-        targetRir: logSetDto.targetRir,
-        actualRestDuration: logSetDto.actualRestDuration,
       },
     });
+
+    if (existingSet) {
+      throw new BadRequestException(
+        `Set ${logSetDto.setNumber} is already logged for this exercise`
+      );
+    }
+
+    try {
+      await this.prisma.setLog.create({
+        data: {
+          exerciseLogId,
+          setNumber: logSetDto.setNumber,
+          reps: logSetDto.reps,
+          weight: logSetDto.weight,
+          rir: logSetDto.rir,
+          setType: logSetDto.setType,
+          targetReps: logSetDto.targetReps,
+          targetWeight: logSetDto.targetWeight,
+          targetRir: logSetDto.targetRir,
+          actualRestDuration: logSetDto.actualRestDuration,
+        },
+      });
+    } catch (error) {
+      // Handle unique constraint violation
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
+        throw new BadRequestException(
+          `Set ${logSetDto.setNumber} is already logged for this exercise`
+        );
+      }
+      throw error;
+    }
 
     return this.findById(workoutId, userId);
   }

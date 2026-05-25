@@ -69,6 +69,18 @@ export default function ExerciseCard({
   const hasPlannedSets = exercise.plannedSets && exercise.plannedSets.length > 0;
 
   const handleLogSet = async (setNumber: number, isUnplanned: boolean = false) => {
+    // Double-click protection: Check if set is already logged
+    const existingSet = getLoggedSet(setNumber);
+    if (existingSet) {
+      console.warn(`Set ${setNumber} is already logged`);
+      return;
+    }
+
+    // Prevent multiple simultaneous API calls for the same set
+    if (loading) {
+      return;
+    }
+
     let values;
     let setType: SetType = SetType.WORKING;
     let plannedRestAfterSet: number | undefined;
@@ -83,6 +95,12 @@ export default function ExerciseCard({
       };
       setType = unplannedSet.setType;
       plannedRestAfterSet = 90; // Default for unplanned sets
+      
+      // Validation: Prevent logging empty unplanned sets
+      if (!values.weight || !values.reps || parseFloat(values.weight) === 0 || parseInt(values.reps) === 0) {
+        console.warn('Cannot log set with empty weight or reps');
+        return;
+      }
     } else {
       // Both setNumber and order are 1-based
       const plannedSet = exercise.plannedSets?.find(ps => ps.order === setNumber);
@@ -121,6 +139,10 @@ export default function ExerciseCard({
       });
     } catch (error) {
       console.error('Failed to log set:', error);
+      // If DB constraint violation, show user-friendly message
+      if (error instanceof Error && error.message.includes('Unique constraint')) {
+        console.error('This set number is already logged (database constraint)');
+      }
     }
   };
 
@@ -602,6 +624,9 @@ export default function ExerciseCard({
           {/* Ungeplante Sätze */}
           {unplannedSets.map((unplannedSet) => {
             const loggedSet = getLoggedSet(unplannedSet.setNumber);
+            // Check if unplanned set has valid values
+            const hasValidValues = unplannedSet.weight && unplannedSet.reps && 
+              parseFloat(unplannedSet.weight) > 0 && parseInt(unplannedSet.reps) > 0;
 
             return (
               <div
@@ -624,8 +649,9 @@ export default function ExerciseCard({
                     ) : (
                       <button
                         onClick={() => handleLogSet(unplannedSet.setNumber, true)}
-                        disabled={loading}
-                        className="w-5 h-5 border-2 border-gray-400 rounded hover:border-blue-600 disabled:opacity-50"
+                        disabled={loading || !hasValidValues}
+                        className="w-5 h-5 border-2 border-gray-400 rounded hover:border-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={!hasValidValues ? 'Gewicht und Wiederholungen müssen ausgefüllt sein' : ''}
                       />
                     )}
                   </div>
