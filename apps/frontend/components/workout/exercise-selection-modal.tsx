@@ -54,13 +54,18 @@ export default function ExerciseSelectionModal({
   };
 
   const muscleGroups = [
-    MuscleGroup.CHEST,
-    MuscleGroup.BACK,
-    MuscleGroup.BICEPS,
-    MuscleGroup.TRICEPS,
-    MuscleGroup.ABS,
+    MuscleGroup.ABDOMEN,
+    MuscleGroup.LATISSIMUS,
+    MuscleGroup.TRAPEZIUS,
+    MuscleGroup.LOWER_BACK,
+    MuscleGroup.HAMSTRINGS,
+    MuscleGroup.GLUTES,
     MuscleGroup.SHOULDERS,
-    MuscleGroup.LEGS,
+    MuscleGroup.BICEPS,
+    MuscleGroup.CHEST,
+    MuscleGroup.QUADRICEPS,
+    MuscleGroup.CALVES,
+    MuscleGroup.TRICEPS,
   ];
 
   const equipments = [
