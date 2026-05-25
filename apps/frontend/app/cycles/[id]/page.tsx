@@ -4,6 +4,7 @@ import { ProtectedRoute } from '@/components/protected-route';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
+import { MUSCLE_GROUP_LABELS } from '@/lib/exercise-utils';
 import { 
   CycleDetails, 
   PersonalRecord, 
@@ -227,11 +228,7 @@ export default function CycleDetailPage() {
 
   // Translation helpers
   const translateMuscleGroup = (mg: string): string => {
-    const translations: Record<string, string> = {
-      CHEST: 'Brust', BACK: 'Rücken', LEGS: 'Beine', SHOULDERS: 'Schultern',
-      BICEPS: 'Bizeps', TRICEPS: 'Trizeps', ABS: 'Bauch', FOREARMS: 'Unterarme',
-    };
-    return translations[mg] || mg;
+    return MUSCLE_GROUP_LABELS[mg as MuscleGroup] || mg;
   };
 
   const translateEquipment = (eq: Equipment): string => {
@@ -845,12 +842,25 @@ export default function CycleDetailPage() {
                     >
                       Alle
                     </button>
-                    {['CHEST', 'BACK', 'LEGS', 'SHOULDERS', 'BICEPS', 'TRICEPS', 'ABS', 'FOREARMS'].map((muscle) => (
+                    {[
+                      MuscleGroup.ABDOMEN,
+                      MuscleGroup.LATISSIMUS,
+                      MuscleGroup.TRAPEZIUS,
+                      MuscleGroup.LOWER_BACK,
+                      MuscleGroup.HAMSTRINGS,
+                      MuscleGroup.GLUTES,
+                      MuscleGroup.SHOULDERS,
+                      MuscleGroup.BICEPS,
+                      MuscleGroup.CHEST,
+                      MuscleGroup.QUADRICEPS,
+                      MuscleGroup.CALVES,
+                      MuscleGroup.TRICEPS,
+                    ].map((muscle) => (
                       <button
                         key={muscle}
-                        onClick={() => toggleMuscle(muscle as MuscleGroup)}
+                        onClick={() => toggleMuscle(muscle)}
                         className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                          selectedMuscles.includes(muscle as MuscleGroup)
+                          selectedMuscles.includes(muscle)
                             ? 'bg-blue-600 text-white'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                         }`}
