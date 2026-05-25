@@ -203,8 +203,10 @@ export default function ExerciseCard({
   };
 
   const addUnplannedSet = () => {
+    // Calculate next set number based on the highest order in planned sets (not the count!)
+    // This is important because planned sets may have gaps (e.g., order: 2, 3, 5 if set 1 was removed)
     const nextSetNumber = Math.max(
-      hasPlannedSets ? exercise.plannedSets!.length : 0,
+      hasPlannedSets ? Math.max(...exercise.plannedSets!.map(ps => ps.order)) : 0,
       ...unplannedSets.map(s => s.setNumber),
       ...exercise.sets.map(s => s.setNumber)
     ) + 1;
