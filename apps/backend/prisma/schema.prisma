@@ -186,6 +186,8 @@ model SetLog {
   actualRestDuration Int?
   completedAt        DateTime    @default(now())
   exerciseLog        ExerciseLog @relation(fields: [exerciseLogId], references: [id], onDelete: Cascade)
+
+  @@unique([exerciseLogId, setNumber])
 }
 
 model WorkoutTemplate {
