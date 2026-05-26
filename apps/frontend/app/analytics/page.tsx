@@ -42,6 +42,7 @@ import {
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import SelectedExerciseCard from '@/components/analytics/selected-exercise-card';
+import ScrollableChart from '@/components/analytics/scrollable-chart';
 
 export default function AnalyticsPage() {
   // Data states
@@ -1295,8 +1296,9 @@ export default function AnalyticsPage() {
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">
                       Vergleichsansicht
                     </h3>
-                    <ResponsiveContainer width="100%" height={400}>
-                      <LineChart data={mergedChartData}>
+                    <ScrollableChart dataPointCount={mergedChartData.length}>
+                      <ResponsiveContainer width="100%" height={400}>
+                        <LineChart data={mergedChartData}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis
                           dataKey="date"
@@ -1360,6 +1362,7 @@ export default function AnalyticsPage() {
                         ))}
                       </LineChart>
                     </ResponsiveContainer>
+                    </ScrollableChart>
                   </div>
                 )}
                 
@@ -1369,8 +1372,9 @@ export default function AnalyticsPage() {
                     <h3 className="text-lg font-semibold text-gray-900 mb-4">
                       Volumen-Entwicklung
                     </h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={volumeData.dataPoints}>
+                    <ScrollableChart dataPointCount={volumeData.dataPoints.length}>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={volumeData.dataPoints}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis
                           dataKey={cycleMode ? "date" : "date"}
@@ -1404,6 +1408,7 @@ export default function AnalyticsPage() {
                         />
                       </LineChart>
                     </ResponsiveContainer>
+                    </ScrollableChart>
                     <div className="mt-4 text-center">
                       <div className="text-sm text-gray-600">
                         Gesamtes Volumen
@@ -1432,8 +1437,9 @@ export default function AnalyticsPage() {
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">
                           %ORM-Entwicklung
                         </h3>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <LineChart data={ormData.dataPoints}>
+                        <ScrollableChart dataPointCount={ormData.dataPoints.length}>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={ormData.dataPoints}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis
                               dataKey="date"
@@ -1464,6 +1470,7 @@ export default function AnalyticsPage() {
                             />
                           </LineChart>
                         </ResponsiveContainer>
+                        </ScrollableChart>
                         <div className="mt-4 text-center">
                           <div className="text-sm text-gray-600">
                             Durchschnitt %ORM
@@ -1491,8 +1498,9 @@ export default function AnalyticsPage() {
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">
                           RIR-Verteilung
                         </h3>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <BarChart data={rirData.dataPoints}>
+                        <ScrollableChart dataPointCount={rirData.dataPoints.length}>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={rirData.dataPoints}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis
                               dataKey="date"
@@ -1512,6 +1520,7 @@ export default function AnalyticsPage() {
                             <Bar dataKey="rir2Count" fill="#22c55e" name="RIR 2" />
                           </BarChart>
                         </ResponsiveContainer>
+                        </ScrollableChart>
                         <div className="mt-4 text-center">
                           <div className="text-sm text-gray-600">
                             Gesamte Sets
@@ -1539,8 +1548,9 @@ export default function AnalyticsPage() {
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">
                           RIR-Verteilung
                         </h3>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <BarChart data={rirData.dataPoints}>
+                        <ScrollableChart dataPointCount={rirData.dataPoints.length}>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={rirData.dataPoints}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis
                               dataKey="date"
@@ -1565,6 +1575,7 @@ export default function AnalyticsPage() {
                             <Bar dataKey="rir2Count" fill="#22c55e" name="RIR 2" />
                           </BarChart>
                         </ResponsiveContainer>
+                        </ScrollableChart>
                         <div className="mt-4 text-center">
                           <div className="text-sm text-gray-600">
                             Gesamte Sets
@@ -1601,8 +1612,9 @@ export default function AnalyticsPage() {
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">
                           Workout-Dauer
                         </h3>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <LineChart data={durationData.dataPoints}>
+                        <ScrollableChart dataPointCount={durationData.dataPoints.length}>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={durationData.dataPoints}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis
                               dataKey="date"
@@ -1628,6 +1640,7 @@ export default function AnalyticsPage() {
                             />
                           </LineChart>
                         </ResponsiveContainer>
+                        </ScrollableChart>
                         <div className="mt-4 text-center">
                           <div className="text-sm text-gray-600">
                             Durchschnittliche Dauer
@@ -1667,8 +1680,9 @@ export default function AnalyticsPage() {
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">
                           Workout-Dauer
                         </h3>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <LineChart data={durationData.dataPoints}>
+                        <ScrollableChart dataPointCount={durationData.dataPoints.length}>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={durationData.dataPoints}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis
                               dataKey="date"
@@ -1699,6 +1713,7 @@ export default function AnalyticsPage() {
                             />
                           </LineChart>
                         </ResponsiveContainer>
+                        </ScrollableChart>
                         <div className="mt-4 text-center">
                           <div className="text-sm text-gray-600">
                             Durchschnittliche Dauer
@@ -1729,8 +1744,9 @@ export default function AnalyticsPage() {
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">
                           Durchschnittliche Satzpause
                         </h3>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <LineChart data={restTimeData.dataPoints}>
+                        <ScrollableChart dataPointCount={restTimeData.dataPoints.length}>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={restTimeData.dataPoints}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis
                               dataKey="date"
@@ -1756,6 +1772,7 @@ export default function AnalyticsPage() {
                             />
                           </LineChart>
                         </ResponsiveContainer>
+                        </ScrollableChart>
                         <div className="mt-4 text-center">
                           <div className="text-sm text-gray-600">
                             Durchschnittliche Pause
@@ -1783,38 +1800,40 @@ export default function AnalyticsPage() {
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">
                           Durchschnittliche Satzpause
                         </h3>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <LineChart data={restTimeData.dataPoints}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              dataKey="date"
-                              tickFormatter={(date, index) => formatXAxisLabel(restTimeData.dataPoints[index])}
-                              style={{ fontSize: '12px' }}
-                            />
-                            <YAxis
-                              label={{ value: 'Sekunden', angle: -90, position: 'insideLeft' }}
-                              style={{ fontSize: '12px' }}
-                            />
-                            <Tooltip
-                              formatter={(value: any) => [`${value}s`, 'Satzpause']}
-                              labelFormatter={(label, payload) => {
-                                if (payload && payload.length > 0) {
-                                  return formatTooltipLabel(payload[0].payload);
-                                }
-                                return formatDate(label as string);
-                              }}
-                            />
-                            <Legend />
-                            <Line
-                              type="monotone"
-                              dataKey="averageRestTime"
-                              stroke="#f59e0b"
-                              strokeWidth={2}
-                              dot={{ r: 4 }}
-                              name="Satzpause"
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
+                        <ScrollableChart dataPointCount={restTimeData.dataPoints.length}>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={restTimeData.dataPoints}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis
+                                dataKey="date"
+                                tickFormatter={(date, index) => formatXAxisLabel(restTimeData.dataPoints[index])}
+                                style={{ fontSize: '12px' }}
+                              />
+                              <YAxis
+                                label={{ value: 'Sekunden', angle: -90, position: 'insideLeft' }}
+                                style={{ fontSize: '12px' }}
+                              />
+                              <Tooltip
+                                formatter={(value: any) => [`${value}s`, 'Satzpause']}
+                                labelFormatter={(label, payload) => {
+                                  if (payload && payload.length > 0) {
+                                    return formatTooltipLabel(payload[0].payload);
+                                  }
+                                  return formatDate(label as string);
+                                }}
+                              />
+                              <Legend />
+                              <Line
+                                type="monotone"
+                                dataKey="averageRestTime"
+                                stroke="#f59e0b"
+                                strokeWidth={2}
+                                dot={{ r: 4 }}
+                                name="Satzpause"
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </ScrollableChart>
                         <div className="mt-4 text-center">
                           <div className="text-sm text-gray-600">
                             Durchschnittliche Pause
@@ -1842,31 +1861,33 @@ export default function AnalyticsPage() {
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">
                           Wiederholungen pro Workout
                         </h3>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <LineChart data={repsData.dataPoints}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              dataKey="date"
-                              tickFormatter={formatDate}
-                              style={{ fontSize: '12px' }}
-                            />
-                            <YAxis
-                              label={{ value: 'Wiederholungen', angle: -90, position: 'insideLeft' }}
-                              style={{ fontSize: '12px' }}
-                            />
-                            <Tooltip
-                              formatter={(value: any) => [value, 'Wiederholungen']}
-                              labelFormatter={(label: any) => formatDate(label as string)}
-                            />
-                            <Legend />
-                            <Line
-                              dataKey="reps"
-                              stroke="#10b981"
-                              strokeWidth={2}
-                              name="Wiederholungen"
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
+                        <ScrollableChart dataPointCount={repsData.dataPoints.length}>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={repsData.dataPoints}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis
+                                dataKey="date"
+                                tickFormatter={formatDate}
+                                style={{ fontSize: '12px' }}
+                              />
+                              <YAxis
+                                label={{ value: 'Wiederholungen', angle: -90, position: 'insideLeft' }}
+                                style={{ fontSize: '12px' }}
+                              />
+                              <Tooltip
+                                formatter={(value: any) => [value, 'Wiederholungen']}
+                                labelFormatter={(label: any) => formatDate(label as string)}
+                              />
+                              <Legend />
+                              <Line
+                                dataKey="reps"
+                                stroke="#10b981"
+                                strokeWidth={2}
+                                name="Wiederholungen"
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </ScrollableChart>
                         <div className="mt-4 grid grid-cols-2 gap-4 text-center">
                           <div>
                             <div className="text-sm text-gray-600">
@@ -1904,31 +1925,33 @@ export default function AnalyticsPage() {
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">
                           Arbeitssätze pro Workout
                         </h3>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <LineChart data={setsData.dataPoints}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              dataKey="date"
-                              tickFormatter={formatDate}
-                              style={{ fontSize: '12px' }}
-                            />
-                            <YAxis
-                              label={{ value: 'Sätze', angle: -90, position: 'insideLeft' }}
-                              style={{ fontSize: '12px' }}
-                            />
-                            <Tooltip
-                              formatter={(value: any) => [value, 'Sätze']}
-                              labelFormatter={(label: any) => formatDate(label as string)}
-                            />
-                            <Legend />
-                            <Line
-                              dataKey="sets"
-                              stroke="#f59e0b"
-                              strokeWidth={2}
-                              name="Sätze"
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
+                        <ScrollableChart dataPointCount={setsData.dataPoints.length}>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={setsData.dataPoints}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis
+                                dataKey="date"
+                                tickFormatter={formatDate}
+                                style={{ fontSize: '12px' }}
+                              />
+                              <YAxis
+                                label={{ value: 'Sätze', angle: -90, position: 'insideLeft' }}
+                                style={{ fontSize: '12px' }}
+                              />
+                              <Tooltip
+                                formatter={(value: any) => [value, 'Sätze']}
+                                labelFormatter={(label: any) => formatDate(label as string)}
+                              />
+                              <Legend />
+                              <Line
+                                dataKey="sets"
+                                stroke="#f59e0b"
+                                strokeWidth={2}
+                                name="Sätze"
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </ScrollableChart>
                         <div className="mt-4 grid grid-cols-2 gap-4 text-center">
                           <div>
                             <div className="text-sm text-gray-600">
@@ -1966,36 +1989,38 @@ export default function AnalyticsPage() {
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">
                           Wiederholungen pro Workout
                         </h3>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <LineChart data={repsData.dataPoints}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              dataKey="date"
-                              tickFormatter={(date, index) => formatXAxisLabel(repsData.dataPoints[index])}
-                              style={{ fontSize: '12px' }}
-                            />
-                            <YAxis
-                              label={{ value: 'Wiederholungen', angle: -90, position: 'insideLeft' }}
-                              style={{ fontSize: '12px' }}
-                            />
-                            <Tooltip
-                              formatter={(value: any) => [value, 'Wiederholungen']}
-                              labelFormatter={(label, payload) => {
-                                if (payload && payload.length > 0) {
-                                  return formatTooltipLabel(payload[0].payload);
-                                }
-                                return formatDate(label as string);
-                              }}
-                            />
-                            <Legend />
-                            <Line
-                              dataKey="reps"
-                              stroke="#10b981"
-                              strokeWidth={2}
-                              name="Wiederholungen"
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
+                        <ScrollableChart dataPointCount={repsData.dataPoints.length}>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={repsData.dataPoints}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis
+                                dataKey="date"
+                                tickFormatter={(date, index) => formatXAxisLabel(repsData.dataPoints[index])}
+                                style={{ fontSize: '12px' }}
+                              />
+                              <YAxis
+                                label={{ value: 'Wiederholungen', angle: -90, position: 'insideLeft' }}
+                                style={{ fontSize: '12px' }}
+                              />
+                              <Tooltip
+                                formatter={(value: any) => [value, 'Wiederholungen']}
+                                labelFormatter={(label, payload) => {
+                                  if (payload && payload.length > 0) {
+                                    return formatTooltipLabel(payload[0].payload);
+                                  }
+                                  return formatDate(label as string);
+                                }}
+                              />
+                              <Legend />
+                              <Line
+                                dataKey="reps"
+                                stroke="#10b981"
+                                strokeWidth={2}
+                                name="Wiederholungen"
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </ScrollableChart>
                         <div className="mt-4 grid grid-cols-2 gap-4 text-center">
                           <div>
                             <div className="text-sm text-gray-600">
@@ -2033,36 +2058,38 @@ export default function AnalyticsPage() {
                         <h3 className="text-lg font-semibold text-gray-900 mb-4">
                           Arbeitssätze pro Workout
                         </h3>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <LineChart data={setsData.dataPoints}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              dataKey="date"
-                              tickFormatter={(date, index) => formatXAxisLabel(setsData.dataPoints[index])}
-                              style={{ fontSize: '12px' }}
-                            />
-                            <YAxis
-                              label={{ value: 'Sätze', angle: -90, position: 'insideLeft' }}
-                              style={{ fontSize: '12px' }}
-                            />
-                            <Tooltip
-                              formatter={(value: any) => [value, 'Sätze']}
-                              labelFormatter={(label, payload) => {
-                                if (payload && payload.length > 0) {
-                                  return formatTooltipLabel(payload[0].payload);
-                                }
-                                return formatDate(label as string);
-                              }}
-                            />
-                            <Legend />
-                            <Line
-                              dataKey="sets"
-                              stroke="#f59e0b"
-                              strokeWidth={2}
-                              name="Sätze"
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
+                        <ScrollableChart dataPointCount={setsData.dataPoints.length}>
+                          <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={setsData.dataPoints}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis
+                                dataKey="date"
+                                tickFormatter={(date, index) => formatXAxisLabel(setsData.dataPoints[index])}
+                                style={{ fontSize: '12px' }}
+                              />
+                              <YAxis
+                                label={{ value: 'Sätze', angle: -90, position: 'insideLeft' }}
+                                style={{ fontSize: '12px' }}
+                              />
+                              <Tooltip
+                                formatter={(value: any) => [value, 'Sätze']}
+                                labelFormatter={(label, payload) => {
+                                  if (payload && payload.length > 0) {
+                                    return formatTooltipLabel(payload[0].payload);
+                                  }
+                                  return formatDate(label as string);
+                                }}
+                              />
+                              <Legend />
+                              <Line
+                                dataKey="sets"
+                                stroke="#f59e0b"
+                                strokeWidth={2}
+                                name="Sätze"
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </ScrollableChart>
                         <div className="mt-4 grid grid-cols-2 gap-4 text-center">
                           <div>
                             <div className="text-sm text-gray-600">

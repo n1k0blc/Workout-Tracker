@@ -23,6 +23,7 @@ import {
 } from '@/types';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import SelectedExerciseCard from '@/components/analytics/selected-exercise-card';
+import ScrollableChart from '@/components/analytics/scrollable-chart';
 import Link from 'next/link';
 import { 
   ArrowLeft, 
@@ -1000,8 +1001,9 @@ export default function CycleDetailPage() {
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">
                         Vergleich
                       </h3>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={mergedChartData}>
+                      <ScrollableChart dataPointCount={mergedChartData.length}>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={mergedChartData}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
                             dataKey="date"
@@ -1061,18 +1063,20 @@ export default function CycleDetailPage() {
                             />
                           ))}
                         </LineChart>
-                      </ResponsiveContainer>
+                        </ResponsiveContainer>
+                      </ScrollableChart>
                     </div>
                   )}
 
-                  {/* Volume Chart */}
+                  {/* Volume Chart */
                   {selectedViews.length === 1 && selectedViews.includes('volume') && volumeData && volumeData.dataPoints.length > 0 && (
                     <div className="bg-white rounded-lg shadow p-6">
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">
                         Volumen-Entwicklung
                       </h3>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={volumeData.dataPoints}>
+                      <ScrollableChart dataPointCount={volumeData.dataPoints.length}>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={volumeData.dataPoints}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
                             dataKey="date"
@@ -1110,7 +1114,8 @@ export default function CycleDetailPage() {
                             name="Volumen"
                           />
                         </LineChart>
-                      </ResponsiveContainer>
+                        </ResponsiveContainer>
+                      </ScrollableChart>
                       <div className="mt-4 text-center">
                         <div className="text-sm text-gray-600">
                           Gesamtes Volumen
@@ -1139,8 +1144,9 @@ export default function CycleDetailPage() {
                           <h3 className="text-lg font-semibold text-gray-900 mb-4">
                             %ORM-Entwicklung
                           </h3>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <LineChart data={ormData.dataPoints}>
+                          <ScrollableChart dataPointCount={ormData.dataPoints.length}>
+                            <ResponsiveContainer width="100%" height={300}>
+                              <LineChart data={ormData.dataPoints}>
                               <CartesianGrid strokeDasharray="3 3" />
                               <XAxis
                                 dataKey="date"
@@ -1175,7 +1181,8 @@ export default function CycleDetailPage() {
                                 name="%ORM"
                               />
                             </LineChart>
-                          </ResponsiveContainer>
+                            </ResponsiveContainer>
+                          </ScrollableChart>
                           <div className="mt-4 text-center">
                             <div className="text-sm text-gray-600">
                               Durchschnitt %ORM
@@ -1203,8 +1210,9 @@ export default function CycleDetailPage() {
                           <h3 className="text-lg font-semibold text-gray-900 mb-4">
                             RIR-Verteilung
                           </h3>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={rirData.dataPoints}>
+                          <ScrollableChart dataPointCount={rirData.dataPoints.length}>
+                            <ResponsiveContainer width="100%" height={300}>
+                              <BarChart data={rirData.dataPoints}>
                               <CartesianGrid strokeDasharray="3 3" />
                               <XAxis
                                 dataKey="date"
@@ -1233,7 +1241,8 @@ export default function CycleDetailPage() {
                               <Bar dataKey="rir1Count" fill="#eab308" name="RIR 1" />
                               <Bar dataKey="rir2Count" fill="#22c55e" name="RIR 2" />
                             </BarChart>
-                          </ResponsiveContainer>
+                            </ResponsiveContainer>
+                          </ScrollableChart>
                         </>
                       ) : (
                         <div className="text-center py-12">
@@ -1251,8 +1260,9 @@ export default function CycleDetailPage() {
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">
                         Dauer-Entwicklung
                       </h3>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={durationData.dataPoints}>
+                      <ScrollableChart dataPointCount={durationData.dataPoints.length}>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={durationData.dataPoints}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
                             dataKey="date"
@@ -1287,7 +1297,8 @@ export default function CycleDetailPage() {
                             name="Dauer"
                           />
                         </LineChart>
-                      </ResponsiveContainer>
+                        </ResponsiveContainer>
+                      </ScrollableChart>
                       <div className="mt-4 text-center">
                         <div className="text-sm text-gray-600">
                           Durchschnittliche Dauer
@@ -1305,8 +1316,9 @@ export default function CycleDetailPage() {
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">
                         Satzpausen-Entwicklung
                       </h3>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={restTimeData.dataPoints}>
+                      <ScrollableChart dataPointCount={restTimeData.dataPoints.length}>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={restTimeData.dataPoints}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
                             dataKey="date"
@@ -1341,7 +1353,8 @@ export default function CycleDetailPage() {
                             name="Satzpause"
                           />
                         </LineChart>
-                      </ResponsiveContainer>
+                        </ResponsiveContainer>
+                      </ScrollableChart>
                       <div className="mt-4 text-center">
                         <div className="text-sm text-gray-600">
                           Durchschnittliche Satzpause
@@ -1359,8 +1372,9 @@ export default function CycleDetailPage() {
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">
                         Wiederholungen-Entwicklung
                       </h3>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={repsData.dataPoints}>
+                      <ScrollableChart dataPointCount={repsData.dataPoints.length}>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={repsData.dataPoints}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
                             dataKey="date"
@@ -1395,7 +1409,8 @@ export default function CycleDetailPage() {
                             name="Wiederholungen"
                           />
                         </LineChart>
-                      </ResponsiveContainer>
+                        </ResponsiveContainer>
+                      </ScrollableChart>
                       <div className="mt-4 text-center">
                         <div className="text-sm text-gray-600">
                           Gesamte Wiederholungen
@@ -1413,8 +1428,9 @@ export default function CycleDetailPage() {
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">
                         Sätze-Entwicklung
                       </h3>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={setsData.dataPoints}>
+                      <ScrollableChart dataPointCount={setsData.dataPoints.length}>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={setsData.dataPoints}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
                             dataKey="date"
@@ -1449,7 +1465,8 @@ export default function CycleDetailPage() {
                             name="Sätze"
                           />
                         </LineChart>
-                      </ResponsiveContainer>
+                        </ResponsiveContainer>
+                      </ScrollableChart>
                       <div className="mt-4 text-center">
                         <div className="text-sm text-gray-600">
                           Gesamte Sätze
