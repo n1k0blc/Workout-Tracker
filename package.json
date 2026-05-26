@@ -8,6 +8,7 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "npm run backend & npm run frontend",
     "backend": "cd apps/backend && npm run start:dev",
     "frontend": "cd apps/frontend && npm run dev",
     "backend:build": "cd apps/backend && npm run build",
