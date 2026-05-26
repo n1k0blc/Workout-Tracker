@@ -23,6 +23,7 @@ import {
 } from '@/types';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import SelectedExerciseCard from '@/components/analytics/selected-exercise-card';
+import ScrollableChart from '@/components/analytics/scrollable-chart';
 import Link from 'next/link';
 import { 
   ArrowLeft, 
@@ -1000,68 +1001,70 @@ export default function CycleDetailPage() {
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">
                         Vergleich
                       </h3>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={mergedChartData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis
-                            dataKey="date"
-                            tickFormatter={(date, index) => formatXAxisLabel(mergedChartData[index])}
-                            style={{ fontSize: '12px' }}
-                          />
-                          {/* Left Y-Axis */}
-                          {chartLineConfigs.some(config => config.yAxisId === 'left') && (
-                            <YAxis
-                              yAxisId="left"
-                              label={{
-                                value: chartLineConfigs.find(c => c.yAxisId === 'left')?.unit || '',
-                                angle: -90,
-                                position: 'insideLeft',
-                              }}
+                      <ScrollableChart dataPointCount={mergedChartData.length}>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={mergedChartData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis
+                              dataKey="date"
+                              tickFormatter={(date, index) => formatXAxisLabel(mergedChartData[index])}
                               style={{ fontSize: '12px' }}
                             />
-                          )}
-                          {/* Right Y-Axis */}
-                          {chartLineConfigs.some(config => config.yAxisId === 'right') && (
-                            <YAxis
-                              yAxisId="right"
-                              orientation="right"
-                              label={{
-                                value: chartLineConfigs.find(c => c.yAxisId === 'right')?.unit || '',
-                                angle: 90,
-                                position: 'insideRight',
+                            {/* Left Y-Axis */}
+                            {chartLineConfigs.some(config => config.yAxisId === 'left') && (
+                              <YAxis
+                                yAxisId="left"
+                                label={{
+                                  value: chartLineConfigs.find(c => c.yAxisId === 'left')?.unit || '',
+                                  angle: -90,
+                                  position: 'insideLeft',
+                                }}
+                                style={{ fontSize: '12px' }}
+                              />
+                            )}
+                            {/* Right Y-Axis */}
+                            {chartLineConfigs.some(config => config.yAxisId === 'right') && (
+                              <YAxis
+                                yAxisId="right"
+                                orientation="right"
+                                label={{
+                                  value: chartLineConfigs.find(c => c.yAxisId === 'right')?.unit || '',
+                                  angle: 90,
+                                  position: 'insideRight',
+                                }}
+                                style={{ fontSize: '12px' }}
+                              />
+                            )}
+                            <Tooltip
+                              labelFormatter={(label: any, payload: readonly any[]) => {
+                                if (payload && payload.length > 0) {
+                                  return formatTooltipLabel(payload[0].payload);
+                                }
+                                const date = new Date(label as string);
+                                return new Intl.DateTimeFormat('de-DE', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric',
+                                }).format(date);
                               }}
-                              style={{ fontSize: '12px' }}
                             />
-                          )}
-                          <Tooltip
-                            labelFormatter={(label: any, payload: readonly any[]) => {
-                              if (payload && payload.length > 0) {
-                                return formatTooltipLabel(payload[0].payload);
-                              }
-                              const date = new Date(label as string);
-                              return new Intl.DateTimeFormat('de-DE', {
-                                day: '2-digit',
-                                month: '2-digit',
-                                year: 'numeric',
-                              }).format(date);
-                            }}
-                          />
-                          <Legend />
-                          {chartLineConfigs.map((config) => (
-                            <Line
-                              key={config.dataKey}
-                              type="monotone"
-                              dataKey={config.dataKey}
-                              name={config.name}
-                              stroke={config.color}
-                              yAxisId={config.yAxisId}
-                              strokeWidth={2}
-                              dot={{ r: 3 }}
-                              activeDot={{ r: 5 }}
-                            />
-                          ))}
-                        </LineChart>
-                      </ResponsiveContainer>
+                            <Legend />
+                            {chartLineConfigs.map((config) => (
+                              <Line
+                                key={config.dataKey}
+                                type="monotone"
+                                dataKey={config.dataKey}
+                                name={config.name}
+                                stroke={config.color}
+                                yAxisId={config.yAxisId}
+                                strokeWidth={2}
+                                dot={{ r: 3 }}
+                                activeDot={{ r: 5 }}
+                              />
+                            ))}
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </ScrollableChart>
                     </div>
                   )}
 
@@ -1071,9 +1074,10 @@ export default function CycleDetailPage() {
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">
                         Volumen-Entwicklung
                       </h3>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={volumeData.dataPoints}>
-                          <CartesianGrid strokeDasharray="3 3" />
+                      <ScrollableChart dataPointCount={volumeData.dataPoints.length}>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={volumeData.dataPoints}>
+                            <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
                             dataKey="date"
                             tickFormatter={(date, index) => formatXAxisLabel(volumeData.dataPoints[index])}
@@ -1110,7 +1114,8 @@ export default function CycleDetailPage() {
                             name="Volumen"
                           />
                         </LineChart>
-                      </ResponsiveContainer>
+                        </ResponsiveContainer>
+                      </ScrollableChart>
                       <div className="mt-4 text-center">
                         <div className="text-sm text-gray-600">
                           Gesamtes Volumen
@@ -1139,9 +1144,10 @@ export default function CycleDetailPage() {
                           <h3 className="text-lg font-semibold text-gray-900 mb-4">
                             %ORM-Entwicklung
                           </h3>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <LineChart data={ormData.dataPoints}>
-                              <CartesianGrid strokeDasharray="3 3" />
+                          <ScrollableChart dataPointCount={ormData.dataPoints.length}>
+                            <ResponsiveContainer width="100%" height={300}>
+                              <LineChart data={ormData.dataPoints}>
+                                <CartesianGrid strokeDasharray="3 3" />
                               <XAxis
                                 dataKey="date"
                                 tickFormatter={(date, index) => formatXAxisLabel(ormData.dataPoints[index])}
@@ -1175,7 +1181,8 @@ export default function CycleDetailPage() {
                                 name="%ORM"
                               />
                             </LineChart>
-                          </ResponsiveContainer>
+                            </ResponsiveContainer>
+                          </ScrollableChart>
                           <div className="mt-4 text-center">
                             <div className="text-sm text-gray-600">
                               Durchschnitt %ORM
@@ -1203,9 +1210,10 @@ export default function CycleDetailPage() {
                           <h3 className="text-lg font-semibold text-gray-900 mb-4">
                             RIR-Verteilung
                           </h3>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={rirData.dataPoints}>
-                              <CartesianGrid strokeDasharray="3 3" />
+                          <ScrollableChart dataPointCount={rirData.dataPoints.length}>
+                            <ResponsiveContainer width="100%" height={300}>
+                              <BarChart data={rirData.dataPoints}>
+                                <CartesianGrid strokeDasharray="3 3" />
                               <XAxis
                                 dataKey="date"
                                 tickFormatter={(date, index) => formatXAxisLabel(rirData.dataPoints[index])}
@@ -1233,7 +1241,8 @@ export default function CycleDetailPage() {
                               <Bar dataKey="rir1Count" fill="#eab308" name="RIR 1" />
                               <Bar dataKey="rir2Count" fill="#22c55e" name="RIR 2" />
                             </BarChart>
-                          </ResponsiveContainer>
+                            </ResponsiveContainer>
+                          </ScrollableChart>
                         </>
                       ) : (
                         <div className="text-center py-12">
@@ -1251,9 +1260,10 @@ export default function CycleDetailPage() {
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">
                         Dauer-Entwicklung
                       </h3>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={durationData.dataPoints}>
-                          <CartesianGrid strokeDasharray="3 3" />
+                      <ScrollableChart dataPointCount={durationData.dataPoints.length}>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={durationData.dataPoints}>
+                            <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
                             dataKey="date"
                             tickFormatter={(date, index) => formatXAxisLabel(durationData.dataPoints[index])}
@@ -1287,7 +1297,8 @@ export default function CycleDetailPage() {
                             name="Dauer"
                           />
                         </LineChart>
-                      </ResponsiveContainer>
+                        </ResponsiveContainer>
+                      </ScrollableChart>
                       <div className="mt-4 text-center">
                         <div className="text-sm text-gray-600">
                           Durchschnittliche Dauer
@@ -1305,9 +1316,10 @@ export default function CycleDetailPage() {
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">
                         Satzpausen-Entwicklung
                       </h3>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={restTimeData.dataPoints}>
-                          <CartesianGrid strokeDasharray="3 3" />
+                      <ScrollableChart dataPointCount={restTimeData.dataPoints.length}>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={restTimeData.dataPoints}>
+                            <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
                             dataKey="date"
                             tickFormatter={(date, index) => formatXAxisLabel(restTimeData.dataPoints[index])}
@@ -1341,7 +1353,8 @@ export default function CycleDetailPage() {
                             name="Satzpause"
                           />
                         </LineChart>
-                      </ResponsiveContainer>
+                        </ResponsiveContainer>
+                      </ScrollableChart>
                       <div className="mt-4 text-center">
                         <div className="text-sm text-gray-600">
                           Durchschnittliche Satzpause
@@ -1359,9 +1372,10 @@ export default function CycleDetailPage() {
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">
                         Wiederholungen-Entwicklung
                       </h3>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={repsData.dataPoints}>
-                          <CartesianGrid strokeDasharray="3 3" />
+                      <ScrollableChart dataPointCount={repsData.dataPoints.length}>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={repsData.dataPoints}>
+                            <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
                             dataKey="date"
                             tickFormatter={(date, index) => formatXAxisLabel(repsData.dataPoints[index])}
@@ -1395,7 +1409,8 @@ export default function CycleDetailPage() {
                             name="Wiederholungen"
                           />
                         </LineChart>
-                      </ResponsiveContainer>
+                        </ResponsiveContainer>
+                      </ScrollableChart>
                       <div className="mt-4 text-center">
                         <div className="text-sm text-gray-600">
                           Gesamte Wiederholungen
@@ -1413,9 +1428,10 @@ export default function CycleDetailPage() {
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">
                         Sätze-Entwicklung
                       </h3>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={setsData.dataPoints}>
-                          <CartesianGrid strokeDasharray="3 3" />
+                      <ScrollableChart dataPointCount={setsData.dataPoints.length}>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={setsData.dataPoints}>
+                            <CartesianGrid strokeDasharray="3 3" />
                           <XAxis
                             dataKey="date"
                             tickFormatter={(date, index) => formatXAxisLabel(setsData.dataPoints[index])}
@@ -1449,7 +1465,8 @@ export default function CycleDetailPage() {
                             name="Sätze"
                           />
                         </LineChart>
-                      </ResponsiveContainer>
+                        </ResponsiveContainer>
+                      </ScrollableChart>
                       <div className="mt-4 text-center">
                         <div className="text-sm text-gray-600">
                           Gesamte Sätze
