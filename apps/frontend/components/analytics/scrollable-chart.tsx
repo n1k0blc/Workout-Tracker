@@ -13,12 +13,12 @@ interface ScrollableChartProps {
  * wenn zu viele Datenpunkte vorhanden sind.
  * 
  * @param dataPointCount - Anzahl der Datenpunkte im Chart
- * @param minDataPointsForScroll - Ab wie vielen Datenpunkten scrollen aktiviert wird (default: 10)
+ * @param minDataPointsForScroll - Ab wie vielen Datenpunkten scrollen aktiviert wird (default: 5)
  */
 export default function ScrollableChart({ 
   children, 
   dataPointCount,
-  minDataPointsForScroll = 10 
+  minDataPointsForScroll = 5 
 }: ScrollableChartProps) {
   const [isMobile, setIsMobile] = useState(false);
 
@@ -33,11 +33,20 @@ export default function ScrollableChart({
   
   // Berechne Breite basierend auf Anzahl der Datenpunkte
   // ~60px pro Datenpunkt für gute Lesbarkeit auf Mobile
-  const chartWidth = shouldScroll ? dataPointCount * 60 : '100%';
+  const chartWidth = shouldScroll ? dataPointCount * 60 : undefined;
+
+  console.log('ScrollableChart Debug:', { 
+    isMobile, 
+    dataPointCount, 
+    minDataPointsForScroll,
+    shouldScroll, 
+    chartWidth,
+    windowWidth: typeof window !== 'undefined' ? window.innerWidth : 'SSR'
+  });
 
   return (
     <div className={shouldScroll ? 'overflow-x-auto pb-2' : ''}>
-      <div style={{ width: chartWidth, minWidth: shouldScroll ? '100%' : undefined }}>
+      <div style={{ width: chartWidth }}>
         {children}
       </div>
     </div>

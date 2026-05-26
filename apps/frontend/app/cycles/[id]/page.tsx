@@ -1060,6 +1060,7 @@ export default function CycleDetailPage() {
                                 strokeWidth={2}
                                 dot={{ r: 3 }}
                                 activeDot={{ r: 5 }}
+                                connectNulls={true}
                               />
                             ))}
                           </LineChart>
@@ -1179,6 +1180,7 @@ export default function CycleDetailPage() {
                                 strokeWidth={2}
                                 dot={{ r: 4 }}
                                 name="%ORM"
+                                connectNulls={true}
                               />
                             </LineChart>
                             </ResponsiveContainer>
