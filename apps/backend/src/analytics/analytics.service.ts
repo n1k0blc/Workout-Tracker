@@ -525,6 +525,9 @@ export class AnalyticsService {
         ...(gymFilter !== undefined && { homeGymId: gymFilter }),
       },
       include: {
+        homeGym: {
+          select: { id: true, name: true },
+        },
         exercises: {
           include: {
             exercise: {
@@ -577,6 +580,9 @@ export class AnalyticsService {
               date: workout.date,
               workoutId: workout.id,
               details: { weight: adjustedWeight, reps: set.reps },
+              homeGym: workout.homeGym
+                ? { id: workout.homeGym.id, name: workout.homeGym.name }
+                : null,
             });
           }
         }
