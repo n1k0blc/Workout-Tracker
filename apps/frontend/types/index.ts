@@ -329,6 +329,8 @@ export interface PersonalRecord {
     reps?: number;
     sets?: number;
   };
+  /** Gym where this PR was achieved (null = "Anderes Gym") */
+  homeGym?: { id: string; name: string } | null;
 }
 
 export interface PersonalRecordsResponse {

@@ -14,6 +14,7 @@ import {
 } from '@/types';
 import CircularProgress from '@/components/CircularProgress';
 import TrendIndicator from '@/components/TrendIndicator';
+import { PersonalRecordCard } from '@/components/PersonalRecordCard';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -384,27 +385,10 @@ export default function DashboardPage() {
                       {prs.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                           {prs.map((pr) => (
-                            <div
+                            <PersonalRecordCard
                               key={`${pr.exerciseId}-${pr.type}`}
-                              className="border border-gray-200 rounded-lg p-4"
-                            >
-                              <div className="flex flex-col">
-                                <div className="font-medium text-gray-900 mb-2">
-                                  {pr.exerciseName}
-                                </div>
-                                <div className="text-sm text-gray-600">
-                                  {pr.type === 'weight' && `Gewicht: ${pr.value}kg`}
-                                  {pr.type === 'reps' && pr.isUnilateral && pr.details?.reps && 
-                                    `Wiederholungen: ${pr.details.reps * 2} (${pr.details.reps}x2)`}
-                                  {pr.type === 'reps' && !pr.isUnilateral && `Wiederholungen: ${pr.value}`}
-                                  {pr.type === 'volume' && `Volumen: ${formatNumber(pr.value)}kg`}
-                                  {pr.type === 'one_rm' && `1RM: ${pr.value.toFixed(1)}kg`}
-                                </div>
-                                <div className="text-xs text-gray-500 mt-2">
-                                  {formatDate(pr.date)}
-                                </div>
-                              </div>
-                            </div>
+                              pr={pr}
+                            />
                           ))}
                         </div>
                       ) : (

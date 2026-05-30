@@ -43,6 +43,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import SelectedExerciseCard from '@/components/analytics/selected-exercise-card';
 import ScrollableChart from '@/components/analytics/scrollable-chart';
+import { PersonalRecordCard } from '@/components/PersonalRecordCard';
 
 export default function AnalyticsPage() {
   // Data states
@@ -2202,30 +2203,10 @@ export default function AnalyticsPage() {
                       {prs.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {prs.map((pr) => (
-                            <div
+                            <PersonalRecordCard
                               key={`${pr.exerciseId}-${pr.type}`}
-                              className="border border-gray-200 rounded-lg p-4"
-                            >
-                              <div className="flex items-start justify-between">
-                                <div className="flex-1">
-                                  <div className="font-semibold text-gray-900">
-                                    {pr.exerciseName}
-                                  </div>
-                                  <div className="text-sm text-gray-600 mt-1">
-                                    <span className="font-medium">Gewicht:</span>{' '}
-                                    {pr.value}kg
-                                  </div>
-                                  {pr.details && pr.details.weight && pr.details.reps && (
-                                    <div className="text-xs text-gray-500 mt-1">
-                                      {pr.details.weight}kg × {pr.isUnilateral ? `${pr.details.reps * 2} (${pr.details.reps}x2)` : pr.details.reps} Wdh.
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="text-xs text-gray-500 ml-4">
-                                  {formatDate(pr.date)}
-                                </div>
-                              </div>
-                            </div>
+                              pr={pr}
+                            />
                           ))}
                         </div>
                       ) : (
