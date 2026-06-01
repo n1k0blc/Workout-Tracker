@@ -6,20 +6,40 @@ import { useWorkout } from '@/lib/workout-context';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import ExerciseSelectionModal from './exercise-selection-modal';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  IconGripVertical,
+  IconChevronDown,
+  IconRefresh,
+  IconTrash,
+  IconEdit,
+  IconCheck,
+  IconPlus,
+} from '@tabler/icons-react';
+
+// TODO: This component mixes live execution logging/editing with presentation.
+// Before extracting a shared WorkoutExercise component (with mode="execution"|"editor"|"review"),
+// further separation of concerns may be useful. Unplanned live tracking removed (Phase 4).
 
 interface ExerciseCardProps {
   exercise: ExerciseLog;
   exerciseNumber: number;
 }
 
-interface UnplannedSet {
-  id: string;
-  setNumber: number;
-  weight: string;
-  reps: string;
-  rir: string;
-  setType: SetType;
-}
 
 export default function ExerciseCard({
   exercise,
@@ -32,15 +52,9 @@ export default function ExerciseCard({
     deleteSet, 
     updateSet, 
     loading, 
-    removedPlannedSets, 
-    markPlannedSetAsRemoved,
-    unplannedSets: contextUnplannedSets,
-    addUnplannedSet: addUnplannedSetToContext,
-    removeUnplannedSet: removeUnplannedSetFromContext,
   } = useWorkout();
 
   const [editValues, setEditValues] = useState<{[key: number]: {weight: string, reps: string, rir: string, setType: SetType}}>({});
-  const [unplannedSets, setUnplannedSets] = useState<UnplannedSet[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showReplaceModal, setShowReplaceModal] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true);
@@ -68,45 +82,48 @@ export default function ExerciseCard({
 
   const hasPlannedSets = exercise.plannedSets && exercise.plannedSets.length > 0;
 
-  const handleLogSet = async (setNumber: number, isUnplanned: boolean = false) => {
-    // Double-click protection: Check if set is already logged
+  // Local drafts for additional/extra sets (free workouts or sets beyond planned).
+  // These are UI-only (not persisted in context) – backend only cares about final logs.
+  const [additionalSetNumbers, setAdditionalSetNumbers] = useState<number[]>([]);
+
+  const addAdditionalSet = () => {
+    const maxPlanned = hasPlannedSets
+      ? Math.max(...exercise.plannedSets!.map((ps) => ps.order))
+      : 0;
+    const maxLogged = exercise.sets.length > 0
+      ? Math.max(...exercise.sets.map((s) => s.setNumber))
+      : 0;
+    const maxDraft = additionalSetNumbers.length > 0
+      ? Math.max(...additionalSetNumbers)
+      : 0;
+    const next = Math.max(maxPlanned, maxLogged, maxDraft) + 1;
+
+    setAdditionalSetNumbers((prev) => [...prev, next]);
+    setEditValues((prev) => ({
+      ...prev,
+      [next]: { weight: '', reps: '', rir: '', setType: SetType.WORKING },
+    }));
+  };
+
+  const handleLogSet = async (setNumber: number) => {
+    // Double-click protection
     const existingSet = getLoggedSet(setNumber);
     if (existingSet) {
       console.warn(`Set ${setNumber} is already logged`);
       return;
     }
-
-    // Prevent multiple simultaneous API calls for the same set
     if (loading) {
       return;
     }
 
-    let values;
+    // Both setNumber and order are 1-based
+    const plannedSet = exercise.plannedSets?.find((ps) => ps.order === setNumber);
+
+    let values: { weight: string; reps: string; rir: string };
     let setType: SetType = SetType.WORKING;
     let plannedRestAfterSet: number | undefined;
 
-    if (isUnplanned) {
-      const unplannedSet = unplannedSets.find(s => s.setNumber === setNumber);
-      if (!unplannedSet) return;
-      values = {
-        weight: unplannedSet.weight,
-        reps: unplannedSet.reps,
-        rir: unplannedSet.rir,
-      };
-      setType = unplannedSet.setType;
-      plannedRestAfterSet = 90; // Default for unplanned sets
-      
-      // Validation: Prevent logging empty unplanned sets
-      if (!values.weight || !values.reps || parseFloat(values.weight) === 0 || parseInt(values.reps) === 0) {
-        console.warn('Cannot log set with empty weight or reps');
-        return;
-      }
-    } else {
-      // Both setNumber and order are 1-based
-      const plannedSet = exercise.plannedSets?.find(ps => ps.order === setNumber);
-      if (!plannedSet) return;
-
-      // Merge edited values with planned set values
+    if (plannedSet) {
       values = {
         weight: editValues[setNumber]?.weight ?? plannedSet.weight.toString(),
         reps: editValues[setNumber]?.reps ?? plannedSet.reps.toString(),
@@ -114,6 +131,19 @@ export default function ExerciseCard({
       };
       setType = editValues[setNumber]?.setType ?? plannedSet.setType;
       plannedRestAfterSet = plannedSet.restAfterSet;
+    } else {
+      // Additional / free set: must come from seeded editValues (from addAdditionalSet)
+      const ev = editValues[setNumber];
+      if (!ev) return;
+      const w = parseFloat(ev.weight || '0');
+      const r = parseInt(ev.reps || '0');
+      if (w === 0 || r === 0) {
+        console.warn('Cannot log additional set with empty weight or reps');
+        return;
+      }
+      values = { weight: ev.weight, reps: ev.reps, rir: ev.rir };
+      setType = ev.setType || SetType.WORKING;
+      plannedRestAfterSet = 90; // sensible default for extra sets
     }
 
     try {
@@ -126,20 +156,17 @@ export default function ExerciseCard({
         plannedRestAfterSet,
       });
 
-      // If this was an unplanned set, remove it from context tracking
-      if (isUnplanned) {
-        removeUnplannedSetFromContext(exercise.id, setNumber);
-      }
+      // Remove from additional drafts (if it was one)
+      setAdditionalSetNumbers((prev) => prev.filter((n) => n !== setNumber));
 
-      // Clear edit state
-      setEditValues(prev => {
-        const newVals = {...prev};
+      // Clear edit state for this setNumber
+      setEditValues((prev) => {
+        const newVals = { ...prev };
         delete newVals[setNumber];
         return newVals;
       });
     } catch (error) {
       console.error('Failed to log set:', error);
-      // If DB constraint violation, show user-friendly message
       if (error instanceof Error && error.message.includes('Unique constraint')) {
         console.error('This set number is already logged (database constraint)');
       }
@@ -202,54 +229,6 @@ export default function ExerciseCard({
     }
   };
 
-  const addUnplannedSet = () => {
-    // Calculate next set number based on the highest order in planned sets (not the count!)
-    // This is important because planned sets may have gaps (e.g., order: 2, 3, 5 if set 1 was removed)
-    const nextSetNumber = Math.max(
-      hasPlannedSets ? Math.max(...exercise.plannedSets!.map(ps => ps.order)) : 0,
-      ...unplannedSets.map(s => s.setNumber),
-      ...exercise.sets.map(s => s.setNumber)
-    ) + 1;
-
-    setUnplannedSets(prev => [...prev, {
-      id: `unplanned-${Date.now()}`,
-      setNumber: nextSetNumber,
-      weight: '',
-      reps: '',
-      rir: '',
-      setType: SetType.WORKING,
-    }]);
-    
-    // Track in context for validation
-    addUnplannedSetToContext(exercise.id, nextSetNumber);
-  };
-
-  const removeUnplannedSet = (id: string) => {
-    // Find the set to get its setNumber before removing
-    const setToRemove = unplannedSets.find(s => s.id === id);
-    if (setToRemove) {
-      removeUnplannedSetFromContext(exercise.id, setToRemove.setNumber);
-    }
-    setUnplannedSets(prev => prev.filter(s => s.id !== id));
-  };
-
-  const updateUnplannedSet = (id: string, field: keyof UnplannedSet, value: string | SetType) => {
-    setUnplannedSets(prev => prev.map(s => 
-      s.id === id ? { ...s, [field]: value } : s
-    ));
-  };
-
-  const removePlannedSet = (setNumber: number) => {
-    // Mark the set as removed in the context
-    // Both setNumber and order are 1-based, so we use setNumber directly
-    markPlannedSetAsRemoved(exercise.id, setNumber);
-    // Remove from editValues if it was being edited
-    setEditValues(prev => {
-      const newVals = {...prev};
-      delete newVals[setNumber];
-      return newVals;
-    });
-  };
 
   const getLoggedSet = (setNumber: number) => {
     return exercise.sets.find(s => s.setNumber === setNumber);
@@ -285,136 +264,70 @@ export default function ExerciseCard({
     return plannedSet?.setType || SetType.WORKING;
   };
 
-  // Check if all sets for this exercise are logged
-  const isExerciseComplete = (): boolean => {
-    // Get all set numbers that should exist
-    const setsToLog: Set<number> = new Set();
-    
-    // Add planned sets (that aren't removed)
-    const removedSets = removedPlannedSets.get(exercise.id) || new Set();
-    if (hasPlannedSets) {
-      exercise.plannedSets?.forEach((plannedSet) => {
-        // Both order and setNumber are 1-based
-        const setNumber = plannedSet.order;
-        if (!removedSets.has(setNumber)) {  // Check with 1-based setNumber
-          setsToLog.add(setNumber);
-        }
-      });
-    }
-    
-    // Add unplanned sets (both those in local state and in context)
-    const contextUnplannedForExercise = contextUnplannedSets.get(exercise.id) || new Set();
-    contextUnplannedForExercise.forEach(setNum => setsToLog.add(setNum));
-    
-    // For free workouts (no planned sets): consider complete if there are logged sets
-    // and no pending unplanned sets
-    if (!hasPlannedSets) {
-      const hasLoggedSets = exercise.sets && exercise.sets.length > 0;
-      const noPendingUnplannedSets = contextUnplannedForExercise.size === 0;
-      return hasLoggedSets && noPendingUnplannedSets;
-    }
-    
-    // If there are no sets to log, exercise is not complete
-    if (setsToLog.size === 0) {
-      return false;
-    }
-    
-    // Check if every set that should exist has been logged
-    const loggedSetNumbers = new Set(exercise.sets.map(s => s.setNumber));
-    
-    for (const setNum of setsToLog) {
-      if (!loggedSetNumbers.has(setNum)) {
-        return false;
-      }
-    }
-    
-    return true;
-  };
-
-  const exerciseComplete = isExerciseComplete();
-
   return (
     <>
-      <div 
-        ref={setNodeRef} 
-        style={style} 
-        className={`rounded-lg shadow-sm overflow-hidden ${
-          exerciseComplete 
-            ? 'bg-green-50/50 ring-2 ring-green-200' 
-            : 'bg-white'
-        }`}
+      <Card
+        ref={setNodeRef}
+        style={style}
+        className="py-0 gap-0 overflow-hidden rounded-lg border-border"
       >
-        {/* Exercise Header */}
-        <div className={`px-4 py-3 flex items-center justify-between ${
-          exerciseComplete ? 'bg-green-100/50' : 'bg-gray-100'
-        }`}>
+        {/* Exercise Header (compact bar) */}
+        <div className="px-4 py-3 flex items-center justify-between bg-muted border-b border-border">
           <div className="flex items-center gap-3">
             {/* Drag Handle */}
             <button
               {...attributes}
               {...listeners}
-              className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600"
+              className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-              </svg>
+              <IconGripVertical className="size-5" />
             </button>
-            <span className="text-sm font-semibold text-gray-500">
+            <span className="text-sm font-semibold text-muted-foreground">
               #{exerciseNumber}
             </span>
-            <h3 className="font-semibold text-gray-900">
+            <h3 className="font-semibold text-foreground">
               {exercise.exerciseName}
             </h3>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             {/* Collapse Button */}
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="text-gray-600 hover:text-gray-800"
+              className="size-8"
             >
-              <svg 
-                className={`w-5 h-5 transition-transform ${isCollapsed ? 'rotate-180' : ''}`}
-                fill="none" 
-                viewBox="0 0 24 24" 
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
+              <IconChevronDown className={`size-4 transition-transform ${isCollapsed ? 'rotate-180' : ''}`} />
+            </Button>
             {/* Replace Exercise Button */}
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setShowReplaceModal(true)}
               disabled={exercise.sets.length > 0}
-              className="text-blue-600 hover:text-blue-800 disabled:text-gray-400 disabled:cursor-not-allowed"
+              className="size-8"
               title={exercise.sets.length > 0 ? "Übung kann nicht ausgetauscht werden nachdem Sets geloggt wurden" : "Übung austauschen"}
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-              </svg>
-            </button>
-            <button
+              <IconRefresh className="size-4" />
+            </Button>
+            {/* Delete Exercise Button */}
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setShowDeleteConfirm(true)}
-              className="text-red-600 hover:text-red-800"
+              className="size-8 text-destructive hover:text-destructive"
               title="Übung entfernen"
             >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
+              <IconTrash className="size-4" />
+            </Button>
           </div>
         </div>
 
         {/* Sets */}
         {!isCollapsed && (
-          <div className="p-4 space-y-2">
-          {/* Planned Sets */}
-          {hasPlannedSets && exercise.plannedSets!
-            .filter(plannedSet => {
-              // Filter out removed sets
-              const removedSets = removedPlannedSets.get(exercise.id);
-              return !removedSets || !removedSets.has(plannedSet.order);
-            })
-            .map((plannedSet, idx) => {
+          <CardContent className="p-4 space-y-2">
+          {/* Planned Sets (prepare rows or logged display) */}
+          {hasPlannedSets && exercise.plannedSets!.map((plannedSet) => {
             // setNumber and order are both 1-based in the database
             const setNumber = plannedSet.order;
             const loggedSet = getLoggedSet(setNumber);
@@ -422,153 +335,119 @@ export default function ExerciseCard({
             return (
               <div
                 key={plannedSet.id}
-                className={
-                  `border rounded-lg p-3 ${
-                    loggedSet
-                      ? 'bg-green-50 border-green-200'
-                      : plannedSet.setType === SetType.WARMUP
-                      ? 'bg-orange-50 border-orange-200'
-                      : 'bg-blue-50 border-blue-200'
-                  }`
-                }
+                className="border rounded-md p-3 bg-muted/30 border-border"
               >
                 <div className="flex items-start gap-3">
-                  {/* Checkbox */}
+                  {/* Checkbox / Status (neutral, no green "complete" cue) */}
                   <div className="mt-1">
                     {loggedSet ? (
-                      <div className="w-5 h-5 bg-green-600 rounded flex items-center justify-center">
-                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
+                      <div className="flex size-5 items-center justify-center rounded bg-muted text-muted-foreground">
+                        <IconCheck className="size-3.5" />
                       </div>
                     ) : (
                       <button
                         onClick={() => handleLogSet(setNumber)}
                         disabled={loading}
-                        className="w-5 h-5 border-2 border-gray-400 rounded hover:border-blue-600 disabled:opacity-50"
+                        className="flex size-5 items-center justify-center rounded border-2 border-muted-foreground/40 hover:border-primary disabled:opacity-50"
                       />
                     )}
                   </div>
 
                   {/* Set Content */}
                   <div className="flex-1">
-                    <div className="flex items-center justify-between mb-2">
-                      {/* Trash icon for unlogged planned sets */}
-                      <div className="flex-1"></div>
-                      {!loggedSet && (
-                        <button
-                          onClick={() => removePlannedSet(setNumber)}
-                          className="text-red-600 hover:text-red-800"
-                          title="Geplanten Satz entfernen"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-
                     {loggedSet ? (
                       editingSetId === loggedSet.id ? (
-                        // Edit mode
-                        <div className="space-y-2">
+                        // Edit mode for logged set (planned origin)
+                        <div className="space-y-3">
                           <div className="grid grid-cols-3 gap-2">
                             <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                {`Gewicht (kg)${exercise.isDoubleWeight ? ' (2x)' : ''}`}
-                              </label>
-                              <input
+                              <Label className="text-xs">{`Gewicht (kg)${exercise.isDoubleWeight ? ' (2x)' : ''}`}</Label>
+                              <Input
                                 type="number"
                                 step="0.5"
                                 value={editingValues.weight}
                                 onChange={(e) => setEditingValues(prev => ({ ...prev, weight: e.target.value }))}
                                 placeholder="0"
-                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="h-8 text-sm"
                               />
                             </div>
                             <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                {`Wdh${exercise.isUnilateral ? ' (2x)' : ''}`}
-                              </label>
-                              <input
+                              <Label className="text-xs">{`Wdh${exercise.isUnilateral ? ' (2x)' : ''}`}</Label>
+                              <Input
                                 type="number"
                                 value={editingValues.reps}
                                 onChange={(e) => setEditingValues(prev => ({ ...prev, reps: e.target.value }))}
                                 placeholder="0"
-                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="h-8 text-sm"
                               />
                             </div>
                             <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                RIR
-                              </label>
-                              <input
+                              <Label className="text-xs">RIR</Label>
+                              <Input
                                 type="number"
                                 value={editingValues.rir}
                                 onChange={(e) => setEditingValues(prev => ({ ...prev, rir: e.target.value }))}
                                 placeholder="0"
-                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="h-8 text-sm"
                               />
                             </div>
                           </div>
                           <div className="flex gap-2">
-                            <button
-                              onClick={handleSaveEdit}
-                              disabled={loading}
-                              className="flex-1 bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700 disabled:opacity-50"
-                            >
+                            <Button onClick={handleSaveEdit} disabled={loading} className="flex-1" size="sm">
                               Speichern
-                            </button>
-                            <button
-                              onClick={handleCancelEdit}
-                              disabled={loading}
-                              className="flex-1 bg-gray-200 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-300 disabled:opacity-50"
-                            >
+                            </Button>
+                            <Button onClick={handleCancelEdit} disabled={loading} variant="outline" className="flex-1" size="sm">
                               Abbrechen
-                            </button>
+                            </Button>
                           </div>
                         </div>
                       ) : (
-                        // Display mode
+                        // Display mode for logged set
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <span className={`text-xs px-2 py-0.5 rounded ${
-                              loggedSet.setType === SetType.WARMUP
-                                ? 'bg-orange-100 text-orange-700'
-                                : 'bg-blue-100 text-blue-700'
-                            }`}>
+                            <Badge variant={loggedSet.setType === SetType.WARMUP ? 'outline' : 'default'} className="text-xs">
                               {loggedSet.setType === SetType.WARMUP ? 'Aufwärmen' : 'Arbeit'}
-                            </span>
-                            <span className="text-sm font-semibold text-gray-900">
+                            </Badge>
+                            <span className="text-sm font-semibold text-foreground">
                               {loggedSet.weight}kg × {loggedSet.reps} Wdh
                             </span>
                             {loggedSet.rir !== undefined && (
-                              <span className="text-sm text-gray-600">RIR {loggedSet.rir}</span>
+                              <span className="text-sm text-muted-foreground">RIR {loggedSet.rir}</span>
                             )}
                           </div>
-                          <button
-                            onClick={() => handleEditSet(loggedSet)}
-                            disabled={loading}
-                            className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
-                            title="Bearbeiten"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                            </svg>
-                          </button>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-7"
+                              onClick={() => handleEditSet(loggedSet)}
+                              disabled={loading}
+                              title="Bearbeiten"
+                            >
+                              <IconEdit className="size-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="size-7 text-destructive hover:text-destructive"
+                              onClick={() => handleDeleteSet(loggedSet.id)}
+                              disabled={loading}
+                              title="Satz löschen"
+                            >
+                              <IconTrash className="size-3.5" />
+                            </Button>
+                          </div>
                         </div>
                       )
                     ) : (
                       <div className="space-y-2">
-                        {/* SetType Dropdown */}
+                        {/* SetType select */}
                         <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Satztyp
-                          </label>
+                          <Label className="text-xs">Satztyp</Label>
                           <select
                             value={getEditSetType(setNumber)}
                             onChange={(e) => updateEditValue(setNumber, 'setType', e.target.value as SetType)}
-                            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                           >
                             <option value={SetType.WORKING}>Arbeitssatz</option>
                             <option value={SetType.WARMUP}>Aufwärmsatz</option>
@@ -578,40 +457,34 @@ export default function ExerciseCard({
                         {/* Input Fields */}
                         <div className="grid grid-cols-3 gap-2">
                           <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                              {`Gewicht (kg)${exercise.isDoubleWeight ? ' (2x)' : ''}`}
-                            </label>
-                            <input
+                            <Label className="text-xs">{`Gewicht (kg)${exercise.isDoubleWeight ? ' (2x)' : ''}`}</Label>
+                            <Input
                               type="number"
                               step="0.5"
                               value={getEditValue(setNumber, 'weight')}
                               onChange={(e) => updateEditValue(setNumber, 'weight', e.target.value)}
                               placeholder="0"
-                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="h-8 text-sm"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                              {`Wdh${exercise.isUnilateral ? ' (2x)' : ''}`}
-                            </label>
-                            <input
+                            <Label className="text-xs">{`Wdh${exercise.isUnilateral ? ' (2x)' : ''}`}</Label>
+                            <Input
                               type="number"
                               value={getEditValue(setNumber, 'reps')}
                               onChange={(e) => updateEditValue(setNumber, 'reps', e.target.value)}
                               placeholder="0"
-                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="h-8 text-sm"
                             />
                           </div>
                           <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                              RIR
-                            </label>
-                            <input
+                            <Label className="text-xs">RIR</Label>
+                            <Input
                               type="number"
                               value={getEditValue(setNumber, 'rir')}
                               onChange={(e) => updateEditValue(setNumber, 'rir', e.target.value)}
                               placeholder="0"
-                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="h-8 text-sm"
                             />
                           </div>
                         </div>
@@ -623,388 +496,210 @@ export default function ExerciseCard({
             );
           })}
 
-          {/* Ungeplante Sätze */}
-          {unplannedSets.map((unplannedSet) => {
-            const loggedSet = getLoggedSet(unplannedSet.setNumber);
-            // Check if unplanned set has valid values
-            const hasValidValues = unplannedSet.weight && unplannedSet.reps && 
-              parseFloat(unplannedSet.weight) > 0 && parseInt(unplannedSet.reps) > 0;
-
-            return (
+          {/* Additional prepare rows (free workouts or sets beyond the planned blueprint) */}
+          {additionalSetNumbers
+            .filter((n) => !getLoggedSet(n))
+            .map((setNumber) => (
               <div
-                key={unplannedSet.id}
-                className={`border rounded-lg p-3 ${
-                  loggedSet
-                    ? 'bg-green-50 border-green-200'
-                    : 'bg-gray-50 border-gray-300'
-                }`}
+                key={`add-${setNumber}`}
+                className="border rounded-md p-3 bg-muted/30 border-border"
               >
                 <div className="flex items-start gap-3">
-                  {/* Checkbox */}
+                  {/* Checkbox for additional */}
                   <div className="mt-1">
-                    {loggedSet ? (
-                      <div className="w-5 h-5 bg-green-600 rounded flex items-center justify-center">
-                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => handleLogSet(unplannedSet.setNumber, true)}
-                        disabled={loading || !hasValidValues}
-                        className="w-5 h-5 border-2 border-gray-400 rounded hover:border-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title={!hasValidValues ? 'Gewicht und Wiederholungen müssen ausgefüllt sein' : ''}
-                      />
-                    )}
+                    <button
+                      onClick={() => handleLogSet(setNumber)}
+                      disabled={loading}
+                      className="flex size-5 items-center justify-center rounded border-2 border-muted-foreground/40 hover:border-primary disabled:opacity-50"
+                    />
                   </div>
-
-                  {/* Set Content */}
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-700">
-                        <span className="text-xs text-gray-500">(ungeplant)</span>
-                      </span>
-                      {!loggedSet && (
-                        <button
-                          onClick={() => removeUnplannedSet(unplannedSet.id)}
-                          className="text-red-600 hover:text-red-800"
-                          title="Satz entfernen"
-                        >
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      )}
+                  <div className="flex-1 space-y-2">
+                    {/* SetType */}
+                    <div>
+                      <Label className="text-xs">Satztyp</Label>
+                      <select
+                        value={getEditSetType(setNumber)}
+                        onChange={(e) => updateEditValue(setNumber, 'setType', e.target.value as SetType)}
+                        className="flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      >
+                        <option value={SetType.WORKING}>Arbeitssatz</option>
+                        <option value={SetType.WARMUP}>Aufwärmsatz</option>
+                      </select>
                     </div>
-
-                    {loggedSet ? (
-                      editingSetId === loggedSet.id ? (
-                        // Edit mode
-                        <div className="space-y-2">
-                          <div className="grid grid-cols-3 gap-2">
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                {`Gewicht (kg)${exercise.isDoubleWeight ? ' (2x)' : ''}`}
-                              </label>
-                              <input
-                                type="number"
-                                step="0.5"
-                                value={editingValues.weight}
-                                onChange={(e) => setEditingValues(prev => ({ ...prev, weight: e.target.value }))}
-                                placeholder="0"
-                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                {`Wdh${exercise.isUnilateral ? ' (2x)' : ''}`}
-                              </label>
-                              <input
-                                type="number"
-                                value={editingValues.reps}
-                                onChange={(e) => setEditingValues(prev => ({ ...prev, reps: e.target.value }))}
-                                placeholder="0"
-                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">
-                                RIR
-                              </label>
-                              <input
-                                type="number"
-                                value={editingValues.rir}
-                                onChange={(e) => setEditingValues(prev => ({ ...prev, rir: e.target.value }))}
-                                placeholder="0"
-                                className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              />
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={handleSaveEdit}
-                              disabled={loading}
-                              className="flex-1 bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700 disabled:opacity-50"
-                            >
-                              Speichern
-                            </button>
-                            <button
-                              onClick={handleCancelEdit}
-                              disabled={loading}
-                              className="flex-1 bg-gray-200 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-300 disabled:opacity-50"
-                            >
-                              Abbrechen
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        // Display mode
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <span className={`text-xs px-2 py-0.5 rounded ${
-                              loggedSet.setType === SetType.WARMUP
-                                ? 'bg-orange-100 text-orange-700'
-                                : 'bg-blue-100 text-blue-700'
-                            }`}>
-                              {loggedSet.setType === SetType.WARMUP ? 'Aufwärmen' : 'Arbeit'}
-                            </span>
-                            <span className="text-sm font-semibold text-gray-900">
-                              {loggedSet.weight}kg × {loggedSet.reps} Wdh
-                            </span>
-                            {loggedSet.rir !== undefined && (
-                              <span className="text-sm text-gray-600">RIR {loggedSet.rir}</span>
-                            )}
-                          </div>
-                          <button
-                            onClick={() => handleEditSet(loggedSet)}
-                            disabled={loading}
-                            className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
-                            title="Bearbeiten"
-                          >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                            </svg>
-                          </button>
-                        </div>
-                      )
-                    ) : (
-                      <div className="space-y-2">
-                        {/* SetType Dropdown */}
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            Satztyp
-                          </label>
-                          <select
-                            value={unplannedSet.setType}
-                            onChange={(e) => updateUnplannedSet(unplannedSet.id, 'setType', e.target.value as SetType)}
-                            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          >
-                            <option value={SetType.WORKING}>Arbeitssatz</option>
-                            <option value={SetType.WARMUP}>Aufwärmsatz</option>
-                          </select>
-                        </div>
-
-                        {/* Input Fields */}
-                        <div className="grid grid-cols-3 gap-2">
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                              {`Gewicht (kg)${exercise.isDoubleWeight ? ' (2x)' : ''}`}
-                            </label>
-                            <input
-                              type="number"
-                              step="0.5"
-                              value={unplannedSet.weight}
-                              onChange={(e) => updateUnplannedSet(unplannedSet.id, 'weight', e.target.value)}
-                              placeholder="0"
-                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                              {`Wdh${exercise.isUnilateral ? ' (2x)' : ''}`}
-                            </label>
-                            <input
-                              type="number"
-                              value={unplannedSet.reps}
-                              onChange={(e) => updateUnplannedSet(unplannedSet.id, 'reps', e.target.value)}
-                              placeholder="0"
-                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                              RIR
-                            </label>
-                            <input
-                              type="number"
-                              value={unplannedSet.rir}
-                              onChange={(e) => updateUnplannedSet(unplannedSet.id, 'rir', e.target.value)}
-                              placeholder="0"
-                              className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            />
-                          </div>
-                        </div>
+                    {/* Inputs */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <Label className="text-xs">{`Gewicht (kg)${exercise.isDoubleWeight ? ' (2x)' : ''}`}</Label>
+                        <Input
+                          type="number"
+                          step="0.5"
+                          value={getEditValue(setNumber, 'weight')}
+                          onChange={(e) => updateEditValue(setNumber, 'weight', e.target.value)}
+                          placeholder="0"
+                          className="h-8 text-sm"
+                        />
                       </div>
-                    )}
+                      <div>
+                        <Label className="text-xs">{`Wdh${exercise.isUnilateral ? ' (2x)' : ''}`}</Label>
+                        <Input
+                          type="number"
+                          value={getEditValue(setNumber, 'reps')}
+                          onChange={(e) => updateEditValue(setNumber, 'reps', e.target.value)}
+                          placeholder="0"
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">RIR</Label>
+                        <Input
+                          type="number"
+                          value={getEditValue(setNumber, 'rir')}
+                          onChange={(e) => updateEditValue(setNumber, 'rir', e.target.value)}
+                          placeholder="0"
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            );
-          })}
+            ))}
 
-          {/* Freie Workouts ohne geplante Sätze */}
-          {!hasPlannedSets && unplannedSets.length === 0 && exercise.sets.length > 0 && (
-            exercise.sets.map((set) => (
-              <div
-                key={set.id}
-                className="bg-green-50 border border-green-200 px-4 py-3 rounded-lg"
-              >
+          {/* Extra logged sets (all for free workouts, or sets added beyond planned) */}
+          {exercise.sets
+            .filter((s) => !hasPlannedSets || !exercise.plannedSets!.some((p) => p.order === s.setNumber))
+            .sort((a, b) => a.setNumber - b.setNumber)
+            .map((set) => (
+              <div key={set.id} className="border rounded-md p-3 bg-card border-border">
                 {editingSetId === set.id ? (
-                  // Edit mode
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-5 h-5 bg-green-600 rounded flex items-center justify-center">
-                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                    </div>
+                  // Edit form (shared structure with planned-logged edit)
+                  <div className="space-y-3">
                     <div className="grid grid-cols-3 gap-2">
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          {`Gewicht (kg)${exercise.isDoubleWeight ? ' (2x)' : ''}`}
-                        </label>
-                        <input
+                        <Label className="text-xs">{`Gewicht (kg)${exercise.isDoubleWeight ? ' (2x)' : ''}`}</Label>
+                        <Input
                           type="number"
                           step="0.5"
                           value={editingValues.weight}
                           onChange={(e) => setEditingValues(prev => ({ ...prev, weight: e.target.value }))}
                           placeholder="0"
-                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="h-8 text-sm"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          {`Wdh${exercise.isUnilateral ? ' (2x)' : ''}`}
-                        </label>
-                        <input
+                        <Label className="text-xs">{`Wdh${exercise.isUnilateral ? ' (2x)' : ''}`}</Label>
+                        <Input
                           type="number"
                           value={editingValues.reps}
                           onChange={(e) => setEditingValues(prev => ({ ...prev, reps: e.target.value }))}
                           placeholder="0"
-                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="h-8 text-sm"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">
-                          RIR
-                        </label>
-                        <input
+                        <Label className="text-xs">RIR</Label>
+                        <Input
                           type="number"
                           value={editingValues.rir}
                           onChange={(e) => setEditingValues(prev => ({ ...prev, rir: e.target.value }))}
                           placeholder="0"
-                          className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="h-8 text-sm"
                         />
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <button
-                        onClick={handleSaveEdit}
-                        disabled={loading}
-                        className="flex-1 bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700 disabled:opacity-50"
-                      >
+                      <Button onClick={handleSaveEdit} disabled={loading} className="flex-1" size="sm">
                         Speichern
-                      </button>
-                      <button
-                        onClick={handleCancelEdit}
-                        disabled={loading}
-                        className="flex-1 bg-gray-200 text-gray-700 px-3 py-1.5 rounded text-sm hover:bg-gray-300 disabled:opacity-50"
-                      >
+                      </Button>
+                      <Button onClick={handleCancelEdit} disabled={loading} variant="outline" className="flex-1" size="sm">
                         Abbrechen
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ) : (
-                  // Display mode
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-5 h-5 bg-green-600 rounded flex items-center justify-center">
-                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
+                    <div className="flex items-center gap-3">
+                      <div className="flex size-5 items-center justify-center rounded bg-muted text-muted-foreground">
+                        <IconCheck className="size-3.5" />
                       </div>
-                      <div className="flex items-center gap-3 text-sm">
-                        <span className={`text-xs px-2 py-0.5 rounded ${
-                          set.setType === SetType.WARMUP
-                            ? 'bg-orange-100 text-orange-700'
-                            : 'bg-blue-100 text-blue-700'
-                        }`}>
-                          {set.setType === SetType.WARMUP ? 'Aufwärmen' : 'Arbeit'}
-                        </span>
-                        <span className="font-semibold text-gray-900">
-                          {set.weight}kg × {set.reps} Wdh
-                        </span>
-                        {set.rir !== undefined && (
-                          <span className="text-gray-600">RIR {set.rir}</span>
-                        )}
-                      </div>
+                      <Badge variant={set.setType === SetType.WARMUP ? 'outline' : 'default'} className="text-xs">
+                        {set.setType === SetType.WARMUP ? 'Aufwärmen' : 'Arbeit'}
+                      </Badge>
+                      <span className="text-sm font-semibold text-foreground">
+                        {set.weight}kg × {set.reps} Wdh
+                      </span>
+                      {set.rir !== undefined && (
+                        <span className="text-sm text-muted-foreground">RIR {set.rir}</span>
+                      )}
                     </div>
-                    <div className="flex gap-2">
-                      <button
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-7"
                         onClick={() => handleEditSet(set)}
                         disabled={loading}
-                        className="text-blue-600 hover:text-blue-800 disabled:opacity-50"
                         title="Bearbeiten"
                       >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                        </svg>
-                      </button>
-                      <button
+                        <IconEdit className="size-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-7 text-destructive hover:text-destructive"
                         onClick={() => handleDeleteSet(set.id)}
                         disabled={loading}
-                        className="text-red-600 hover:text-red-800 disabled:opacity-50"
                         title="Satz löschen"
                       >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
+                        <IconTrash className="size-3.5" />
+                      </Button>
                     </div>
                   </div>
                 )}
               </div>
-            ))
-          )}
+            ))}
 
-          {/* Add Unplanned Set Button */}
-          <button
-            onClick={addUnplannedSet}
+          {/* Add additional set (works for free + for adding beyond planned) */}
+          <Button
+            variant="outline"
+            onClick={addAdditionalSet}
             disabled={loading}
-            className="w-full py-2 px-4 border-2 border-dashed border-gray-300 text-gray-600 rounded-lg hover:border-blue-500 hover:text-blue-600 disabled:opacity-50 text-sm font-medium"
+            className="w-full border-dashed text-muted-foreground hover:text-foreground"
           >
-            + Satz hinzufügen
-          </button>
+            <IconPlus className="size-4 mr-2" />
+            Satz hinzufügen
+          </Button>
 
-          {!hasPlannedSets && unplannedSets.length === 0 && exercise.sets.length === 0 && (
-            <p className="text-gray-500 text-sm text-center py-2">
+          {!hasPlannedSets && exercise.sets.length === 0 && additionalSetNumbers.length === 0 && (
+            <p className="text-muted-foreground text-sm text-center py-2">
               Noch keine Sätze geloggt
             </p>
           )}
-          </div>
+          </CardContent>
         )}
-      </div>
+      </Card>
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Übung entfernen?
-            </h3>
-            <p className="text-gray-600 mb-6">
-              Möchtest du <strong>{exercise.exerciseName}</strong> und alle
-              zugehörigen Sätze entfernen?
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50"
-              >
-                Abbrechen
-              </button>
-              <button
-                onClick={handleRemoveExercise}
-                disabled={loading}
-                className="flex-1 py-2 px-4 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 disabled:opacity-50"
-              >
-                {loading ? 'Wird entfernt...' : 'Entfernen'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Delete Confirmation (AlertDialog, no X button, consistent with other modals) */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={(open) => !open && setShowDeleteConfirm(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Übung entfernen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Möchtest du <strong>{exercise.exerciseName}</strong> und alle zugehörigen Sätze entfernen?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRemoveExercise}
+              disabled={loading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {loading ? 'Wird entfernt...' : 'Entfernen'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Replace Exercise Modal */}
       {showReplaceModal && (

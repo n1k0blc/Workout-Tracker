@@ -14,11 +14,6 @@ interface WorkoutContextType {
   isPastWorkout: boolean;
   pastWorkoutDuration: number;
   setPastWorkoutDuration: (duration: number) => void;
-  removedPlannedSets: Map<string, Set<number>>; // exerciseLogId -> set of setNumbers that were removed
-  markPlannedSetAsRemoved: (exerciseLogId: string, setNumber: number) => void;
-  unplannedSets: Map<string, Set<number>>; // exerciseLogId -> set of setNumbers for unplanned sets
-  addUnplannedSet: (exerciseLogId: string, setNumber: number) => void;
-  removeUnplannedSet: (exerciseLogId: string, setNumber: number) => void;
   startWorkout: (data: {
     cycleId?: string;
     workoutDayId?: string;
@@ -77,8 +72,6 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const [isRestTimerPaused, setIsRestTimerPaused] = useState(false);
   const [isPastWorkout, setIsPastWorkout] = useState(false);
   const [pastWorkoutDuration, setPastWorkoutDuration] = useState(0);
-  const [removedPlannedSets, setRemovedPlannedSets] = useState<Map<string, Set<number>>>(new Map());
-  const [unplannedSets, setUnplannedSets] = useState<Map<string, Set<number>>>(new Map());
   const [workoutDuration, setWorkoutDuration] = useState(0);
   const [restTimer, setRestTimer] = useState(0); // Elapsed seconds
   const [restTimerTarget, setRestTimerTarget] = useState(0); // Target seconds
@@ -150,44 +143,6 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       }
       
       return newPausedState;
-    });
-  };
-
-  const markPlannedSetAsRemoved = (exerciseLogId: string, setNumber: number) => {
-    setRemovedPlannedSets(prev => {
-      const newMap = new Map(prev);
-      const exerciseSet = newMap.get(exerciseLogId) || new Set();
-      exerciseSet.add(setNumber);
-      newMap.set(exerciseLogId, exerciseSet);
-      return newMap;
-    });
-  };
-
-  const addUnplannedSet = (exerciseLogId: string, setNumber: number) => {
-    setUnplannedSets(prev => {
-      const newMap = new Map(prev);
-      const exerciseSet = newMap.get(exerciseLogId) || new Set();
-      const newExerciseSet = new Set(exerciseSet);  // Clone the Set!
-      newExerciseSet.add(setNumber);
-      newMap.set(exerciseLogId, newExerciseSet);
-      return newMap;
-    });
-  };
-
-  const removeUnplannedSet = (exerciseLogId: string, setNumber: number) => {
-    setUnplannedSets(prev => {
-      const newMap = new Map(prev);
-      const exerciseSet = newMap.get(exerciseLogId);
-      if (exerciseSet) {
-        const newExerciseSet = new Set(exerciseSet);  // Clone the Set!
-        newExerciseSet.delete(setNumber);
-        if (newExerciseSet.size === 0) {
-          newMap.delete(exerciseLogId);
-        } else {
-          newMap.set(exerciseLogId, newExerciseSet);
-        }
-      }
-      return newMap;
     });
   };
 
@@ -319,8 +274,6 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setWorkoutDuration(0);
     setIsPastWorkout(isPast ?? false);
     setPastWorkoutDuration(pastDuration ?? 0);
-    setRemovedPlannedSets(new Map());
-    setUnplannedSets(new Map());
     setPausedWorkoutDuration(null);
     setPausedRestTimer(null);
     setPausedRestTimerValue(null);
@@ -353,8 +306,6 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       setWorkoutDuration(0);
       setIsPastWorkout(data.isPastWorkout ?? false);
       setPastWorkoutDuration(data.pastWorkoutDuration ?? 0);
-      setRemovedPlannedSets(new Map()); // Reset removed sets for new workout
-      setUnplannedSets(new Map()); // Reset unplanned sets for new workout
       setPausedWorkoutDuration(null);
       setPausedRestTimer(null);
       setPausedRestTimerValue(null);
@@ -680,11 +631,6 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         isPastWorkout,
         pastWorkoutDuration,
         setPastWorkoutDuration,
-        removedPlannedSets,
-        markPlannedSetAsRemoved,
-        unplannedSets,
-        addUnplannedSet,
-        removeUnplannedSet,
         startWorkout,
         completeWorkout,
         discardWorkout,
