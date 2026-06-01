@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -49,11 +50,9 @@ export default function LoginPage() {
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="email" className="sr-only">
-                E-Mail-Adresse
-              </label>
+          <FieldGroup>
+            <Field>
+              <FieldLabel htmlFor="email">E-Mail-Adresse</FieldLabel>
               <Input
                 id="email"
                 type="email"
@@ -62,13 +61,11 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="E-Mail-Adresse"
-                className="rounded-t-md rounded-b-none"
               />
-            </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Passwort
-              </label>
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="password">Passwort</FieldLabel>
               <Input
                 id="password"
                 type="password"
@@ -77,10 +74,9 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Passwort"
-                className="rounded-b-md rounded-t-none"
               />
-            </div>
-          </div>
+            </Field>
+          </FieldGroup>
 
           {error && (
             <Alert variant="destructive">
@@ -88,11 +84,9 @@ export default function LoginPage() {
             </Alert>
           )}
 
-          <div>
-            <Button type="submit" className="w-full" disabled={loading} size="lg">
-              {loading ? 'Wird angemeldet...' : 'Anmelden'}
-            </Button>
-          </div>
+          <Button type="submit" className="w-full" disabled={loading} size="lg">
+            {loading ? 'Wird angemeldet...' : 'Anmelden'}
+          </Button>
         </form>
       </div>
     </div>

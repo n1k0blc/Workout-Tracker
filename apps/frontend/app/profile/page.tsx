@@ -383,14 +383,14 @@ export default function ProfilePage() {
                 Noch keine Gyms hinzugefügt
               </p>
             ) : (
-              <div className="space-y-3">
+              <div className="divide-y rounded-md border">
                 {homeGyms.map((gym) => (
                   <div
                     key={gym.id}
-                    className="flex items-center justify-between rounded-lg border p-4"
+                    className="flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors"
                   >
                     <span className="font-medium">{gym.name}</span>
-                    <div className="flex gap-2">
+                    <div className="flex gap-1">
                       <Button
                         variant="ghost"
                         size="icon"
@@ -399,7 +399,7 @@ export default function ProfilePage() {
                           setEditingGymName(gym.name);
                         }}
                       >
-                        <IconEdit />
+                        <IconEdit className="size-4" />
                       </Button>
                       <Button
                         variant="ghost"
@@ -408,7 +408,7 @@ export default function ProfilePage() {
                         disabled={loading}
                         className="text-destructive hover:text-destructive"
                       >
-                        <IconTrash />
+                        <IconTrash className="size-4" />
                       </Button>
                     </div>
                   </div>

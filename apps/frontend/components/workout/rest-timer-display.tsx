@@ -20,10 +20,10 @@ export function RestTimerDisplay() {
       onClick={toggleRestTimerPause}
       className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer hover:opacity-90 ${
         isRestTimerPaused
-          ? 'bg-gray-500 text-white'
+          ? 'bg-muted text-muted-foreground'
           : isOvertime
-          ? 'bg-red-600 text-white'
-          : 'bg-blue-600 text-white'
+          ? 'bg-destructive text-destructive-foreground'
+          : 'bg-primary text-primary-foreground'
       }`}
       title={isRestTimerPaused ? 'Satzpause fortsetzen' : 'Satzpause anhalten'}
     >

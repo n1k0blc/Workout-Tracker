@@ -188,7 +188,7 @@ export default function DashboardPage() {
                             localStorage.setItem(`cycle-${completedCycle.id}-acknowledged`, 'true');
                             router.push(`/cycles/${completedCycle.id}?celebration=true`);
                           }}
-                          className="bg-primary text-primary-foreground p-6 cursor-pointer hover:opacity-90 transition-all"
+                          className="rounded-lg bg-primary text-primary-foreground p-6 cursor-pointer hover:opacity-90 transition-all"
                         >
                           <div className="text-center">
                             <div className="text-6xl mb-3">🎉</div>
@@ -306,31 +306,25 @@ export default function DashboardPage() {
                     </CardHeader>
                     <CardContent>
                       {weekWorkouts.length > 0 ? (
-                        <div className="space-y-3">
+                        <div className="divide-y border">
                           {weekWorkouts.map((workout) => (
                             <div
                               key={workout.id}
                               onClick={() => router.push(`/history/${workout.id}`)}
-                              className="border p-4 hover:bg-muted hover:border-primary/30 transition-colors cursor-pointer"
+                              className="flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer"
                             >
-                              <div className="flex items-start justify-between">
-                                <div className="flex-1">
-                                  <div className="font-medium">
-                                    {workout.workoutDayName || workout.templateName || 'Freies Workout'}
-                                  </div>
-                                  <div className="text-sm text-muted-foreground mt-1">
-                                    {formatDate(workout.date)}
-                                  </div>
-                                  {workout.cycleName && (
-                                    <div className="text-xs text-muted-foreground mt-1">
-                                      {workout.cycleName}
-                                    </div>
-                                  )}
+                              <div>
+                                <div className="font-medium">
+                                  {workout.workoutDayName || workout.templateName || 'Freies Workout'}
                                 </div>
-                                <Badge variant="secondary">
-                                  {workout.exerciseCount} Übungen
-                                </Badge>
+                                <div className="text-sm text-muted-foreground mt-1">
+                                  {formatDate(workout.date)}
+                                  {workout.cycleName && ` · ${workout.cycleName}`}
+                                </div>
                               </div>
+                              <Badge variant="secondary">
+                                {workout.exerciseCount} Übungen
+                              </Badge>
                             </div>
                           ))}
                         </div>
@@ -349,7 +343,7 @@ export default function DashboardPage() {
                     </CardHeader>
                     <CardContent>
                       {nextWorkout ? (
-                        <div className="border border-primary/20 bg-muted p-6">
+                        <div className="border bg-card p-6">
                           <div className="text-center">
                             <div className="text-2xl font-bold mb-2">
                               {nextWorkout.workoutDayName}
@@ -362,7 +356,7 @@ export default function DashboardPage() {
                                 {nextWorkout.templateName}
                               </div>
                             )}
-                            <div className="mt-4 pt-4 border-t border-primary/20">
+                            <div className="mt-4 pt-4 border-t">
                               <div className="text-lg font-semibold text-primary">
                                 {getDayName(nextWorkout.dayOfWeek)}
                               </div>
@@ -373,13 +367,13 @@ export default function DashboardPage() {
                           </div>
                         </div>
                       ) : (
-                        <div className="text-center py-12">
-                          <div className="text-muted-foreground">
+                        <div className="rounded-lg border border-dashed p-8 text-center">
+                          <div className="text-muted-foreground mb-2">
                             Kein aktiver Zyklus
                           </div>
                           <Link
                             href="/cycles"
-                            className="inline-block mt-4 text-sm text-primary hover:underline font-medium"
+                            className="inline-block text-sm text-primary hover:underline font-medium"
                           >
                             Zyklus erstellen →
                           </Link>

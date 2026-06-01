@@ -1,7 +1,16 @@
 'use client';
 
 import { useAuth } from '@/lib/auth-context';
-import { HomeGym } from '@/types';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { IconHome, IconBuilding } from '@tabler/icons-react';
 
 interface GymLocationModalProps {
   isOpen: boolean;
@@ -18,77 +27,62 @@ export default function GymLocationModal({
 }: GymLocationModalProps) {
   const { user } = useAuth();
 
-  if (!isOpen) return null;
-
   // Sort home gyms alphabetically
   const homeGyms = [...(user?.homeGyms || [])].sort((a, b) =>
     a.name.localeCompare(b.name)
   );
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 relative max-h-[90vh] overflow-y-auto">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-        >
-          <svg
-            className="w-6 h-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
-        </button>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-md [&>button]:hidden">
+        <DialogHeader>
+          <DialogTitle className="text-center text-2xl">Wo trainierst du heute?</DialogTitle>
+          <DialogDescription className="text-center">
+            Wähle dein Trainingsort aus
+          </DialogDescription>
+        </DialogHeader>
 
-        <h2 className="text-2xl font-bold mb-2 text-center">
-          Wo trainierst du heute?
-        </h2>
-        <p className="text-gray-600 text-center mb-6">
-          Wähle dein Trainingsort aus
-        </p>
-
-        <div className="space-y-3">
+        <div className="space-y-3 pt-2">
           {/* Home Gyms */}
           {homeGyms.map((gym) => {
             const isRecommended = plannedHomeGymId === gym.id;
             return (
-              <button
+              <Button
                 key={gym.id}
                 onClick={() => onSelectGym(gym.id)}
-                className="relative w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold py-5 px-6 rounded-lg transition-colors flex flex-col items-center gap-1 text-lg"
+                className="w-full h-auto py-3 flex items-start gap-3 text-left"
+                variant="default"
               >
-                {isRecommended && (
-                  <span className="absolute top-2 right-2 text-xs bg-white text-violet-600 px-2 py-1 rounded-full font-medium">
-                    Heute empfohlen
-                  </span>
-                )}
-                <span className="text-2xl">🏠</span>
-                <span>{gym.name}</span>
-              </button>
+                <IconHome className="size-5 mt-0.5 shrink-0" />
+                <div className="flex flex-col items-start">
+                  <span>{gym.name}</span>
+                  {isRecommended ? (
+                    <Badge variant="secondary" className="text-xs mt-0.5">
+                      Heute empfohlen
+                    </Badge>
+                  ) : (
+                    <span className="text-xs mt-0.5 invisible">Heute empfohlen</span>
+                  )}
+                </div>
+              </Button>
             );
           })}
 
           {/* Other Gym */}
-          <button
+          <Button
             onClick={() => onSelectGym(null)}
-            className="w-full bg-gray-600 hover:bg-gray-700 text-white font-semibold py-5 px-6 rounded-lg transition-colors flex flex-col items-center gap-1 text-lg"
+            className="w-full h-auto py-3 flex items-center justify-center gap-3 text-base"
+            variant="outline"
           >
-            <span className="text-2xl">🏋️</span>
+            <IconBuilding className="size-5" />
             <span>Anderes Gym</span>
-          </button>
+          </Button>
         </div>
 
-        <p className="text-xs text-gray-500 text-center mt-4">
+        <p className="text-xs text-muted-foreground text-center pt-2">
           PRs werden nur von Home Gym Workouts gezählt
         </p>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

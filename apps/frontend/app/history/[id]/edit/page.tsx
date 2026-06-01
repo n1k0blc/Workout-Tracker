@@ -5,6 +5,19 @@ import { useRouter, useParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
 import { Workout } from '@/types';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Field, FieldLabel } from '@/components/ui/field';
+import { DatePicker } from '@/components/date-picker';
+import {
+  IconChevronLeft,
+  IconCheck,
+  IconX,
+  IconBarbell,
+  IconFlame,
+} from '@tabler/icons-react';
 
 export default function EditWorkoutPage() {
   const router = useRouter();
@@ -122,8 +135,8 @@ export default function EditWorkoutPage() {
   if (loading || !workout) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-lg text-gray-600">Lädt Workout...</div>
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="text-lg text-muted-foreground">Lädt Workout...</div>
         </div>
       </ProtectedRoute>
     );
@@ -131,150 +144,188 @@ export default function EditWorkoutPage() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-background">
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0 space-y-6">
+            {/* Back Button */}
+            <Button
+              variant="ghost"
+              onClick={() => router.push('/history')}
+              className="flex items-center gap-2 -ml-2"
+            >
+              <IconChevronLeft className="size-4" />
+              Zurück zum Verlauf
+            </Button>
+
             {/* Header */}
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">
-                Workout bearbeiten
-              </h2>
-              <p className="mt-1 text-sm text-gray-600">
-                {workout.isFreeWorkout
-                  ? workout.templateName || 'Freies Workout'
-                  : workout.workoutDayName || 'Workout'}
-                {workout.cycleName && ` - ${workout.cycleName}`}
-              </p>
-            </div>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <h2 className="text-2xl font-bold text-foreground">
+                      Workout bearbeiten
+                    </h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {workout.isFreeWorkout
+                        ? workout.templateName || 'Freies Workout'
+                        : workout.workoutDayName || 'Workout'}
+                      {workout.cycleName && ` - ${workout.cycleName}`}
+                    </p>
+                  </div>
+                  <Badge variant="outline">Bearbeitung</Badge>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Workout Date */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Workout-Datum
-              </label>
-              <input
-                type="date"
-                value={workoutDate}
-                onChange={(e) => setWorkoutDate(e.target.value)}
-                className="w-full md:w-auto px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <p className="mt-2 text-sm text-gray-500">
-                Ursprünglich: {formatDate(workout.date)}
-              </p>
-            </div>
+            <Card>
+              <CardContent className="p-6">
+                <Field>
+                  <FieldLabel>Workout-Datum</FieldLabel>
+                  <DatePicker
+                    date={workoutDate ? new Date(workoutDate) : null}
+                    onSelect={(date) => {
+                      if (date) {
+                        const y = date.getFullYear();
+                        const m = String(date.getMonth() + 1).padStart(2, '0');
+                        const d = String(date.getDate()).padStart(2, '0');
+                        setWorkoutDate(`${y}-${m}-${d}`);
+                      } else {
+                        setWorkoutDate('');
+                      }
+                    }}
+                    className="w-full md:w-auto"
+                  />
+                </Field>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Ursprünglich: {formatDate(workout.date)}
+                </p>
+              </CardContent>
+            </Card>
 
             {/* Exercises */}
             <div className="space-y-4">
               {workout.exercises.map((exercise, idx) => (
-                <div key={exercise.id} className="bg-white rounded-lg shadow p-6">
-                  <div className="mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      #{idx + 1} {exercise.exerciseName}
-                    </h3>
-                  </div>
+                <Card key={exercise.id}>
+                  <CardContent className="p-6">
+                    <div className="mb-4">
+                      <h3 className="text-lg font-semibold text-foreground">
+                        #{idx + 1} {exercise.exerciseName}
+                      </h3>
+                    </div>
 
-                  {/* Sets */}
-                  <div className="space-y-3">
-                    {exercise.sets.map((set) => {
-                      const editedSet = editedSets[exercise.id]?.[set.id];
-                      return (
-                        <div
-                          key={set.id}
-                          className="bg-gray-50 rounded-lg p-4 border border-gray-200"
-                        >
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex-1"></div>
-                            <span className="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded">
-                              {set.setType === 'WARMUP' ? 'Aufwärmen' : 'Arbeitssatz'}
-                            </span>
-                          </div>
+                    {/* Sets */}
+                    <div className="space-y-3">
+                      {exercise.sets.map((set) => {
+                        const editedSet = editedSets[exercise.id]?.[set.id];
+                        const isWarmup = set.setType === 'WARMUP';
+                        return (
+                          <div
+                            key={set.id}
+                            className="rounded-md border bg-muted/30 p-4"
+                          >
+                            <div className="flex items-center gap-3 mb-3">
+                              <Badge
+                                variant={isWarmup ? 'outline' : 'default'}
+                                className="p-1"
+                                title={isWarmup ? 'Aufwärmen' : 'Arbeit'}
+                              >
+                                {isWarmup ? (
+                                  <IconFlame className="size-7" />
+                                ) : (
+                                  <IconBarbell className="size-7" />
+                                )}
+                              </Badge>
+                            </div>
 
-                          <div className="grid grid-cols-3 gap-3">
-                            <div>
-                              <label className="block text-xs text-gray-600 mb-1">
-                                Wiederholungen{exercise.isUnilateral ? ' (2x)' : ''}
-                              </label>
-                              <input
-                                type="number"
-                                value={editedSet?.reps || ''}
-                                onChange={(e) =>
-                                  handleSetValueChange(
-                                    exercise.id,
-                                    set.id,
-                                    'reps',
-                                    e.target.value
-                                  )
-                                }
-                                min="1"
-                                className="w-full px-2 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs text-gray-600 mb-1">
-                                Gewicht (kg){exercise.isDoubleWeight ? ' (2x)' : ''}
-                              </label>
-                              <input
-                                type="number"
-                                step="0.5"
-                                value={editedSet?.weight || ''}
-                                onChange={(e) =>
-                                  handleSetValueChange(
-                                    exercise.id,
-                                    set.id,
-                                    'weight',
-                                    e.target.value
-                                  )
-                                }
-                                min="0"
-                                className="w-full px-2 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs text-gray-600 mb-1">
-                                RIR
-                              </label>
-                              <input
-                                type="number"
-                                value={editedSet?.rir || ''}
-                                onChange={(e) =>
-                                  handleSetValueChange(
-                                    exercise.id,
-                                    set.id,
-                                    'rir',
-                                    e.target.value
-                                  )
-                                }
-                                min="0"
-                                max="10"
-                                placeholder="-"
-                                className="w-full px-2 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              />
+                            <div className="grid grid-cols-3 gap-3">
+                              <Field>
+                                <FieldLabel className="text-xs">
+                                  Wiederholungen{exercise.isUnilateral ? ' (2x)' : ''}
+                                </FieldLabel>
+                                <Input
+                                  type="number"
+                                  value={editedSet?.reps || ''}
+                                  onChange={(e) =>
+                                    handleSetValueChange(
+                                      exercise.id,
+                                      set.id,
+                                      'reps',
+                                      e.target.value
+                                    )
+                                  }
+                                  min="1"
+                                  className="w-full text-sm"
+                                />
+                              </Field>
+                              <Field>
+                                <FieldLabel className="text-xs">
+                                  Gewicht (kg){exercise.isDoubleWeight ? ' (2x)' : ''}
+                                </FieldLabel>
+                                <Input
+                                  type="number"
+                                  step="0.5"
+                                  value={editedSet?.weight || ''}
+                                  onChange={(e) =>
+                                    handleSetValueChange(
+                                      exercise.id,
+                                      set.id,
+                                      'weight',
+                                      e.target.value
+                                    )
+                                  }
+                                  min="0"
+                                  className="w-full text-sm"
+                                />
+                              </Field>
+                              <Field>
+                                <FieldLabel className="text-xs">RIR</FieldLabel>
+                                <Input
+                                  type="number"
+                                  value={editedSet?.rir || ''}
+                                  onChange={(e) =>
+                                    handleSetValueChange(
+                                      exercise.id,
+                                      set.id,
+                                      'rir',
+                                      e.target.value
+                                    )
+                                  }
+                                  min="0"
+                                  max="10"
+                                  placeholder="-"
+                                  className="w-full text-sm"
+                                />
+                              </Field>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
 
             {/* Actions */}
             <div className="flex gap-3">
-              <button
+              <Button
+                variant="outline"
+                className="flex-1"
                 onClick={() => router.push('/history')}
                 disabled={saving}
-                className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 disabled:opacity-50"
               >
+                <IconX className="mr-2 size-4" />
                 Abbrechen
-              </button>
-              <button
+              </Button>
+              <Button
+                className="flex-1"
                 onClick={handleSave}
                 disabled={saving}
-                className="flex-1 px-4 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
+                <IconCheck className="mr-2 size-4" />
                 {saving ? 'Speichert...' : 'Speichern'}
-              </button>
+              </Button>
             </div>
           </div>
         </main>

@@ -201,8 +201,8 @@ export default function RegisterPage() {
             </FieldGroup>
 
             {/* Personal Info */}
-            <div className="pt-2">
-              <div className="mb-3 text-sm font-medium text-foreground">Persönliche Daten</div>
+            <div className="pt-4">
+              <div className="mb-3 text-sm font-medium text-muted-foreground">Persönliche Daten</div>
               <FieldGroup>
                 <div className="grid grid-cols-2 gap-3">
                   <Field>
@@ -281,8 +281,8 @@ export default function RegisterPage() {
         ) : (
           <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
             <FieldGroup>
-              <div>
-                <div className="flex items-center justify-between mb-2">
+              <Field>
+                <div className="flex items-center justify-between">
                   <FieldLabel>Deine Home Gyms</FieldLabel>
                   <Button
                     type="button"
@@ -295,33 +295,34 @@ export default function RegisterPage() {
                     Hinzufügen
                   </Button>
                 </div>
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-sm text-muted-foreground mt-1 mb-4">
                   Füge die Studios hinzu, in denen du trainierst. Du kannst später weitere hinzufügen.
                 </p>
-                <div className="space-y-3">
-                  {homeGyms.map((gym, index) => (
-                    <div key={index} className="flex gap-2 items-center">
-                      <Input
-                        value={gym.name}
-                        onChange={(e) => handleGymNameChange(index, e.target.value)}
-                        placeholder={index === 0 ? "z.B. Mein Home Gym" : "Studio Name"}
-                        className="flex-1"
-                      />
-                      {homeGyms.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveGym(index)}
-                          className="text-muted-foreground hover:text-destructive shrink-0"
-                        >
-                          <IconX />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
+              </Field>
+
+              <FieldGroup className="gap-3">
+                {homeGyms.map((gym, index) => (
+                  <Field key={index} className="flex-row items-center gap-2">
+                    <Input
+                      value={gym.name}
+                      onChange={(e) => handleGymNameChange(index, e.target.value)}
+                      placeholder={index === 0 ? "z.B. Mein Home Gym" : "Studio Name"}
+                      className="flex-1"
+                    />
+                    {homeGyms.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleRemoveGym(index)}
+                        className="text-muted-foreground hover:text-destructive shrink-0"
+                      >
+                        <IconX />
+                      </Button>
+                    )}
+                  </Field>
+                ))}
+              </FieldGroup>
             </FieldGroup>
 
             {error && (
@@ -330,7 +331,7 @@ export default function RegisterPage() {
               </Alert>
             )}
 
-            <div className="flex gap-3">
+            <div className="flex gap-3 pt-2">
               <Button
                 type="button"
                 variant="outline"

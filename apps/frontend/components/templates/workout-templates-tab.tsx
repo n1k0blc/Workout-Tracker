@@ -4,7 +4,20 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { WorkoutTemplate } from '@/types';
-import { Plus, Edit, Trash2, Dumbbell, Clock, Tag } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { IconPlus, IconEdit, IconTrash, IconBarbell, IconClock, IconTag } from '@tabler/icons-react';
 
 export default function WorkoutTemplatesTab() {
   const router = useRouter();
@@ -48,30 +61,27 @@ export default function WorkoutTemplatesTab() {
     <div className="space-y-6">
       {/* Header with count */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-muted-foreground">
           {systemTemplates.length} System-Vorlagen · {customTemplates.length} Benutzerdefinierte
           Vorlagen
         </p>
-        <button
-          onClick={() => router.push('/templates/new')}
-          className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-        >
-          <Plus className="h-5 w-5" />
+        <Button onClick={() => router.push('/templates/new')}>
+          <IconPlus className="mr-2 size-4" />
           Neue Vorlage
-        </button>
+        </Button>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <div className="text-lg text-gray-600">Lädt Vorlagen...</div>
+          <div className="text-lg text-muted-foreground">Lädt Vorlagen...</div>
         </div>
       ) : (
         <div className="space-y-8">
           {/* System Templates */}
           {systemTemplates.length > 0 && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Dumbbell className="h-5 w-5" />
+              <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                <IconBarbell className="size-5" />
                 System-Vorlagen
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -84,8 +94,8 @@ export default function WorkoutTemplatesTab() {
 
           {/* Custom Templates */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Tag className="h-5 w-5" />
+            <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+              <IconTag className="size-5" />
               Benutzerdefinierte Vorlagen
             </h3>
             {customTemplates.length > 0 ? (
@@ -100,43 +110,40 @@ export default function WorkoutTemplatesTab() {
                 ))}
               </div>
             ) : (
-              <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-                <p className="text-gray-600 mb-4">Noch keine benutzerdefinierten Vorlagen</p>
-                <p className="text-sm text-gray-500">
-                  Erstelle Vorlagen aus Blueprints oder abgeschlossenen Workouts
-                </p>
-              </div>
+              <Card>
+                <CardContent className="p-12 text-center">
+                  <p className="text-muted-foreground mb-4">Noch keine benutzerdefinierten Vorlagen</p>
+                  <p className="text-sm text-muted-foreground">
+                    Erstelle Vorlagen aus Blueprints oder abgeschlossenen Workouts
+                  </p>
+                </CardContent>
+              </Card>
             )}
           </div>
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {deleteTemplateId && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Vorlage löschen?</h3>
-            <p className="text-sm text-gray-600 mb-6">
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteTemplateId} onOpenChange={(open) => !open && setDeleteTemplateId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Vorlage löschen?</AlertDialogTitle>
+            <AlertDialogDescription>
               Möchten Sie diese Workout-Vorlage wirklich löschen? Diese Aktion kann nicht
               rückgängig gemacht werden.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={handleDeleteTemplate}
-                className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 font-medium transition-colors"
-              >
-                Löschen
-              </button>
-              <button
-                onClick={() => setDeleteTemplateId(null)}
-                className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 font-medium transition-colors"
-              >
-                Abbrechen
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteTemplate}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Löschen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -149,69 +156,67 @@ interface TemplateCardProps {
 
 function TemplateCard({ template, onDelete, onEdit }: TemplateCardProps) {
   return (
-    <div className="bg-white rounded-lg shadow-sm p-5 hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <h4 className="font-semibold text-gray-900 text-lg">{template.name}</h4>
-        {template.isCustom && (
-          <div className="flex gap-2">
-            {onEdit && (
-              <button
-                onClick={onEdit}
-                className="text-blue-600 hover:text-blue-800 transition-colors"
-                title="Vorlage bearbeiten"
-              >
-                <Edit className="h-4 w-4" />
-              </button>
-            )}
-            {onDelete && (
-              <button
-                onClick={onDelete}
-                className="text-red-600 hover:text-red-800 transition-colors"
-                title="Vorlage löschen"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+    <Card className="hover:shadow-sm transition-shadow">
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <h4 className="font-semibold text-foreground text-lg">{template.name}</h4>
+          {template.isCustom && (
+            <div className="flex gap-1">
+              {onEdit && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  onClick={onEdit}
+                  title="Vorlage bearbeiten"
+                >
+                  <IconEdit className="size-4" />
+                </Button>
+              )}
+              {onDelete && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={onDelete}
+                  title="Vorlage löschen"
+                >
+                  <IconTrash className="size-4" />
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
 
-      <div className="space-y-2 text-sm text-gray-600">
-        <div className="flex items-center gap-2">
-          <Dumbbell className="h-4 w-4" />
-          <span>
-            {template.totalExercises} {template.totalExercises === 1 ? 'Übung' : 'Übungen'}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4" />
-          <span>
-            {template.totalSets} {template.totalSets === 1 ? 'Satz' : 'Sätze'}
-          </span>
-        </div>
-        {template.recommendedGymName && (
+        <div className="space-y-1.5 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
-            <Tag className="h-4 w-4" />
-            <span className="truncate">{template.recommendedGymName}</span>
+            <IconBarbell className="size-4" />
+            <span>
+              {template.totalExercises} {template.totalExercises === 1 ? 'Übung' : 'Übungen'}
+            </span>
           </div>
-        )}
-      </div>
-
-      {!template.isCustom && (
-        <div className="mt-4 pt-3 border-t border-gray-100">
-          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-            System-Vorlage
-          </span>
+          <div className="flex items-center gap-2">
+            <IconClock className="size-4" />
+            <span>
+              {template.totalSets} {template.totalSets === 1 ? 'Satz' : 'Sätze'}
+            </span>
+          </div>
+          {template.recommendedGymName && (
+            <div className="flex items-center gap-2">
+              <IconTag className="size-4" />
+              <span className="truncate">{template.recommendedGymName}</span>
+            </div>
+          )}
         </div>
-      )}
 
-      {template.isCustom && (
-        <div className="mt-4 pt-3 border-t border-gray-100">
-          <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
-            Benutzerdefiniert
-          </span>
+        <div className="mt-4 pt-3 border-t">
+          {template.isCustom ? (
+            <Badge variant="secondary" className="text-xs">Benutzerdefiniert</Badge>
+          ) : (
+            <Badge variant="outline" className="text-xs">System-Vorlage</Badge>
+          )}
         </div>
-      )}
-    </div>
+      </CardContent>
+    </Card>
   );
 }

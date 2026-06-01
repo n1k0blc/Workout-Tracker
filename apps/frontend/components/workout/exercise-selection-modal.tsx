@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Exercise, MuscleGroup, Equipment } from '@/types';
 import { apiClient } from '@/lib/api';
 import { MUSCLE_GROUP_LABELS } from '@/lib/exercise-utils';
-import CreateExerciseModal from '@/components/exercises/create-exercise-modal';
+import { ExerciseEditorDialog } from '@/components/exercises/exercise-editor-dialog';
 
 interface ExerciseSelectionModalProps {
   onClose: () => void;
@@ -24,7 +24,7 @@ export default function ExerciseSelectionModal({
   const [equipmentFilter, setEquipmentFilter] = useState<
     Equipment | undefined
   >();
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   useEffect(() => {
     loadExercises();
@@ -51,6 +51,7 @@ export default function ExerciseSelectionModal({
     // Add new exercise to list and select it
     setExercises((prev) => [exercise, ...prev]);
     onSelect(exercise.id, exercise);
+    setShowCreateDialog(false);
   };
 
   const muscleGroups = [
@@ -204,7 +205,7 @@ export default function ExerciseSelectionModal({
         {/* Create Custom Exercise Button */}
         <div className="px-6 py-3 border-b border-gray-200">
           <button
-            onClick={() => setShowCreateModal(true)}
+            onClick={() => setShowCreateDialog(true)}
             className="w-full py-2 px-4 border-2 border-dashed border-gray-300 text-gray-600 font-medium rounded-lg hover:border-blue-500 hover:text-blue-600 transition-colors"
           >
             + Benutzerdefinierte Übung erstellen
@@ -248,13 +249,12 @@ export default function ExerciseSelectionModal({
         </div>
       </div>
 
-      {/* Create Exercise Modal */}
-      {showCreateModal && (
-        <CreateExerciseModal
-          onClose={() => setShowCreateModal(false)}
-          onCreated={handleExerciseCreated}
-        />
-      )}
+      {/* Create Exercise Dialog (shared) */}
+      <ExerciseEditorDialog
+        open={showCreateDialog}
+        onOpenChange={setShowCreateDialog}
+        onSuccess={handleExerciseCreated}
+      />
     </div>
   );
 }

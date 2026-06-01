@@ -5,6 +5,26 @@ import { useRouter } from 'next/navigation';
 import { useWorkout } from '@/lib/workout-context';
 import { apiClient } from '@/lib/api';
 import { Workout } from '@/types';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  IconCalendar,
+  IconDumbbell,
+  IconTemplate,
+  IconHistory,
+  IconX,
+  IconAlertTriangle,
+} from '@tabler/icons-react';
 import CycleWorkoutSelectionModal from './cycle-workout-selection-modal';
 import GymLocationModal from './gym-location-modal';
 import PastWorkoutSetupModal from './past-workout-setup-modal';
@@ -12,7 +32,7 @@ import TemplateSelectionModal from './template-selection-modal';
 
 export default function WorkoutStartScreen() {
   const router = useRouter();
-  const { startWorkout, loading, refreshActiveWorkout, setActiveWorkoutDirectly } = useWorkout();
+  const { startWorkout, loading, setActiveWorkoutDirectly } = useWorkout();
   const [suggestedWorkout, setSuggestedWorkout] = useState<Workout | null>(
     null
   );
@@ -21,6 +41,11 @@ export default function WorkoutStartScreen() {
   const [showCycleWorkoutModal, setShowCycleWorkoutModal] = useState(false);
   const [showGymLocationModal, setShowGymLocationModal] = useState(false);
   const [showPastWorkoutModal, setShowPastWorkoutModal] = useState(false);
+  const [showPastWorkoutDetails, setShowPastWorkoutDetails] = useState(false);
+
+  // State for the common past workout details step
+  const [pastDetailsDate, setPastDetailsDate] = useState('');
+  const [pastDetailsDuration, setPastDetailsDuration] = useState(60);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [templateRecommendedGymId, setTemplateRecommendedGymId] = useState<string | undefined>();
@@ -91,7 +116,13 @@ export default function WorkoutStartScreen() {
       pastWorkoutDuration: prev?.pastWorkoutDuration,
     }));
     setShowCycleWorkoutModal(false);
-    setShowGymLocationModal(true);
+
+    if (pendingWorkoutData?.isPastWorkout) {
+      // For past workouts, go to details step first
+      openPastWorkoutDetails();
+    } else {
+      setShowGymLocationModal(true);
+    }
   };
 
   const handleGymLocationSelected = async (homeGymId: string | null) => {
@@ -122,39 +153,55 @@ export default function WorkoutStartScreen() {
     setShowPastWorkoutModal(true);
   };
 
-  const handlePastWorkoutFree = (date: string, durationMinutes: number) => {
+  // New simplified handlers for the restructured past workout flow
+  const handlePastWorkoutChooseFree = () => {
+    setShowPastWorkoutModal(false);
     setPendingWorkoutData({
       isFreeWorkout: true,
       isPastWorkout: true,
-      pastWorkoutDate: date,
-      pastWorkoutDuration: durationMinutes * 60,
     });
-    setShowPastWorkoutModal(false);
-    setShowGymLocationModal(true);
+    openPastWorkoutDetails();
   };
 
-  const handlePastWorkoutCycle = (date: string, durationMinutes: number) => {
-    // Store date and duration temporarily and show cycle selection
+  const handlePastWorkoutChooseCycle = () => {
+    setShowPastWorkoutModal(false);
     setPendingWorkoutData({
       isFreeWorkout: false,
       isPastWorkout: true,
-      pastWorkoutDate: date,
-      pastWorkoutDuration: durationMinutes * 60,
     });
-    setShowPastWorkoutModal(false);
     setShowCycleWorkoutModal(true);
   };
 
-  const handlePastWorkoutTemplate = (date: string, durationMinutes: number) => {
-    // Store date and duration temporarily and show template selection
+  const handlePastWorkoutChooseTemplate = () => {
+    setShowPastWorkoutModal(false);
     setPendingWorkoutData({
       isFreeWorkout: false,
       isPastWorkout: true,
-      pastWorkoutDate: date,
-      pastWorkoutDuration: durationMinutes * 60,
     });
-    setShowPastWorkoutModal(false);
     setShowTemplateModal(true);
+  };
+
+  // Handlers for the common Workout Details step (used by Free, Cycle, and Template past flows)
+  const openPastWorkoutDetails = () => {
+    setPastDetailsDate(new Date().toISOString().split('T')[0]);
+    setPastDetailsDuration(60);
+    setShowPastWorkoutDetails(true);
+  };
+
+  const handlePastWorkoutDetailsConfirm = () => {
+    setPendingWorkoutData((prev) => ({
+      ...prev,
+      pastWorkoutDate: pastDetailsDate,
+      pastWorkoutDuration: pastDetailsDuration * 60,
+    }));
+    setShowPastWorkoutDetails(false);
+    setShowGymLocationModal(true);
+  };
+
+  const handlePastWorkoutDetailsBack = () => {
+    setShowPastWorkoutDetails(false);
+    setShowPastWorkoutModal(true);
+    setPendingWorkoutData(null);
   };
 
   const handleTemplateSelected = (templateId: string, recommendedGymId?: string) => {
@@ -168,7 +215,11 @@ export default function WorkoutStartScreen() {
       setPendingWorkoutData(null);
     }
     
-    setShowGymLocationModal(true);
+    if (pendingWorkoutData?.isPastWorkout) {
+      openPastWorkoutDetails();
+    } else {
+      setShowGymLocationModal(true);
+    }
   };
 
   const handleGymForTemplate = async (homeGymId: string | null) => {
@@ -204,16 +255,10 @@ export default function WorkoutStartScreen() {
     }
   };
 
-  const formatTime = (seconds: number): string => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
   if (loadingSuggestion) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg text-gray-600">
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="text-lg text-muted-foreground">
           Lade Workout-Vorschlag...
         </div>
       </div>
@@ -221,73 +266,72 @@ export default function WorkoutStartScreen() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-background pb-20">
       {/* Header */}
-      <div className="bg-white shadow-sm sticky top-0 z-10">
+      <div className="border-b bg-card sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-2xl font-bold text-foreground">
               Neues Workout
             </h1>
-            <button
+            <Button
+              variant="ghost"
               onClick={() => router.push('/dashboard')}
-              className="text-gray-600 hover:text-gray-900"
             >
+              <IconX className="mr-2 size-4" />
               Abbrechen
-            </button>
+            </Button>
           </div>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
         {error && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <p className="text-sm text-yellow-800">{error}</p>
+          <div className="flex items-start gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-900 dark:bg-yellow-950">
+            <IconAlertTriangle className="mt-0.5 size-5 text-yellow-600 dark:text-yellow-400" />
+            <p className="text-sm text-yellow-800 dark:text-yellow-200">{error}</p>
           </div>
         )}
 
         {/* Suggested Workout */}
         {suggestedWorkout && (
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-            <div className="bg-blue-600 px-6 py-4">
-              <h2 className="text-xl font-semibold text-white">
-                Vorgeschlagenes Workout
-              </h2>
+          <Card>
+            <CardHeader>
+              <CardTitle>Vorgeschlagenes Workout</CardTitle>
               {suggestedWorkout.cycleName && (
-                <p className="text-blue-100 text-sm mt-1">
-                  {suggestedWorkout.cycleName} •{' '}
-                  {suggestedWorkout.workoutDayName}
+                <p className="text-muted-foreground text-sm mt-1">
+                  {suggestedWorkout.cycleName} • {suggestedWorkout.workoutDayName}
                 </p>
               )}
-            </div>
+            </CardHeader>
 
-            <div className="p-6 space-y-4">
+            <CardContent className="p-6 space-y-4">
               {suggestedWorkout.exercises.length > 0 ? (
                 <>
                   <div className="space-y-3">
-                    {suggestedWorkout.exercises.map((exercise, idx) => (
+                    {suggestedWorkout.exercises.map((exercise) => (
                       <div
                         key={exercise.exerciseId}
-                        className="border border-gray-200 rounded-lg p-4"
+                        className="rounded-md border bg-muted/30 p-4"
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium text-gray-500">
+                              <span className="text-sm font-medium text-muted-foreground">
                                 #{exercise.order}
                               </span>
-                              <h3 className="font-semibold text-gray-900">
+                              <h3 className="font-semibold text-foreground">
                                 {exercise.exerciseName}
                               </h3>
                             </div>
                             {exercise.plannedSets && exercise.plannedSets.length > 0 && (
                               <div className="mt-2 space-y-1">
-                                <div className="text-sm font-medium text-gray-700">
+                                <div className="text-sm font-medium text-foreground">
                                   {exercise.plannedSets.length} geplante Sätze:
                                 </div>
                                 {exercise.plannedSets.map((set, setIdx) => (
-                                  <div key={setIdx} className="text-sm text-gray-600">
-                                    {set.setType === 'WARMUP' ? '🔥 Aufwärmen' : '💪 Arbeit'} - {set.reps} Wdh × {set.weight}kg @ RIR {set.rir}
+                                  <div key={setIdx} className="text-sm text-muted-foreground">
+                                    {set.setType === 'WARMUP' ? 'Aufwärmen' : 'Arbeit'} — {set.reps} Wdh × {set.weight} kg @ RIR {set.rir}
                                   </div>
                                 ))}
                               </div>
@@ -298,130 +342,163 @@ export default function WorkoutStartScreen() {
                     ))}
                   </div>
 
-                  <button
+                  <Button
                     onClick={handleStartSuggested}
                     disabled={loading}
-                    className="w-full py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full"
+                    size="lg"
                   >
-                    {loading
-                      ? 'Wird gestartet...'
-                      : 'Vorgeschlagenes Workout starten'}
-                  </button>
+                    {loading ? 'Wird gestartet...' : 'Vorgeschlagenes Workout starten'}
+                  </Button>
                 </>
               ) : (
-                <p className="text-gray-600">
+                <p className="text-muted-foreground">
                   Keine Übungen im vorgeschlagenen Workout.
                 </p>
               )}
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Free Workout Option */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <div className="p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">
-              Freies Workout
-            </h2>
-            <p className="text-gray-600 text-sm mb-4">
-              Starte ein Workout ohne Vorlage und füge Übungen nach Belieben
-              hinzu.
-            </p>
-            <button
-              onClick={handleStartFree}
-              disabled={loading}
-              className="w-full py-3 px-4 bg-gray-900 text-white font-medium rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Wird gestartet...' : 'Freies Workout starten'}
-            </button>
-          </div>
-        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-start gap-3">
+              <IconDumbbell className="mt-1 size-5 text-muted-foreground" />
+              <div className="flex-1">
+                <h2 className="text-lg font-semibold text-foreground mb-2">
+                  Freies Workout
+                </h2>
+                <p className="text-muted-foreground text-sm mb-4">
+                  Starte ein Workout ohne Vorlage und füge Übungen nach Belieben hinzu.
+                </p>
+                <Button
+                  onClick={handleStartFree}
+                  disabled={loading}
+                  className="w-full"
+                >
+                  Freies Workout starten
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Template Workout */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <div className="p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">
-              Vorlagenworkout starten
-            </h2>
-            <p className="text-gray-600 text-sm mb-4">
-              Wähle eine gespeicherte Workout-Vorlage und starte direkt mit
-              vorausgefüllten Übungen und Werten.
-            </p>
-            <button
-              onClick={() => setShowTemplateModal(true)}
-              disabled={loading}
-              className="w-full py-3 px-4 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Vorlage wählen
-            </button>
-          </div>
-        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-start gap-3">
+              <IconTemplate className="mt-1 size-5 text-muted-foreground" />
+              <div className="flex-1">
+                <h2 className="text-lg font-semibold text-foreground mb-2">
+                  Vorlagenworkout starten
+                </h2>
+                <p className="text-muted-foreground text-sm mb-4">
+                  Wähle eine gespeicherte Workout-Vorlage und starte direkt mit vorausgefüllten Übungen und Werten.
+                </p>
+                <Button
+                  onClick={() => setShowTemplateModal(true)}
+                  disabled={loading}
+                  className="w-full"
+                >
+                  Vorlage wählen
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Cycle Workout Selection */}
         {hasActiveCycle && (
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-            <div className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">
-                Andere Workouts aus dem Zyklus
-              </h2>
-              <p className="text-gray-600 text-sm mb-4">
-                Wähle ein beliebiges Workout aus deinem aktuellen Trainingszyklus.
-              </p>
-              <button
-                onClick={() => setShowCycleWorkoutModal(true)}
-                disabled={loading}
-                className="w-full py-3 px-4 border-2 border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Workout aus Zyklus wählen
-              </button>
-            </div>
-          </div>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-start gap-3">
+                <IconCalendar className="mt-1 size-5 text-muted-foreground" />
+                <div className="flex-1">
+                  <h2 className="text-lg font-semibold text-foreground mb-2">
+                    Andere Workouts aus dem Zyklus
+                  </h2>
+                  <p className="text-muted-foreground text-sm mb-4">
+                    Wähle ein beliebiges Workout aus deinem aktuellen Trainingszyklus.
+                  </p>
+                  <Button
+                    onClick={() => setShowCycleWorkoutModal(true)}
+                    disabled={loading}
+                    className="w-full"
+                  >
+                    Workout aus Zyklus wählen
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Past Workout Tracking */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <div className="p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">
-              Vergangenes Workout tracken
-            </h2>
-            <p className="text-gray-600 text-sm mb-4">
-              Trage ein bereits durchgeführtes Workout nachträglich ein.
-            </p>
-            <button
-              onClick={handleStartPastWorkout}
-              disabled={loading}
-              className="w-full py-3 px-4 border-2 border-purple-300 text-purple-700 font-medium rounded-lg hover:bg-purple-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Vergangenes Workout tracken
-            </button>
-          </div>
-        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-start gap-3">
+              <IconHistory className="mt-1 size-5 text-muted-foreground" />
+              <div className="flex-1">
+                <h2 className="text-lg font-semibold text-foreground mb-2">
+                  Vergangenes Workout tracken
+                </h2>
+                <p className="text-muted-foreground text-sm mb-4">
+                  Trage ein bereits durchgeführtes Workout nachträglich ein.
+                </p>
+                <Button
+                  onClick={handleStartPastWorkout}
+                  disabled={loading}
+                  className="w-full"
+                >
+                  Vergangenes Workout tracken
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Info Box */}
-        {suggestedWorkout && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-800">
-              💡 <strong>Tipp:</strong> Das vorgeschlagene Workout basiert auf
-              deinem aktiven Trainingszyklus. Du kannst während des Workouts
-              jederzeit Übungen hinzufügen, entfernen oder anpassen.
-            </p>
-          </div>
-        )}
       </div>
 
       {/* Cycle Workout Selection Modal */}
       {showCycleWorkoutModal && (
         <CycleWorkoutSelectionModal
-          onClose={() => setShowCycleWorkoutModal(false)}
+          onClose={() => {
+            setShowCycleWorkoutModal(false);
+            if (pendingWorkoutData?.isPastWorkout) {
+              // Go back to type selection
+              setShowPastWorkoutModal(true);
+            }
+          }}
           onSelect={handleStartCycleWorkout}
+          onProceedToDetails={
+            pendingWorkoutData?.isPastWorkout
+              ? (cycleId, workoutDayId) => {
+                  handleStartCycleWorkout(cycleId, workoutDayId);
+                }
+              : undefined
+          }
         />
       )}
 
       {/* Template Selection Modal */}
       {showTemplateModal && (
         <TemplateSelectionModal
-          onClose={() => setShowTemplateModal(false)}
+          onClose={() => {
+            setShowTemplateModal(false);
+            if (pendingWorkoutData?.isPastWorkout) {
+              // Go back to type selection
+              setShowPastWorkoutModal(true);
+            }
+          }}
           onSelect={handleTemplateSelected}
+          onProceedToDetails={
+            pendingWorkoutData?.isPastWorkout
+              ? (templateId, recommendedGymId) => {
+                  handleTemplateSelected(templateId, recommendedGymId);
+                }
+              : undefined
+          }
         />
       )}
 
@@ -438,14 +515,108 @@ export default function WorkoutStartScreen() {
         plannedHomeGymId={templateRecommendedGymId || suggestedWorkout?.plannedHomeGymId}
       />
 
-      {/* Past Workout Setup Modal */}
+      {/* Past Workout Setup Modal - only type selection now */}
       <PastWorkoutSetupModal
         isOpen={showPastWorkoutModal}
         onClose={() => setShowPastWorkoutModal(false)}
-        onStartFree={handlePastWorkoutFree}
-        onStartCycle={handlePastWorkoutCycle}
-        onStartTemplate={handlePastWorkoutTemplate}
+        onChooseFree={handlePastWorkoutChooseFree}
+        onChooseCycle={handlePastWorkoutChooseCycle}
+        onChooseTemplate={handlePastWorkoutChooseTemplate}
       />
+
+      {/* Common Workout Details step for past workouts (Date + Duration) */}
+      <Dialog open={showPastWorkoutDetails} onOpenChange={(open) => !open && handlePastWorkoutDetailsBack()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Workout-Details</DialogTitle>
+            <DialogDescription>
+              Gib Datum und ungefähre Dauer des vergangenen Workouts ein.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>Workout-Datum</Label>
+              <Input
+                type="date"
+                value={pastDetailsDate}
+                max={new Date().toISOString().split('T')[0]}
+                onChange={(e) => setPastDetailsDate(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <Label>Workout-Dauer (Minuten)</Label>
+              <Input
+                type="number"
+                min="1"
+                value={pastDetailsDuration}
+                onChange={(e) => setPastDetailsDuration(parseInt(e.target.value) || 0)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex gap-3">
+            <Button variant="outline" onClick={handlePastWorkoutDetailsBack} className="flex-1">
+              Zurück
+            </Button>
+            <Button
+              onClick={handlePastWorkoutDetailsConfirm}
+              disabled={!pastDetailsDate || pastDetailsDuration < 1}
+              className="flex-1"
+            >
+              Weiter zur Gym Auswahl
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Common Workout Details step for past workouts */}
+      <Dialog open={showPastWorkoutDetails} onOpenChange={(open) => !open && handlePastWorkoutDetailsBack()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Workout-Details</DialogTitle>
+            <DialogDescription>
+              Gib Datum und ungefähre Dauer des vergangenen Workouts ein.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>Workout-Datum</Label>
+              <Input
+                type="date"
+                value={pastDetailsDate}
+                max={new Date().toISOString().split('T')[0]}
+                onChange={(e) => setPastDetailsDate(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <Label>Workout-Dauer (Minuten)</Label>
+              <Input
+                type="number"
+                min="1"
+                value={pastDetailsDuration}
+                onChange={(e) => setPastDetailsDuration(parseInt(e.target.value) || 0)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex gap-3">
+            <Button variant="outline" onClick={handlePastWorkoutDetailsBack} className="flex-1">
+              Zurück
+            </Button>
+            <Button
+              onClick={handlePastWorkoutDetailsConfirm}
+              disabled={!pastDetailsDate || pastDetailsDuration < 1}
+              className="flex-1"
+            >
+              Weiter zur Gym Auswahl
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

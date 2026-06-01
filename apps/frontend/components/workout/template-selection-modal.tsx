@@ -3,20 +3,32 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
 import { WorkoutTemplate } from '@/types';
-import { Dumbbell, Clock, X } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { IconDumbbell, IconClock } from '@tabler/icons-react';
 
 interface TemplateSelectionModalProps {
   onSelect: (templateId: string, recommendedGymId?: string) => void;
   onClose: () => void;
+  /** When provided, the modal acts in "selection + confirm" mode (used for past workout tracking) */
+  onProceedToDetails?: (templateId: string, recommendedGymId?: string) => void;
 }
 
 export default function TemplateSelectionModal({
   onSelect,
   onClose,
+  onProceedToDetails,
 }: TemplateSelectionModalProps) {
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'system' | 'custom'>('all');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
 
   useEffect(() => {
     loadTemplates();
@@ -45,30 +57,21 @@ export default function TemplateSelectionModal({
       : templates;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+    <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-0 [&>button]:hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Workout-Vorlage wählen
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-            aria-label="Schließen"
-          >
-            <X className="h-6 w-6" />
-          </button>
-        </div>
+        <DialogHeader className="px-6 pt-6 pb-4 border-b">
+          <DialogTitle>Workout-Vorlage wählen</DialogTitle>
+        </DialogHeader>
 
         {/* Filter Tabs */}
-        <div className="flex border-b border-gray-200 px-6">
+        <div className="flex border-b px-6">
           <button
             onClick={() => setFilter('all')}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               filter === 'all'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             Alle ({templates.length})
@@ -77,8 +80,8 @@ export default function TemplateSelectionModal({
             onClick={() => setFilter('system')}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               filter === 'system'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             System ({systemTemplates.length})
@@ -87,8 +90,8 @@ export default function TemplateSelectionModal({
             onClick={() => setFilter('custom')}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               filter === 'custom'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             Benutzerdefiniert ({customTemplates.length})
@@ -99,67 +102,96 @@ export default function TemplateSelectionModal({
         <div className="flex-1 overflow-y-auto p-6">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="text-gray-600">Lädt Vorlagen...</div>
+              <div className="text-muted-foreground">Lädt Vorlagen...</div>
             </div>
           ) : filteredTemplates.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredTemplates.map((template) => (
-                <button
-                  key={template.id}
-                  onClick={() => onSelect(template.id, template.recommendedGymId)}
-                  className="text-left bg-gray-50 hover:bg-blue-50 border border-gray-200 hover:border-blue-400 rounded-lg p-4 transition-colors"
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-semibold text-gray-900 flex-1">
-                      {template.name}
-                    </h4>
-                    {!template.isCustom && (
-                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded ml-2">
-                        System
-                      </span>
-                    )}
-                  </div>
-                  <div className="space-y-1 text-sm text-gray-600">
-                    <div className="flex items-center gap-2">
-                      <Dumbbell className="h-4 w-4" />
-                      <span>
-                        {template.totalExercises}{' '}
-                        {template.totalExercises === 1 ? 'Übung' : 'Übungen'}
-                      </span>
+              {filteredTemplates.map((template) => {
+                const isSelected = selectedTemplateId === template.id;
+
+                return (
+                  <button
+                    key={template.id}
+                    onClick={() => {
+                      if (onProceedToDetails) {
+                        setSelectedTemplateId(template.id);
+                      } else {
+                        onSelect(template.id, template.recommendedGymId);
+                      }
+                    }}
+                    className={`text-left border rounded-lg p-4 transition-colors hover:border-primary hover:bg-muted/50 text-left ${
+                      isSelected ? 'border-primary ring-2 ring-primary ring-offset-2' : ''
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <h4 className="font-semibold text-foreground flex-1 pr-2">
+                        {template.name}
+                      </h4>
+                      {!template.isCustom && (
+                        <Badge variant="secondary" className="text-xs shrink-0">
+                          System
+                        </Badge>
+                      )}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      <span>
-                        {template.totalSets}{' '}
-                        {template.totalSets === 1 ? 'Satz' : 'Sätze'}
-                      </span>
-                    </div>
-                    {template.recommendedGymName && (
-                      <div className="text-xs text-gray-500 mt-2">
-                        Empfohlenes Gym: {template.recommendedGymName}
+                    <div className="space-y-1 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <IconDumbbell className="size-4" />
+                        <span>
+                          {template.totalExercises} {template.totalExercises === 1 ? 'Übung' : 'Übungen'}
+                        </span>
                       </div>
-                    )}
-                  </div>
-                </button>
-              ))}
+                      <div className="flex items-center gap-2">
+                        <IconClock className="size-4" />
+                        <span>
+                          {template.totalSets} {template.totalSets === 1 ? 'Satz' : 'Sätze'}
+                        </span>
+                      </div>
+                      {template.recommendedGymName && (
+                        <div className="text-xs text-muted-foreground mt-2">
+                          Empfohlenes Gym: {template.recommendedGymName}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           ) : (
-            <div className="text-center py-12 text-gray-600">
+            <div className="text-center py-12 text-muted-foreground">
               Keine Vorlagen gefunden
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 p-6">
-          <button
-            onClick={onClose}
-            className="w-full py-2 px-4 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
-          >
-            Abbrechen
-          </button>
+        <div className="border-t p-6">
+          {onProceedToDetails ? (
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={onClose} className="flex-1">
+                Zurück
+              </Button>
+              <Button
+                onClick={() => {
+                  if (selectedTemplateId) {
+                    const template = filteredTemplates.find(t => t.id === selectedTemplateId);
+                    if (template) {
+                      onProceedToDetails(template.id, template.recommendedGymId);
+                    }
+                  }
+                }}
+                disabled={!selectedTemplateId}
+                className="flex-1"
+              >
+                Weiter zu Workout Details
+              </Button>
+            </div>
+          ) : (
+            <Button variant="outline" onClick={onClose} className="w-full">
+              Abbrechen
+            </Button>
+          )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
