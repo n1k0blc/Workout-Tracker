@@ -47,7 +47,6 @@ export default function ExerciseCard({
     removeExercise, 
     replaceExercise, 
     logSet, 
-    deleteSet, 
     updateSet, 
     loading, 
   } = useWorkout();
@@ -174,14 +173,6 @@ export default function ExerciseCard({
     }
   };
 
-  const handleDeleteSet = async (setLogId: string) => {
-    try {
-      await deleteSet(setLogId);
-    } catch (error) {
-      console.error('Failed to delete set:', error);
-    }
-  };
-
   const handleRemoveExercise = async () => {
     try {
       await removeExercise(exercise.id);
@@ -261,17 +252,34 @@ export default function ExerciseCard({
       setActiveSwipe({ ...activeSwipe, offset: clamped });
     }
   };
-  const endSwipe = (key: string | number, logSetNumber?: number, deleteSetId?: string) => {
+  const endSwipe = (key: string | number, setNumber?: number, isLogged: boolean = false) => {
     if (!activeSwipe || activeSwipe.key !== key) {
       setActiveSwipe(null);
       return;
     }
     const offset = activeSwipe.offset;
     setActiveSwipe(null);
-    if (offset > SWIPE_THRESHOLD && logSetNumber !== undefined) {
-      handleLogSet(logSetNumber);
-    } else if (offset < -SWIPE_THRESHOLD && deleteSetId) {
-      handleDeleteSet(deleteSetId);
+    if (offset > SWIPE_THRESHOLD && setNumber !== undefined && !isLogged) {
+      handleLogSet(setNumber);
+    } else if (offset < -SWIPE_THRESHOLD && setNumber !== undefined && !isLogged) {
+      discardUnloggedSet(setNumber, key);
+    }
+    // RTL on logged: no effect (cannot delete logged sets via swipe)
+  };
+
+  const discardUnloggedSet = (setNumber: number, key: string | number) => {
+    // Clear any pending edits for this setNumber (reverts planned to defaults, clears additional)
+    setEditValues(prev => {
+      const newVals = { ...prev };
+      delete newVals[setNumber];
+      return newVals;
+    });
+
+    const isAdditional = (typeof key === 'string' && key.startsWith('add-')) ||
+      (!hasPlannedSets || !exercise.plannedSets?.some(ps => ps.order === setNumber));
+
+    if (isAdditional) {
+      setAdditionalSetNumbers(prev => prev.filter(n => n !== setNumber));
     }
   };
 
@@ -405,8 +413,8 @@ export default function ExerciseCard({
                   key={plannedSet.id}
                   onPointerDown={(e) => startSwipe(swipeKey, e.clientX, e.clientY)}
                   onPointerMove={(e) => updateSwipe(e.clientX, e.clientY)}
-                  onPointerUp={() => endSwipe(swipeKey, setNumber, loggedSet?.id)}
-                  onPointerLeave={() => endSwipe(swipeKey, setNumber, loggedSet?.id)}
+                  onPointerUp={() => endSwipe(swipeKey, setNumber, !!loggedSet)}
+                  onPointerLeave={() => endSwipe(swipeKey, setNumber, !!loggedSet)}
                   onPointerCancel={() => setActiveSwipe(null)}
                   style={swipeOffset !== 0 ? { transform: `translateX(${swipeOffset}px)` } : undefined}
                   className={`${swipeClass} transition-transform touch-pan-y`}
@@ -492,8 +500,8 @@ export default function ExerciseCard({
                   key={`add-${setNumber}`}
                   onPointerDown={(e) => startSwipe(swipeKey, e.clientX, e.clientY)}
                   onPointerMove={(e) => updateSwipe(e.clientX, e.clientY)}
-                  onPointerUp={() => endSwipe(swipeKey, setNumber)}
-                  onPointerLeave={() => endSwipe(swipeKey, setNumber)}
+                  onPointerUp={() => endSwipe(swipeKey, setNumber, false)}
+                  onPointerLeave={() => endSwipe(swipeKey, setNumber, false)}
                   onPointerCancel={() => setActiveSwipe(null)}
                   style={swipeOffset !== 0 ? { transform: `translateX(${swipeOffset}px)` } : undefined}
                   className={`${swipeClass} transition-transform touch-pan-y`}
@@ -547,8 +555,8 @@ export default function ExerciseCard({
                     key={set.id}
                     onPointerDown={(e) => startSwipe(swipeKey, e.clientX, e.clientY)}
                     onPointerMove={(e) => updateSwipe(e.clientX, e.clientY)}
-                    onPointerUp={() => endSwipe(swipeKey, undefined, set.id)}
-                    onPointerLeave={() => endSwipe(swipeKey, undefined, set.id)}
+                    onPointerUp={() => endSwipe(swipeKey, set.setNumber, true)}
+                    onPointerLeave={() => endSwipe(swipeKey, set.setNumber, true)}
                     onPointerCancel={() => setActiveSwipe(null)}
                     style={swipeOffset !== 0 ? { transform: `translateX(${swipeOffset}px)` } : undefined}
                     className={`${swipeClass} transition-transform touch-pan-y`}

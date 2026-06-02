@@ -396,7 +396,9 @@ Dieser Plan respektiert die Projekt-Philosophie (Flexibilität, keine starren Bl
 - Table: always consistent Input cells for values (no layout shift on log), dynamic header showing (2x) for Gewicht/Wdh based on exercise flags.
 - Logged rows: inputs (value from logged or editing buffer on tweak), live updateSet on field change (no explicit save), fat non-interactive check (no unlog via tap/swipe), delete only via RTL swipe (no per-row buttons).
 - Unlogged rows: inputs + normal check (tap or LTR swipe to log).
-- RTL swipe on unlogged: no-op (no delete of unlogged/drafts).
+- RTL swipe (delete gesture) on **unlogged** set: discards the draft (clears overrides for planned; removes prepare row for additional/extras). Allows deciding not to do a set.
+- RTL swipe on **logged** set: no effect whatsoever (cannot delete logged sets via swipe).
+- LTR or check tap only affects unlogged (logs them; no unlogging).
 - Type change via icon only pre-log.
 - Lint/tsc clean.
 - Plan updated.
