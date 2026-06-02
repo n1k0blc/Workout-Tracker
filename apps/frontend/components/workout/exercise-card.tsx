@@ -83,7 +83,11 @@ export default function ExerciseCard({
   // These are UI-only (not persisted in context) – backend only cares about final logs.
   const [additionalSetNumbers, setAdditionalSetNumbers] = useState<number[]>([]);
 
-  // Swipe state for set rows (LTR = log if unlogged, RTL = delete if logged). Native pointer events for touch + mouse.
+  // Locally skipped planned set numbers (for this workout execution only).
+  // Allows "deleting" (hiding the row for) unlogged planned sets via RTL swipe.
+  const [skippedPlannedSetNumbers, setSkippedPlannedSetNumbers] = useState<Set<number>>(new Set());
+
+  // Swipe state for set rows (LTR = log if unlogged, RTL = discard unlogged draft).
   const [activeSwipe, setActiveSwipe] = useState<null | { key: string | number; startX: number; startY: number; offset: number }>(null);
 
   const addAdditionalSet = () => {
@@ -228,7 +232,9 @@ export default function ExerciseCard({
 
   const getSetIndicatorSlots = (): number[] => {
     if (hasPlannedSets && exercise.plannedSets!.length > 0) {
-      return exercise.plannedSets!.map((ps) => ps.order);
+      return exercise.plannedSets!
+        .filter(ps => !skippedPlannedSetNumbers.has(ps.order))
+        .map((ps) => ps.order);
     }
     const maxLogged = exercise.sets.length > 0 ? Math.max(...exercise.sets.map((s) => s.setNumber)) : 0;
     const maxDraft = additionalSetNumbers.length > 0 ? Math.max(...additionalSetNumbers) : 0;
@@ -262,12 +268,12 @@ export default function ExerciseCard({
     if (offset > SWIPE_THRESHOLD && setNumber !== undefined && !isLogged) {
       handleLogSet(setNumber);
     } else if (offset < -SWIPE_THRESHOLD && setNumber !== undefined && !isLogged) {
-      discardUnloggedSet(setNumber, key);
+      discardUnloggedSet(setNumber);
     }
     // RTL on logged: no effect (cannot delete logged sets via swipe)
   };
 
-  const discardUnloggedSet = (setNumber: number, key: string | number) => {
+  const discardUnloggedSet = (setNumber: number) => {
     // Clear any pending edits for this setNumber (reverts planned to defaults, clears additional)
     setEditValues(prev => {
       const newVals = { ...prev };
@@ -275,10 +281,17 @@ export default function ExerciseCard({
       return newVals;
     });
 
-    const isAdditional = (typeof key === 'string' && key.startsWith('add-')) ||
-      (!hasPlannedSets || !exercise.plannedSets?.some(ps => ps.order === setNumber));
+    const isPlannedSlot = hasPlannedSets && exercise.plannedSets?.some(ps => ps.order === setNumber);
 
-    if (isAdditional) {
+    if (isPlannedSlot) {
+      // For unlogged planned: "delete" means hide the row for this execution (user doesn't want to do this planned set)
+      setSkippedPlannedSetNumbers(prev => {
+        const next = new Set(prev);
+        next.add(setNumber);
+        return next;
+      });
+    } else {
+      // Additional / extra / free: remove the prepare row entirely
       setAdditionalSetNumbers(prev => prev.filter(n => n !== setNumber));
     }
   };
@@ -394,8 +407,10 @@ export default function ExerciseCard({
               <div className="text-center">✓</div>
             </div>
 
-            {/* Planned Sets as table rows */}
-            {hasPlannedSets && exercise.plannedSets!.map((plannedSet) => {
+            {/* Planned Sets as table rows (filter skipped unlogged ones) */}
+            {hasPlannedSets && exercise.plannedSets!
+              .filter(ps => !skippedPlannedSetNumbers.has(ps.order))
+              .map((plannedSet) => {
               const setNumber = plannedSet.order;
               const loggedSet = getLoggedSet(setNumber);
               const isEditingThis = editingSetId === loggedSet?.id;
