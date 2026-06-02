@@ -71,8 +71,10 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete }: ActiveWorkout
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
+      // Long-press to drag (for reordering exercises without visible grip handle)
       activationConstraint: {
-        distance: 8,
+        delay: 300,
+        tolerance: 8,
       },
     }),
     useSensor(KeyboardSensor, {

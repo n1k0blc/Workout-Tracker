@@ -22,13 +22,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  IconGripVertical,
-  IconChevronDown,
   IconRefresh,
   IconTrash,
   IconEdit,
   IconCheck,
   IconPlus,
+  IconFlame,
+  IconBarbell,
 } from '@tabler/icons-react';
 
 // TODO: This component mixes live execution logging/editing with presentation.
@@ -264,6 +264,17 @@ export default function ExerciseCard({
     return plannedSet?.setType || SetType.WORKING;
   };
 
+  const getSetIndicatorSlots = (): number[] => {
+    if (hasPlannedSets && exercise.plannedSets!.length > 0) {
+      return exercise.plannedSets!.map((ps) => ps.order);
+    }
+    const maxLogged = exercise.sets.length > 0 ? Math.max(...exercise.sets.map((s) => s.setNumber)) : 0;
+    const maxDraft = additionalSetNumbers.length > 0 ? Math.max(...additionalSetNumbers) : 0;
+    const total = Math.max(maxLogged, maxDraft, 0);
+    if (total === 0) return [];
+    return Array.from({ length: total }, (_, i) => i + 1);
+  };
+
   return (
     <>
       <Card
@@ -272,38 +283,48 @@ export default function ExerciseCard({
         className="py-0 gap-0 overflow-hidden rounded-lg border-border"
       >
         {/* Exercise Header (compact bar) */}
-        <div className="px-4 py-3 flex items-center justify-between bg-muted border-b border-border">
-          <div className="flex items-center gap-3">
-            {/* Drag Handle */}
-            <button
-              {...attributes}
-              {...listeners}
-              className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
-            >
-              <IconGripVertical className="size-5" />
-            </button>
-            <span className="text-sm font-semibold text-muted-foreground">
-              #{exerciseNumber}
-            </span>
-            <h3 className="font-semibold text-foreground">
-              {exercise.exerciseName}
-            </h3>
+        <div className="px-4 py-3 flex items-start justify-between bg-muted border-b border-border">
+          {/* Name area + indicators: long-press to drag-reorder; tap name to toggle collapse */}
+          <div
+            {...attributes}
+            {...listeners}
+            className="flex flex-col cursor-grab active:cursor-grabbing"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsCollapsed(!isCollapsed);
+            }}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-semibold text-muted-foreground">
+                #{exerciseNumber}
+              </span>
+              <h3 className="font-semibold text-foreground">
+                {exercise.exerciseName}
+              </h3>
+            </div>
+            {/* Collapsed set progress indicators: horizontal lines, foreground for logged */}
+            {isCollapsed && (
+              <div className="flex items-center gap-1 mt-1 ml-8">
+                {getSetIndicatorSlots().map((slot, i) => {
+                  const logged = !!getLoggedSet(slot);
+                  return (
+                    <div
+                      key={i}
+                      className={`h-[2.5px] w-4 rounded-[1px] transition-colors ${logged ? 'bg-foreground' : 'bg-muted-foreground/30'}`}
+                      title={`Satz ${slot}${logged ? ' geloggt' : ''}`}
+                    />
+                  );
+                })}
+              </div>
+            )}
           </div>
-          <div className="flex items-center gap-1">
-            {/* Collapse Button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsCollapsed(!isCollapsed)}
-              className="size-8"
-            >
-              <IconChevronDown className={`size-4 transition-transform ${isCollapsed ? 'rotate-180' : ''}`} />
-            </Button>
+          <div className="flex items-center gap-1 mt-0.5">
             {/* Replace Exercise Button */}
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setShowReplaceModal(true)}
+              onPointerDown={(e) => e.stopPropagation()}
               disabled={exercise.sets.length > 0}
               className="size-8"
               title={exercise.sets.length > 0 ? "Übung kann nicht ausgetauscht werden nachdem Sets geloggt wurden" : "Übung austauschen"}
@@ -315,6 +336,7 @@ export default function ExerciseCard({
               variant="ghost"
               size="icon"
               onClick={() => setShowDeleteConfirm(true)}
+              onPointerDown={(e) => e.stopPropagation()}
               className="size-8 text-destructive hover:text-destructive"
               title="Übung entfernen"
             >
@@ -405,8 +427,8 @@ export default function ExerciseCard({
                         // Display mode for logged set
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <Badge variant={loggedSet.setType === SetType.WARMUP ? 'outline' : 'default'} className="text-xs">
-                              {loggedSet.setType === SetType.WARMUP ? 'Aufwärmen' : 'Arbeit'}
+                            <Badge variant={loggedSet.setType === SetType.WARMUP ? 'outline' : 'default'} className="p-0.5" title={loggedSet.setType === SetType.WARMUP ? 'Aufwärmen' : 'Arbeit'}>
+                              {loggedSet.setType === SetType.WARMUP ? <IconFlame className="size-4" /> : <IconBarbell className="size-4" />}
                             </Badge>
                             <span className="text-sm font-semibold text-foreground">
                               {loggedSet.weight}kg × {loggedSet.reps} Wdh
@@ -622,8 +644,8 @@ export default function ExerciseCard({
                       <div className="flex size-5 items-center justify-center rounded bg-muted text-muted-foreground">
                         <IconCheck className="size-3.5" />
                       </div>
-                      <Badge variant={set.setType === SetType.WARMUP ? 'outline' : 'default'} className="text-xs">
-                        {set.setType === SetType.WARMUP ? 'Aufwärmen' : 'Arbeit'}
+                      <Badge variant={set.setType === SetType.WARMUP ? 'outline' : 'default'} className="p-0.5" title={set.setType === SetType.WARMUP ? 'Aufwärmen' : 'Arbeit'}>
+                        {set.setType === SetType.WARMUP ? <IconFlame className="size-4" /> : <IconBarbell className="size-4" />}
                       </Badge>
                       <span className="text-sm font-semibold text-foreground">
                         {set.weight}kg × {set.reps} Wdh
