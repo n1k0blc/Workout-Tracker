@@ -23,7 +23,6 @@ import {
 import {
   IconRefresh,
   IconTrash,
-  IconEdit,
   IconCheck,
   IconPlus,
   IconFlame,
@@ -183,36 +182,6 @@ export default function ExerciseCard({
     }
   };
 
-  const handleEditSet = (setLog: { id: string; reps: number; weight: number; rir?: number }) => {
-    setEditingSetId(setLog.id);
-    setEditingValues({
-      reps: setLog.reps.toString(),
-      weight: setLog.weight.toString(),
-      rir: setLog.rir !== undefined ? setLog.rir.toString() : '',
-    });
-  };
-
-  const handleSaveEdit = async () => {
-    if (!editingSetId) return;
-
-    try {
-      await updateSet(editingSetId, {
-        reps: parseInt(editingValues.reps) || 0,
-        weight: parseFloat(editingValues.weight) || 0,
-        rir: editingValues.rir ? parseInt(editingValues.rir) : undefined,
-      });
-      setEditingSetId(null);
-      setEditingValues({ reps: '', weight: '', rir: '' });
-    } catch (error) {
-      console.error('Failed to update set:', error);
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setEditingSetId(null);
-    setEditingValues({ reps: '', weight: '', rir: '' });
-  };
-
   const handleRemoveExercise = async () => {
     try {
       await removeExercise(exercise.id);
@@ -306,6 +275,35 @@ export default function ExerciseCard({
     }
   };
 
+  // Helper for changing values in a row (live update for logged sets)
+  const handleRowValueChange = (setNumber: number, loggedSet: { id: string; weight: number; reps: number; rir?: number; setNumber?: number } | null, field: 'weight' | 'reps' | 'rir', newValStr: string) => {
+    if (loggedSet) {
+      if (editingSetId !== loggedSet.id) {
+        setEditingSetId(loggedSet.id);
+        setEditingValues({
+          weight: loggedSet.weight.toString(),
+          reps: loggedSet.reps.toString(),
+          rir: loggedSet.rir != null ? loggedSet.rir.toString() : '',
+        });
+      }
+      setEditingValues(prev => ({ ...prev, [field]: newValStr }));
+
+      // Build payload from current editing buffer or logged + this change
+      const w = field === 'weight'
+        ? (parseFloat(newValStr) || 0)
+        : (editingValues.weight ? parseFloat(editingValues.weight) : loggedSet.weight);
+      const r = field === 'reps'
+        ? (parseInt(newValStr) || 0)
+        : (editingValues.reps ? parseInt(editingValues.reps) : loggedSet.reps);
+      const ri = field === 'rir'
+        ? (parseInt(newValStr) || undefined)
+        : (editingValues.rir ? parseInt(editingValues.rir) : loggedSet.rir);
+      updateSet(loggedSet.id, { weight: w, reps: r, rir: ri });
+    } else {
+      updateEditValue(setNumber, field, newValStr);
+    }
+  };
+
   return (
     <>
       <Card
@@ -382,8 +380,8 @@ export default function ExerciseCard({
             {/* Compact column header (optional, saves space on mobile) */}
             <div className="grid grid-cols-[auto_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)_auto] items-center gap-x-2 px-1 pb-1 text-[10px] text-muted-foreground font-medium">
               <div></div>
-              <div>Gewicht</div>
-              <div>Wdh</div>
+              <div>Gewicht{exercise.isDoubleWeight ? ' (2x)' : ''}</div>
+              <div>Wdh{exercise.isUnilateral ? ' (2x)' : ''}</div>
               <div>RIR</div>
               <div className="text-center">✓</div>
             </div>
@@ -423,7 +421,7 @@ export default function ExerciseCard({
                           updateEditValue(setNumber, 'setType', next);
                         }
                       }}
-                      disabled={loading || (!!loggedSet && !isEditingThis)}
+                      disabled={loading || !!loggedSet}
                       className="flex items-center justify-center"
                       title={isWarmup ? 'Aufwärmen' : 'Arbeit'}
                     >
@@ -432,87 +430,43 @@ export default function ExerciseCard({
                       </Badge>
                     </button>
 
-                    {/* Weight cell */}
-                    {loggedSet && !isEditingThis ? (
-                      <span className="tabular-nums text-sm font-medium text-foreground">
-                        {loggedSet.weight} <span className="text-[10px] text-muted-foreground">kg</span>
-                        {exercise.isDoubleWeight && <span className="text-[10px] text-muted-foreground ml-0.5">(2x)</span>}
-                      </span>
-                    ) : (
-                      <Input
-                        type="number"
-                        step="0.5"
-                        value={isEditingThis ? editingValues.weight : getEditValue(setNumber, 'weight')}
-                        onChange={(e) => {
-                          if (isEditingThis) setEditingValues(prev => ({ ...prev, weight: e.target.value }));
-                          else updateEditValue(setNumber, 'weight', e.target.value);
-                        }}
-                        placeholder="0"
-                        className="h-7 text-sm tabular-nums"
-                        disabled={loading}
-                      />
-                    )}
+                    {/* Weight cell - always input style; for logged: live editable via updateSet */}
+                    <Input
+                      type="number"
+                      step="0.5"
+                      value={isEditingThis ? editingValues.weight : (loggedSet ? loggedSet.weight.toString() : getEditValue(setNumber, 'weight'))}
+                      onChange={(e) => handleRowValueChange(setNumber, loggedSet ?? null, 'weight', e.target.value)}
+                      placeholder="0"
+                      className="h-7 text-sm tabular-nums"
+                      disabled={loading}
+                    />
 
-                    {/* Reps cell */}
-                    {loggedSet && !isEditingThis ? (
-                      <span className="tabular-nums text-sm font-medium text-foreground">
-                        {loggedSet.reps} <span className="text-[10px] text-muted-foreground">Wdh</span>
-                        {exercise.isUnilateral && <span className="text-[10px] text-muted-foreground ml-0.5">(2x)</span>}
-                      </span>
-                    ) : (
-                      <Input
-                        type="number"
-                        value={isEditingThis ? editingValues.reps : getEditValue(setNumber, 'reps')}
-                        onChange={(e) => {
-                          if (isEditingThis) setEditingValues(prev => ({ ...prev, reps: e.target.value }));
-                          else updateEditValue(setNumber, 'reps', e.target.value);
-                        }}
-                        placeholder="0"
-                        className="h-7 text-sm tabular-nums"
-                        disabled={loading}
-                      />
-                    )}
+                    {/* Reps cell - always input style; for logged: live editable via updateSet */}
+                    <Input
+                      type="number"
+                      value={isEditingThis ? editingValues.reps : (loggedSet ? loggedSet.reps.toString() : getEditValue(setNumber, 'reps'))}
+                      onChange={(e) => handleRowValueChange(setNumber, loggedSet ?? null, 'reps', e.target.value)}
+                      placeholder="0"
+                      className="h-7 text-sm tabular-nums"
+                      disabled={loading}
+                    />
 
-                    {/* RIR cell */}
-                    {loggedSet && !isEditingThis ? (
-                      <span className="tabular-nums text-sm text-muted-foreground">
-                        {loggedSet.rir !== undefined ? `RIR ${loggedSet.rir}` : ''}
-                      </span>
-                    ) : (
-                      <Input
-                        type="number"
-                        value={isEditingThis ? editingValues.rir : getEditValue(setNumber, 'rir')}
-                        onChange={(e) => {
-                          if (isEditingThis) setEditingValues(prev => ({ ...prev, rir: e.target.value }));
-                          else updateEditValue(setNumber, 'rir', e.target.value);
-                        }}
-                        placeholder=""
-                        className="h-7 text-sm tabular-nums"
-                        disabled={loading}
-                      />
-                    )}
+                    {/* RIR cell - always input style; for logged: live editable via updateSet */}
+                    <Input
+                      type="number"
+                      value={isEditingThis ? editingValues.rir : (loggedSet ? (loggedSet.rir != null ? loggedSet.rir.toString() : '') : getEditValue(setNumber, 'rir'))}
+                      onChange={(e) => handleRowValueChange(setNumber, loggedSet ?? null, 'rir', e.target.value)}
+                      placeholder=""
+                      className="h-7 text-sm tabular-nums"
+                      disabled={loading}
+                    />
 
-                    {/* Check / actions cell */}
+                    {/* Check / actions cell - always same columns; no extra buttons on logged (prevents shift); fat check is indicator only */}
                     <div className="flex justify-end">
                       {loggedSet ? (
-                        isEditingThis ? (
-                          <div className="flex gap-1">
-                            <Button size="sm" onClick={handleSaveEdit} disabled={loading} className="h-7 px-2 text-xs">Speichern</Button>
-                            <Button size="sm" variant="outline" onClick={handleCancelEdit} disabled={loading} className="h-7 px-2 text-xs">Abbr.</Button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" className="size-6" onClick={() => handleEditSet(loggedSet)} disabled={loading} title="Bearbeiten">
-                              <IconEdit className="size-3.5" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="size-6 text-destructive hover:text-destructive" onClick={() => handleDeleteSet(loggedSet.id)} disabled={loading} title="Satz löschen">
-                              <IconTrash className="size-3.5" />
-                            </Button>
-                            <button disabled={loading} className="p-0.5" title="Geloggt (Swipe RTL zum Löschen)">
-                              <IconCheck className="size-4 text-foreground stroke-[3]" />
-                            </button>
-                          </div>
-                        )
+                        <button disabled={loading} className="p-0.5" title="Geloggt (nicht entloggen möglich; Swipe RTL zum Löschen)">
+                          <IconCheck className="size-4 text-foreground stroke-[3]" />
+                        </button>
                       ) : (
                         <button onClick={() => handleLogSet(setNumber)} disabled={loading} className="p-0.5" title="Satz loggen (oder Swipe LTR)">
                           <IconCheck className="size-4 text-muted-foreground/60 hover:text-primary" />
@@ -561,9 +515,9 @@ export default function ExerciseCard({
                       </Badge>
                     </button>
 
-                    <Input type="number" step="0.5" value={getEditValue(setNumber, 'weight')} onChange={(e) => updateEditValue(setNumber, 'weight', e.target.value)} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} />
-                    <Input type="number" value={getEditValue(setNumber, 'reps')} onChange={(e) => updateEditValue(setNumber, 'reps', e.target.value)} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} />
-                    <Input type="number" value={getEditValue(setNumber, 'rir')} onChange={(e) => updateEditValue(setNumber, 'rir', e.target.value)} placeholder="" className="h-7 text-sm tabular-nums" disabled={loading} />
+                    <Input type="number" step="0.5" value={getEditValue(setNumber, 'weight')} onChange={(e) => handleRowValueChange(setNumber, null, 'weight', e.target.value)} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} />
+                    <Input type="number" value={getEditValue(setNumber, 'reps')} onChange={(e) => handleRowValueChange(setNumber, null, 'reps', e.target.value)} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} />
+                    <Input type="number" value={getEditValue(setNumber, 'rir')} onChange={(e) => handleRowValueChange(setNumber, null, 'rir', e.target.value)} placeholder="" className="h-7 text-sm tabular-nums" disabled={loading} />
 
                     <div className="flex justify-end">
                       <button onClick={() => handleLogSet(setNumber)} disabled={loading} className="p-0.5" title="Satz loggen (oder Swipe LTR)">
@@ -606,34 +560,39 @@ export default function ExerciseCard({
                         </Badge>
                       </div>
 
-                      {isEditingThis ? (
-                        <>
-                          <Input type="number" step="0.5" value={editingValues.weight} onChange={(e) => setEditingValues(prev => ({ ...prev, weight: e.target.value }))} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} />
-                          <Input type="number" value={editingValues.reps} onChange={(e) => setEditingValues(prev => ({ ...prev, reps: e.target.value }))} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} />
-                          <Input type="number" value={editingValues.rir} onChange={(e) => setEditingValues(prev => ({ ...prev, rir: e.target.value }))} placeholder="" className="h-7 text-sm tabular-nums" disabled={loading} />
-                          <div className="flex justify-end gap-1">
-                            <Button size="sm" onClick={handleSaveEdit} disabled={loading} className="h-7 px-2 text-xs">Speichern</Button>
-                            <Button size="sm" variant="outline" onClick={handleCancelEdit} disabled={loading} className="h-7 px-2 text-xs">Abbr.</Button>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <span className="tabular-nums text-sm font-medium text-foreground">{set.weight} <span className="text-[10px] text-muted-foreground">kg</span></span>
-                          <span className="tabular-nums text-sm font-medium text-foreground">{set.reps} <span className="text-[10px] text-muted-foreground">Wdh</span></span>
-                          <span className="tabular-nums text-sm text-muted-foreground">{set.rir !== undefined ? `RIR ${set.rir}` : ''}</span>
-                          <div className="flex justify-end items-center gap-1">
-                            <Button variant="ghost" size="icon" className="size-6" onClick={() => handleEditSet(set)} disabled={loading} title="Bearbeiten">
-                              <IconEdit className="size-3.5" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="size-6 text-destructive hover:text-destructive" onClick={() => handleDeleteSet(set.id)} disabled={loading} title="Satz löschen">
-                              <IconTrash className="size-3.5" />
-                            </Button>
-                            <button disabled={loading} className="p-0.5" title="Geloggt (Swipe RTL zum Löschen)">
-                              <IconCheck className="size-4 text-foreground stroke-[3]" />
-                            </button>
-                          </div>
-                        </>
-                      )}
+                      {/* Value cells - always inputs for consistent layout; live edit for logged via updateSet */}
+                      <Input
+                        type="number"
+                        step="0.5"
+                        value={isEditingThis ? editingValues.weight : set.weight.toString()}
+                        onChange={(e) => handleRowValueChange(set.setNumber, set, 'weight', e.target.value)}
+                        placeholder="0"
+                        className="h-7 text-sm tabular-nums"
+                        disabled={loading}
+                      />
+                      <Input
+                        type="number"
+                        value={isEditingThis ? editingValues.reps : set.reps.toString()}
+                        onChange={(e) => handleRowValueChange(set.setNumber, set, 'reps', e.target.value)}
+                        placeholder="0"
+                        className="h-7 text-sm tabular-nums"
+                        disabled={loading}
+                      />
+                      <Input
+                        type="number"
+                        value={isEditingThis ? editingValues.rir : (set.rir != null ? set.rir.toString() : '')}
+                        onChange={(e) => handleRowValueChange(set.setNumber, set, 'rir', e.target.value)}
+                        placeholder=""
+                        className="h-7 text-sm tabular-nums"
+                        disabled={loading}
+                      />
+
+                      {/* Check cell - fat only, no buttons (delete via swipe) */}
+                      <div className="flex justify-end">
+                        <button disabled={loading} className="p-0.5" title="Geloggt (nicht entloggen möglich; Swipe RTL zum Löschen)">
+                          <IconCheck className="size-4 text-foreground stroke-[3]" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );

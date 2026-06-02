@@ -391,19 +391,17 @@ Nächste Arbeit (nicht in diesem Schritt): UX-Feinschliff + Design/Implementieru
 
 Dieser Plan respektiert die Projekt-Philosophie (Flexibilität, keine starren Blueprints, mobile-first PWA) und baut direkt auf der vorherigen shadcn-Migration der ExerciseCard auf.
 
-**Umsetzung Stand (aktuell):** 
-- Header UX: Grip and chevron removed, long-press on name area for reorder (sensors updated to delay 300), tap on name for toggle collapse/expand. Action buttons protected.
-- Collapsed indicators: horizontal lines under name using getSetIndicatorSlots (planned or current sets), bg-foreground for logged (schwarz/fett), muted for unlogged.
-- Set type icons: updated in logged displays to use IconFlame / IconBarbell in Badges (matching history page exactly).
-- Full table layout for expanded sets (grid with cells: tappable Type-Icon using Flame/Barbell, Weight/Wdh/RIR as Input or display, Check for log) + swipe wrappers on ALL row types (planned prepare, additional prepare, extra logged) implemented.
-- Swipe logic: native PointerEvents, LTR swipe or tap check = log (unlogged rows), RTL swipe = delete (logged rows), visual translateX + bg tint (primary/5 for log dir, destructive/5 for delete).
-- Edit mode for logged rows works in the table cells (inputs + save/cancel in check column).
-- Prepare rows use icon tap to change type, no more select.
-- Delete buttons kept next to edit for logged (as fallback), swipe is primary for delete.
-- Lint clean (0 errors/warnings), tsc clean for our files.
+**Umsetzung Stand (aktuell, inkl. User-Feedback-Fixes):** 
+- Header UX + collapsed indicators + set type icons (Flame/Barbell) as before.
+- Table: always consistent Input cells for values (no layout shift on log), dynamic header showing (2x) for Gewicht/Wdh based on exercise flags.
+- Logged rows: inputs (value from logged or editing buffer on tweak), live updateSet on field change (no explicit save), fat non-interactive check (no unlog via tap/swipe), delete only via RTL swipe (no per-row buttons).
+- Unlogged rows: inputs + normal check (tap or LTR swipe to log).
+- RTL swipe on unlogged: no-op (no delete of unlogged/drafts).
+- Type change via icon only pre-log.
+- Lint/tsc clean.
 - Plan updated.
 
-All points from user request + screenshots now delivered in stable form.
+All points addressed.
 
 ---
 
