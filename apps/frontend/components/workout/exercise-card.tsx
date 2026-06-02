@@ -10,7 +10,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -85,6 +84,9 @@ export default function ExerciseCard({
   // Local drafts for additional/extra sets (free workouts or sets beyond planned).
   // These are UI-only (not persisted in context) – backend only cares about final logs.
   const [additionalSetNumbers, setAdditionalSetNumbers] = useState<number[]>([]);
+
+  // Swipe state for set rows (LTR = log if unlogged, RTL = delete if logged). Native pointer events for touch + mouse.
+  const [activeSwipe, setActiveSwipe] = useState<null | { key: string | number; startX: number; startY: number; offset: number }>(null);
 
   const addAdditionalSet = () => {
     const maxPlanned = hasPlannedSets
@@ -275,6 +277,35 @@ export default function ExerciseCard({
     return Array.from({ length: total }, (_, i) => i + 1);
   };
 
+  // Swipe helpers
+  const SWIPE_THRESHOLD = 70;
+  const startSwipe = (key: string | number, clientX: number, clientY: number) => {
+    if (loading) return;
+    setActiveSwipe({ key, startX: clientX, startY: clientY, offset: 0 });
+  };
+  const updateSwipe = (clientX: number, clientY: number) => {
+    if (!activeSwipe) return;
+    const dx = clientX - activeSwipe.startX;
+    const dy = clientY - activeSwipe.startY;
+    if (Math.abs(dx) > Math.abs(dy) * 1.5) { // mostly horizontal
+      const clamped = Math.max(-120, Math.min(120, dx));
+      setActiveSwipe({ ...activeSwipe, offset: clamped });
+    }
+  };
+  const endSwipe = (key: string | number, logSetNumber?: number, deleteSetId?: string) => {
+    if (!activeSwipe || activeSwipe.key !== key) {
+      setActiveSwipe(null);
+      return;
+    }
+    const offset = activeSwipe.offset;
+    setActiveSwipe(null);
+    if (offset > SWIPE_THRESHOLD && logSetNumber !== undefined) {
+      handleLogSet(logSetNumber);
+    } else if (offset < -SWIPE_THRESHOLD && deleteSetId) {
+      handleDeleteSet(deleteSetId);
+    }
+  };
+
   return (
     <>
       <Card
@@ -345,358 +376,278 @@ export default function ExerciseCard({
           </div>
         </div>
 
-        {/* Sets */}
+        {/* Sets - table layout with swipe support */}
         {!isCollapsed && (
-          <CardContent className="p-4 space-y-2">
-          {/* Planned Sets (prepare rows or logged display) */}
-          {hasPlannedSets && exercise.plannedSets!.map((plannedSet) => {
-            // setNumber and order are both 1-based in the database
-            const setNumber = plannedSet.order;
-            const loggedSet = getLoggedSet(setNumber);
+          <CardContent className="p-2 sm:p-3">
+            {/* Compact column header (optional, saves space on mobile) */}
+            <div className="grid grid-cols-[auto_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)_auto] items-center gap-x-2 px-1 pb-1 text-[10px] text-muted-foreground font-medium">
+              <div></div>
+              <div>Gewicht</div>
+              <div>Wdh</div>
+              <div>RIR</div>
+              <div className="text-center">✓</div>
+            </div>
 
-            return (
-              <div
-                key={plannedSet.id}
-                className="border rounded-md p-3 bg-muted/30 border-border"
-              >
-                <div className="flex items-start gap-3">
-                  {/* Checkbox / Status (neutral, no green "complete" cue) */}
-                  <div className="mt-1">
-                    {loggedSet ? (
-                      <div className="flex size-5 items-center justify-center rounded bg-muted text-muted-foreground">
-                        <IconCheck className="size-3.5" />
-                      </div>
+            {/* Planned Sets as table rows */}
+            {hasPlannedSets && exercise.plannedSets!.map((plannedSet) => {
+              const setNumber = plannedSet.order;
+              const loggedSet = getLoggedSet(setNumber);
+              const isEditingThis = editingSetId === loggedSet?.id;
+              const currentType = loggedSet ? loggedSet.setType : getEditSetType(setNumber);
+              const isWarmup = currentType === SetType.WARMUP;
+
+              const gridClass = "grid grid-cols-[auto_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)_auto] items-center gap-x-2 py-1.5 border-b border-border last:border-b-0";
+
+              const swipeKey = setNumber;
+              const swipeOffset = activeSwipe && activeSwipe.key === swipeKey ? activeSwipe.offset : 0;
+              const swipeClass = swipeOffset > 0 ? 'bg-primary/5' : swipeOffset < 0 ? 'bg-destructive/5' : '';
+
+              return (
+                <div
+                  key={plannedSet.id}
+                  onPointerDown={(e) => startSwipe(swipeKey, e.clientX, e.clientY)}
+                  onPointerMove={(e) => updateSwipe(e.clientX, e.clientY)}
+                  onPointerUp={() => endSwipe(swipeKey, setNumber, loggedSet?.id)}
+                  onPointerLeave={() => endSwipe(swipeKey, setNumber, loggedSet?.id)}
+                  onPointerCancel={() => setActiveSwipe(null)}
+                  style={swipeOffset !== 0 ? { transform: `translateX(${swipeOffset}px)` } : undefined}
+                  className={`${swipeClass} transition-transform touch-pan-y`}
+                >
+                  <div className={gridClass}>
+                    {/* Type cell: tappable icon for unlogged/editing to switch type */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!loggedSet || isEditingThis) {
+                          const next = isWarmup ? SetType.WORKING : SetType.WARMUP;
+                          updateEditValue(setNumber, 'setType', next);
+                        }
+                      }}
+                      disabled={loading || (!!loggedSet && !isEditingThis)}
+                      className="flex items-center justify-center"
+                      title={isWarmup ? 'Aufwärmen' : 'Arbeit'}
+                    >
+                      <Badge variant={isWarmup ? 'outline' : 'default'} className="p-0.5">
+                        {isWarmup ? <IconFlame className="size-4" /> : <IconBarbell className="size-4" />}
+                      </Badge>
+                    </button>
+
+                    {/* Weight cell */}
+                    {loggedSet && !isEditingThis ? (
+                      <span className="tabular-nums text-sm font-medium text-foreground">
+                        {loggedSet.weight} <span className="text-[10px] text-muted-foreground">kg</span>
+                        {exercise.isDoubleWeight && <span className="text-[10px] text-muted-foreground ml-0.5">(2x)</span>}
+                      </span>
                     ) : (
-                      <button
-                        onClick={() => handleLogSet(setNumber)}
+                      <Input
+                        type="number"
+                        step="0.5"
+                        value={isEditingThis ? editingValues.weight : getEditValue(setNumber, 'weight')}
+                        onChange={(e) => {
+                          if (isEditingThis) setEditingValues(prev => ({ ...prev, weight: e.target.value }));
+                          else updateEditValue(setNumber, 'weight', e.target.value);
+                        }}
+                        placeholder="0"
+                        className="h-7 text-sm tabular-nums"
                         disabled={loading}
-                        className="flex size-5 items-center justify-center rounded border-2 border-muted-foreground/40 hover:border-primary disabled:opacity-50"
                       />
                     )}
-                  </div>
 
-                  {/* Set Content */}
-                  <div className="flex-1">
-                    {loggedSet ? (
-                      editingSetId === loggedSet.id ? (
-                        // Edit mode for logged set (planned origin)
-                        <div className="space-y-3">
-                          <div className="grid grid-cols-3 gap-2">
-                            <div>
-                              <Label className="text-xs">{`Gewicht (kg)${exercise.isDoubleWeight ? ' (2x)' : ''}`}</Label>
-                              <Input
-                                type="number"
-                                step="0.5"
-                                value={editingValues.weight}
-                                onChange={(e) => setEditingValues(prev => ({ ...prev, weight: e.target.value }))}
-                                placeholder="0"
-                                className="h-8 text-sm"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs">{`Wdh${exercise.isUnilateral ? ' (2x)' : ''}`}</Label>
-                              <Input
-                                type="number"
-                                value={editingValues.reps}
-                                onChange={(e) => setEditingValues(prev => ({ ...prev, reps: e.target.value }))}
-                                placeholder="0"
-                                className="h-8 text-sm"
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-xs">RIR</Label>
-                              <Input
-                                type="number"
-                                value={editingValues.rir}
-                                onChange={(e) => setEditingValues(prev => ({ ...prev, rir: e.target.value }))}
-                                placeholder="0"
-                                className="h-8 text-sm"
-                              />
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button onClick={handleSaveEdit} disabled={loading} className="flex-1" size="sm">
-                              Speichern
-                            </Button>
-                            <Button onClick={handleCancelEdit} disabled={loading} variant="outline" className="flex-1" size="sm">
-                              Abbrechen
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        // Display mode for logged set
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <Badge variant={loggedSet.setType === SetType.WARMUP ? 'outline' : 'default'} className="p-0.5" title={loggedSet.setType === SetType.WARMUP ? 'Aufwärmen' : 'Arbeit'}>
-                              {loggedSet.setType === SetType.WARMUP ? <IconFlame className="size-4" /> : <IconBarbell className="size-4" />}
-                            </Badge>
-                            <span className="text-sm font-semibold text-foreground">
-                              {loggedSet.weight}kg × {loggedSet.reps} Wdh
-                            </span>
-                            {loggedSet.rir !== undefined && (
-                              <span className="text-sm text-muted-foreground">RIR {loggedSet.rir}</span>
-                            )}
-                          </div>
+                    {/* Reps cell */}
+                    {loggedSet && !isEditingThis ? (
+                      <span className="tabular-nums text-sm font-medium text-foreground">
+                        {loggedSet.reps} <span className="text-[10px] text-muted-foreground">Wdh</span>
+                        {exercise.isUnilateral && <span className="text-[10px] text-muted-foreground ml-0.5">(2x)</span>}
+                      </span>
+                    ) : (
+                      <Input
+                        type="number"
+                        value={isEditingThis ? editingValues.reps : getEditValue(setNumber, 'reps')}
+                        onChange={(e) => {
+                          if (isEditingThis) setEditingValues(prev => ({ ...prev, reps: e.target.value }));
+                          else updateEditValue(setNumber, 'reps', e.target.value);
+                        }}
+                        placeholder="0"
+                        className="h-7 text-sm tabular-nums"
+                        disabled={loading}
+                      />
+                    )}
+
+                    {/* RIR cell */}
+                    {loggedSet && !isEditingThis ? (
+                      <span className="tabular-nums text-sm text-muted-foreground">
+                        {loggedSet.rir !== undefined ? `RIR ${loggedSet.rir}` : ''}
+                      </span>
+                    ) : (
+                      <Input
+                        type="number"
+                        value={isEditingThis ? editingValues.rir : getEditValue(setNumber, 'rir')}
+                        onChange={(e) => {
+                          if (isEditingThis) setEditingValues(prev => ({ ...prev, rir: e.target.value }));
+                          else updateEditValue(setNumber, 'rir', e.target.value);
+                        }}
+                        placeholder=""
+                        className="h-7 text-sm tabular-nums"
+                        disabled={loading}
+                      />
+                    )}
+
+                    {/* Check / actions cell */}
+                    <div className="flex justify-end">
+                      {loggedSet ? (
+                        isEditingThis ? (
                           <div className="flex gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="size-7"
-                              onClick={() => handleEditSet(loggedSet)}
-                              disabled={loading}
-                              title="Bearbeiten"
-                            >
+                            <Button size="sm" onClick={handleSaveEdit} disabled={loading} className="h-7 px-2 text-xs">Speichern</Button>
+                            <Button size="sm" variant="outline" onClick={handleCancelEdit} disabled={loading} className="h-7 px-2 text-xs">Abbr.</Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" className="size-6" onClick={() => handleEditSet(loggedSet)} disabled={loading} title="Bearbeiten">
                               <IconEdit className="size-3.5" />
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="size-7 text-destructive hover:text-destructive"
-                              onClick={() => handleDeleteSet(loggedSet.id)}
-                              disabled={loading}
-                              title="Satz löschen"
-                            >
+                            <Button variant="ghost" size="icon" className="size-6 text-destructive hover:text-destructive" onClick={() => handleDeleteSet(loggedSet.id)} disabled={loading} title="Satz löschen">
                               <IconTrash className="size-3.5" />
                             </Button>
+                            <button disabled={loading} className="p-0.5" title="Geloggt (Swipe RTL zum Löschen)">
+                              <IconCheck className="size-4 text-foreground stroke-[3]" />
+                            </button>
                           </div>
-                        </div>
-                      )
-                    ) : (
-                      <div className="space-y-2">
-                        {/* SetType select */}
-                        <div>
-                          <Label className="text-xs">Satztyp</Label>
-                          <select
-                            value={getEditSetType(setNumber)}
-                            onChange={(e) => updateEditValue(setNumber, 'setType', e.target.value as SetType)}
-                            className="flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                          >
-                            <option value={SetType.WORKING}>Arbeitssatz</option>
-                            <option value={SetType.WARMUP}>Aufwärmsatz</option>
-                          </select>
-                        </div>
-
-                        {/* Input Fields */}
-                        <div className="grid grid-cols-3 gap-2">
-                          <div>
-                            <Label className="text-xs">{`Gewicht (kg)${exercise.isDoubleWeight ? ' (2x)' : ''}`}</Label>
-                            <Input
-                              type="number"
-                              step="0.5"
-                              value={getEditValue(setNumber, 'weight')}
-                              onChange={(e) => updateEditValue(setNumber, 'weight', e.target.value)}
-                              placeholder="0"
-                              className="h-8 text-sm"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs">{`Wdh${exercise.isUnilateral ? ' (2x)' : ''}`}</Label>
-                            <Input
-                              type="number"
-                              value={getEditValue(setNumber, 'reps')}
-                              onChange={(e) => updateEditValue(setNumber, 'reps', e.target.value)}
-                              placeholder="0"
-                              className="h-8 text-sm"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-xs">RIR</Label>
-                            <Input
-                              type="number"
-                              value={getEditValue(setNumber, 'rir')}
-                              onChange={(e) => updateEditValue(setNumber, 'rir', e.target.value)}
-                              placeholder="0"
-                              className="h-8 text-sm"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Additional prepare rows (free workouts or sets beyond the planned blueprint) */}
-          {additionalSetNumbers
-            .filter((n) => !getLoggedSet(n))
-            .map((setNumber) => (
-              <div
-                key={`add-${setNumber}`}
-                className="border rounded-md p-3 bg-muted/30 border-border"
-              >
-                <div className="flex items-start gap-3">
-                  {/* Checkbox for additional */}
-                  <div className="mt-1">
-                    <button
-                      onClick={() => handleLogSet(setNumber)}
-                      disabled={loading}
-                      className="flex size-5 items-center justify-center rounded border-2 border-muted-foreground/40 hover:border-primary disabled:opacity-50"
-                    />
-                  </div>
-                  <div className="flex-1 space-y-2">
-                    {/* SetType */}
-                    <div>
-                      <Label className="text-xs">Satztyp</Label>
-                      <select
-                        value={getEditSetType(setNumber)}
-                        onChange={(e) => updateEditValue(setNumber, 'setType', e.target.value as SetType)}
-                        className="flex h-8 w-full rounded-md border border-input bg-background px-2 py-1 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      >
-                        <option value={SetType.WORKING}>Arbeitssatz</option>
-                        <option value={SetType.WARMUP}>Aufwärmsatz</option>
-                      </select>
-                    </div>
-                    {/* Inputs */}
-                    <div className="grid grid-cols-3 gap-2">
-                      <div>
-                        <Label className="text-xs">{`Gewicht (kg)${exercise.isDoubleWeight ? ' (2x)' : ''}`}</Label>
-                        <Input
-                          type="number"
-                          step="0.5"
-                          value={getEditValue(setNumber, 'weight')}
-                          onChange={(e) => updateEditValue(setNumber, 'weight', e.target.value)}
-                          placeholder="0"
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs">{`Wdh${exercise.isUnilateral ? ' (2x)' : ''}`}</Label>
-                        <Input
-                          type="number"
-                          value={getEditValue(setNumber, 'reps')}
-                          onChange={(e) => updateEditValue(setNumber, 'reps', e.target.value)}
-                          placeholder="0"
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs">RIR</Label>
-                        <Input
-                          type="number"
-                          value={getEditValue(setNumber, 'rir')}
-                          onChange={(e) => updateEditValue(setNumber, 'rir', e.target.value)}
-                          placeholder="0"
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-
-          {/* Extra logged sets (all for free workouts, or sets added beyond planned) */}
-          {exercise.sets
-            .filter((s) => !hasPlannedSets || !exercise.plannedSets!.some((p) => p.order === s.setNumber))
-            .sort((a, b) => a.setNumber - b.setNumber)
-            .map((set) => (
-              <div key={set.id} className="border rounded-md p-3 bg-card border-border">
-                {editingSetId === set.id ? (
-                  // Edit form (shared structure with planned-logged edit)
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-3 gap-2">
-                      <div>
-                        <Label className="text-xs">{`Gewicht (kg)${exercise.isDoubleWeight ? ' (2x)' : ''}`}</Label>
-                        <Input
-                          type="number"
-                          step="0.5"
-                          value={editingValues.weight}
-                          onChange={(e) => setEditingValues(prev => ({ ...prev, weight: e.target.value }))}
-                          placeholder="0"
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs">{`Wdh${exercise.isUnilateral ? ' (2x)' : ''}`}</Label>
-                        <Input
-                          type="number"
-                          value={editingValues.reps}
-                          onChange={(e) => setEditingValues(prev => ({ ...prev, reps: e.target.value }))}
-                          placeholder="0"
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <Label className="text-xs">RIR</Label>
-                        <Input
-                          type="number"
-                          value={editingValues.rir}
-                          onChange={(e) => setEditingValues(prev => ({ ...prev, rir: e.target.value }))}
-                          placeholder="0"
-                          className="h-8 text-sm"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button onClick={handleSaveEdit} disabled={loading} className="flex-1" size="sm">
-                        Speichern
-                      </Button>
-                      <Button onClick={handleCancelEdit} disabled={loading} variant="outline" className="flex-1" size="sm">
-                        Abbrechen
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex size-5 items-center justify-center rounded bg-muted text-muted-foreground">
-                        <IconCheck className="size-3.5" />
-                      </div>
-                      <Badge variant={set.setType === SetType.WARMUP ? 'outline' : 'default'} className="p-0.5" title={set.setType === SetType.WARMUP ? 'Aufwärmen' : 'Arbeit'}>
-                        {set.setType === SetType.WARMUP ? <IconFlame className="size-4" /> : <IconBarbell className="size-4" />}
-                      </Badge>
-                      <span className="text-sm font-semibold text-foreground">
-                        {set.weight}kg × {set.reps} Wdh
-                      </span>
-                      {set.rir !== undefined && (
-                        <span className="text-sm text-muted-foreground">RIR {set.rir}</span>
+                        )
+                      ) : (
+                        <button onClick={() => handleLogSet(setNumber)} disabled={loading} className="p-0.5" title="Satz loggen (oder Swipe LTR)">
+                          <IconCheck className="size-4 text-muted-foreground/60 hover:text-primary" />
+                        </button>
                       )}
                     </div>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-7"
-                        onClick={() => handleEditSet(set)}
-                        disabled={loading}
-                        title="Bearbeiten"
-                      >
-                        <IconEdit className="size-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-7 text-destructive hover:text-destructive"
-                        onClick={() => handleDeleteSet(set.id)}
-                        disabled={loading}
-                        title="Satz löschen"
-                      >
-                        <IconTrash className="size-3.5" />
-                      </Button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Additional prepare rows (free or extra) as table rows */}
+            {additionalSetNumbers.filter((n) => !getLoggedSet(n)).map((setNumber) => {
+              const gridClass = "grid grid-cols-[auto_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)_auto] items-center gap-x-2 py-1.5 border-b border-border last:border-b-0";
+              const isWarmup = getEditSetType(setNumber) === SetType.WARMUP;
+
+              const swipeKey = `add-${setNumber}`;
+              const swipeOffset = activeSwipe && activeSwipe.key === swipeKey ? activeSwipe.offset : 0;
+              const swipeClass = swipeOffset > 0 ? 'bg-primary/5' : swipeOffset < 0 ? 'bg-destructive/5' : '';
+
+              return (
+                <div
+                  key={`add-${setNumber}`}
+                  onPointerDown={(e) => startSwipe(swipeKey, e.clientX, e.clientY)}
+                  onPointerMove={(e) => updateSwipe(e.clientX, e.clientY)}
+                  onPointerUp={() => endSwipe(swipeKey, setNumber)}
+                  onPointerLeave={() => endSwipe(swipeKey, setNumber)}
+                  onPointerCancel={() => setActiveSwipe(null)}
+                  style={swipeOffset !== 0 ? { transform: `translateX(${swipeOffset}px)` } : undefined}
+                  className={`${swipeClass} transition-transform touch-pan-y`}
+                >
+                  <div className={gridClass}>
+                    {/* Type: tappable icon */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = isWarmup ? SetType.WORKING : SetType.WARMUP;
+                        updateEditValue(setNumber, 'setType', next);
+                      }}
+                      disabled={loading}
+                      className="flex items-center justify-center"
+                      title={isWarmup ? 'Aufwärmen' : 'Arbeit'}
+                    >
+                      <Badge variant={isWarmup ? 'outline' : 'default'} className="p-0.5">
+                        {isWarmup ? <IconFlame className="size-4" /> : <IconBarbell className="size-4" />}
+                      </Badge>
+                    </button>
+
+                    <Input type="number" step="0.5" value={getEditValue(setNumber, 'weight')} onChange={(e) => updateEditValue(setNumber, 'weight', e.target.value)} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} />
+                    <Input type="number" value={getEditValue(setNumber, 'reps')} onChange={(e) => updateEditValue(setNumber, 'reps', e.target.value)} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} />
+                    <Input type="number" value={getEditValue(setNumber, 'rir')} onChange={(e) => updateEditValue(setNumber, 'rir', e.target.value)} placeholder="" className="h-7 text-sm tabular-nums" disabled={loading} />
+
+                    <div className="flex justify-end">
+                      <button onClick={() => handleLogSet(setNumber)} disabled={loading} className="p-0.5" title="Satz loggen (oder Swipe LTR)">
+                        <IconCheck className="size-4 text-muted-foreground/60 hover:text-primary" />
+                      </button>
                     </div>
                   </div>
-                )}
-              </div>
-            ))}
+                </div>
+              );
+            })}
 
-          {/* Add additional set (works for free + for adding beyond planned) */}
-          <Button
-            variant="outline"
-            onClick={addAdditionalSet}
-            disabled={loading}
-            className="w-full border-dashed text-muted-foreground hover:text-foreground"
-          >
-            <IconPlus className="size-4 mr-2" />
-            Satz hinzufügen
-          </Button>
+            {/* Extra logged sets (free or beyond planned) as table rows */}
+            {exercise.sets
+              .filter((s) => !hasPlannedSets || !exercise.plannedSets!.some((p) => p.order === s.setNumber))
+              .sort((a, b) => a.setNumber - b.setNumber)
+              .map((set) => {
+                const gridClass = "grid grid-cols-[auto_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)_auto] items-center gap-x-2 py-1.5 border-b border-border last:border-b-0";
+                const isWarmup = set.setType === SetType.WARMUP;
+                const isEditingThis = editingSetId === set.id;
 
-          {!hasPlannedSets && exercise.sets.length === 0 && additionalSetNumbers.length === 0 && (
-            <p className="text-muted-foreground text-sm text-center py-2">
-              Noch keine Sätze geloggt
-            </p>
-          )}
+                const swipeKey = set.id;
+                const swipeOffset = activeSwipe && activeSwipe.key === swipeKey ? activeSwipe.offset : 0;
+                const swipeClass = swipeOffset > 0 ? 'bg-primary/5' : swipeOffset < 0 ? 'bg-destructive/5' : '';
+
+                return (
+                  <div
+                    key={set.id}
+                    onPointerDown={(e) => startSwipe(swipeKey, e.clientX, e.clientY)}
+                    onPointerMove={(e) => updateSwipe(e.clientX, e.clientY)}
+                    onPointerUp={() => endSwipe(swipeKey, undefined, set.id)}
+                    onPointerLeave={() => endSwipe(swipeKey, undefined, set.id)}
+                    onPointerCancel={() => setActiveSwipe(null)}
+                    style={swipeOffset !== 0 ? { transform: `translateX(${swipeOffset}px)` } : undefined}
+                    className={`${swipeClass} transition-transform touch-pan-y`}
+                  >
+                    <div className={gridClass}>
+                      <div className="flex items-center justify-center">
+                        <Badge variant={isWarmup ? 'outline' : 'default'} className="p-0.5">
+                          {isWarmup ? <IconFlame className="size-4" /> : <IconBarbell className="size-4" />}
+                        </Badge>
+                      </div>
+
+                      {isEditingThis ? (
+                        <>
+                          <Input type="number" step="0.5" value={editingValues.weight} onChange={(e) => setEditingValues(prev => ({ ...prev, weight: e.target.value }))} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} />
+                          <Input type="number" value={editingValues.reps} onChange={(e) => setEditingValues(prev => ({ ...prev, reps: e.target.value }))} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} />
+                          <Input type="number" value={editingValues.rir} onChange={(e) => setEditingValues(prev => ({ ...prev, rir: e.target.value }))} placeholder="" className="h-7 text-sm tabular-nums" disabled={loading} />
+                          <div className="flex justify-end gap-1">
+                            <Button size="sm" onClick={handleSaveEdit} disabled={loading} className="h-7 px-2 text-xs">Speichern</Button>
+                            <Button size="sm" variant="outline" onClick={handleCancelEdit} disabled={loading} className="h-7 px-2 text-xs">Abbr.</Button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <span className="tabular-nums text-sm font-medium text-foreground">{set.weight} <span className="text-[10px] text-muted-foreground">kg</span></span>
+                          <span className="tabular-nums text-sm font-medium text-foreground">{set.reps} <span className="text-[10px] text-muted-foreground">Wdh</span></span>
+                          <span className="tabular-nums text-sm text-muted-foreground">{set.rir !== undefined ? `RIR ${set.rir}` : ''}</span>
+                          <div className="flex justify-end items-center gap-1">
+                            <Button variant="ghost" size="icon" className="size-6" onClick={() => handleEditSet(set)} disabled={loading} title="Bearbeiten">
+                              <IconEdit className="size-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="size-6 text-destructive hover:text-destructive" onClick={() => handleDeleteSet(set.id)} disabled={loading} title="Satz löschen">
+                              <IconTrash className="size-3.5" />
+                            </Button>
+                            <button disabled={loading} className="p-0.5" title="Geloggt (Swipe RTL zum Löschen)">
+                              <IconCheck className="size-4 text-foreground stroke-[3]" />
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+            {/* Add set button (table-like) */}
+            <Button variant="outline" onClick={addAdditionalSet} disabled={loading} className="w-full mt-2 border-dashed text-muted-foreground hover:text-foreground h-8">
+              <IconPlus className="size-4 mr-2" />
+              Satz hinzufügen
+            </Button>
+
+            {!hasPlannedSets && exercise.sets.length === 0 && additionalSetNumbers.length === 0 && (
+              <p className="text-muted-foreground text-sm text-center py-2">Noch keine Sätze geloggt</p>
+            )}
           </CardContent>
         )}
       </Card>

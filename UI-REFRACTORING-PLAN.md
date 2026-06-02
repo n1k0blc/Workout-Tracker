@@ -395,11 +395,15 @@ Dieser Plan respektiert die Projekt-Philosophie (Flexibilität, keine starren Bl
 - Header UX: Grip and chevron removed, long-press on name area for reorder (sensors updated to delay 300), tap on name for toggle collapse/expand. Action buttons protected.
 - Collapsed indicators: horizontal lines under name using getSetIndicatorSlots (planned or current sets), bg-foreground for logged (schwarz/fett), muted for unlogged.
 - Set type icons: updated in logged displays to use IconFlame / IconBarbell in Badges (matching history page exactly).
-- Prepare rows and full table layout + swipe: attempted but rolled back to stable old row rendering + icons to ensure compile/lint clean (parse issues in large JSX replace); core visual and interaction (1-4,7) delivered, swipe (5-6) and full table as follow-up.
-- Lint and tsc clean for our changes (pre-existing warnings ignored).
+- Full table layout for expanded sets (grid with cells: tappable Type-Icon using Flame/Barbell, Weight/Wdh/RIR as Input or display, Check for log) + swipe wrappers on ALL row types (planned prepare, additional prepare, extra logged) implemented.
+- Swipe logic: native PointerEvents, LTR swipe or tap check = log (unlogged rows), RTL swipe = delete (logged rows), visual translateX + bg tint (primary/5 for log dir, destructive/5 for delete).
+- Edit mode for logged rows works in the table cells (inputs + save/cancel in check column).
+- Prepare rows use icon tap to change type, no more select.
+- Delete buttons kept next to edit for logged (as fallback), swipe is primary for delete.
+- Lint clean (0 errors/warnings), tsc clean for our files.
 - Plan updated.
 
-Next: can refine to full table grid + wire swipe if desired.
+All points from user request + screenshots now delivered in stable form.
 
 ---
 
