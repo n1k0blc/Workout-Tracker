@@ -553,6 +553,8 @@ Zusätzlich: Der "Workout beenden?"-Dialog (Overlay mit "Blueprint aktualisieren
 - Keine lucide mehr, volle sera-Konsistenz, Dark/Light safe.
 - Lint + tsc clean.
 - Accessibility-Fix: `DialogTitle` (visuell versteckt via `@radix-ui/react-visually-hidden`) hinzugefügt, da Radix Dialog einen Title für Screenreader erfordert. `showCloseButton={false}` explizit gesetzt.
+- Confetti: useEffect now depends on `open` prop so it triggers correctly when the modal opens (was firing on initial mount before because component is always in tree).
+- PRs slide: removed 🎉 emoji; switched trophy to IconAward (Tabler) with semantic black/white colors (bg-muted / text-foreground) instead of gold/amber; close button now rounded-lg (eckig) instead of rounded-full.
 
 **Wichtiger Bugfix (entdeckt nach Migration):** Beim Öffnen des Workout-Screens (zum Starten) kam es zu einem Error in `calculateWorkoutStats` bei `workout.exercises`. 
 Ursache: Die CompletionModal-Komponente ist jetzt immer im React-Tree (controlled Dialog). Der Callsite übergab `completedWorkout!` (State initial `null`). Die Stats-Berechnung lief bei jedem Render und crashte bei fehlendem Workout. 

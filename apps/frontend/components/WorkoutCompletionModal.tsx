@@ -40,7 +40,7 @@ export function WorkoutCompletionModal({
   onClose,
 }: WorkoutCompletionModalProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [showConfetti, setShowConfetti] = useState(true);
+  const [showConfetti, setShowConfetti] = useState(false);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
 
   const stats = workout
@@ -58,7 +58,15 @@ export function WorkoutCompletionModal({
   const totalSlides = hasPRs ? 6 : 5;
 
   useEffect(() => {
-    // Set window size for confetti (initial + resize listener)
+    if (!open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setShowConfetti(false);
+      return;
+    }
+
+    // Trigger confetti only when the modal opens
+    setShowConfetti(true);
+
     const updateSize = () => {
       setWindowSize({
         width: window.innerWidth,
@@ -77,7 +85,7 @@ export function WorkoutCompletionModal({
       window.removeEventListener('resize', updateSize);
       clearTimeout(timer);
     };
-  }, []);
+  }, [open]);
 
   // Swipe handlers
   useSwipe({
@@ -144,20 +152,20 @@ export function WorkoutCompletionModal({
       if (onOpenChange) onOpenChange(o);
       if (!o && onClose) onClose();
     }}>
-      {/* Confetti (outside content for layering) */}
-      {showConfetti && (
-        <Confetti
-          width={windowSize.width}
-          height={windowSize.height}
-          recycle={false}
-          numberOfPieces={300}
-        />
-      )}
-
       <DialogContent 
         className="max-w-2xl p-0 overflow-hidden rounded-xl" 
         showCloseButton={false}
       >
+        {/* Confetti inside the modal content for proper layering */}
+        {showConfetti && (
+          <Confetti
+            width={windowSize.width}
+            height={windowSize.height}
+            recycle={false}
+            numberOfPieces={300}
+            style={{ position: 'absolute', top: 0, left: 0, zIndex: 10, pointerEvents: 'none' }}
+          />
+        )}
         <VisuallyHidden.Root>
           <DialogTitle>Workout-Statistiken</DialogTitle>
         </VisuallyHidden.Root>
@@ -166,7 +174,7 @@ export function WorkoutCompletionModal({
           variant="ghost"
           size="icon"
           onClick={handleClose}
-          className="absolute top-4 right-4 z-10 h-9 w-9 rounded-full bg-muted/80 hover:bg-muted"
+          className="absolute top-4 right-4 z-10 h-9 w-9 rounded-lg bg-muted/80 hover:bg-muted"
           aria-label="Überspringen"
         >
           <IconX className="h-4 w-4" />
