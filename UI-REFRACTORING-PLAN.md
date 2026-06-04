@@ -548,7 +548,7 @@ Zusätzlich: Der "Workout beenden?"-Dialog (Overlay mit "Blueprint aktualisieren
 - Alle Navigation: Buttons (outline/ghost/default), Progress mit `bg-primary` / `bg-muted`.
 - Alle 6 Slides: Tabler Icons (IconBarbell, IconClock, IconTrophy, IconTrendingUp, IconListCheck, IconClipboardList), semantic tokens (text-foreground/primary/muted-foreground, bg-primary/10, bg-card, border-border, bg-muted).
 - Summary: Set-Typen jetzt mit Badge + IconFlame/IconBarbell (konsistent zu ExerciseCard), Warmup/Working Unterscheidung via Badge-Variant.
-- PRsSlide: Amber Akzent für Feier, nutzt bereits gute shadcn PersonalRecordCard.
+- PRsSlide: Amber Akzent für Feier, nutzt bereits gute shadcn PersonalRecordCard. (später: explizite border border-border hinzugefügt für sichtbare Umrandung wie auf Dashboard).
 - Callsite in workout/page.tsx angepasst.
 - Keine lucide mehr, volle sera-Konsistenz, Dark/Light safe.
 - Lint + tsc clean.

@@ -25,6 +25,7 @@ export function PRsSlide({ personalRecords }: PRsSlideProps) {
             key={index}
             pr={pr}
             showDate={false}
+            className="border border-border"
           />
         ))}
       </div>
