@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ExerciseLog, SetType } from '@/types';
+import { ExerciseLog, SetLog, SetType } from '@/types';
 import { useWorkout } from '@/lib/workout-context';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -330,6 +330,122 @@ export default function ExerciseCard({
     }
   };
 
+  // Render helpers for extra rows (used to render logged extras + unlogged drafts in a single sorted-by-setNumber list)
+  const renderDraftRow = (setNumber: number) => {
+    const gridClass = "grid grid-cols-[auto_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)_auto] items-center gap-x-2 py-1.5 border-b border-border last:border-b-0";
+    const isWarmup = getEditSetType(setNumber) === SetType.WARMUP;
+
+    const swipeKey = `add-${setNumber}`;
+    const swipeOffset = activeSwipe && activeSwipe.key === swipeKey ? activeSwipe.offset : 0;
+    const swipeClass = swipeOffset > 0 ? 'bg-primary/5' : swipeOffset < 0 ? 'bg-destructive/5' : '';
+
+    return (
+      <div
+        key={`add-${setNumber}`}
+        onPointerDown={(e) => startSwipe(swipeKey, e.clientX, e.clientY)}
+        onPointerMove={(e) => updateSwipe(e.clientX, e.clientY)}
+        onPointerUp={() => endSwipe(swipeKey, setNumber, false)}
+        onPointerLeave={() => endSwipe(swipeKey, setNumber, false)}
+        onPointerCancel={() => setActiveSwipe(null)}
+        style={swipeOffset !== 0 ? { transform: `translateX(${swipeOffset}px)` } : undefined}
+        className={`${swipeClass} transition-transform touch-pan-y`}
+      >
+        <div className={gridClass}>
+          {/* Type: tappable icon for unlogged drafts */}
+          <button
+            type="button"
+            onClick={() => {
+              const next = isWarmup ? SetType.WORKING : SetType.WARMUP;
+              updateEditValue(setNumber, 'setType', next);
+            }}
+            disabled={loading}
+            className="flex items-center justify-center"
+            title={isWarmup ? 'Aufwärmen' : 'Arbeit'}
+          >
+            <Badge variant={isWarmup ? 'outline' : 'default'} className="p-0.5">
+              {isWarmup ? <IconFlame className="size-4" /> : <IconBarbell className="size-4" />}
+            </Badge>
+          </button>
+
+          <Input type="number" step="0.5" value={getEditValue(setNumber, 'weight')} onChange={(e) => handleRowValueChange(setNumber, null, 'weight', e.target.value)} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} />
+          <Input type="number" value={getEditValue(setNumber, 'reps')} onChange={(e) => handleRowValueChange(setNumber, null, 'reps', e.target.value)} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} />
+          <Input type="number" value={getEditValue(setNumber, 'rir')} onChange={(e) => handleRowValueChange(setNumber, null, 'rir', e.target.value)} placeholder="" className="h-7 text-sm tabular-nums" disabled={loading} />
+
+          <div className="flex justify-end">
+            <button onClick={() => handleLogSet(setNumber)} disabled={loading} className="p-0.5" title="Satz loggen (oder Swipe LTR)">
+              <IconCheck className="size-4 text-muted-foreground/60 hover:text-primary" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderLoggedExtraRow = (set: SetLog) => {
+    const gridClass = "grid grid-cols-[auto_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)_auto] items-center gap-x-2 py-1.5 border-b border-border last:border-b-0";
+    const isWarmup = set.setType === SetType.WARMUP;
+    const isEditingThis = editingSetId === set.id;
+
+    const swipeKey = set.id;
+    const swipeOffset = activeSwipe && activeSwipe.key === swipeKey ? activeSwipe.offset : 0;
+    const swipeClass = swipeOffset > 0 ? 'bg-primary/5' : swipeOffset < 0 ? 'bg-destructive/5' : '';
+
+    return (
+      <div
+        key={set.id}
+        onPointerDown={(e) => startSwipe(swipeKey, e.clientX, e.clientY)}
+        onPointerMove={(e) => updateSwipe(e.clientX, e.clientY)}
+        onPointerUp={() => endSwipe(swipeKey, set.setNumber, true)}
+        onPointerLeave={() => endSwipe(swipeKey, set.setNumber, true)}
+        onPointerCancel={() => setActiveSwipe(null)}
+        style={swipeOffset !== 0 ? { transform: `translateX(${swipeOffset}px)` } : undefined}
+        className={`${swipeClass} transition-transform touch-pan-y`}
+      >
+        <div className={gridClass}>
+          <div className="flex items-center justify-center">
+            <Badge variant={isWarmup ? 'outline' : 'default'} className="p-0.5">
+              {isWarmup ? <IconFlame className="size-4" /> : <IconBarbell className="size-4" />}
+            </Badge>
+          </div>
+
+          {/* Value cells - always inputs for consistent layout; live edit for logged via updateSet */}
+          <Input
+            type="number"
+            step="0.5"
+            value={isEditingThis ? editingValues.weight : set.weight.toString()}
+            onChange={(e) => handleRowValueChange(set.setNumber, set, 'weight', e.target.value)}
+            placeholder="0"
+            className="h-7 text-sm tabular-nums"
+            disabled={loading}
+          />
+          <Input
+            type="number"
+            value={isEditingThis ? editingValues.reps : set.reps.toString()}
+            onChange={(e) => handleRowValueChange(set.setNumber, set, 'reps', e.target.value)}
+            placeholder="0"
+            className="h-7 text-sm tabular-nums"
+            disabled={loading}
+          />
+          <Input
+            type="number"
+            value={isEditingThis ? editingValues.rir : (set.rir != null ? set.rir.toString() : '')}
+            onChange={(e) => handleRowValueChange(set.setNumber, set, 'rir', e.target.value)}
+            placeholder=""
+            className="h-7 text-sm tabular-nums"
+            disabled={loading}
+          />
+
+          {/* Check cell - fat only, no buttons (delete via swipe) */}
+          <div className="flex justify-end">
+            <button disabled={loading} className="p-0.5" title="Geloggt (nicht entloggen möglich; Swipe RTL zum Löschen)">
+              <IconCheck className="size-4 text-foreground stroke-[3]" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
       <Card
@@ -506,125 +622,33 @@ export default function ExerciseCard({
               );
             })}
 
-            {/* Additional prepare rows (free or extra) as table rows */}
-            {additionalSetNumbers.filter((n) => !getLoggedSet(n)).map((setNumber) => {
-              const gridClass = "grid grid-cols-[auto_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)_auto] items-center gap-x-2 py-1.5 border-b border-border last:border-b-0";
-              const isWarmup = getEditSetType(setNumber) === SetType.WARMUP;
+            {/* Extra sets (logged extras + unlogged additional drafts) in correct ascending setNumber order.
+               This ensures that newly added unplanned sets always appear after previously logged unplanned sets (at the bottom of the extras section). */}
+            {(() => {
+              const draftNumbers = additionalSetNumbers.filter((n) => !getLoggedSet(n));
+              const loggedExtraSets = exercise.sets
+                .filter((s) => !hasPlannedSets || !exercise.plannedSets!.some((p) => p.order === s.setNumber))
+                .sort((a, b) => a.setNumber - b.setNumber);
 
-              const swipeKey = `add-${setNumber}`;
-              const swipeOffset = activeSwipe && activeSwipe.key === swipeKey ? activeSwipe.offset : 0;
-              const swipeClass = swipeOffset > 0 ? 'bg-primary/5' : swipeOffset < 0 ? 'bg-destructive/5' : '';
+              const allExtraNumbers = Array.from(
+                new Set([
+                  ...draftNumbers,
+                  ...loggedExtraSets.map((s) => s.setNumber),
+                ])
+              ).sort((a, b) => a - b);
 
-              return (
-                <div
-                  key={`add-${setNumber}`}
-                  onPointerDown={(e) => startSwipe(swipeKey, e.clientX, e.clientY)}
-                  onPointerMove={(e) => updateSwipe(e.clientX, e.clientY)}
-                  onPointerUp={() => endSwipe(swipeKey, setNumber, false)}
-                  onPointerLeave={() => endSwipe(swipeKey, setNumber, false)}
-                  onPointerCancel={() => setActiveSwipe(null)}
-                  style={swipeOffset !== 0 ? { transform: `translateX(${swipeOffset}px)` } : undefined}
-                  className={`${swipeClass} transition-transform touch-pan-y`}
-                >
-                  <div className={gridClass}>
-                    {/* Type: tappable icon */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const next = isWarmup ? SetType.WORKING : SetType.WARMUP;
-                        updateEditValue(setNumber, 'setType', next);
-                      }}
-                      disabled={loading}
-                      className="flex items-center justify-center"
-                      title={isWarmup ? 'Aufwärmen' : 'Arbeit'}
-                    >
-                      <Badge variant={isWarmup ? 'outline' : 'default'} className="p-0.5">
-                        {isWarmup ? <IconFlame className="size-4" /> : <IconBarbell className="size-4" />}
-                      </Badge>
-                    </button>
-
-                    <Input type="number" step="0.5" value={getEditValue(setNumber, 'weight')} onChange={(e) => handleRowValueChange(setNumber, null, 'weight', e.target.value)} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} />
-                    <Input type="number" value={getEditValue(setNumber, 'reps')} onChange={(e) => handleRowValueChange(setNumber, null, 'reps', e.target.value)} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} />
-                    <Input type="number" value={getEditValue(setNumber, 'rir')} onChange={(e) => handleRowValueChange(setNumber, null, 'rir', e.target.value)} placeholder="" className="h-7 text-sm tabular-nums" disabled={loading} />
-
-                    <div className="flex justify-end">
-                      <button onClick={() => handleLogSet(setNumber)} disabled={loading} className="p-0.5" title="Satz loggen (oder Swipe LTR)">
-                        <IconCheck className="size-4 text-muted-foreground/60 hover:text-primary" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* Extra logged sets (free or beyond planned) as table rows */}
-            {exercise.sets
-              .filter((s) => !hasPlannedSets || !exercise.plannedSets!.some((p) => p.order === s.setNumber))
-              .sort((a, b) => a.setNumber - b.setNumber)
-              .map((set) => {
-                const gridClass = "grid grid-cols-[auto_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)_auto] items-center gap-x-2 py-1.5 border-b border-border last:border-b-0";
-                const isWarmup = set.setType === SetType.WARMUP;
-                const isEditingThis = editingSetId === set.id;
-
-                const swipeKey = set.id;
-                const swipeOffset = activeSwipe && activeSwipe.key === swipeKey ? activeSwipe.offset : 0;
-                const swipeClass = swipeOffset > 0 ? 'bg-primary/5' : swipeOffset < 0 ? 'bg-destructive/5' : '';
-
-                return (
-                  <div
-                    key={set.id}
-                    onPointerDown={(e) => startSwipe(swipeKey, e.clientX, e.clientY)}
-                    onPointerMove={(e) => updateSwipe(e.clientX, e.clientY)}
-                    onPointerUp={() => endSwipe(swipeKey, set.setNumber, true)}
-                    onPointerLeave={() => endSwipe(swipeKey, set.setNumber, true)}
-                    onPointerCancel={() => setActiveSwipe(null)}
-                    style={swipeOffset !== 0 ? { transform: `translateX(${swipeOffset}px)` } : undefined}
-                    className={`${swipeClass} transition-transform touch-pan-y`}
-                  >
-                    <div className={gridClass}>
-                      <div className="flex items-center justify-center">
-                        <Badge variant={isWarmup ? 'outline' : 'default'} className="p-0.5">
-                          {isWarmup ? <IconFlame className="size-4" /> : <IconBarbell className="size-4" />}
-                        </Badge>
-                      </div>
-
-                      {/* Value cells - always inputs for consistent layout; live edit for logged via updateSet */}
-                      <Input
-                        type="number"
-                        step="0.5"
-                        value={isEditingThis ? editingValues.weight : set.weight.toString()}
-                        onChange={(e) => handleRowValueChange(set.setNumber, set, 'weight', e.target.value)}
-                        placeholder="0"
-                        className="h-7 text-sm tabular-nums"
-                        disabled={loading}
-                      />
-                      <Input
-                        type="number"
-                        value={isEditingThis ? editingValues.reps : set.reps.toString()}
-                        onChange={(e) => handleRowValueChange(set.setNumber, set, 'reps', e.target.value)}
-                        placeholder="0"
-                        className="h-7 text-sm tabular-nums"
-                        disabled={loading}
-                      />
-                      <Input
-                        type="number"
-                        value={isEditingThis ? editingValues.rir : (set.rir != null ? set.rir.toString() : '')}
-                        onChange={(e) => handleRowValueChange(set.setNumber, set, 'rir', e.target.value)}
-                        placeholder=""
-                        className="h-7 text-sm tabular-nums"
-                        disabled={loading}
-                      />
-
-                      {/* Check cell - fat only, no buttons (delete via swipe) */}
-                      <div className="flex justify-end">
-                        <button disabled={loading} className="p-0.5" title="Geloggt (nicht entloggen möglich; Swipe RTL zum Löschen)">
-                          <IconCheck className="size-4 text-foreground stroke-[3]" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              return allExtraNumbers.map((setNumber) => {
+                const loggedSet = getLoggedSet(setNumber);
+                const isDraft = draftNumbers.includes(setNumber) && !loggedSet;
+                if (isDraft) {
+                  return renderDraftRow(setNumber);
+                }
+                if (loggedSet) {
+                  return renderLoggedExtraRow(loggedSet);
+                }
+                return null;
+              });
+            })()}
 
             {/* Add set button (table-like) */}
             <Button variant="outline" onClick={addAdditionalSet} disabled={loading} className="w-full mt-2 border-dashed text-muted-foreground hover:text-foreground h-8">

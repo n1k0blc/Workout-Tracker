@@ -2,7 +2,7 @@
 
 **Status:** Aktiv  
 **Branch:** `UI-Refactoring`  
-**Letztes Update:** April 2026 (ExerciseCard shadcn + UX (Swipe/Table/Indicators), RestTimer Light-Mode Fix, unplanned bars in collapsed, theme destructive-foreground)
+**Letztes Update:** April 2026 (ExerciseCard shadcn + UX (Swipe/Table/Indicators + correct extra sets ordering after logging unplanned), RestTimer Light-Mode Fix, unplanned bars, theme destructive-foreground)
 
 ---
 
@@ -413,6 +413,9 @@ All points addressed.
 - **Rest-Timer Light-Mode Kontrast bei Overtime**: Timer wird bei `restTimer > restTimerTarget` korrekt rot (`bg-destructive`). Vorher `text-destructive-foreground` (nicht definiert im sera-Theme) → in Light-Mode schwarze Schrift auf Rot (schlechter Kontrast).
   - Fix: `--destructive-foreground: oklch(0.985 0 0);` (weiß) explizit in `:root` und `.dark` von globals.css hinzugefügt + `--color-destructive-foreground` im `@theme inline` exposed. Damit `text-destructive-foreground` auf red jetzt überall weiße Schrift liefert (Light + Dark). Besser als hard `text-white` im Timer, da konsistent für alle Destructive-Buttons (z.B. Löschen in Card/Templates/Cycles).
   - RestTimerDisplay selbst unverändert (nutzt bereits die Klasse für isOvertime).
+- **Reihenfolge von ungeplanten Sätzen in der Tabelle**: Nachdem ein ungeplanter Satz geloggt wurde (wird in "Extra logged sets" gerendert) und dann ein weiterer ungeplanter hinzugefügt wird (landet als unlogged Draft in additionalSetNumbers), erschien der neue Draft immer direkt nach den geplanten Rows (weil "Additional prepare rows" Block vor "Extra logged" stand). Dadurch stand er nicht "ganz unten nach dem bereits geloggten ungeplanten".
+  - Fix: Statt zwei separaten Blöcken (die bei Block-Reihenfolge nur den happy-path abdecken würden) jetzt ein einziges kombiniertes Rendering für Extras: berechne alle relevanten extra setNumbers (drafts + logged extras), sortiere aufsteigend nach setNumber, rendere via `renderDraftRow` / `renderLoggedExtraRow` Helfern in dieser Reihenfolge. Neue ungeplante landen damit immer am Ende der Extra-Sektion (korrekt nach bereits geloggten ungeplanten). Funktioniert auch bei "out-of-order" loggen von Drafts und für Free-Workouts. Helfer-Funktionen kapseln die (unterschiedlichen) Row-JSX, um Duplizierung zu vermeiden.
+  - Verifiziert: eslint + tsc clean auf der Datei.
 - Verifiziert: eslint (betroffene Datei clean), tsc (keine neuen Fehler in modified files), semantische Tokens + keine Hardcodes.
 - Plan + Code-Stand aktualisiert.
 
