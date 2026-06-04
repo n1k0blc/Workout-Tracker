@@ -438,18 +438,19 @@ export default function EditBlueprintPage() {
         </main>
       </div>
 
-      {/* Exercise Selection Modal */}
-      {showExerciseModal && (
-        <ExerciseSelectionModal
-          onSelect={
-            replacingExerciseId ? handleReplaceExercise : handleAddExercise
-          }
-          onClose={() => {
-            setShowExerciseModal(false);
+      {/* Exercise Selection Modal (shadcn Dialog, controlled) */}
+      <ExerciseSelectionModal
+        open={showExerciseModal}
+        onOpenChange={(isOpen) => {
+          setShowExerciseModal(isOpen);
+          if (!isOpen) {
             setReplacingExerciseId(null);
-          }}
-        />
-      )}
+          }
+        }}
+        onSelect={
+          replacingExerciseId ? handleReplaceExercise : handleAddExercise
+        }
+      />
 
       {/* Save Template Modal */}
       {showSaveTemplateModal && (

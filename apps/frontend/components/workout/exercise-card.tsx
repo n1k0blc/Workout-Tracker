@@ -685,13 +685,12 @@ export default function ExerciseCard({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Replace Exercise Modal */}
-      {showReplaceModal && (
-        <ExerciseSelectionModal
-          onClose={() => setShowReplaceModal(false)}
-          onSelect={handleReplaceExercise}
-        />
-      )}
+      {/* Replace Exercise Modal (shadcn Dialog, controlled) */}
+      <ExerciseSelectionModal
+        open={showReplaceModal}
+        onOpenChange={setShowReplaceModal}
+        onSelect={handleReplaceExercise}
+      />
     </>
   );
 }

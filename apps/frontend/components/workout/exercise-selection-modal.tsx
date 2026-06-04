@@ -1,18 +1,30 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Exercise, MuscleGroup, Equipment } from '@/types';
 import { apiClient } from '@/lib/api';
 import { MUSCLE_GROUP_LABELS } from '@/lib/exercise-utils';
 import { ExerciseEditorDialog } from '@/components/exercises/exercise-editor-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { IconPlus } from '@tabler/icons-react';
 
 interface ExerciseSelectionModalProps {
-  onClose: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onSelect: (exerciseId: string, exercise?: Exercise) => void;
 }
 
 export default function ExerciseSelectionModal({
-  onClose,
+  open,
+  onOpenChange,
   onSelect,
 }: ExerciseSelectionModalProps) {
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -26,11 +38,7 @@ export default function ExerciseSelectionModal({
   >();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
-  useEffect(() => {
-    loadExercises();
-  }, [search, muscleGroupFilter, equipmentFilter]);
-
-  const loadExercises = async () => {
+  const loadExercises = useCallback(async () => {
     setLoading(true);
     try {
       const data = await apiClient.getExercises({
@@ -45,7 +53,11 @@ export default function ExerciseSelectionModal({
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, muscleGroupFilter, equipmentFilter]);
+
+  useEffect(() => {
+    loadExercises();
+  }, [loadExercises]);
 
   const handleExerciseCreated = (exercise: Exercise) => {
     // Add new exercise to list and select it
@@ -97,125 +109,95 @@ export default function ExerciseSelectionModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">
-              Übung hinzufügen
-            </h2>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-          </div>
+        <DialogHeader className="px-6 py-4 border-b shrink-0">
+          <DialogTitle>Übung hinzufügen</DialogTitle>
+        </DialogHeader>
 
-          {/* Search */}
-          <input
+        {/* Search */}
+        <div className="px-6 py-4 border-b shrink-0">
+          <Input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Übung suchen..."
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full"
           />
         </div>
 
         {/* Filters */}
-        <div className="px-6 py-3 border-b border-gray-200 space-y-3">
+        <div className="px-6 py-3 border-b space-y-3 shrink-0">
           {/* Muscle Group Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-muted-foreground mb-1.5">
               Muskelgruppe
             </label>
             <div className="flex flex-wrap gap-2">
-              <button
+              <Button
+                variant={!muscleGroupFilter ? 'default' : 'outline'}
+                size="sm"
                 onClick={() => setMuscleGroupFilter(undefined)}
-                className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  !muscleGroupFilter
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
               >
                 Alle
-              </button>
+              </Button>
               {muscleGroups.map((mg) => (
-                <button
+                <Button
                   key={mg}
+                  variant={muscleGroupFilter === mg ? 'default' : 'outline'}
+                  size="sm"
                   onClick={() => setMuscleGroupFilter(mg)}
-                  className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    muscleGroupFilter === mg
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
                 >
                   {translateMuscleGroup(mg)}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
 
           {/* Equipment Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-muted-foreground mb-1.5">
               Equipment
             </label>
             <div className="flex flex-wrap gap-2">
-              <button
+              <Button
+                variant={!equipmentFilter ? 'default' : 'outline'}
+                size="sm"
                 onClick={() => setEquipmentFilter(undefined)}
-                className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  !equipmentFilter
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
               >
                 Alle
-              </button>
+              </Button>
               {equipments.map((eq) => (
-                <button
+                <Button
                   key={eq}
+                  variant={equipmentFilter === eq ? 'default' : 'outline'}
+                  size="sm"
                   onClick={() => setEquipmentFilter(eq)}
-                  className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    equipmentFilter === eq
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
                 >
                   {translateEquipment(eq)}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
         </div>
 
         {/* Create Custom Exercise Button */}
-        <div className="px-6 py-3 border-b border-gray-200">
-          <button
+        <div className="px-6 py-3 border-b shrink-0">
+          <Button
+            variant="outline"
             onClick={() => setShowCreateDialog(true)}
-            className="w-full py-2 px-4 border-2 border-dashed border-gray-300 text-gray-600 font-medium rounded-lg hover:border-blue-500 hover:text-blue-600 transition-colors"
+            className="w-full"
           >
-            + Benutzerdefinierte Übung erstellen
-          </button>
+            <IconPlus className="mr-2 size-4" />
+            Benutzerdefinierte Übung erstellen
+          </Button>
         </div>
 
         {/* Exercise List */}
         <div className="flex-1 overflow-y-auto p-6">
           {loading ? (
-            <div className="text-center py-8 text-gray-600">
+            <div className="text-center py-8 text-muted-foreground">
               Lädt Übungen...
             </div>
           ) : exercises.length > 0 ? (
@@ -224,37 +206,36 @@ export default function ExerciseSelectionModal({
                 <button
                   key={exercise.id}
                   onClick={() => onSelect(exercise.id, exercise)}
-                  className="w-full text-left px-4 py-3 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                  className="w-full text-left px-4 py-3 rounded-md border border-border bg-card hover:bg-accent active:bg-accent/80 transition-colors"
                 >
-                  <div className="font-medium text-gray-900">
+                  <div className="font-medium text-foreground">
                     {exercise.name}
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">
-                    {translateMuscleGroup(exercise.muscleGroup)} •{' '}
-                    {translateEquipment(exercise.equipment)}
+                  <div className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
+                    {translateMuscleGroup(exercise.muscleGroup)} • {translateEquipment(exercise.equipment)}
                     {exercise.isCustom && (
-                      <span className="ml-2 text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded">
+                      <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
                         Custom
-                      </span>
+                      </Badge>
                     )}
                   </div>
                 </button>
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-gray-600">
+            <div className="text-center py-8 text-muted-foreground">
               Keine Übungen gefunden
             </div>
           )}
         </div>
-      </div>
+      </DialogContent>
 
-      {/* Create Exercise Dialog (shared) */}
+      {/* Create Exercise Dialog (shared, already shadcn) */}
       <ExerciseEditorDialog
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
         onSuccess={handleExerciseCreated}
       />
-    </div>
+    </Dialog>
   );
 }

@@ -2,7 +2,7 @@
 
 **Status:** Aktiv  
 **Branch:** `UI-Refactoring`  
-**Letztes Update:** April 2026 (ExerciseCard shadcn + UX (Swipe/Table/Indicators + correct extra sets ordering after logging unplanned), RestTimer Light-Mode Fix, unplanned bars, theme destructive-foreground)
+**Letztes Update:** April 2026 (ExerciseCard UX complete + ExerciseSelectionModal shadcn Migration + large centered square + icon trigger for adding exercises in active workout)
 
 ---
 
@@ -70,7 +70,7 @@ Phase 3 wird hiermit offiziell abgeschlossen.
 - **Dokumentation**: Dieser Plan fortlaufend aktualisiert mit Entscheidungen, Begründungen (DDD/Flexibilität: historische Daten immutable, plannedSets = load-time only) und detailliertem Stand.
 - **Ergebnis**: ExerciseCard bereit für die Extraktion einer shared `WorkoutExercise`-Komponente (geplant: modes execution | editor | review für Live, Template/Cycle-Editor, History-Review).
 
-**Stand:** Phase 4 Teil 2 (visueller + logischer Teil für ExerciseCard + Active + UX-Verfeinerungen wie Table/Swipe/Indicators + nachgelagerte Fixes für unplanned bars + timer contrast) als Meilenstein abgeschlossen. Nächster Fokus: Shared WorkoutExercise Komponente (modes) + weitere Polishing.
+**Stand:** Phase 4 Teil 2 (ExerciseCard + Active Workout UX inkl. Swipe/Table/Indicators, Fixes + Exercise Add Overlay shadcn Migration + neuer großer zentrierter + Icon Trigger) als Meilenstein abgeschlossen. Nächster Fokus: Shared WorkoutExercise Komponente (modes execution/editor/review).
 
 ---
 
@@ -421,6 +421,123 @@ All points addressed.
 
 ---
 
+### Phase 4 – Nächster Schritt: Übung-hinzufügen Overlay + Trigger auf shadcn/sera (User Request)
+**User Request (direkt):** "okay super dann lass uns als nächstes das übung hinzufügen overlay auf shadcn umstellen. Ich fände es gut wenn wir anstatt "Übung hinzufügen" button einfach ein großes + icon zeigen das mittig ausgerichtet ist und eckig ist. Wenn man darauf klickt öffnet sich das overlay"
+
+**Ziel:**
+- Vollständige Migration des `ExerciseSelectionModal` (shared Component für Active-Workout, Replace in Card, Template-Editor, Cycle-Blueprint, etc.) auf shadcn/ui + sera Tokens.
+- Redesign des Triggers **im aktiven Workout-Screen**: Statt des alten dashed Text-Buttons ("+ Übung hinzufügen" / "Erste Übung hinzufügen") ein großes, mittig ausgerichtetes, **eckiges/quadratisches** + Icon (IconPlus, Tabler), das prominent als CTA dient. Klick öffnet das (nun moderne) Overlay.
+- Konsistenz: Filter, Liste, Create-Custom-Button ebenfalls auf Button/Input/Card-Patterns migriert.
+- API modernisiert zu controlled Dialog (open + onOpenChange) für bessere Integration mit anderen shadcn Dialogs.
+- Mobile UX: Große Tap-Targets, gutes Scrolling, semantische Farben (auch Light-Mode).
+
+**Warum shared?**
+- ExerciseSelectionModal wird aktuell in vielen Kontexten verwendet (active-workout-screen, exercise-card für Replace, template-editor-screen, cycle editors, blueprint-editor-step, analytics?, cycles pages).
+- Die visuelle Modernisierung des Overlays profitiert allen Flows.
+- Der Trigger-Redesign (großes + Icon) wird **nur für den aktiven Workout** umgesetzt (andere Editoren können später ihre alten dashed Buttons ebenfalls upgraden oder behalten).
+
+**Detaillierte Umsetzungsschritte:**
+1. **exercise-selection-modal.tsx**
+   - Props anpassen:
+     ```ts
+     interface ... {
+       open: boolean;
+       onOpenChange: (open: boolean) => void;
+       onSelect: (exerciseId: string, exercise?: Exercise) => void;
+     }
+     ```
+   - Statt custom `<div className="fixed inset-0 bg-black...">` + inner white box: `<Dialog open={open} onOpenChange={onOpenChange}> <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden"> ...`
+   - Header: Dialog-nahe Struktur + Title "Übung hinzufügen" + optional Close (Dialog bringt eigenes X mit IconX; bei Bedarf via [&>button]:hidden ausblenden).
+   - Search: `<Input type="text" ... placeholder="Übung suchen..." />` (kein custom focus-ring blue).
+   - Filters (Muscle + Equipment):
+     - Statt custom bg-blue-600 chips: `<Button variant={active ? 'default' : 'outline'} size="sm" onClick=... >` (wie bereits in exercises-tab.tsx umgesetzt).
+     - Wrap in flex gap, scrollable on small screens if nötig.
+   - "Benutzerdefinierte Übung erstellen": Statt dashed button → `<Button variant="outline" className="w-full" onClick=...><IconPlus className="mr-2 size-4" /> Benutzerdefinierte Übung erstellen</Button>`
+   - Exercise List:
+     - Statt custom gray buttons: Liste von `<button className="w-full text-left rounded-md border border-border bg-card p-4 hover:bg-accent transition-colors ...">` oder `<Card className="cursor-pointer" onClick=...><CardContent ...>` (Pattern aus exercises-tab).
+     - Name: font-medium text-foreground
+     - Sub: text-sm text-muted-foreground mit muscle • equipment + optional Custom Badge (use <Badge variant="secondary" className="...">Custom</Badge>)
+     - Loading / Empty states mit text-muted-foreground.
+   - Imports: IconPlus, IconX (falls manuell), Button, Input, Card/CardContent, Badge, Dialog* from ui, und behalte ExerciseEditorDialog.
+   - Entferne alle Hardcodes (gray-*, blue-*, bg-white, text-gray-900 etc.) → Tokens.
+   - Behalte die volle Funktionalität (Search+Filter live via useEffect, duplicate-check lebt im Caller, handleExerciseCreated fügt hinzu + select + close create).
+
+2. **Call Sites updaten (alle Verwendungen)**
+   - active-workout-screen.tsx
+   - exercise-card.tsx (Replace Flow)
+   - components/templates/template-editor-screen.tsx
+   - app/cycles/[id]/... , app/cycles/[id]/edit/... , components/cycles/blueprint-editor-step.tsx
+   - app/analytics/page.tsx (falls aktiv genutzt)
+   - Jeweils: State bleibt `const [show, setShow] = useState(false);`
+     Statt `{show && <ExerciseSelectionModal onClose={() => setShow(false)} onSelect={...} /> }`
+     → `<ExerciseSelectionModal open={show} onOpenChange={setShow} onSelect={...} />`
+   - In manchen Callern (z.B. Replace) wird zusätzlich replacingId gesetzt/gelöscht → onOpenChange oder onClose-Callback anpassen (kann onOpenChange nutzen um bei close zu resetten).
+   - ExerciseEditorDialog (sub) bleibt unverändert.
+
+3. **Trigger Redesign nur im Active Workout (active-workout-screen.tsx)**
+   - Empty State (wenn exercises.length === 0):
+     - Im bestehenden `<Card><CardContent className="p-8 text-center">` :
+       - Text "Noch keine Übungen hinzugefügt"
+       - Darunter/als zentrale Aktion: großes quadratisches + Icon
+         ```tsx
+         <Button
+           variant="outline"
+           onClick={() => setShowExerciseModal(true)}
+           className="mx-auto h-16 w-16 rounded-lg p-0 flex items-center justify-center"  // eckig, square, centered
+         >
+           <IconPlus className="size-8" />
+         </Button>
+         ```
+   - Wenn exercises vorhanden (nach der Dnd Liste):
+     - Entferne den alten `<button className="w-full py-3 ... border-dashed border-gray-300 ...">+ Übung hinzufügen</button>`
+     - Stattdessen mittig zentriertes großes + :
+       ```tsx
+       <div className="flex justify-center py-3">
+         <Button
+           variant="outline"
+           onClick={() => setShowExerciseModal(true)}
+           className="h-14 w-14 rounded-lg p-0"   // oder h-16 w-16 für "groß"
+         >
+           <IconPlus className="size-7" />
+         </Button>
+       </div>
+       ```
+   - Import: `IconPlus` aus '@tabler/icons-react' hinzufügen (andere Icons schon da).
+   - "eckig": rounded-lg (passt zu sera Card rounded-lg, keine pill/rounded-full, keine starken Schatten).
+   - Mittig: flex justify-center + mx-auto.
+   - Optional: bei Hover leichte Scale oder border-primary für Feedback, aber keep ruhig.
+   - Der Bottom Action Bar (Verwerfen / Beenden) bleibt unten fixiert.
+
+4. **Sonstiges / Polish**
+   - In der Modal ggf. den Dialog X ausblenden wenn gewünscht (`className="[&>button]:hidden"`), aber für Picker ist X praktisch (User kann ohne Select abbrechen). Aktuell Dialog-Default lassen.
+   - Duplicate-Toast etc. bleiben.
+   - Nach Migration: prüfen ob in Template/Cycle-Editoren die alten Trigger noch sinnvoll sind (später können die auch auf großes + oder Icon-Button umgestellt werden).
+   - Keine Breaking Changes an der eigentlichen Add-Logik (addExercise aus Context).
+
+**Betroffene Dateien**
+- `apps/frontend/components/workout/exercise-selection-modal.tsx` (Hauptarbeit)
+- `apps/frontend/components/workout/active-workout-screen.tsx` (Trigger + Callsite + Import IconPlus)
+- `apps/frontend/components/workout/exercise-card.tsx` (Callsite für Replace)
+- Alle anderen Call-Sites (Template, Cycles, Blueprint, Analytics)
+- `UI-REFRACTORING-PLAN.md`
+
+**Empfohlene Reihenfolge**
+1. Plan in dieses Doc schreiben + User-Confirm (implizit durch "lass uns").
+2. Modal migrieren + neue Props.
+3. Call-Sites updaten (beginnend mit active + card, da primärer Kontext).
+4. Trigger in active-workout-screen auf großes + Icon umbauen (Empty + Add-More).
+5. eslint --max-warnings=0 + tsc auf betroffenen Files.
+6. Manuell testen: Active Workout (empty + mit Exercises + Replace), mind. ein Editor-Flow (Template).
+7. Plan updaten, commit + push.
+
+Dieser Schritt baut direkt auf der shadcn-Migration von ExerciseCard, anderen Modals (Gym, Past, Complete, Discard, TemplateSelection) und der shared ExerciseEditorDialog auf. Passt perfekt zur sera-Preset-Philosophie (Tokens, Tabler, Card/Button, scharfe Kanten).
+
+**Status nach Abschluss (wird hier ergänzt):** ...
+
+**Nächster Fokus nach diesem Schritt:** Weiter Phase 4 → Shared `WorkoutExercise` Komponente extrahieren (die dann auch in Template/Cycle Editoren + History Review einheitlich genutzt werden kann). Oder weitere kleine Polishes.
+
+---
+
 **Nächster Fokus nach diesen Fixes:** Weiter mit Phase 4 (Shared WorkoutExercise Komponente für execution|editor|review, oder weitere Polishing wie Swipe-Feedback-Verbesserungen, +Satz als Tabellenzeile etc. je nach User-Feedback).
 
 ---
@@ -481,9 +598,8 @@ All points addressed.
 3. Mit der Umsetzung von Phase 4 beginnen (Teil 1 + visuelle + logische Teil 2 für ExerciseCard bereits umgesetzt – siehe oben)
 
 **Aktueller Fokus:**
-- UX-Verfeinerungen am aktiven Workout-Screen (ExerciseCard) – detaillierter Plan siehe Abschnitt "Phase 4 – UX Verbesserungen Active Workout Screen (ExerciseCard) – Detaillierter Plan" oben.
-- Long-Press Drag, Tap-to-Toggle, Swipe-to-Log/Delete, Tabellen-Layout für Sätze, collapsed Satz-Indikatoren.
-- Danach: Extraktion der shared `WorkoutExercise` Komponente (modes: execution | editor | review).
+- UX-Verfeinerungen am aktiven Workout-Screen (ExerciseCard + Add-Exercise-Overlay/Trigger) – siehe neuen Abschnitt "Phase 4 – Nächster Schritt: Übung-hinzufügen Overlay + Trigger auf shadcn/sera".
+- Danach: Extraktion der shared `WorkoutExercise` Komponente (modes: execution | editor | review) die in Workout + Templates + Cycles einheitlich nutzbar ist.
 
 ---
 

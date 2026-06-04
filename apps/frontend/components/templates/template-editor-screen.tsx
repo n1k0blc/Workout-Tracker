@@ -461,16 +461,17 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
         </div>
       </main>
 
-      {/* Exercise Selection Modal */}
-      {showExerciseModal && (
-        <ExerciseSelectionModal
-          onSelect={handleAddExercise}
-          onClose={() => {
-            setShowExerciseModal(false);
+      {/* Exercise Selection Modal (shadcn Dialog, controlled) */}
+      <ExerciseSelectionModal
+        open={showExerciseModal}
+        onOpenChange={(isOpen) => {
+          setShowExerciseModal(isOpen);
+          if (!isOpen) {
             setReplacingExerciseId(null);
-          }}
-        />
-      )}
+          }
+        }}
+        onSelect={handleAddExercise}
+      />
     </div>
   );
 }

@@ -462,13 +462,12 @@ export default function BlueprintEditorStep({
         </div>
       </div>
 
-      {/* Exercise Selection Modal */}
-      {showExerciseModal && (
-        <ExerciseSelectionModal
-          onClose={() => setShowExerciseModal(false)}
-          onSelect={addExerciseToBlueprint}
-        />
-      )}
+      {/* Exercise Selection Modal (shadcn Dialog, controlled) */}
+      <ExerciseSelectionModal
+        open={showExerciseModal}
+        onOpenChange={setShowExerciseModal}
+        onSelect={addExerciseToBlueprint}
+      />
 
       {/* Save Template Modal */}
       {showSaveTemplateModal && (

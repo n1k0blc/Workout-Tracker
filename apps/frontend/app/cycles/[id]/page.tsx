@@ -1590,26 +1590,25 @@ export default function CycleDetailPage() {
         </main>
       </div>
 
-      {/* Exercise Selection Modal */}
-      {showExerciseModal && (
-        <ExerciseSelectionModal
-          onClose={() => setShowExerciseModal(false)}
-          onSelect={async (exerciseId: string, exercise?: Exercise) => {
-            if (exercise) {
-              setSelectedExercise(exercise);
-            } else {
-              // Fetch exercise details if not provided
-              try {
-                const fetchedExercise = await apiClient.getExercise(exerciseId);
-                setSelectedExercise(fetchedExercise);
-              } catch (error) {
-                console.error('Failed to fetch exercise:', error);
-              }
+      {/* Exercise Selection Modal (shadcn Dialog, controlled) */}
+      <ExerciseSelectionModal
+        open={showExerciseModal}
+        onOpenChange={setShowExerciseModal}
+        onSelect={async (exerciseId: string, exercise?: Exercise) => {
+          if (exercise) {
+            setSelectedExercise(exercise);
+          } else {
+            // Fetch exercise details if not provided
+            try {
+              const fetchedExercise = await apiClient.getExercise(exerciseId);
+              setSelectedExercise(fetchedExercise);
+            } catch (error) {
+              console.error('Failed to fetch exercise:', error);
             }
-            setShowExerciseModal(false);
-          }}
-        />
-      )}
+          }
+          setShowExerciseModal(false);
+        }}
+      />
     </ProtectedRoute>
   );
 }

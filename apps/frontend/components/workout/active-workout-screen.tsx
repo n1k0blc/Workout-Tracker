@@ -39,6 +39,7 @@ import {
 import {
   IconPlayerPlay,
   IconPlayerPause,
+  IconPlus,
 } from '@tabler/icons-react';
 
 interface ActiveWorkoutScreenProps {
@@ -60,7 +61,6 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete }: ActiveWorkout
     isPastWorkout,
     pastWorkoutDuration,
     setPastWorkoutDuration,
-    initTemplateSave,
   } = useWorkout();
 
   const [showExerciseModal, setShowExerciseModal] = useState(false);
@@ -285,25 +285,35 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete }: ActiveWorkout
             </DndContext>
           ) : (
             <Card>
-              <CardContent className="p-8 text-center">
-                <p className="text-muted-foreground mb-4">
+              <CardContent className="p-8 flex flex-col items-center gap-4 text-center">
+                <p className="text-muted-foreground">
                   Noch keine Übungen hinzugefügt
                 </p>
-                <Button onClick={() => setShowExerciseModal(true)}>
-                  Erste Übung hinzufügen
+                {/* Large centered square + icon as primary CTA (eckig, mittig) */}
+                <Button
+                  variant="outline"
+                  onClick={() => setShowExerciseModal(true)}
+                  className="h-16 w-16 rounded-lg p-0 flex items-center justify-center"
+                  aria-label="Erste Übung hinzufügen"
+                >
+                  <IconPlus className="size-8" />
                 </Button>
               </CardContent>
             </Card>
           )}
 
-          {/* Add Exercise Button */}
+          {/* Add Exercise: large centered square + icon (instead of text button) */}
           {activeWorkout.exercises.length > 0 && (
-            <button
-              onClick={() => setShowExerciseModal(true)}
-              className="w-full py-3 px-4 border-2 border-dashed border-gray-300 text-gray-600 font-medium rounded-lg hover:border-blue-500 hover:text-blue-600 transition-colors"
-            >
-              + Übung hinzufügen
-            </button>
+            <div className="flex justify-center py-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowExerciseModal(true)}
+                className="h-14 w-14 rounded-lg p-0 flex items-center justify-center"
+                aria-label="Übung hinzufügen"
+              >
+                <IconPlus className="size-7" />
+              </Button>
+            </div>
           )}
         </div>
       </div>
@@ -329,13 +339,12 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete }: ActiveWorkout
         </div>
       </div>
 
-      {/* Exercise Selection Modal */}
-      {showExerciseModal && (
-        <ExerciseSelectionModal
-          onClose={() => setShowExerciseModal(false)}
-          onSelect={handleAddExercise}
-        />
-      )}
+      {/* Exercise Selection Modal (shadcn Dialog, controlled) */}
+      <ExerciseSelectionModal
+        open={showExerciseModal}
+        onOpenChange={setShowExerciseModal}
+        onSelect={handleAddExercise}
+      />
 
       {/* Complete Confirmation Modal */}
       <Dialog open={showCompleteConfirm} onOpenChange={(open) => {
