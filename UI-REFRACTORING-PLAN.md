@@ -552,6 +552,7 @@ Zusätzlich: Der "Workout beenden?"-Dialog (Overlay mit "Blueprint aktualisieren
 - Callsite in workout/page.tsx angepasst.
 - Keine lucide mehr, volle sera-Konsistenz, Dark/Light safe.
 - Lint + tsc clean.
+- Accessibility-Fix: `DialogTitle` (visuell versteckt via `@radix-ui/react-visually-hidden`) hinzugefügt, da Radix Dialog einen Title für Screenreader erfordert. `showCloseButton={false}` explizit gesetzt.
 
 **Wichtiger Bugfix (entdeckt nach Migration):** Beim Öffnen des Workout-Screens (zum Starten) kam es zu einem Error in `calculateWorkoutStats` bei `workout.exercises`. 
 Ursache: Die CompletionModal-Komponente ist jetzt immer im React-Tree (controlled Dialog). Der Callsite übergab `completedWorkout!` (State initial `null`). Die Stats-Berechnung lief bei jedem Render und crashte bei fehlendem Workout. 

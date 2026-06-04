@@ -13,8 +13,10 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import { VolumeSlide } from './slides/VolumeSlide';
 import { DurationSlide } from './slides/DurationSlide';
 import { ExercisesSlide } from './slides/ExercisesSlide';
@@ -152,7 +154,13 @@ export function WorkoutCompletionModal({
         />
       )}
 
-      <DialogContent className="max-w-2xl p-0 overflow-hidden rounded-xl [&>button]:hidden">
+      <DialogContent 
+        className="max-w-2xl p-0 overflow-hidden rounded-xl" 
+        showCloseButton={false}
+      >
+        <VisuallyHidden.Root>
+          <DialogTitle>Workout-Statistiken</DialogTitle>
+        </VisuallyHidden.Root>
         {/* Close / Skip Button (top right, no default X) */}
         <Button
           variant="ghost"
