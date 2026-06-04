@@ -25,7 +25,7 @@ import { SummarySlide } from './slides/SummarySlide';
 interface WorkoutCompletionModalProps {
   open: boolean;
   onOpenChange?: (open: boolean) => void;
-  workout: Workout;
+  workout?: Workout;
   personalRecords?: PersonalRecord[];
   onClose?: () => void;
 }
@@ -41,7 +41,15 @@ export function WorkoutCompletionModal({
   const [showConfetti, setShowConfetti] = useState(true);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
 
-  const stats = calculateWorkoutStats(workout, personalRecords);
+  const stats = workout
+    ? calculateWorkoutStats(workout, personalRecords)
+    : {
+        totalVolume: 0,
+        duration: 0,
+        exerciseCount: 0,
+        setCount: 0,
+        personalRecords: [] as PersonalRecord[],
+      };
   
   // Determine slides to show (skip PRs if none)
   const hasPRs = stats.personalRecords.length > 0;
@@ -96,6 +104,8 @@ export function WorkoutCompletionModal({
   };
 
   const renderSlide = () => {
+    if (!workout) return null;
+
     // Adjust slide index if PRs are skipped
     let slideIndex = currentSlide;
     if (!hasPRs && currentSlide >= 4) {
@@ -157,7 +167,7 @@ export function WorkoutCompletionModal({
         {/* Slide Content */}
         <div className="min-h-[500px] flex items-center justify-center p-8 bg-card">
           <div className="w-full">
-            {renderSlide()}
+            {workout ? renderSlide() : null}
           </div>
         </div>
 

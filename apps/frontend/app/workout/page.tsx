@@ -160,7 +160,7 @@ export default function WorkoutPage() {
               handleCompletionModalClose();
             }
           }}
-          workout={completedWorkout!}
+          workout={completedWorkout ?? undefined}
           personalRecords={personalRecords}
         />
       </div>

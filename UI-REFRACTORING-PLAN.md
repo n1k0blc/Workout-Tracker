@@ -553,6 +553,10 @@ Zusätzlich: Der "Workout beenden?"-Dialog (Overlay mit "Blueprint aktualisieren
 - Keine lucide mehr, volle sera-Konsistenz, Dark/Light safe.
 - Lint + tsc clean.
 
+**Wichtiger Bugfix (entdeckt nach Migration):** Beim Öffnen des Workout-Screens (zum Starten) kam es zu einem Error in `calculateWorkoutStats` bei `workout.exercises`. 
+Ursache: Die CompletionModal-Komponente ist jetzt immer im React-Tree (controlled Dialog). Der Callsite übergab `completedWorkout!` (State initial `null`). Die Stats-Berechnung lief bei jedem Render und crashte bei fehlendem Workout. 
+Gelöst durch: `workout?` optional, sichere Default-Stats, Guards in `renderSlide()` und im Slide-Content, Callsite mit `?? undefined`. Zusätzlich `SetType.WARMUP` Enum statt String-Literal für bessere Typsicherheit.
+
 ### Phase 4 – WorkoutCompletionModal (Statistiken-Slideshow nach Workout-Abschluss) – Migration auf shadcn/sera
 **User Request:** "lass uns mal den großen block der slide show angehen die nach dem speichern eines workouts angezeigt wird, in dem man die stats des workouts sieht. Das sollte auch komplett auf unser shadcn modell angeglichen werden"
 
