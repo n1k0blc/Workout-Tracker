@@ -231,16 +231,21 @@ export default function ExerciseCard({
   };
 
   const getSetIndicatorSlots = (): number[] => {
+    const slots = new Set<number>();
+
     if (hasPlannedSets && exercise.plannedSets!.length > 0) {
-      return exercise.plannedSets!
+      exercise.plannedSets!
         .filter(ps => !skippedPlannedSetNumbers.has(ps.order))
-        .map((ps) => ps.order);
+        .forEach((ps) => slots.add(ps.order));
     }
-    const maxLogged = exercise.sets.length > 0 ? Math.max(...exercise.sets.map((s) => s.setNumber)) : 0;
-    const maxDraft = additionalSetNumbers.length > 0 ? Math.max(...additionalSetNumbers) : 0;
-    const total = Math.max(maxLogged, maxDraft, 0);
-    if (total === 0) return [];
-    return Array.from({ length: total }, (_, i) => i + 1);
+
+    // Include logged sets (covers logged planned + logged extras; for free workouts: all logged)
+    exercise.sets.forEach((s) => slots.add(s.setNumber));
+
+    // Include unlogged additional/extras (for planned workouts with added sets, and free workouts)
+    additionalSetNumbers.forEach((n) => slots.add(n));
+
+    return Array.from(slots).sort((a, b) => a - b);
   };
 
   // Swipe helpers

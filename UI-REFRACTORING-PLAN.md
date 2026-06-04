@@ -2,7 +2,7 @@
 
 **Status:** Aktiv  
 **Branch:** `UI-Refactoring`  
-**Letztes Update:** April 2026 (ExerciseCard shadcn Migration + Phase 4 Active Workout Vereinfachung)
+**Letztes Update:** April 2026 (ExerciseCard shadcn + UX (Swipe/Table/Indicators), RestTimer Light-Mode Fix, unplanned bars in collapsed, theme destructive-foreground)
 
 ---
 
@@ -70,7 +70,7 @@ Phase 3 wird hiermit offiziell abgeschlossen.
 - **Dokumentation**: Dieser Plan fortlaufend aktualisiert mit Entscheidungen, Begründungen (DDD/Flexibilität: historische Daten immutable, plannedSets = load-time only) und detailliertem Stand.
 - **Ergebnis**: ExerciseCard bereit für die Extraktion einer shared `WorkoutExercise`-Komponente (geplant: modes execution | editor | review für Live, Template/Cycle-Editor, History-Review).
 
-**Stand:** Phase 4 Teil 2 (visueller + logischer Teil für ExerciseCard + Active) als Meilenstein abgeschlossen. Nächster Fokus: UX-Verfeinerungen + echte Shared Component.
+**Stand:** Phase 4 Teil 2 (visueller + logischer Teil für ExerciseCard + Active + UX-Verfeinerungen wie Table/Swipe/Indicators + nachgelagerte Fixes für unplanned bars + timer contrast) als Meilenstein abgeschlossen. Nächster Fokus: Shared WorkoutExercise Komponente (modes) + weitere Polishing.
 
 ---
 
@@ -405,6 +405,20 @@ Dieser Plan respektiert die Projekt-Philosophie (Flexibilität, keine starren Bl
 - Plan updated.
 
 All points addressed.
+
+**Zusätzliche Fixes aus Mac-Testing (User-Report nach Swipe/Tabellen-Umsetzung):**
+- **Collapsed Indikatoren für ungeplante Sätze**: `getSetIndicatorSlots()` in exercise-card.tsx berücksichtigte bei `hasPlannedSets` nur die (gefilterten) plannedSets. Ungeplante zusätzliche Sätze (via "+ Satz hinzufügen", egal ob noch ungeloggt in additionalSetNumbers oder bereits geloggt in exercise.sets) fehlten in den horizontalen Balken im Collapsed-State.
+  - Fix: Umgestellt auf einheitliches `Set<number>`-Union: non-skipped planned + alle logged sets (extras inkl.) + additional drafts. Dann sortiert. Funktioniert jetzt für planned+added, free-workouts und gemischt. Balken-Farbe via `getLoggedSet(slot)` (bg-foreground vs muted-foreground/30) bleibt korrekt.
+  - "egal ob gelogged oder ungelogged" jetzt abgedeckt; skipped planned bleiben ausgeblendet (kein Balken).
+- **Rest-Timer Light-Mode Kontrast bei Overtime**: Timer wird bei `restTimer > restTimerTarget` korrekt rot (`bg-destructive`). Vorher `text-destructive-foreground` (nicht definiert im sera-Theme) → in Light-Mode schwarze Schrift auf Rot (schlechter Kontrast).
+  - Fix: `--destructive-foreground: oklch(0.985 0 0);` (weiß) explizit in `:root` und `.dark` von globals.css hinzugefügt + `--color-destructive-foreground` im `@theme inline` exposed. Damit `text-destructive-foreground` auf red jetzt überall weiße Schrift liefert (Light + Dark). Besser als hard `text-white` im Timer, da konsistent für alle Destructive-Buttons (z.B. Löschen in Card/Templates/Cycles).
+  - RestTimerDisplay selbst unverändert (nutzt bereits die Klasse für isOvertime).
+- Verifiziert: eslint (betroffene Datei clean), tsc (keine neuen Fehler in modified files), semantische Tokens + keine Hardcodes.
+- Plan + Code-Stand aktualisiert.
+
+---
+
+**Nächster Fokus nach diesen Fixes:** Weiter mit Phase 4 (Shared WorkoutExercise Komponente für execution|editor|review, oder weitere Polishing wie Swipe-Feedback-Verbesserungen, +Satz als Tabellenzeile etc. je nach User-Feedback).
 
 ---
 
