@@ -543,7 +543,104 @@ Dieser Schritt baut direkt auf der shadcn-Migration von ExerciseCard, anderen Mo
 
 Zusätzlich: Der "Workout beenden?"-Dialog (Overlay mit "Blueprint aktualisieren" und "Als Vorlage speichern" Optionen) war bereits auf shadcn Dialog umgestellt und wurde mit Card-Wrapping für die Optionen weiter poliert. Die nachgelagerte Namenseingabe für "als neue Vorlage speichern" (wenn gewählt) wurde von altem custom Overlay auf shadcn Dialog + Input + Footer-Buttons migriert.
 
-**Nächster Fokus nach diesem Schritt:** Weiter Phase 4 → Shared `WorkoutExercise` Komponente extrahieren (die dann auch in Template/Cycle Editoren + History Review einheitlich genutzt werden kann). Oder weitere kleine Polishes.
+**WorkoutCompletionModal (Slide-Show) vollständig migriert:**
+- Haupt-Modal: shadcn `Dialog` + `DialogContent` (controlled open/onOpenChange, hidden default X, eigene Close-Button mit IconX).
+- Alle Navigation: Buttons (outline/ghost/default), Progress mit `bg-primary` / `bg-muted`.
+- Alle 6 Slides: Tabler Icons (IconBarbell, IconClock, IconTrophy, IconTrendingUp, IconListCheck, IconClipboardList), semantic tokens (text-foreground/primary/muted-foreground, bg-primary/10, bg-card, border-border, bg-muted).
+- Summary: Set-Typen jetzt mit Badge + IconFlame/IconBarbell (konsistent zu ExerciseCard), Warmup/Working Unterscheidung via Badge-Variant.
+- PRsSlide: Amber Akzent für Feier, nutzt bereits gute shadcn PersonalRecordCard.
+- Callsite in workout/page.tsx angepasst.
+- Keine lucide mehr, volle sera-Konsistenz, Dark/Light safe.
+- Lint + tsc clean.
+
+### Phase 4 – WorkoutCompletionModal (Statistiken-Slideshow nach Workout-Abschluss) – Migration auf shadcn/sera
+**User Request:** "lass uns mal den großen block der slide show angehen die nach dem speichern eines workouts angezeigt wird, in dem man die stats des workouts sieht. Das sollte auch komplett auf unser shadcn modell angeglichen werden"
+
+**Ziel:**
+- Vollständige visuelle und technische Migration der `WorkoutCompletionModal` (inkl. aller 6 Slides) auf shadcn/sera: Dialog statt custom fixed, Tabler Icons (keine lucide), 100% semantische Tokens (keine blue-600, gray-900, bg-white, orange-50 etc.), Button/Card/Badge wo sinnvoll, konsistente rounded-lg/eckig, mobile-first.
+- Bewahren der UX: Confetti (kurz), Swipe (useSwipe Hook), Progress Dots, Desktop Arrows, Finish/Skip, PRs-Slide optional ausblenden, animate-fadeIn, detaillierte Summary mit Sets.
+- Persönliche Records nutzen bereits die gute `PersonalRecordCard` + `GymTag` (shadcn).
+- Keine Breaking Changes an Logik (hasPRs, slide index adjustment, onClose → Template-Save oder Dashboard).
+
+**Detaillierter Plan:**
+1. **Struktur der Haupt-Komponente (`WorkoutCompletionModal.tsx`)**
+   - Props erweitern auf controlled: `open: boolean; onOpenChange?: (open: boolean) => void;` + behalte onClose für Kompat (oder nur onOpenChange, update Callsite).
+   - Root: Statt `<div className="fixed inset-0 z-50 ... bg-black/50 backdrop-blur-sm">` → `<Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }} > <DialogContent className="max-w-2xl p-0 overflow-hidden rounded-xl"> ...`
+     - DialogContent übernimmt Backdrop + Positioning + Accessibility.
+     - Optional `className="[&>button]:hidden"` wenn wir eigenes Close wollen (User bevorzugte oft keine X bei Confirm-Flows).
+   - Confetti bleibt global im Portal-Bereich (vor oder nach Content).
+   - Skip/Close Button: Statt custom absolute button mit lucide X + gray bg → shadcn Button ghost oder IconButton mit `IconX`, positioniert, oder Dialog's eigenes X nutzen + anpassen.
+   - Slide Area: `<div className="min-h-[500px] flex items-center justify-center p-8 bg-card">` (nutze Card-ähnlich).
+   - Navigation Footer: In eigenem Bereich mit border-t oder Padding.
+     - Progress Dots: `bg-primary` für active, `bg-muted` für inactive + hover.
+     - Buttons: Alle zu `<Button variant="outline" size="sm" className="...">` mit Tabler Icons (`IconChevronLeft`, `IconChevronRight`).
+     - Last Slide "Fertig" Button: `variant="default"` (primary).
+     - "Überspringen" (non-last): ghost oder outline.
+   - Keep `useSwipe` Hook (funktioniert unabhängig).
+   - Import: `Dialog*` from ui/dialog, `Button` from ui/button, Tabler Icons statt lucide.
+
+2. **Slide-Komponenten (apps/frontend/components/slides/*.tsx) – einheitlich**
+   - Jede Slide: `text-center space-y-6 animate-fadeIn`
+   - Icon Container: Statt `p-4 bg-blue-100 rounded-full` → `p-4 bg-primary/10 rounded-full` oder `bg-muted` je nach Slide.
+     - Icon Farbe: `text-primary` (für Volumen/Dauer/Übungen/Sets/Summary), für PRs `text-yellow-500` oder passendes (oder `text-foreground` mit accent).
+   - Titel: `text-2xl font-semibold text-foreground`
+   - Große Zahl: `text-6xl font-bold text-primary`
+   - Subtext: `text-xl text-muted-foreground`
+   - Beschreibung: `text-muted-foreground max-w-md mx-auto`
+   - Ersetze alle lucide:
+     - TrendingUp → IconTrendingUp
+     - Clock → IconClock
+     - Dumbbell → IconBarbell (bereits im Projekt verwendet)
+     - ListChecks → IconListCheck oder IconChecklist
+     - Trophy → IconTrophy
+     - TrendingUp (klein) → IconTrendingUp
+     - ClipboardList → IconClipboardList
+   - Volume/Duration/Exercises/Sets: einheitliches Blau → primary Theme.
+   - PRsSlide: Gelb-Theme beibehalten (bg-yellow-100 → bg-amber-100 oder `bg-primary/10` mit Trophy Icon in passender Farbe), nutzt bereits gute PersonalRecordCard.
+   - SummarySlide (komplexester):
+     - Exercise Cards: Statt `bg-gray-50 rounded-lg p-4` → `<Card className="bg-muted/30">` oder einfach div mit `border border-border bg-card rounded-md p-4`
+     - Set Rows: Warmup → orange Theme durch `bg-orange-50 border-orange-200` etc. anpassen zu semantisch:
+       - Warmup: `bg-muted border border-border` + Badge outline + IconFlame (wie in ExerciseCard!)
+       - Working: `bg-muted/50 border border-border` + Badge default + IconBarbell
+     - Nutze `<Badge variant={isWarmup ? 'outline' : 'default'}>` + Tabler Icons für SetType (konsistent mit ExerciseCard!).
+     - Header mit # + Name: text-foreground, muted labels.
+   - Alle Slides behalten ihre props und Logik.
+
+3. **Callsite Update (`app/workout/page.tsx`)**
+   - Statt conditional `{showCompletionModal && <WorkoutCompletionModal onClose=... />}`
+     → `<WorkoutCompletionModal open={showCompletionModal} onOpenChange={(o) => { if (!o) handleCompletionModalClose(); }} ... />` (align mit ExerciseSelectionModal Pattern).
+   - Entferne veraltete conditional Logik wenn möglich.
+   - Stelle sicher, dass handleCompletionModalClose weiterhin korrekt (set false + template logic) triggert.
+
+4. **Weitere Anpassungen / Polish**
+   - Entferne lucide-react Importe überall (ersetze durch @tabler/icons-react).
+   - Behalte `animate-fadeIn` (global definiert).
+   - Confetti: Bleibt, z-index beachten (vor Content).
+   - Accessibility: aria-labels für Dots/Buttons behalten/verbessern.
+   - Mobile: Arrows hidden (md:flex), Swipe funktioniert, Dots immer da.
+   - Keine harten Farben mehr (blue-600 → primary, gray-900 → foreground, bg-white → card, etc.).
+   - Rounded: rounded-lg / rounded-md für eckigen sera Look (keine xl wenn nicht nötig).
+   - Nach Migration: Test-Flow: Workout abschließen → Choice Dialog → Completion Slides (mit/ohne PRs) → Swipe/Click Nav → Fertig → ggf. Template Save.
+   - Update Plan-Doc + Commit.
+
+**Betroffene Dateien**
+- `apps/frontend/components/WorkoutCompletionModal.tsx`
+- `apps/frontend/components/slides/VolumeSlide.tsx`, `DurationSlide.tsx`, `ExercisesSlide.tsx`, `SetsSlide.tsx`, `PRsSlide.tsx`, `SummarySlide.tsx`
+- `apps/frontend/app/workout/page.tsx` (Callsite)
+- Optional: `apps/frontend/hooks/useSwipe.ts` (nicht nötig)
+- `UI-REFRACTORING-PLAN.md`
+
+**Reihenfolge der Umsetzung**
+1. Plane detailliert in diesem Doc.
+2. Migriere Haupt-Modal + Dialog-Wrapper.
+3. Migriere Slides nacheinander (einfache zuerst, Summary zuletzt).
+4. Update Callsite + Parent-Handling.
+5. Lint + tsc + manuelles Verifizieren (inkl. Dark/Light Mode, PRs, Swipe).
+6. Plan-Status + Commit/Push.
+
+Das ist der letzte große "alte" Block im Post-Workout Flow. Danach ist der aktive Workout Screen visuell fast komplett auf sera.
+
+**Status nach Abschluss (wird ergänzt):** ...
 
 ---
 

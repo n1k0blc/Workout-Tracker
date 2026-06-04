@@ -1,6 +1,6 @@
 import { PersonalRecord } from '@/types';
 import { PersonalRecordCard } from '@/components/PersonalRecordCard';
-import { Trophy, TrendingUp } from 'lucide-react';
+import { IconTrophy, IconTrendingUp } from '@tabler/icons-react';
 
 interface PRsSlideProps {
   personalRecords: PersonalRecord[];
@@ -10,12 +10,12 @@ export function PRsSlide({ personalRecords }: PRsSlideProps) {
   return (
     <div className="text-center space-y-6 animate-fadeIn">
       <div className="flex justify-center">
-        <div className="p-4 bg-yellow-100 rounded-full">
-          <Trophy className="h-12 w-12 text-yellow-600" />
+        <div className="p-4 bg-amber-100 dark:bg-amber-900/20 rounded-full">
+          <IconTrophy className="h-12 w-12 text-amber-600 dark:text-amber-500" />
         </div>
       </div>
 
-      <h2 className="text-2xl font-semibold text-gray-900">
+      <h2 className="text-2xl font-semibold text-foreground">
         🎉 Neue Personal Records!
       </h2>
 
@@ -29,8 +29,8 @@ export function PRsSlide({ personalRecords }: PRsSlideProps) {
         ))}
       </div>
 
-      <div className="flex items-center justify-center gap-2 text-gray-500">
-        <TrendingUp className="h-5 w-5" />
+      <div className="flex items-center justify-center gap-2 text-muted-foreground">
+        <IconTrendingUp className="h-5 w-5" />
         <span>Hervorragende Leistung!</span>
       </div>
     </div>

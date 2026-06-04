@@ -152,14 +152,17 @@ export default function WorkoutPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Workout Completion Modal */}
-        {showCompletionModal && completedWorkout && (
-          <WorkoutCompletionModal
-            workout={completedWorkout}
-            personalRecords={personalRecords}
-            onClose={handleCompletionModalClose}
-          />
-        )}
+        {/* Workout Completion Modal (shadcn Dialog, controlled) */}
+        <WorkoutCompletionModal
+          open={showCompletionModal}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) {
+              handleCompletionModalClose();
+            }
+          }}
+          workout={completedWorkout!}
+          personalRecords={personalRecords}
+        />
       </div>
     </ProtectedRoute>
   );
