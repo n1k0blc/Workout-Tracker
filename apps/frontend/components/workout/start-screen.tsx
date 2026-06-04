@@ -299,8 +299,8 @@ export default function WorkoutStartScreen() {
           <Card>
             <CardContent className="p-6">
               <div className="flex items-start gap-3">
-                <IconTarget className="mt-1 size-5 text-muted-foreground" />
-                <div className="flex-1">
+                <IconTarget className="mt-1 size-5 text-muted-foreground flex-shrink-0" />
+                <div className="flex-1 min-w-0">
                   <h2 className="text-lg font-semibold text-foreground mb-2">
                     Vorgeschlagenes Workout
                   </h2>
@@ -319,7 +319,7 @@ export default function WorkoutStartScreen() {
                             className="rounded-md border bg-muted/30 p-4"
                           >
                             <div className="flex items-start justify-between">
-                              <div className="flex-1">
+                              <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
                                   <span className="text-sm font-medium text-muted-foreground">
                                     #{exercise.order}
@@ -370,8 +370,8 @@ export default function WorkoutStartScreen() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-start gap-3">
-              <IconDumbbell className="mt-1 size-5 text-muted-foreground" />
-              <div className="flex-1">
+              <IconDumbbell className="mt-1 size-5 text-muted-foreground flex-shrink-0" />
+              <div className="flex-1 min-w-0">
                 <h2 className="text-lg font-semibold text-foreground mb-2">
                   Freies Workout
                 </h2>
@@ -394,8 +394,8 @@ export default function WorkoutStartScreen() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-start gap-3">
-              <IconTemplate className="mt-1 size-5 text-muted-foreground" />
-              <div className="flex-1">
+              <IconTemplate className="mt-1 size-5 text-muted-foreground flex-shrink-0" />
+              <div className="flex-1 min-w-0">
                 <h2 className="text-lg font-semibold text-foreground mb-2">
                   Vorlagenworkout starten
                 </h2>
@@ -419,8 +419,8 @@ export default function WorkoutStartScreen() {
           <Card>
             <CardContent className="p-6">
               <div className="flex items-start gap-3">
-                <IconCalendar className="mt-1 size-5 text-muted-foreground" />
-                <div className="flex-1">
+                <IconCalendar className="mt-1 size-5 text-muted-foreground flex-shrink-0" />
+                <div className="flex-1 min-w-0">
                   <h2 className="text-lg font-semibold text-foreground mb-2">
                     Andere Workouts aus dem Zyklus
                   </h2>
@@ -444,8 +444,8 @@ export default function WorkoutStartScreen() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-start gap-3">
-              <IconHistory className="mt-1 size-5 text-muted-foreground" />
-              <div className="flex-1">
+              <IconHistory className="mt-1 size-5 text-muted-foreground flex-shrink-0" />
+              <div className="flex-1 min-w-0">
                 <h2 className="text-lg font-semibold text-foreground mb-2">
                   Vergangenes Workout tracken
                 </h2>

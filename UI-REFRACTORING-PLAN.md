@@ -110,6 +110,8 @@ Ab sofort arbeiten wir in **Phase 4: Workout Screen**.
 
 **Nachtrag (UI-Alignment):** Die "Vorgeschlagenes Workout"-Card wurde an die Standard-Card-Struktur angepasst (gleiches flex + Icon + h2 + p + Button-Pattern wie Free/Template/Cycle/Past-Cards). Kein CardHeader/CardTitle mehr (vermeidet uppercase via CSS), Icon hinzugefügt (IconTarget), Titel in normaler Schreibweise.
 
+**Mobile-Fix:** Allen Karten-Icons `flex-shrink-0` und den `.flex-1`-Containern `min-w-0` hinzugefügt. Verhindert, dass bei schmalen Mobile-Viewports der Icon "verschwindet" (durch Content mit hoher min-width wie lange Set-Texte in der Suggested-Liste geclippt oder aus dem Flow gedrängt wird).
+
 ---
 
 ### Phase 4 – Vorläufige Ziele (weiterhin gültig)
