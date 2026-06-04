@@ -362,48 +362,52 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete }: ActiveWorkout
             </DialogDescription>
           </DialogHeader>
 
-          {/* Blueprint Update Checkbox */}
+          {/* Blueprint Update Option */}
           {hasBlueprint && (
-            <div className="rounded-lg border bg-muted/50 p-4">
+            <Card className="bg-muted/50 border">
+              <CardContent className="p-4">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={updateBlueprint}
+                    onChange={(e) => setUpdateBlueprint(e.target.checked)}
+                    className="mt-1 size-4 accent-primary"
+                  />
+                  <div>
+                    <div className="font-medium text-foreground">
+                      Blueprint aktualisieren
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      Überschreibe den Blueprint mit den heutigen Werten (Gewicht, Wiederholungen, RIR).
+                      Diese werden beim nächsten Training vorgeschlagen.
+                    </div>
+                  </div>
+                </label>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Save as Template Option */}
+          <Card className="bg-muted/50 border">
+            <CardContent className="p-4">
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={updateBlueprint}
-                  onChange={(e) => setUpdateBlueprint(e.target.checked)}
+                  checked={saveAsTemplate}
+                  onChange={(e) => setSaveAsTemplate(e.target.checked)}
                   className="mt-1 size-4 accent-primary"
                 />
                 <div>
                   <div className="font-medium text-foreground">
-                    Blueprint aktualisieren
+                    Als Vorlage speichern
                   </div>
                   <div className="text-sm text-muted-foreground mt-1">
-                    Überschreibe den Blueprint mit den heutigen Werten (Gewicht, Wiederholungen, RIR).
-                    Diese werden beim nächsten Training vorgeschlagen.
+                    Speichere dieses Workout als wiederverwendbare Vorlage mit deinen heutigen Werten.
                   </div>
                 </div>
               </label>
-            </div>
-          )}
-
-          {/* Save as Template Checkbox */}
-          <div className="rounded-lg border bg-muted/50 p-4">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={saveAsTemplate}
-                onChange={(e) => setSaveAsTemplate(e.target.checked)}
-                className="mt-1 size-4 accent-primary"
-              />
-              <div>
-                <div className="font-medium text-foreground">
-                  Als Vorlage speichern
-                </div>
-                <div className="text-sm text-muted-foreground mt-1">
-                  Speichere dieses Workout als wiederverwendbare Vorlage mit deinen heutigen Werten.
-                </div>
-              </div>
-            </label>
-          </div>
+            </CardContent>
+          </Card>
 
           <DialogFooter className="flex gap-3">
             <Button

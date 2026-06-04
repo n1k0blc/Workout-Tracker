@@ -182,7 +182,7 @@ export default function ExerciseSelectionModal({
           </div>
         </div>
 
-        {/* Create Custom Exercise Button */}
+        {/* Create Custom Exercise Button — uses the shared ExerciseEditorDialog */}
         <div className="px-6 py-3 border-b shrink-0">
           <Button
             variant="outline"
@@ -230,7 +230,11 @@ export default function ExerciseSelectionModal({
         </div>
       </DialogContent>
 
-      {/* Create Exercise Dialog (shared, already shadcn) */}
+      {/* 
+        Create custom exercise via the shared ExerciseEditorDialog component.
+        On success we optimistically add it to the visible list and immediately call onSelect 
+        so the newly created exercise is added to the workout / template / blueprint.
+      */}
       <ExerciseEditorDialog
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}

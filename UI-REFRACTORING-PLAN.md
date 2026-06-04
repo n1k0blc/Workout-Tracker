@@ -473,6 +473,7 @@ All points addressed.
      → `<ExerciseSelectionModal open={show} onOpenChange={setShow} onSelect={...} />`
    - In manchen Callern (z.B. Replace) wird zusätzlich replacingId gesetzt/gelöscht → onOpenChange oder onClose-Callback anpassen (kann onOpenChange nutzen um bei close zu resetten).
    - ExerciseEditorDialog (sub) bleibt unverändert.
+- Wichtig: Der Button "Benutzerdefinierte Übung erstellen" **im Overlay** verwendet bereits die shared `ExerciseEditorDialog`. Nach erfolgreichem Erstellen wird die Übung sofort in die sichtbare Liste eingefügt und automatisch selektiert (`handleExerciseCreated`). Das ist die korrekte Nutzung der Shared Component.
 
 3. **Trigger Redesign nur im Active Workout (active-workout-screen.tsx)**
    - Empty State (wenn exercises.length === 0):
@@ -532,7 +533,15 @@ All points addressed.
 
 Dieser Schritt baut direkt auf der shadcn-Migration von ExerciseCard, anderen Modals (Gym, Past, Complete, Discard, TemplateSelection) und der shared ExerciseEditorDialog auf. Passt perfekt zur sera-Preset-Philosophie (Tokens, Tabler, Card/Button, scharfe Kanten).
 
-**Status nach Abschluss (wird hier ergänzt):** ...
+**Status nach Abschluss:**
+- Modal vollständig auf shadcn/sera migriert (Dialog, Button, Input, Badge, Tokens, Tabler IconPlus).
+- Props auf controlled open/onOpenChange umgestellt; alle Call-Sites (7+) aktualisiert.
+- Im aktiven Workout: "Übung hinzufügen" Text-Buttons durch große, mittig zentrierte, eckige (rounded-lg) quadratische + Icon Buttons (h-16/w-16 bzw. h-14/w-14) ersetzt — für Empty State und nach der Exercise-Liste.
+- Filter, Liste, Custom-Create modernisiert.
+- eslint clean (primäre Files), tsc clean (keine neuen Fehler), Plan + Commit/Push.
+- Passt zu Flexibilität (mid-workout add jederzeit) + mobile-first PWA.
+
+Zusätzlich: Der "Workout beenden?"-Dialog (Overlay mit "Blueprint aktualisieren" und "Als Vorlage speichern" Optionen) war bereits auf shadcn Dialog umgestellt und wurde mit Card-Wrapping für die Optionen weiter poliert. Die nachgelagerte Namenseingabe für "als neue Vorlage speichern" (wenn gewählt) wurde von altem custom Overlay auf shadcn Dialog + Input + Footer-Buttons migriert.
 
 **Nächster Fokus nach diesem Schritt:** Weiter Phase 4 → Shared `WorkoutExercise` Komponente extrahieren (die dann auch in Template/Cycle Editoren + History Review einheitlich genutzt werden kann). Oder weitere kleine Polishes.
 
