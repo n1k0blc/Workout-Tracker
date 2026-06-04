@@ -108,6 +108,8 @@ Ab sofort arbeiten wir in **Phase 4: Workout Screen**.
 
 **Fazit:** Der Einstieg in den Workout-Bereich ist jetzt spürbar moderner, konsistenter und benutzerfreundlicher.
 
+**Nachtrag (UI-Alignment):** Die "Vorgeschlagenes Workout"-Card wurde an die Standard-Card-Struktur angepasst (gleiches flex + Icon + h2 + p + Button-Pattern wie Free/Template/Cycle/Past-Cards). Kein CardHeader/CardTitle mehr (vermeidet uppercase via CSS), Icon hinzugefügt (IconTarget), Titel in normaler Schreibweise.
+
 ---
 
 ### Phase 4 – Vorläufige Ziele (weiterhin gültig)
