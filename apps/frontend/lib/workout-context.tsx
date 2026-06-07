@@ -402,7 +402,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const addExercise = async (exerciseId: string) => {
     if (!activeWorkout) return;
 
-    if (activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
+    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
       // local add for history edit / completed via shared edit component
       try {
         const exDetails = await apiClient.getExercise(exerciseId);
@@ -455,7 +455,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const removeExercise = async (exerciseLogId: string) => {
     if (!activeWorkout) return;
 
-    if (activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
+    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
       const updated = {
         ...activeWorkout,
         exercises: activeWorkout.exercises.filter((ex: { id: string }) => ex.id !== exerciseLogId),
@@ -482,7 +482,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const replaceExercise = async (exerciseLogId: string, newExerciseId: string) => {
     if (!activeWorkout) return;
 
-    if (activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
+    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
       try {
         const exDetails = await apiClient.getExercise(newExerciseId);
         const updated = {
@@ -542,7 +542,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       exercises: reorderedExercises,
     });
 
-    if (activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
+    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
       return; // no API for completed
     }
 
@@ -576,7 +576,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     // For completed workouts (e.g. history edit using the shared component in 'edit' mode),
     // perform local update only. Do not hit the active workout mutation APIs.
     // Persistence happens on the parent's explicit save via updateCompletedWorkout.
-    if (activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
+    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
       const updatedExercises = activeWorkout.exercises.map((ex) => {
         if (ex.id !== exerciseLogId) return ex;
 
@@ -651,7 +651,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const deleteSet = async (setLogId: string) => {
     if (!activeWorkout) return;
 
-    if (activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
+    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
       const updatedExercises = activeWorkout.exercises.map((ex) => ({
         ...ex,
         sets: ex.sets.filter((s) => s.id !== setLogId),
@@ -685,7 +685,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   ) => {
     if (!activeWorkout) return;
 
-    if (activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
+    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
       // local update for completed (history edit via shared component)
       const updatedExercises = activeWorkout.exercises.map((ex) => ({
         ...ex,

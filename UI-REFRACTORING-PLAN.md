@@ -171,6 +171,53 @@ Der Workout Screen (Start + Active + Completion) ist nun visuell und UX-technisc
 - Workaround implementiert: In `buildSyntheticWorkout` werden für geladene Templates die Target-Sets **sofort als `sets` (SetLog-Shape) vorgefüllt**. Die Card-Logik (`!getLoggedSet`) skippt dann das Re-Commit. Zusätzlich defensiv die Validierung so angepasst, dass sie auch `plannedSets` berücksichtigt.
 - Das ist ein klassisches Symptom der "Misuse" des Performed-Workout-Modells (Logging-Semantik, Deferred-Commits, Guards für reale Sätze) für pure Planned/Blueprint-Editing. Kein Backend-Problem (die Validierung ist rein client-seitig vor dem API-Call; das Template-Backend akzeptiert das Payload). Wird mit dem zukünftigen dedizierten Editor-Modus / besserer Entkopplung der Shared Component sauberer. Bis dahin als Teil des bekannten Technical Debt mitgenommen.
 
+**Wichtige Reflektion (User-Request Mai 2026):** Wir haben inzwischen spürbar individuelle Logik eingebaut (`isTemplateSynthetic` per ID-Prefix, unterschiedliches Seeding von sets vs. plannedSets, entspannte Guards nur für Templates, separate Cleanup-Effekte, etc.). Das widerspricht dem ursprünglichen Ziel einer **einzelnen zentralen Komponente** mit sauberen Modi (`active` für Live-Session mit Timern/Logging, `edit` für volles strukturelles + wertbasiertes Editieren von Plänen oder vergangenen Sessions).
+
+Die zentrale Komponente existiert (`ActiveWorkoutScreen` + `ExerciseCard` mit `mode`), aber der State-Layer (`WorkoutContext` + interne Card-States wie `additionalSetNumbers`, `skippedPlannedSetNumbers`, "logged vs. planned") ist stark auf "Ausführung + performed History" ausgelegt. Deshalb mussten wir für Blueprints (Templates) und History-Edit den gleichen Hack + Sonderfälle verwenden.
+
+### Ursprung des lokalen In-Memory-Mutations-Hacks (chronologisch)
+1. Die Shared Component (ExerciseCard + Screen) wurde primär für das **aktive Workout** (Logging, Timer, Swipe-to-log, Collapse etc.) gebaut und dann für UX-Verbesserungen verfeinert.
+2. Als nächster "stück für stück"-Schritt sollte die Komponente für **History-Edit** von abgeschlossenen Workouts wiederverwendet werden (User-Wunsch: kein separater "Bearbeiten"-Button mehr, direkter Klick auf Karte → zentrale Komponente im edit-Modus).
+3. Problem: Das Backend erlaubt (aus Design-Gründen: Immutable History + aktuelle API für ExerciseLog/SetLog) keine oder nur sehr eingeschränkte strukturelle Änderungen an `COMPLETED`/`DISCARDED` Workouts (kein Replace, Reorder, Add/Remove Exercise auf bereits gespeicherten Sessions).
+4. Um trotzdem die volle UI (Add/Remove/Reorder/Replace + Edit aller Werte) sofort nutzen zu können, ohne auf ein großes Backend-Refactoring zu warten:
+   - `setActiveWorkoutDirectly(realCompletedWorkout)` hijackt den globalen Context.
+   - In **allen** Mutations-Funktionen (`logSet`, `updateSet`, `deleteSet`, `addExercise`, `removeExercise`, `replaceExercise`, `reorderExercises`, `addAdditionalSet` ...) wurde ein früher Check eingebaut:
+     ```ts
+     if (activeWorkout?.status === 'COMPLETED' || activeWorkout?.status === 'DISCARDED') {
+       // lokaler Deep-Clone + Patch
+       setActiveWorkout(cloned);
+       return;   // kein apiClient-Aufruf
+     }
+     // sonst normaler API-Pfad
+     ```
+   - Die History-Edit-Seite hat einen eigenen "Speichern"-Button, der den (lokal mutierten) `activeWorkout` aus dem Context nimmt und über einen dedizierten `updateCompletedWorkout`-Endpoint persistiert (der die performed-Daten für diesen historischen Record ersetzt).
+5. Als Templates als nächster Einstiegspunkt kamen, wurde exakt derselbe Mechanismus verwendet (synthetisches Objekt mit `status: 'COMPLETED'`, `setActiveWorkoutDirectly`, gleicher Hack). Dadurch kamen die Modell-Konflikte (reine `target*` + `isWarmup` vs. performed `sets` + `plannedSets`, "logged immutable" Guards in der Card) und die weiteren Sonderfälle (`isTemplateSynthetic`).
+
+Der Hack war eine bewusste, dokumentierte Übergangslösung ("Technical Debt"), um die zentrale Komponente schnell an allen Stellen einzusetzen ("wir refactoren ja stück für stück").
+
+### Professionelle Lösung (Ziel: keine Prefix-Hacks, keine Status-Missbrauch für UI-Verhalten)
+Wir wollen bei **einer** zentralen Komponente bleiben (`WorkoutScreen` mit `mode: 'active' | 'edit'`), aber saubere Trennung der Konzepte:
+
+- `mode="active"`: Timer, Logging-Column, Swipe-to-log, Pause, "beenden"-Flow, Context ist "Session".
+- `mode="edit"`: Keine Timer, keine Logging-Spalte, volle strukturelle Freiheit (Add/Remove/Reorder/Replace + Werte editieren). Der Parent entscheidet, ob es sich um "performed History" (History-Edit) oder "reinen Plan/Blueprint" (Templates, Cycle-Wizard) handelt.
+
+Mögliche saubere Architektur (ohne Workarounds pro Sonderfall):
+1. Im `WorkoutContext` einen expliziten Modus/Flag einführen:
+   - `editingBlueprint: boolean` (oder allgemeiner `localEditMode: 'performed-history' | 'blueprint' | null`).
+   - `setActiveWorkoutDirectly(workout, options?: { isBlueprintEdit?: boolean, isPast?: boolean })`.
+   - Die Mutations-Funktionen short-circlen lokal, **wenn** `editingBlueprint || status COMPLETED (für History)` — aber das UI-Verhalten (Guards) wird vom Flag gesteuert, nicht vom Status.
+2. Im `ExerciseCard` (und Screen):
+   - Statt `isTemplateSynthetic` (ID-Prefix) nur noch `isBlueprintEdit` aus dem Context oder via Prop.
+   - "logged" / "immutable after log" Guards nur aktiv, wenn es sich um **performed** Edit handelt (History).
+   - Bei Blueprint-Edit: alles ist "Plan", jede Zeile ist editierbar/entfernbar/erset zbar, Swipe-Delete entfernt wirklich aus dem Plan, kein Skip-Mechanismus, keine "unlogged planned" vs. "logged" Unterscheidung für Struktur-Operationen.
+3. Die Card-internen States (`additionalSetNumbers`, `skippedPlannedSetNumbers`) bleiben execution-spezifisch. Für Blueprint-Edit mutieren wir direkt die Plan-Daten (über die Context-Mutations, die dann lokal updaten).
+4. Templates / Cycle-Wizard wrappen weiterhin (Name, Gym, eigenes Speichern), injizieren aber ein sauberes "Blueprint"-Objekt (nicht mehr als fake-COMPLETED-Workout getarnt, oder mit klarem Flag).
+5. Langfristig (nach Backend-Refactoring): Die gleichen Mutations-Endpunkte können für Blueprints und ggf. für Revisionen von History verwendet werden — der Hack fällt dann komplett weg.
+
+Das stellt sicher, dass die **eine** Komponente die zwei Modi sauber unterstützt, ohne dass in der Card oder im Context überall "wenn es ein Template ist..." steht.
+
+(Stand jetzt haben wir die Sonderlogik noch — der User-Request war genau der Anstoß, das sauber zu machen. Nächster Schritt ist ein gezieltes Cleanup.)
+
 **Nächster Schritt: Integration der Shared Komponente in den Template-Editor (Create + Edit benutzerdefinierter Vorlagen) – April 2026**
 
 **Ziel:**

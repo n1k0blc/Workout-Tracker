@@ -82,11 +82,14 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
     return {
       id: idForTemplate ? `template-${idForTemplate}` : `new-template-${Date.now()}`,
       date: now,
-      status: WorkoutStatus.COMPLETED,
+      status: WorkoutStatus.COMPLETED,   // still used for the local-mutation short-circuit (see debt)
       isFreeWorkout: true,
+      // Clean flag for the shared component + card to know this is a pure plan/blueprint edit
+      // (not a performed session). This replaces scattered ID-prefix checks.
+      blueprintEdit: true,
       exercises: exs,
       createdAt: now,
-    } as Workout;
+    } as any;  // blueprintEdit is extension for edit mode
   };
 
   const loadData = useCallback(async () => {

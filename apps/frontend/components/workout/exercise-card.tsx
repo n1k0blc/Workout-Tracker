@@ -101,10 +101,9 @@ export default function ExerciseCard({
 
   const initialEditCommitDone = useRef(false);
 
-  const isTemplateSynthetic = !!activeWorkout && (
-    activeWorkout.id?.startsWith('template-') || 
-    activeWorkout.id?.startsWith('new-template-')
-  );
+  // Centralized detection via the clean flag set by the caller (template editor, future cycle wizard etc.).
+  // Replaces previous ID-prefix hacks. See Technical Debt section in the plan for origin.
+  const isBlueprintEdit = !!(activeWorkout as any)?.blueprintEdit;
 
   const addAdditionalSet = () => {
     const maxPlanned = hasPlannedSets
@@ -308,7 +307,7 @@ export default function ExerciseCard({
     setActiveSwipe(null);
     if (offset > SWIPE_THRESHOLD && setNumber !== undefined && !isLogged) {
       handleLogSet(setNumber);
-    } else if (offset < -SWIPE_THRESHOLD && setNumber !== undefined && (!isLogged || isTemplateSynthetic)) {
+    } else if (offset < -SWIPE_THRESHOLD && setNumber !== undefined && (!isLogged || isBlueprintEdit)) {
       discardUnloggedSet(setNumber);
     }
     // RTL on logged: no effect (cannot delete logged sets via swipe) — except for template synthetic (pure plan edit)
@@ -324,7 +323,7 @@ export default function ExerciseCard({
 
     const isPlannedSlot = hasPlannedSets && exercise.plannedSets?.some(ps => ps.order === setNumber);
 
-    if (isTemplateSynthetic) {
+    if (isBlueprintEdit) {
       // For template synthetic (blueprint / pure plan edit): actually remove the set
       // from the plan data in the local synthetic workout. This makes "delete set"
       // and "replace exercise" work for templates (unlike real completed workouts).
@@ -576,9 +575,9 @@ export default function ExerciseCard({
               size="icon"
               onClick={() => setShowReplaceModal(true)}
               onPointerDown={(e) => e.stopPropagation()}
-              disabled={exercise.sets.length > 0 && !isTemplateSynthetic}
+              disabled={exercise.sets.length > 0 && !isBlueprintEdit}
               className="size-8"
-              title={exercise.sets.length > 0 && !isTemplateSynthetic ? "Übung kann nicht ausgetauscht werden nachdem Sets geloggt wurden" : "Übung austauschen"}
+              title={exercise.sets.length > 0 && !isBlueprintEdit ? "Übung kann nicht ausgetauscht werden nachdem Sets geloggt wurden" : "Übung austauschen"}
             >
               <IconRefresh className="size-4" />
             </Button>
