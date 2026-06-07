@@ -2,7 +2,7 @@
 
 import { ProtectedRoute } from '@/components/protected-route';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/lib/api';
 import { WorkoutListItem } from '@/types';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -12,8 +12,6 @@ import {
   IconCalendar,
   IconClock,
   IconList,
-  IconEdit,
-  IconChevronRight,
 } from '@tabler/icons-react';
 
 type FilterType = '7days' | '30days' | '90days' | 'currentMonth' | 'currentYear' | 'custom';
@@ -27,7 +25,7 @@ export default function HistoryPage() {
 
   useEffect(() => {
     loadWorkouts();
-  }, [filterType, customStartDate, customEndDate]);
+  }, [loadWorkouts]);
 
   const getDateRange = (): { startDate: string; endDate: string } => {
     const now = new Date();
@@ -72,7 +70,7 @@ export default function HistoryPage() {
     };
   };
 
-  const loadWorkouts = async () => {
+  const loadWorkouts = useCallback(async () => {
     if (filterType === 'custom' && (!customStartDate || !customEndDate)) {
       return;
     }
@@ -91,7 +89,8 @@ export default function HistoryPage() {
     } finally {
       setLoading(false);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterType, customStartDate, customEndDate]);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -206,7 +205,7 @@ export default function HistoryPage() {
                       className="block bg-card border rounded-lg p-6 hover:shadow-sm transition-shadow"
                     >
                       <div className="flex items-start justify-between">
-                        <Link href={`/history/${workout.id}`} className="flex-1 min-w-0">
+                        <Link href={`/history/${workout.id}/edit`} className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-3 flex-wrap">
                             <h3 className="text-lg font-semibold text-foreground">
                               {workout.isFreeWorkout
@@ -239,23 +238,7 @@ export default function HistoryPage() {
                           </div>
                         </Link>
 
-                        <div className="flex items-center gap-1 ml-4 shrink-0">
-                          <Link
-                            href={`/history/${workout.id}/edit`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-                            title="Workout bearbeiten"
-                          >
-                            <IconEdit className="size-5" />
-                          </Link>
-                          <Link
-                            href={`/history/${workout.id}`}
-                            className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
-                            title="Details anzeigen"
-                          >
-                            <IconChevronRight className="size-5" />
-                          </Link>
-                        </div>
+
                       </div>
                     </div>
                   ))}

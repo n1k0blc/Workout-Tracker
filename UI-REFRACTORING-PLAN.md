@@ -136,6 +136,14 @@ Der Workout Screen (Start + Active + Completion) ist nun visuell und UX-technisc
 
 **Nächster Schritt:** Phase 4 – Teil 3: Extraktion Shared Components für einheitlichen Workout Screen / WorkoutExercise mit Modi (siehe neuen Abschnitt unten). User hat den UI/UX-Teil des Workout Screens als abgeschlossen betrachtet.
 
+**History Integration (dieser Schritt):**
+- In der History-Liste (app/history/page.tsx): Entfernt den separaten "Bearbeiten"-Button (IconEdit).
+- Der Klick auf ein Workout-Card geht nun direkt auf die Edit-Seite (/history/[id]/edit).
+- Die History-Edit-Seite (app/history/[id]/edit/page.tsx) nutzt jetzt die zentrale Komponente <ActiveWorkoutScreen mode="edit" showBottomBar={false} /> (nach setActiveWorkoutDirectly im Context).
+- Die Edit-Seite behält den eigenen Header (Titel, Datum-Picker) und eigenen Save-Button (der die aktuellen Daten aus dem Context/activeWorkout für updateCompletedWorkout nutzt).
+- Dadurch wird die einheitliche Edit-UI (ohne Log-Spalte, mit voller Add/Reorder/Replace/Add-Set Funktionalität) für History-Edit verwendet.
+- Die alte custom per-Set Form wurde durch die zentrale Komponente ersetzt.
+
 **Erster Schritt der Shared Komponente (dieser Commit):**
 - Zentrale Komponente `ActiveWorkoutScreen` (zukünftig `WorkoutScreen`) erweitert um `mode?: 'active' | 'edit'`.
 - `ExerciseCard` unterstützt jetzt `mode`, im 'edit' Modus wird die Checkhaken-Spalte (Logging) komplett entfernt (Grid auf 4 Spalten, keine Log-Buttons/Swipes für Log).
