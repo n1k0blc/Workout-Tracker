@@ -50,7 +50,9 @@ export default function ExerciseCard({
     replaceExercise, 
     logSet, 
     updateSet, 
-    loading, 
+    loading,
+    activeWorkout,
+    setActiveWorkoutDirectly,
   } = useWorkout();
 
   const [editValues, setEditValues] = useState<{[key: number]: {weight: string, reps: string, rir: string, setType: SetType}}>({});
@@ -98,6 +100,11 @@ export default function ExerciseCard({
   const [activeSwipe, setActiveSwipe] = useState<null | { key: string | number; startX: number; startY: number; offset: number }>(null);
 
   const initialEditCommitDone = useRef(false);
+
+  const isTemplateSynthetic = !!activeWorkout && (
+    activeWorkout.id?.startsWith('template-') || 
+    activeWorkout.id?.startsWith('new-template-')
+  );
 
   const addAdditionalSet = () => {
     const maxPlanned = hasPlannedSets
@@ -301,10 +308,10 @@ export default function ExerciseCard({
     setActiveSwipe(null);
     if (offset > SWIPE_THRESHOLD && setNumber !== undefined && !isLogged) {
       handleLogSet(setNumber);
-    } else if (offset < -SWIPE_THRESHOLD && setNumber !== undefined && !isLogged) {
+    } else if (offset < -SWIPE_THRESHOLD && setNumber !== undefined && (!isLogged || isTemplateSynthetic)) {
       discardUnloggedSet(setNumber);
     }
-    // RTL on logged: no effect (cannot delete logged sets via swipe)
+    // RTL on logged: no effect (cannot delete logged sets via swipe) — except for template synthetic (pure plan edit)
   };
 
   const discardUnloggedSet = (setNumber: number) => {
@@ -316,6 +323,36 @@ export default function ExerciseCard({
     });
 
     const isPlannedSlot = hasPlannedSets && exercise.plannedSets?.some(ps => ps.order === setNumber);
+
+    if (isTemplateSynthetic) {
+      // For template synthetic (blueprint / pure plan edit): actually remove the set
+      // from the plan data in the local synthetic workout. This makes "delete set"
+      // and "replace exercise" work for templates (unlike real completed workouts).
+      if (activeWorkout && setActiveWorkoutDirectly) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- template synthetic mutation (debt bridge to allow full plan edits)
+        const updatedExercises = activeWorkout.exercises.map((ex: any) => {
+          if (ex.id !== exercise.id) return ex;
+          return {
+            ...ex,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            plannedSets: (ex.plannedSets || []).filter((ps: any) => ps.order !== setNumber),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            sets: (ex.sets || []).filter((s: any) => (s.setNumber ?? s.order) !== setNumber),
+          };
+        });
+        setActiveWorkoutDirectly({
+          ...activeWorkout,
+          exercises: updatedExercises,
+        } as any); // eslint-disable-line @typescript-eslint/no-explicit-any -- synthetic update for template plan edit
+      }
+      setAdditionalSetNumbers(prev => prev.filter(n => n !== setNumber));
+      setSkippedPlannedSetNumbers(prev => {
+        const next = new Set(prev);
+        next.delete(setNumber);
+        return next;
+      });
+      return;
+    }
 
     if (isPlannedSlot) {
       // For unlogged planned: "delete" means hide the row for this execution (user doesn't want to do this planned set)
@@ -539,9 +576,9 @@ export default function ExerciseCard({
               size="icon"
               onClick={() => setShowReplaceModal(true)}
               onPointerDown={(e) => e.stopPropagation()}
-              disabled={exercise.sets.length > 0}
+              disabled={exercise.sets.length > 0 && !isTemplateSynthetic}
               className="size-8"
-              title={exercise.sets.length > 0 ? "Übung kann nicht ausgetauscht werden nachdem Sets geloggt wurden" : "Übung austauschen"}
+              title={exercise.sets.length > 0 && !isTemplateSynthetic ? "Übung kann nicht ausgetauscht werden nachdem Sets geloggt wurden" : "Übung austauschen"}
             >
               <IconRefresh className="size-4" />
             </Button>

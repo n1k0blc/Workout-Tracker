@@ -60,23 +60,13 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
       const raw = ex as any;
       const templateSetsForEx = raw.sets || [];
 
-      // Pre-populate performed `sets` from the template targets.
-      // This ensures that on load of an existing template, ex.sets.length > 0 immediately.
-      // The card's edit-mode auto-commit effect (which has a w>0 && r>0 guard and setTimeout)
-      // is then skipped by its own getLoggedSet check, avoiding duplicates.
-      // Without this, save validation ("jede Übung muss mind. 1 Satz") could fail for pre-existing data
-      // until the user manually touches a set (which forces a context mutation).
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- template target set -> synthetic SetLog (debt bridge)
-      const performedSets = templateSetsForEx.map((ts: any, sIdx: number) => ({
-        id: `setlog-${Date.now()}-${sIdx}`,
-        setNumber: ts.order || sIdx + 1,
-        setType: ts.isWarmup ? SetType.WARMUP : SetType.WORKING,
-        reps: ts.targetReps ?? 0,
-        weight: ts.targetWeight ?? 0,
-        rir: ts.targetRir ?? 0,
-        completedAt: now,
-      }));
-
+      // Keep sets: [] (only populate plannedSets) for template synthetics.
+      // This way the card treats rows as unlogged planned slots:
+      // - replace button not disabled (guard is sets.length > 0)
+      // - swipe RTL delete allowed (only for !logged)
+      // Save validation + payload already support plannedSets as source for templates.
+      // (We previously pre-populated sets to satisfy old strict validation, but that
+      // activated the "logged sets are immutable" guards in the card, breaking delete/replace.)
       return {
         id: raw.id || `ex-${Date.now()}-${idx}`,
         exerciseId: ex.exerciseId,
@@ -84,7 +74,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
         isUnilateral: details?.isUnilateral,
         isDoubleWeight: details?.isDoubleWeight,
         order: ex.order || idx + 1,
-        sets: performedSets,
+        sets: [],
         plannedSets: mapTemplateSetsToPlanned(templateSetsForEx),
       };
     });
