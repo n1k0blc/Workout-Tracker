@@ -402,6 +402,43 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const addExercise = async (exerciseId: string) => {
     if (!activeWorkout) return;
 
+    if (activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
+      // local add for history edit / completed via shared edit component
+      try {
+        const exDetails = await apiClient.getExercise(exerciseId);
+        const newEx = {
+          id: `local-ex-${Date.now()}`,
+          exerciseId,
+          exerciseName: exDetails.name || 'Exercise',
+          isUnilateral: exDetails.isUnilateral,
+          isDoubleWeight: exDetails.isDoubleWeight,
+          order: (activeWorkout.exercises.length || 0) + 1,
+          sets: [],
+          plannedSets: [],
+        };
+        // @ts-expect-error - local stub for completed workout edit via shared component
+        setActiveWorkout({
+          ...activeWorkout,
+          exercises: [...activeWorkout.exercises, newEx],
+        });
+      } catch {
+        // fallback stub
+        const stub = {
+          id: `local-ex-${Date.now()}`,
+          exerciseId,
+          exerciseName: 'Exercise',
+          sets: [],
+          order: (activeWorkout.exercises.length || 0) + 1,
+        };
+        // @ts-expect-error - local stub for completed workout edit via shared component
+        setActiveWorkout({
+          ...activeWorkout,
+          exercises: [...activeWorkout.exercises, stub],
+        });
+      }
+      return;
+    }
+
     setLoading(true);
     try {
       const workout = await apiClient.addExerciseToWorkout(
@@ -420,6 +457,15 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const removeExercise = async (exerciseLogId: string) => {
     if (!activeWorkout) return;
 
+    if (activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
+      const updated = {
+        ...activeWorkout,
+        exercises: activeWorkout.exercises.filter((ex: { id: string }) => ex.id !== exerciseLogId),
+      };
+      setActiveWorkout(updated);
+      return;
+    }
+
     setLoading(true);
     try {
       const workout = await apiClient.removeExerciseFromWorkout(
@@ -437,6 +483,37 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
   const replaceExercise = async (exerciseLogId: string, newExerciseId: string) => {
     if (!activeWorkout) return;
+
+    if (activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
+      try {
+        const exDetails = await apiClient.getExercise(newExerciseId);
+        const updated = {
+          ...activeWorkout,
+          exercises: activeWorkout.exercises.map((ex: { id: string; sets?: unknown }) =>
+            ex.id === exerciseLogId
+              ? {
+                  ...ex,
+                  exerciseId: newExerciseId,
+                  exerciseName: exDetails.name || 'Exercise',
+                  sets: ex.sets || [],
+                }
+              : ex
+          ),
+        };
+        setActiveWorkout(updated);
+      } catch {
+        const updated = {
+          ...activeWorkout,
+          exercises: activeWorkout.exercises.map((ex: { id: string; sets?: unknown }) =>
+            ex.id === exerciseLogId
+              ? { ...ex, exerciseId: newExerciseId, exerciseName: 'Exercise', sets: ex.sets || [] }
+              : ex
+          ),
+        };
+        setActiveWorkout(updated);
+      }
+      return;
+    }
 
     setLoading(true);
     try {
@@ -457,7 +534,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const reorderExercises = async (exerciseIds: string[]) => {
     if (!activeWorkout) return;
 
-    // Optimistic update
+    // Optimistic update (works for both active and completed/history edit)
     const reorderedExercises = exerciseIds
       .map(id => activeWorkout.exercises.find(ex => ex.id === id))
       .filter(Boolean) as typeof activeWorkout.exercises;
@@ -466,6 +543,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       ...activeWorkout,
       exercises: reorderedExercises,
     });
+
+    if (activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
+      return; // no API for completed
+    }
 
     try {
       const workout = await apiClient.reorderExercises(
@@ -493,6 +574,38 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     }
   ) => {
     if (!activeWorkout) return;
+
+    // For completed workouts (e.g. history edit using the shared component in 'edit' mode),
+    // perform local update only. Do not hit the active workout mutation APIs.
+    // Persistence happens on the parent's explicit save via updateCompletedWorkout.
+    if (activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
+      const updatedExercises = activeWorkout.exercises.map((ex) => {
+        if (ex.id !== exerciseLogId) return ex;
+
+        const newSet = {
+          id: `local-${Date.now()}-${data.setNumber}`,
+          setNumber: data.setNumber,
+          setType: data.setType || SetType.WORKING,
+          reps: data.reps,
+          weight: data.weight,
+          rir: data.rir,
+          completedAt: new Date().toISOString(),
+        };
+
+        const existingIndex = ex.sets.findIndex((s) => s.setNumber === data.setNumber);
+        let newSets = [...ex.sets];
+        if (existingIndex >= 0) {
+          newSets[existingIndex] = { ...newSets[existingIndex], ...newSet, id: newSets[existingIndex].id };
+        } else {
+          newSets = [...newSets, newSet].sort((a, b) => a.setNumber - b.setNumber);
+        }
+        return { ...ex, sets: newSets };
+      });
+
+      setActiveWorkout({ ...activeWorkout, exercises: updatedExercises });
+      // no rest timer side effects for completed
+      return;
+    }
 
     setLoading(true);
     try {
@@ -540,6 +653,15 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const deleteSet = async (setLogId: string) => {
     if (!activeWorkout) return;
 
+    if (activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
+      const updatedExercises = activeWorkout.exercises.map((ex) => ({
+        ...ex,
+        sets: ex.sets.filter((s) => s.id !== setLogId),
+      }));
+      setActiveWorkout({ ...activeWorkout, exercises: updatedExercises });
+      return;
+    }
+
     setLoading(true);
     try {
       const workout = await apiClient.deleteSet(
@@ -564,6 +686,16 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     }
   ) => {
     if (!activeWorkout) return;
+
+    if (activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
+      // local update for completed (history edit via shared component)
+      const updatedExercises = activeWorkout.exercises.map((ex) => ({
+        ...ex,
+        sets: ex.sets.map((s) => (s.id === setLogId ? { ...s, ...data } : s)),
+      }));
+      setActiveWorkout({ ...activeWorkout, exercises: updatedExercises });
+      return;
+    }
 
     setLoading(true);
     try {
