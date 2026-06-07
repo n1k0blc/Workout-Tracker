@@ -46,9 +46,10 @@ interface ActiveWorkoutScreenProps {
   onWorkoutComplete?: (workout: Workout, prs: PersonalRecord[], saveAsTemplate: boolean) => void;
   mode?: 'active' | 'edit';
   showBottomBar?: boolean;
+  showHeader?: boolean;
 }
 
-export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active', showBottomBar = true }: ActiveWorkoutScreenProps) {
+export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active', showBottomBar = true, showHeader = true }: ActiveWorkoutScreenProps) {
   const router = useRouter();
   const {
     activeWorkout,
@@ -217,62 +218,66 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
   return (
     <>
       <div className="min-h-screen bg-background pb-32">
-        {/* Header */}
-        <div className="bg-card border-b sticky top-0 z-10">
-          <div className="max-w-4xl mx-auto px-4 py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">
-                  {activeWorkout.isFreeWorkout
-                    ? activeWorkout.templateName || 'Freies Workout'
-                    : activeWorkout.workoutDayName || 'Workout'}
-                </h1>
-                {activeWorkout.cycleName && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {activeWorkout.cycleName}
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center gap-3">
-                {mode === 'active' && !isPastWorkout ? (
-                  <>
-                    <div className="flex flex-col items-end gap-2">
-                      <WorkoutTimer workoutDuration={workoutDuration} />
-                      <RestTimerDisplay />
+        {/* Header - hidden for pure edit usages (e.g. template editor, history edit of completed)
+            where the parent provides its own chrome. For isPastWorkout (past tracking) the header
+            provides the duration input, so it stays unless explicitly hidden. */}
+        {showHeader && (
+          <div className="bg-card border-b sticky top-0 z-10">
+            <div className="max-w-4xl mx-auto px-4 py-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-2xl font-bold text-foreground">
+                    {activeWorkout.isFreeWorkout
+                      ? activeWorkout.templateName || 'Freies Workout'
+                      : activeWorkout.workoutDayName || 'Workout'}
+                  </h1>
+                  {activeWorkout.cycleName && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {activeWorkout.cycleName}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  {mode === 'active' && !isPastWorkout ? (
+                    <>
+                      <div className="flex flex-col items-end gap-2">
+                        <WorkoutTimer workoutDuration={workoutDuration} />
+                        <RestTimerDisplay />
+                      </div>
+                      {/* Pause/Play Button */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={togglePause}
+                        title={isPaused ? 'Training fortsetzen' : 'Training pausieren'}
+                      >
+                        {isPaused ? (
+                          <IconPlayerPlay className="size-6" />
+                        ) : (
+                          <IconPlayerPause className="size-6" />
+                        )}
+                      </Button>
+                    </>
+                  ) : isPastWorkout ? (
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm">Dauer (Min):</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={Math.floor(pastWorkoutDuration / 60)}
+                        onChange={(e) => {
+                          const minutes = parseInt(e.target.value) || 0;
+                          setPastWorkoutDuration(minutes * 60);
+                        }}
+                        className="w-20"
+                      />
                     </div>
-                    {/* Pause/Play Button */}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={togglePause}
-                      title={isPaused ? 'Training fortsetzen' : 'Training pausieren'}
-                    >
-                      {isPaused ? (
-                        <IconPlayerPlay className="size-6" />
-                      ) : (
-                        <IconPlayerPause className="size-6" />
-                      )}
-                    </Button>
-                  </>
-                ) : isPastWorkout ? (
-                  <div className="flex items-center gap-2">
-                    <Label className="text-sm">Dauer (Min):</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={Math.floor(pastWorkoutDuration / 60)}
-                      onChange={(e) => {
-                        const minutes = parseInt(e.target.value) || 0;
-                        setPastWorkoutDuration(minutes * 60);
-                      }}
-                      className="w-20"
-                    />
-                  </div>
-                ) : null}
+                  ) : null}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
           {/* Exercises */}

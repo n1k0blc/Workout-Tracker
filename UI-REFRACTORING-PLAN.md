@@ -773,7 +773,13 @@ Gelöst durch: `workout?` optional, sichere Default-Stats, Guards in `renderSlid
 
 Das ist der letzte große "alte" Block im Post-Workout Flow. Danach ist der aktive Workout Screen visuell fast komplett auf sera.
 
-**Status nach Abschluss (wird ergänzt):** ...
+**Status nach Abschluss (April 2026):** Templates (Create + Edit für benutzerdefinierte Vorlagen) erfolgreich auf die zentrale Shared Component (`ActiveWorkoutScreen` + `ExerciseCard` im `mode="edit"`) umgestellt. Wrapper (`TemplateEditorScreen`) behält Metadaten (Name, Gym) + Save-Logik, delegiert die gesamte Exercise-Liste + Interaktionen an die Shared Component. Synthetisches COMPLETED-Workout + bestehender lokaler Hack ermöglichen die Integration ohne Backend-Änderungen. Layout auf sera vereinheitlicht. Alter lokaler State + `TemplateExerciseCard` aus dem Editor entfernt.
+
+Zusätzlich: `ActiveWorkoutScreen` um `showHeader?: boolean` Prop erweitert (Default true). Im `mode="edit"` (Templates, History-Edit) kann der innere Sticky-Header (inkl. "Freies Workout" Fallback) ausgeblendet werden, da der Parent eigene Überschriften/Metadaten liefert. Für "Vergangenes Workout tracken" (isPastWorkout) bleibt der Header (wegen Dauer-Input) erhalten. History-Edit und Template-Editor nutzen `showHeader={false}`.
+
+Plan-Doc + Commit/Push durchgeführt.
+
+Nächster Fokus (stück für stück): Cycle Wizard / Blueprint Editing mit derselben Komponente.
 
 ---
 

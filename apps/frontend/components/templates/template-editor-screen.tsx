@@ -283,10 +283,12 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
               </CardContent>
             </Card>
 
-            {/* Exercises – using the central shared component in edit mode */}
+            {/* Exercises – using the central shared component in edit mode.
+                No inner header here, the template editor wrapper provides "Vorlage bearbeiten" + metadata. */}
             <ActiveWorkoutScreen
               mode="edit"
               showBottomBar={false}
+              showHeader={false}
             />
 
             {/* Save / Cancel Actions (own buttons like in history edit) */}

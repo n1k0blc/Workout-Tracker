@@ -170,10 +170,12 @@ export default function EditWorkoutPage() {
               </CardContent>
             </Card>
 
-            {/* Exercises - using central shared component in edit mode */}
+            {/* Exercises - using central shared component in edit mode.
+                Header is provided by this page (title + date picker). */}
             <ActiveWorkoutScreen 
               mode="edit" 
               showBottomBar={false} 
+              showHeader={false} 
             />
 
             <div className="flex justify-end">
