@@ -30,10 +30,6 @@ export default function EditWorkoutPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    loadWorkout();
-  }, [loadWorkout]);
-
-  useEffect(() => {
     if (workout) {
       setActiveWorkoutDirectly(workout);
     }
@@ -57,6 +53,10 @@ export default function EditWorkoutPage() {
       setLoading(false);
     }
   }, [workoutId, router]);
+
+  useEffect(() => {
+    loadWorkout();
+  }, [loadWorkout]);
 
   const handleSaveFromShared = async () => {
     if (!activeWorkout) return;
