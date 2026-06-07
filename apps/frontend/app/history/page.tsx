@@ -23,10 +23,6 @@ export default function HistoryPage() {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
 
-  useEffect(() => {
-    loadWorkouts();
-  }, [loadWorkouts]);
-
   const getDateRange = (): { startDate: string; endDate: string } => {
     const now = new Date();
     const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
@@ -91,6 +87,10 @@ export default function HistoryPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterType, customStartDate, customEndDate]);
+
+  useEffect(() => {
+    loadWorkouts();
+  }, [loadWorkouts]);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);

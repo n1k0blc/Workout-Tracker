@@ -43,11 +43,12 @@ import {
 } from '@tabler/icons-react';
 
 interface ActiveWorkoutScreenProps {
-  onWorkoutComplete: (workout: Workout, prs: PersonalRecord[], saveAsTemplate: boolean) => void;
+  onWorkoutComplete?: (workout: Workout, prs: PersonalRecord[], saveAsTemplate: boolean) => void;
   mode?: 'active' | 'edit';
+  showBottomBar?: boolean;
 }
 
-export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active' }: ActiveWorkoutScreenProps) {
+export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active', showBottomBar = true }: ActiveWorkoutScreenProps) {
   const router = useRouter();
   const {
     activeWorkout,
@@ -183,8 +184,8 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
         // Continue anyway with empty array
       }
 
-      // Call parent handler to show completion modal
-      onWorkoutComplete(workout, prs, saveAsTemplate);
+      // Call parent handler to show completion modal (only when provided, e.g. not in pure edit mode for history/templates)
+      onWorkoutComplete?.(workout, prs, saveAsTemplate);
       
     } catch (error) {
       console.error('Failed to complete workout:', error);
@@ -331,25 +332,27 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
       </div>
 
       {/* Bottom Actions Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-card border-t shadow-lg">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex gap-3">
-          <Button
-            variant="outline"
-            onClick={() => setShowDiscardConfirm(true)}
-            disabled={loading}
-            className="flex-1"
-          >
-            Verwerfen
-          </Button>
-          <Button
-            onClick={() => setShowCompleteConfirm(true)}
-            disabled={loading || !canFinishWorkout()}
-            className="flex-1"
-          >
-            Workout beenden
-          </Button>
+      {showBottomBar && (
+        <div className="fixed bottom-0 left-0 right-0 bg-card border-t shadow-lg">
+          <div className="max-w-4xl mx-auto px-4 py-4 flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowDiscardConfirm(true)}
+              disabled={loading}
+              className="flex-1"
+            >
+              Verwerfen
+            </Button>
+            <Button
+              onClick={() => setShowCompleteConfirm(true)}
+              disabled={loading || !canFinishWorkout()}
+              className="flex-1"
+            >
+              Workout beenden
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Exercise Selection Modal (shadcn Dialog, controlled) */}
       <ExerciseSelectionModal

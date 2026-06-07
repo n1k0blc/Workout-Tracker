@@ -416,11 +416,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
           sets: [],
           plannedSets: [],
         };
-        // @ts-expect-error - local stub for completed workout edit via shared component
         setActiveWorkout({
           ...activeWorkout,
           exercises: [...activeWorkout.exercises, newEx],
-        });
+        } as Workout);
       } catch {
         // fallback stub
         const stub = {
@@ -430,11 +429,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
           sets: [],
           order: (activeWorkout.exercises.length || 0) + 1,
         };
-        // @ts-expect-error - local stub for completed workout edit via shared component
         setActiveWorkout({
           ...activeWorkout,
           exercises: [...activeWorkout.exercises, stub],
-        });
+        } as Workout);
       }
       return;
     }
@@ -462,7 +460,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         ...activeWorkout,
         exercises: activeWorkout.exercises.filter((ex: { id: string }) => ex.id !== exerciseLogId),
       };
-      setActiveWorkout(updated);
+      setActiveWorkout(updated as Workout);
       return;
     }
 
@@ -500,7 +498,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
               : ex
           ),
         };
-        setActiveWorkout(updated);
+        setActiveWorkout(updated as Workout);
       } catch {
         const updated = {
           ...activeWorkout,
@@ -510,7 +508,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
               : ex
           ),
         };
-        setActiveWorkout(updated);
+        setActiveWorkout(updated as Workout);
       }
       return;
     }
@@ -602,7 +600,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         return { ...ex, sets: newSets };
       });
 
-      setActiveWorkout({ ...activeWorkout, exercises: updatedExercises });
+      setActiveWorkout({ ...activeWorkout, exercises: updatedExercises } as Workout);
       // no rest timer side effects for completed
       return;
     }
@@ -658,7 +656,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         ...ex,
         sets: ex.sets.filter((s) => s.id !== setLogId),
       }));
-      setActiveWorkout({ ...activeWorkout, exercises: updatedExercises });
+      setActiveWorkout({ ...activeWorkout, exercises: updatedExercises } as Workout);
       return;
     }
 
@@ -693,7 +691,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         ...ex,
         sets: ex.sets.map((s) => (s.id === setLogId ? { ...s, ...data } : s)),
       }));
-      setActiveWorkout({ ...activeWorkout, exercises: updatedExercises });
+      setActiveWorkout({ ...activeWorkout, exercises: updatedExercises } as Workout);
       return;
     }
 

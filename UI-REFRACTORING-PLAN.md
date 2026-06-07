@@ -2,7 +2,7 @@
 
 **Status:** Aktiv  
 **Branch:** `UI-Refactoring`  
-**Letztes Update:** April 2026 (ExerciseCard UX complete + ExerciseSelectionModal shadcn Migration + large centered square + icon trigger for adding exercises in active workout)
+**Letztes Update:** April 2026 (Shared Component first step: history edit integration using ActiveWorkoutScreen mode="edit"; Technical Debt for completed workouts full mutations documented; local in-memory context hack for COMPLETED/DISCARDED)
 
 ---
 
@@ -151,6 +151,16 @@ Der Workout Screen (Start + Active + Completion) ist nun visuell und UX-technisc
 - Timer (Workout + Rest + Pause) nur im 'active' Modus (bzw. !isPast).
 - Alle anderen Funktionen (Add/Remove/Reorder/Replace, Edit Sets, Swipe für Delete bei ungeloggten in active, Additional Sets, etc.) bleiben gleich.
 - Vorbereitung für zukünftige Nutzung in Template-Editor, Cycle Wizard, History Edit (dort wird der parent die Daten/Callbacks liefern, die Komponente rendert die einheitliche Ansicht im edit Modus).
+
+**Technical Debt: Vollständige Shared-Component-Features für abgeschlossene Workouts (April 2026)**
+
+- Im Zuge der "stück für stück" Integration der zentralen Workout-Screen-Komponente wurde die History-Edit-Seite (`/history/[id]/edit`) auf `<ActiveWorkoutScreen mode="edit" />` umgestellt. Dadurch stehen für das Bearbeiten abgeschlossener Workouts bereits viele Features der Shared Component zur Verfügung (Sets editieren, Additional Sets, Add/Remove Exercises, Replace, Reorder etc. in der UI).
+- **Workaround im WorkoutContext (`lib/workout-context.tsx`)**: Alle relevanten Mutations-Funktionen (`logSet`, `updateSet`, `deleteSet`, `addAdditionalSet`, `addExercise`, `removeExercise`, `replaceExercise`, `reorderExercises` etc.) prüfen frühzeitig, ob `activeWorkout.status === 'COMPLETED' || 'DISCARDED'`. In diesem Fall wird **kein** API-Call ausgeführt, sondern ein lokales Deep-Clone + Patch auf dem In-Memory-Objekt via `setActiveWorkout(cloned)` durchgeführt. Die Edit-Seite persistiert dann beim "Speichern" über einen dedizierten `updateCompletedWorkout`-Pfad.
+- Dies ermöglicht aktuell, dass die Shared Component ohne Blocker für History-Edits genutzt werden kann (insbesondere Set-Werte immer editierbar + strukturelle Änderungen in der lokalen UI-Repräsentation).
+- **Limitation**: Das Backend erlaubt derzeit keine (oder nur sehr eingeschränkte) strukturellen Mutationen an bereits abgeschlossenen oder verworfenen Workouts. Viele der vollen Features der Shared Component (Übungen ersetzen, Reihenfolge ändern, Übungen hinzufügen/entfernen beim Editieren historischer Sessions) können **nicht** serverseitig persistiert werden. Die lokalen In-Memory-Änderungen sind rein temporär und würden bei Reload/Neuladen verloren gehen, wenn nicht explizit gespeichert wird – und selbst dann ist die volle Feature-Menge für Completed-Workouts backend-seitig (noch) nicht vorgesehen.
+- **Grund**: Historische Daten sind per Design weitgehend immutable (siehe Projekt-Philosophie). Die aktuelle API und das Datenmodell für `Workout` + `ExerciseLog` + `SetLog` sind primär auf "laufende Sessions" und "immutable Performed History" ausgelegt. Ein nachträgliches Umschreiben der Übungsliste + Reihenfolge + Sätze eines abgeschlossenen Workouts war bisher nicht Teil der Anforderungen.
+- **Plan**: Nach Abschluss des UI-Refactorings wird ein dediziertes **Backend-Refactoring** durchgeführt. Ziel ist es, dass abgeschlossene Workouts die **vollen Mutations-Features der Shared Component** unterstützen (Übungen ersetzen, Reihenfolge ändern, Hinzufügen/Entfernen von Übungen, etc. beim Bearbeiten in der History/Edit-Ansicht), ohne die Unveränderlichkeit der tatsächlichen historischen Logs zu verletzen (vermutlich über ein separates "performed snapshot" / Revision-Modell oder erweiterte Update-Endpunkte für historische Workout-Sessions).
+- **Explizit**: Dieses Backend-Refactoring wird **nicht jetzt** umgesetzt. Die aktuelle lokale In-Memory-Hack-Lösung ist bewusst als temporärer Technical Debt dokumentiert, um die schrittweise Einführung der zentralen Shared Component (Workout Screen mit active/edit-Modi) nicht zu blockieren.
 
 ---
 
