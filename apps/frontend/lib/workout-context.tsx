@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { Workout, SetType } from '@/types';
 import { apiClient } from '@/lib/api';
 
@@ -269,7 +269,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const setActiveWorkoutDirectly = (workout: Workout, isPast?: boolean, pastDuration?: number) => {
+  const setActiveWorkoutDirectly = useCallback((workout: Workout, isPast?: boolean, pastDuration?: number) => {
     setActiveWorkout(workout);
     setWorkoutDuration(0);
     setIsPastWorkout(isPast ?? false);
@@ -288,7 +288,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('workoutStartTime', now.toString());
       }
     }
-  };
+  }, []);
 
   const startWorkout = async (data: {
     cycleId?: string;
