@@ -162,6 +162,60 @@ Der Workout Screen (Start + Active + Completion) ist nun visuell und UX-technisc
 - **Plan**: Nach Abschluss des UI-Refactorings wird ein dediziertes **Backend-Refactoring** durchgeführt. Ziel ist es, dass abgeschlossene Workouts die **vollen Mutations-Features der Shared Component** unterstützen (Übungen ersetzen, Reihenfolge ändern, Hinzufügen/Entfernen von Übungen, etc. beim Bearbeiten in der History/Edit-Ansicht), ohne die Unveränderlichkeit der tatsächlichen historischen Logs zu verletzen (vermutlich über ein separates "performed snapshot" / Revision-Modell oder erweiterte Update-Endpunkte für historische Workout-Sessions).
 - **Explizit**: Dieses Backend-Refactoring wird **nicht jetzt** umgesetzt. Die aktuelle lokale In-Memory-Hack-Lösung ist bewusst als temporärer Technical Debt dokumentiert, um die schrittweise Einführung der zentralen Shared Component (Workout Screen mit active/edit-Modi) nicht zu blockieren.
 
+**Nächster Schritt: Integration der Shared Komponente in den Template-Editor (Create + Edit benutzerdefinierter Vorlagen) – April 2026**
+
+**Ziel:**
+- Sowohl `/templates/new` (neue Vorlage erstellen) als auch `/templates/[id]/edit` (bestehende benutzerdefinierte Vorlage bearbeiten) sollen die **gleiche zentrale Komponente** (`ActiveWorkoutScreen` mit `mode="edit"`) für die Übungs-/Satz-Liste verwenden.
+- Keine separate `TemplateExerciseCard` + lokaler State-Management für die Exercise-Liste mehr (Duplikation vermeiden).
+- Alle Edit-Features der Shared Component stehen sofort zur Verfügung: Long-Press Reorder, Tap-to-Collapse mit horizontalen Balken-Indikatoren, Table-Layout für Sätze, immer editierbare Felder, Replace, Delete Exercise, "+ Satz hinzufügen", große zentrierte + Icons für Add Exercise (Empty-State + unter der Liste), volle shadcn/sera Konsistenz.
+
+**Herausforderung & Lösungsansatz (analog zu History-Edit):**
+- Die Shared Component + `WorkoutContext` sind primär auf `Workout` + `ExerciseLog` (mit `sets` performed + `plannedSets` Snapshot) ausgelegt.
+- Templates verwenden ein separates Modell (`WorkoutTemplateExercise` + `WorkoutTemplateSet` mit reinen `target*` + `isWarmup`).
+- **Lösung (stück für stück, unter Nutzung des bestehenden Completed-Hacks):**
+  1. Im `TemplateEditorScreen` (der gemeinsame Wrapper für new + edit):
+     - Behalte lokale State nur für Metadaten: `name`, `recommendedGymId`, `availableExercises`, `availableGyms`, `loading`/`saving`.
+     - Lade bei `templateId` die Vorlage via `apiClient.getWorkoutTemplate`.
+     - Konstruiere ein **synthetisches `Workout`-Objekt**:
+       - `id`: `'template-' + templateId` oder `'new-template-' + Date.now()`
+       - `status: 'COMPLETED'` (aktiviert den lokalen In-Memory-Mutations-Pfad im Context – siehe Technical Debt oben).
+       - `isFreeWorkout: true`
+       - Für jede Template-Exercise: `ExerciseLog` mit `sets: []` (initial) + `plannedSets: [...]` gemappt aus den TemplateSets (`isWarmup` → `setType: 'WARMUP'|'WORKING'`, `targetReps/Weight/Rir` → `reps/weight/rir`).
+     - Rufe `setActiveWorkoutDirectly(syntheticWorkout)` (ähnlich wie in `history/[id]/edit`).
+     - Ein `useEffect` Cleanup beim Unmount setzt den Context zurück (vermeidet Leak eines Fake-Workouts in andere Flows).
+  2. Im Render: Die Info-Felder (Name, empfohlenes Gym) bleiben als Cards/Felder im Wrapper (wie DatePicker in der History-Edit). Darunter wird `<ActiveWorkoutScreen mode="edit" showBottomBar={false} />` eingebettet.
+  3. Der Shared Screen übernimmt komplett: Dnd (long-press), ExerciseCards (edit-Modus ohne Check-Spalte), Add-Exercise (große + Icons + `ExerciseSelectionModal` – bereits shared und mit Custom-Exercise-Support), alle Mutations (werden lokal gecloned wegen Status).
+  4. Auf "Speichern" im Wrapper:
+     - Lies `activeWorkout` aus dem Context.
+     - Mappe zurück: Für jede Exercise nimm die committeten `sets` (oder Fallback `plannedSets`), konvertiere `setType` + Werte zurück zu `isWarmup` + `target*`.
+     - Baue das bekannte Template-Payload und rufe `createWorkoutTemplate` oder `updateWorkoutTemplate`.
+     - Validierung (Name + jede Übung ≥1 Satz) bleibt im Wrapper (kann später mit canFinish-Logik harmonisiert werden).
+  5. Styling: TemplateEditorScreen auf sera migrieren (bg-background, Card/CardContent, semantic Tokens, Tabler Icons statt lucide/emoji, keine hard blue/gray).
+
+**Vorteile:**
+- Sofortige Konsistenz mit Active-Workout und History-Edit (eine Komponente, ein Verhalten für Add/Remove/Reorder/Replace/Edit-Sets).
+- Die UX-Verbesserungen (Collapse + Balken, Long-Press Drag, Table, Swipe wo sinnvoll auch im Edit) kommen "gratis" zu den Templates.
+- ExerciseSelectionModal + ExerciseEditorDialog (für Custom Exercises) werden weiterhin einheitlich genutzt.
+- Vorbereitung auf Cycle-Wizard (Blueprint-Editing) als nächsten Schritt.
+
+**Risiken / Bekannte Einschränkungen (werden mit dem Debt mitgetragen):**
+- Wir "missbrauchen" den Workout-Context + Completed-Hack temporär für Blueprint-Editing (kein echter Workout, keine Persistenz über den Fake-Status).
+- Mapping performed <-> planned muss robust sein (Mount-Commit-Effekt im ExerciseCard in Edit-Mode hilft, Werte auch ohne explizites "Loggen" verfügbar zu machen).
+- Globale Context-Hijacking: Template-Editor muss sauber cleanupen. Bei laufendem echtem Workout sollte man idealerweise nicht gleichzeitig Templates editieren (User-Flow ist sequentiell).
+- Später (Backend-Refactoring + bessere Shared-Komponente) kann man die Editor-Logik weiter entkoppeln (props-driven statt Context-only).
+
+**Umsetzungsreihenfolge (dieser Schritt):**
+1. Plan + Doc-Update (hier).
+2. `TemplateEditorScreen` anpassen: Import `useWorkout`, `ActiveWorkoutScreen`, `Card` etc. Synthetischen Workout bauen + setDirectly. Wrapper-Layout modernisieren.
+3. `handleSave` umschreiben auf Mapping aus `activeWorkout`.
+4. Alte Exercise-Liste, `TemplateExerciseCard`-Renders, lokalen `exercises` State, eigenen Dnd + Handler für die Liste entfernen (Modal bleibt, wird aber jetzt vom Shared Screen gerendert – doppelte Instanz vermeiden).
+5. Styling-Alignment (Header, Info-Card, Buttons, Loading-State).
+6. Testen der Flows: Neue Vorlage anlegen (Empty + big +, Sets hinzufügen, Edit, Reorder, Replace, Save), Bestehende Custom-Vorlage laden + editieren + save.
+7. Lint + tsc + Commit/Push.
+8. Plan-Doc aktualisieren (Status "Templates nun über Shared Component").
+
+Danach: Nächster "stück für stück" Kandidat ist der Cycle-Wizard / Blueprint-Editing.
+
 ---
 
 ### Phase 4 – Teil 2: Active Workout Screen – Vereinfachung der ExerciseCard & Completion Flow (abgeschlossen)

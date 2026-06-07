@@ -1,44 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
-import { Exercise, HomeGym, WorkoutTemplate, SetType } from '@/types';
-import { Plus, Trash2 } from 'lucide-react';
-import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
-import { TemplateExerciseCard } from './template-exercise-card';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-
-interface TemplateSet {
-  id: string;
-  order: number;
-  isWarmup: boolean;
-  targetReps: number;
-  targetWeight: number;
-  targetRir: number;
-}
-
-interface TemplateExercise {
-  id: string;
-  exerciseId: string;
-  exerciseName: string;
-  order: number;
-  sets: TemplateSet[];
-}
+import { Exercise, HomeGym, Workout, WorkoutStatus, SetType, PlannedSet, WorkoutTemplateExercise } from '@/types';
+import { ProtectedRoute } from '@/components/protected-route';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Field, FieldLabel } from '@/components/ui/field';
+import ActiveWorkoutScreen from '@/components/workout/active-workout-screen';
+import { useWorkout } from '@/lib/workout-context';
+import { IconChevronLeft } from '@tabler/icons-react';
 
 interface TemplateEditorScreenProps {
   templateId?: string;
@@ -46,251 +20,130 @@ interface TemplateEditorScreenProps {
 
 export default function TemplateEditorScreen({ templateId }: TemplateEditorScreenProps) {
   const router = useRouter();
+  const { setActiveWorkoutDirectly, activeWorkout } = useWorkout();
+
   const [name, setName] = useState('');
   const [recommendedGymId, setRecommendedGymId] = useState<string>('');
-  const [exercises, setExercises] = useState<TemplateExercise[]>([]);
-  const [availableExercises, setAvailableExercises] = useState<Exercise[]>([]);
   const [availableGyms, setAvailableGyms] = useState<HomeGym[]>([]);
-  const [showExerciseModal, setShowExerciseModal] = useState(false);
-  const [replacingExerciseId, setReplacingExerciseId] = useState<string | null>(null);
   const [loading, setLoading] = useState(!!templateId);
   const [saving, setSaving] = useState(false);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
+  // Helper: map a template's target sets into PlannedSet shape for the synthetic workout
+  // (input from template model or our synthetic; documented as Technical Debt bridge to shared component)
+  const mapTemplateSetsToPlanned = (sets: unknown[]): PlannedSet[] => {
+    return (sets || []).map((s, idx) => {
+      const raw = s as any; // eslint-disable-line @typescript-eslint/no-explicit-any -- narrow inside bridge helper
+      return {
+        id: raw.id || `planned-${Date.now()}-${idx}`,
+        order: raw.order || idx + 1,
+        setType: (raw.isWarmup ? SetType.WARMUP : SetType.WORKING) as SetType,
+        reps: raw.targetReps ?? 0,
+        weight: raw.targetWeight ?? 0,
+        rir: raw.targetRir ?? 0,
+        restAfterSet: 0,
+      };
+    });
+  };
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  // Build a synthetic Workout-shaped object so the shared edit component + context can be used.
+  // We use status COMPLETED to reuse the existing local-only mutation hack (no real API calls for mutations).
+  // Pass the current available list explicitly for unilateral/double-weight enrichment (avoids stale state).
+  const buildSyntheticWorkout = (
+    templateExercises: WorkoutTemplateExercise[] | undefined,
+    idForTemplate?: string,
+    currentAvailable: Exercise[] = []
+  ): Workout => {
+    const now = new Date().toISOString();
+    const exs = (templateExercises || []).map((ex, idx) => {
+      const details = currentAvailable.find((e) => e.id === ex.exerciseId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- bridge (see Technical Debt in plan for completed/template edit via shared component)
+      const raw = ex as any;
+      return {
+        id: raw.id || `ex-${Date.now()}-${idx}`,
+        exerciseId: ex.exerciseId,
+        exerciseName: ex.exerciseName || '',
+        isUnilateral: details?.isUnilateral,
+        isDoubleWeight: details?.isDoubleWeight,
+        order: ex.order || idx + 1,
+        sets: [], // will be populated via the edit-mode mount commit from plannedSets
+        plannedSets: mapTemplateSetsToPlanned(raw.sets || []),
+      };
+    });
 
-  const loadData = async () => {
+    return {
+      id: idForTemplate ? `template-${idForTemplate}` : `new-template-${Date.now()}`,
+      date: now,
+      status: WorkoutStatus.COMPLETED,
+      isFreeWorkout: true,
+      exercises: exs,
+      createdAt: now,
+    } as Workout;
+  };
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
     try {
-      const [gyms, allExercises] = await Promise.all([
+      const [gyms, fetchedExercises] = await Promise.all([
         apiClient.getHomeGyms(),
         apiClient.getExercises(),
       ]);
       setAvailableGyms(gyms);
-      setAvailableExercises(allExercises);
+
+      let synthetic: Workout | null = null;
 
       if (templateId) {
         const template = await apiClient.getWorkoutTemplate(templateId);
         setName(template.name);
         setRecommendedGymId(template.recommendedGymId || '');
-        
-        if (template.exercises) {
-          // Fix 0-based orders from old templates (ensure 1-based)
-          const fixedExercises = template.exercises.map((ex, idx) => ({
-            ...ex,
-            order: ex.order === 0 ? idx + 1 : ex.order,
-            sets: ex.sets.map((set, setIdx) => ({
-              ...set,
-              order: set.order === 0 ? setIdx + 1 : set.order,
-            })),
-          }));
-          
-          setExercises(
-            fixedExercises.map((ex, exIdx) => ({
-              id: `ex-${Date.now()}-${exIdx}`,
-              exerciseId: ex.exerciseId,
-              exerciseName: ex.exerciseName || '',
-              order: ex.order,
-              sets: ex.sets.map((set, setIdx) => ({
-                id: `set-${Date.now()}-${exIdx}-${setIdx}`,
-                order: set.order,
-                isWarmup: set.isWarmup,
-                targetReps: set.targetReps,
-                targetWeight: set.targetWeight,
-                targetRir: set.targetRir,
-              })),
-            }))
-          );
-        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- API response normalization for template exercises (pre-existing pattern)
+        const fixedExercises = (template.exercises || []).map((ex: any, idx: number) => ({
+          ...ex,
+          order: ex.order === 0 ? idx + 1 : ex.order,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          sets: (ex.sets || []).map((set: any, setIdx: number) => ({
+            ...set,
+            order: set.order === 0 ? setIdx + 1 : set.order,
+          })),
+        }));
+
+        synthetic = buildSyntheticWorkout(fixedExercises, templateId, fetchedExercises);
+      } else {
+        // New template: start empty
+        setName('');
+        setRecommendedGymId('');
+        synthetic = buildSyntheticWorkout([], undefined, fetchedExercises);
+      }
+
+      if (synthetic) {
+        setActiveWorkoutDirectly(synthetic);
       }
     } catch (error) {
-      console.error('Failed to load data:', error);
+      console.error('Failed to load data for template editor:', error);
       alert('Fehler beim Laden der Daten.');
+      router.push('/templates');
     } finally {
       setLoading(false);
     }
-  };
+  }, [templateId, router, setActiveWorkoutDirectly]); // eslint-disable-line react-hooks/exhaustive-deps -- buildSyntheticWorkout is pure and defined in render; we intentionally call load once on mount/param change
 
-  const handleAddExercise = async (exerciseId: string, exercise?: Exercise) => {
-    // Check if this is a replace operation
-    if (replacingExerciseId) {
-      handleReplaceExercise(exerciseId, exercise);
-      return;
-    }
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-    // Use provided exercise or find in available exercises
-    let selectedExercise = exercise;
-    if (!selectedExercise) {
-      selectedExercise = availableExercises.find((ex) => ex.id === exerciseId);
-    }
-    
-    if (!selectedExercise) {
-      alert('Übung nicht gefunden.');
-      return;
-    }
+  // Cleanup: clear the hijacked synthetic workout when leaving the editor
+  // to avoid leaving a fake COMPLETED entry in the global context.
+  useEffect(() => {
+    return () => {
+      // Setting to a null-like value; startWorkout or other flows will overwrite when needed.
+      // Cast to satisfy the typed setter for the synthetic case.
+      setActiveWorkoutDirectly(null as unknown as Workout);
+    };
+  }, [setActiveWorkoutDirectly]);
 
-    // If this is a newly created exercise, add it to availableExercises
-    if (exercise && !availableExercises.find((ex) => ex.id === exercise.id)) {
-      setAvailableExercises((prev) => [exercise, ...prev]);
-    }
-
-    const newOrder = exercises.length + 1;
-
-    setExercises([
-      ...exercises,
-      {
-        id: `ex-${Date.now()}`,
-        exerciseId: selectedExercise.id,
-        exerciseName: selectedExercise.name,
-        order: newOrder,
-        sets: [],
-      },
-    ]);
-    setShowExerciseModal(false);
-  };
-
-  const handleReplaceExercise = (newExerciseId: string, newExercise?: Exercise) => {
-    if (!replacingExerciseId) return;
-
-    // Use provided exercise or find in available exercises
-    let selectedExercise = newExercise;
-    if (!selectedExercise) {
-      selectedExercise = availableExercises.find((ex) => ex.id === newExerciseId);
-    }
-    
-    if (!selectedExercise) {
-      alert('Übung nicht gefunden.');
-      return;
-    }
-
-    // If this is a newly created exercise, add it to availableExercises
-    if (newExercise && !availableExercises.find((ex) => ex.id === newExercise.id)) {
-      setAvailableExercises((prev) => [newExercise, ...prev]);
-    }
-
-    setExercises(
-      exercises.map((ex) =>
-        ex.id === replacingExerciseId
-          ? {
-              ...ex,
-              exerciseId: selectedExercise.id,
-              exerciseName: selectedExercise.name,
-            }
-          : ex
-      )
-    );
-    setShowExerciseModal(false);
-    setReplacingExerciseId(null);
-  };
-
-  const handleOpenReplaceModal = (exerciseId: string) => {
-    setReplacingExerciseId(exerciseId);
-    setShowExerciseModal(true);
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-
-    if (over && active.id !== over.id) {
-      setExercises((items) => {
-        const oldIndex = items.findIndex((item) => item.id === active.id);
-        const newIndex = items.findIndex((item) => item.id === over.id);
-
-        const reordered = arrayMove(items, oldIndex, newIndex);
-        // Update order property
-        return reordered.map((ex, idx) => ({ ...ex, order: idx }));
-      });
-    }
-  };
-
-  const handleRemoveExercise = (exerciseId: string) => {
-    const newExercises = exercises.filter((ex) => ex.id !== exerciseId);
-    // Reorder
-    newExercises.forEach((ex, index) => {
-      ex.order = index;
-    });
-    setExercises(newExercises);
-  };
-
-  const handleAddSet = (exerciseId: string) => {
-    setExercises(
-      exercises.map((ex) => {
-        if (ex.id === exerciseId) {
-          const newSetOrder = ex.sets.length + 1;
-          return {
-            ...ex,
-            sets: [
-              ...ex.sets,
-              {
-                id: `set-${Date.now()}`,
-                order: newSetOrder,
-                isWarmup: false,
-                targetReps: 10,
-                targetWeight: 0,
-                targetRir: 2,
-              },
-            ],
-          };
-        }
-        return ex;
-      })
-    );
-  };
-
-  const handleRemoveSet = (exerciseId: string, setId: string) => {
-    setExercises(
-      exercises.map((ex) => {
-        if (ex.id === exerciseId) {
-          const newSets = ex.sets.filter((s) => s.id !== setId);
-          // Reorder
-          newSets.forEach((set, index) => {
-            set.order = index;
-          });
-          return { ...ex, sets: newSets };
-        }
-        return ex;
-      })
-    );
-  };
-
-  const handleUpdateSet = (
-    exerciseId: string,
-    setId: string,
-    field: keyof TemplateSet,
-    value: any
-  ) => {
-    setExercises(
-      exercises.map((ex) => {
-        if (ex.id === exerciseId) {
-          return {
-            ...ex,
-            sets: ex.sets.map((set) => {
-              if (set.id === setId) {
-                return { ...set, [field]: value };
-              }
-              return set;
-            }),
-          };
-        }
-        return ex;
-      })
-    );
-  };
-
-  const getExerciseDetails = (exerciseId: string): Exercise | undefined => {
-    return availableExercises.find((ex) => ex.id === exerciseId);
-  };
+  // No more local exercise list handlers – the shared ActiveWorkoutScreen (edit mode)
+  // + WorkoutContext (with COMPLETED local-mutation short-circuit) own the full
+  // add/remove/replace/reorder/add-set/edit-set surface.
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -298,33 +151,46 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
       return;
     }
 
-    if (exercises.length === 0) {
+    const current = activeWorkout;
+    if (!current || current.exercises.length === 0) {
       alert('Bitte füge mindestens eine Übung hinzu.');
       return;
     }
 
-    const invalidExercise = exercises.find((ex) => ex.sets.length === 0);
-    if (invalidExercise) {
+    // Validate every exercise has at least one set (template requirement)
+    const hasEmpty = current.exercises.some((ex) => (ex.sets?.length || 0) === 0);
+    if (hasEmpty) {
       alert('Jede Übung muss mindestens einen Satz haben.');
       return;
     }
 
     setSaving(true);
     try {
+      const payloadExercises = current.exercises.map((ex) => {
+        // Prefer the committed performed sets (populated by edit-mode commit + user edits).
+        // Fallback to plannedSets (should not be needed after the mount effect in edit mode).
+        const sourceSets = (ex.sets && ex.sets.length > 0) ? ex.sets : (ex.plannedSets || []);
+        return {
+          exerciseId: ex.exerciseId,
+          order: ex.order,
+          sets: sourceSets.map((s, idx) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mapping performed/planned (shared) back to template targets (debt bridge)
+            const rawSet = s as any;
+            return {
+              order: rawSet.order || rawSet.setNumber || idx + 1,
+              isWarmup: rawSet.setType === SetType.WARMUP || rawSet.isWarmup === true,
+              targetReps: rawSet.reps ?? rawSet.targetReps ?? 0,
+              targetWeight: rawSet.weight ?? rawSet.targetWeight ?? 0,
+              targetRir: rawSet.rir ?? rawSet.targetRir ?? 0,
+            };
+          }),
+        };
+      });
+
       const payload = {
         name: name.trim(),
         recommendedGymId: recommendedGymId || undefined,
-        exercises: exercises.map((ex) => ({
-          exerciseId: ex.exerciseId,
-          order: ex.order,
-          sets: ex.sets.map((set) => ({
-            order: set.order,
-            isWarmup: set.isWarmup,
-            targetReps: set.targetReps,
-            targetWeight: set.targetWeight,
-            targetRir: set.targetRir,
-          })),
-        })),
+        exercises: payloadExercises,
       };
 
       if (templateId) {
@@ -333,6 +199,8 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
         await apiClient.createWorkoutTemplate(payload);
       }
 
+      // Clear synthetic before navigating away (defense in depth)
+      setActiveWorkoutDirectly(null as unknown as Workout);
       router.push('/templates');
     } catch (error) {
       console.error('Failed to save template:', error);
@@ -344,134 +212,107 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-lg text-gray-600">Lädt...</div>
-      </div>
+      <ProtectedRoute>
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="text-lg text-muted-foreground">Lädt Vorlage...</div>
+        </div>
+      </ProtectedRoute>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0 space-y-6">
-          {/* Header */}
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">
-              {templateId ? 'Vorlage bearbeiten' : 'Neue Vorlage erstellen'}
-            </h2>
-            <p className="mt-1 text-sm text-gray-600">
-              Erstelle eine Workout-Vorlage mit Übungen und Sätzen
-            </p>
-          </div>
-
-          {/* Template Info */}
-          <div className="bg-white rounded-lg shadow p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Vorlagenname
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="z.B. Upper Body, Push Day, etc."
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Empfohlenes Studio (Optional)
-              </label>
-              <select
-                value={recommendedGymId}
-                onChange={(e) => setRecommendedGymId(e.target.value)}
-                className="w-full md:w-auto px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Kein empfohlenes Studio</option>
-                {availableGyms.map((gym) => (
-                  <option key={gym.id} value={gym.id}>
-                    {gym.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Exercises */}
-          {exercises.length > 0 ? (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
+    <ProtectedRoute>
+      <div className="min-h-screen bg-background">
+        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="px-4 py-6 sm:px-0 space-y-6">
+            {/* Back Button */}
+            <Button
+              variant="ghost"
+              onClick={() => router.push('/templates')}
+              className="flex items-center gap-2 -ml-2"
             >
-              <SortableContext
-                items={exercises.map((ex) => ex.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                <div className="space-y-4">
-                  {exercises.map((exercise, index) => (
-                    <TemplateExerciseCard
-                      key={exercise.id}
-                      exercise={exercise}
-                      exerciseDetails={getExerciseDetails(exercise.exerciseId)}
-                      index={index}
-                      onRemove={() => handleRemoveExercise(exercise.id)}
-                      onReplace={() => handleOpenReplaceModal(exercise.id)}
-                      onAddSet={() => handleAddSet(exercise.id)}
-                      onRemoveSet={(setId) => handleRemoveSet(exercise.id, setId)}
-                      onUpdateSet={(setId, field, value) =>
-                        handleUpdateSet(exercise.id, setId, field, value)
-                      }
-                    />
-                  ))}
+              <IconChevronLeft className="size-4" />
+              Zurück zu den Vorlagen
+            </Button>
+
+            {/* Header */}
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-2">
+                  <div>
+                    <h2 className="text-2xl font-bold text-foreground">
+                      {templateId ? 'Vorlage bearbeiten' : 'Neue Vorlage erstellen'}
+                    </h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Definiere Übungen und Sätze für diese Workout-Vorlage
+                    </p>
+                  </div>
+                  <Badge variant="outline">{templateId ? 'Bearbeitung' : 'Neu'}</Badge>
                 </div>
-              </SortableContext>
-            </DndContext>
-          ) : null}
+              </CardContent>
+            </Card>
 
-          {/* Add Exercise Button */}
-          <button
-            onClick={() => setShowExerciseModal(true)}
-            className="w-full py-3 border-2 border-dashed border-gray-300 text-gray-600 rounded-lg hover:border-blue-500 hover:bg-blue-50 hover:text-blue-600 transition-all flex items-center justify-center gap-2"
-          >
-            <Plus className="h-5 w-5" />
-            <span className="font-medium">Übung hinzufügen</span>
-          </button>
+            {/* Template Metadata (Name + Recommended Gym) */}
+            <Card>
+              <CardContent className="p-6 space-y-4">
+                <Field>
+                  <FieldLabel>Vorlagenname</FieldLabel>
+                  <Input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="z.B. Upper Body, Push Day, etc."
+                    className="w-full"
+                  />
+                </Field>
 
-          {/* Actions */}
-          {exercises.length > 0 && (
+                <Field>
+                  <FieldLabel>Empfohlenes Studio (Optional)</FieldLabel>
+                  <select
+                    value={recommendedGymId}
+                    onChange={(e) => setRecommendedGymId(e.target.value)}
+                    className="w-full md:w-auto px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring text-sm"
+                  >
+                    <option value="">Kein empfohlenes Studio</option>
+                    {availableGyms.map((gym) => (
+                      <option key={gym.id} value={gym.id}>
+                        {gym.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </CardContent>
+            </Card>
+
+            {/* Exercises – using the central shared component in edit mode */}
+            <ActiveWorkoutScreen
+              mode="edit"
+              showBottomBar={false}
+            />
+
+            {/* Save / Cancel Actions (own buttons like in history edit) */}
             <div className="flex gap-3">
-              <button
-                onClick={() => router.push('/templates')}
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setActiveWorkoutDirectly(null as unknown as Workout);
+                  router.push('/templates');
+                }}
                 disabled={saving}
-                className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                className="flex-1"
               >
                 Abbrechen
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleSave}
-                disabled={saving}
-                className="flex-1 px-4 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                disabled={saving || !activeWorkout}
+                className="flex-1"
               >
                 {saving ? 'Speichert...' : 'Speichern'}
-              </button>
+              </Button>
             </div>
-          )}
-        </div>
-      </main>
-
-      {/* Exercise Selection Modal (shadcn Dialog, controlled) */}
-      <ExerciseSelectionModal
-        open={showExerciseModal}
-        onOpenChange={(isOpen) => {
-          setShowExerciseModal(isOpen);
-          if (!isOpen) {
-            setReplacingExerciseId(null);
-          }
-        }}
-        onSelect={handleAddExercise}
-      />
-    </div>
+          </div>
+        </main>
+      </div>
+    </ProtectedRoute>
   );
 }
