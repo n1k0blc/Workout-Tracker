@@ -99,6 +99,16 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
     });
   };
 
+  const canFinishWorkout = (): boolean => {
+    if (mode === 'edit' || isPastWorkout) {
+      // In edit mode (e.g. past workout tracking), allow finishing as long as there are exercises.
+      // The values in the input fields (edit state or planned) will be used on save.
+      // No requirement for explicit "logged" sets via log UI (which is hidden in edit).
+      return activeWorkout.exercises.length > 0;
+    }
+    return areAllSetsLogged();
+  };
+
   const handleAddExercise = async (exerciseId: string) => {
     // Check if exercise already exists in workout
     const isDuplicate = activeWorkout.exercises.some(
@@ -333,7 +343,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
           </Button>
           <Button
             onClick={() => setShowCompleteConfirm(true)}
-            disabled={loading || !areAllSetsLogged()}
+            disabled={loading || !canFinishWorkout()}
             className="flex-1"
           >
             Workout beenden

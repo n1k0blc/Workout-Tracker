@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { ExerciseLog, SetLog, SetType } from '@/types';
 import { useWorkout } from '@/lib/workout-context';
 import { useSortable } from '@dnd-kit/sortable';
@@ -96,6 +96,8 @@ export default function ExerciseCard({
 
   // Swipe state for set rows (LTR = log if unlogged, RTL = discard unlogged draft).
   const [activeSwipe, setActiveSwipe] = useState<null | { key: string | number; startX: number; startY: number; offset: number }>(null);
+
+  const initialEditCommitDone = useRef(false);
 
   const addAdditionalSet = () => {
     const maxPlanned = hasPlannedSets
@@ -203,9 +205,9 @@ export default function ExerciseCard({
   };
 
 
-  const getLoggedSet = (setNumber: number) => {
+  const getLoggedSet = useCallback((setNumber: number) => {
     return exercise.sets.find(s => s.setNumber === setNumber);
-  };
+  }, [exercise.sets]);
 
   const updateEditValue = (setNumber: number, field: 'weight' | 'reps' | 'rir' | 'setType', value: string | SetType) => {
     setEditValues(prev => ({
@@ -215,24 +217,9 @@ export default function ExerciseCard({
         [field]: value,
       },
     }));
-
-    // In edit mode, auto-commit (log) draft/unlogged planned sets as soon as they have valid weight + reps.
-    // This allows saving past workouts / edits without an explicit "log" UI/column.
-    if (mode === 'edit' && (field === 'weight' || field === 'reps')) {
-      // Use microtask so the state update has flushed
-      Promise.resolve().then(() => {
-        const wStr = field === 'weight' ? (value as string) : (editValues[setNumber]?.weight ?? '');
-        const rStr = field === 'reps' ? (value as string) : (editValues[setNumber]?.reps ?? '');
-        const w = parseFloat(wStr || '0');
-        const r = parseInt(rStr || '0');
-        if (w > 0 && r > 0 && !getLoggedSet(setNumber)) {
-          handleLogSet(setNumber);
-        }
-      });
-    }
   };
 
-  const getEditValue = (setNumber: number, field: 'weight' | 'reps' | 'rir'): string => {
+  const getEditValue = useCallback((setNumber: number, field: 'weight' | 'reps' | 'rir'): string => {
     // Check if we have an edit value (including empty strings)
     if (editValues[setNumber] && editValues[setNumber][field] !== undefined) {
       return editValues[setNumber][field] as string;
@@ -241,7 +228,7 @@ export default function ExerciseCard({
     const plannedSet = exercise.plannedSets?.find(ps => ps.order === setNumber);
     if (!plannedSet) return '';
     return plannedSet[field]?.toString() || '';
-  };
+  }, [editValues, exercise.plannedSets]);
 
   const getEditSetType = (setNumber: number): SetType => {
     if (editValues[setNumber]?.setType) {
@@ -251,6 +238,26 @@ export default function ExerciseCard({
     const plannedSet = exercise.plannedSets?.find(ps => ps.order === setNumber);
     return plannedSet?.setType || SetType.WORKING;
   };
+
+  // In edit mode, on mount, commit any pre-filled planned sets with values (even if not edited),
+  // so that on "beenden" the current field values (planned or edited) are saved.
+  useEffect(() => {
+    if (mode === 'edit' && hasPlannedSets && !initialEditCommitDone.current) {
+      initialEditCommitDone.current = true;
+      exercise.plannedSets!.forEach((ps) => {
+        const sn = ps.order;
+        if (!getLoggedSet(sn)) {
+          const w = parseFloat(getEditValue(sn, 'weight') || ps.weight?.toString() || '0');
+          const r = parseInt(getEditValue(sn, 'reps') || ps.reps?.toString() || '0');
+          if (w > 0 && r > 0) {
+            // schedule to not run during render
+            setTimeout(() => handleLogSet(sn), 0);
+          }
+        }
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, hasPlannedSets]);
 
   const getSetIndicatorSlots = (): number[] => {
     const slots = new Set<number>();
@@ -361,6 +368,16 @@ export default function ExerciseCard({
     const swipeOffset = activeSwipe && activeSwipe.key === swipeKey ? activeSwipe.offset : 0;
     const swipeClass = swipeOffset > 0 ? 'bg-primary/5' : swipeOffset < 0 ? 'bg-destructive/5' : '';
 
+    const commitIfNeeded = () => {
+      if (mode === 'edit' && !getLoggedSet(setNumber)) {
+        const w = parseFloat(getEditValue(setNumber, 'weight') || '0');
+        const r = parseInt(getEditValue(setNumber, 'reps') || '0');
+        if (w > 0 && r > 0) {
+          handleLogSet(setNumber);
+        }
+      }
+    };
+
     return (
       <div
         key={`add-${setNumber}`}
@@ -389,9 +406,9 @@ export default function ExerciseCard({
             </Badge>
           </button>
 
-          <Input type="number" step="0.5" value={getEditValue(setNumber, 'weight')} onChange={(e) => handleRowValueChange(setNumber, null, 'weight', e.target.value)} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} />
-          <Input type="number" value={getEditValue(setNumber, 'reps')} onChange={(e) => handleRowValueChange(setNumber, null, 'reps', e.target.value)} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} />
-          <Input type="number" value={getEditValue(setNumber, 'rir')} onChange={(e) => handleRowValueChange(setNumber, null, 'rir', e.target.value)} placeholder="" className="h-7 text-sm tabular-nums" disabled={loading} />
+          <Input type="number" step="0.5" value={getEditValue(setNumber, 'weight')} onChange={(e) => handleRowValueChange(setNumber, null, 'weight', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} />
+          <Input type="number" value={getEditValue(setNumber, 'reps')} onChange={(e) => handleRowValueChange(setNumber, null, 'reps', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} />
+          <Input type="number" value={getEditValue(setNumber, 'rir')} onChange={(e) => handleRowValueChange(setNumber, null, 'rir', e.target.value)} onBlur={commitIfNeeded} placeholder="" className="h-7 text-sm tabular-nums" disabled={loading} />
 
           {showCheckColumn && (
             <div className="flex justify-end">
@@ -564,22 +581,21 @@ export default function ExerciseCard({
               const currentType = loggedSet ? loggedSet.setType : getEditSetType(setNumber);
               const isWarmup = currentType === SetType.WARMUP;
 
-              // In edit mode (e.g. past workout tracking), auto-commit planned unlogged sets
-              // that have valid values so the user doesn't need a separate "log" step / column.
-              if (mode === 'edit' && !loggedSet) {
-                const ev = editValues[setNumber] || {};
-                const w = parseFloat(ev.weight ?? plannedSet.weight?.toString() ?? '0');
-                const r = parseInt(ev.reps ?? plannedSet.reps?.toString() ?? '0');
-                if (w > 0 && r > 0) {
-                  setTimeout(() => handleLogSet(setNumber), 0);
-                }
-              }
-
               const gridClass = `grid ${colTemplate} items-center gap-x-2 py-1.5 border-b border-border last:border-b-0`;
 
               const swipeKey = setNumber;
               const swipeOffset = activeSwipe && activeSwipe.key === swipeKey ? activeSwipe.offset : 0;
               const swipeClass = swipeOffset > 0 ? 'bg-primary/5' : swipeOffset < 0 ? 'bg-destructive/5' : '';
+
+              const commitIfNeeded = () => {
+                if (mode === 'edit' && !loggedSet) {
+                  const w = parseFloat(getEditValue(setNumber, 'weight') || plannedSet.weight?.toString() || '0');
+                  const r = parseInt(getEditValue(setNumber, 'reps') || plannedSet.reps?.toString() || '0');
+                  if (w > 0 && r > 0) {
+                    handleLogSet(setNumber);
+                  }
+                }
+              };
 
               return (
                 <div
@@ -617,6 +633,7 @@ export default function ExerciseCard({
                       step="0.5"
                       value={isEditingThis ? editingValues.weight : (loggedSet ? loggedSet.weight.toString() : getEditValue(setNumber, 'weight'))}
                       onChange={(e) => handleRowValueChange(setNumber, loggedSet ?? null, 'weight', e.target.value)}
+                      onBlur={commitIfNeeded}
                       placeholder="0"
                       className="h-7 text-sm tabular-nums"
                       disabled={loading}
@@ -627,6 +644,7 @@ export default function ExerciseCard({
                       type="number"
                       value={isEditingThis ? editingValues.reps : (loggedSet ? loggedSet.reps.toString() : getEditValue(setNumber, 'reps'))}
                       onChange={(e) => handleRowValueChange(setNumber, loggedSet ?? null, 'reps', e.target.value)}
+                      onBlur={commitIfNeeded}
                       placeholder="0"
                       className="h-7 text-sm tabular-nums"
                       disabled={loading}
@@ -637,6 +655,7 @@ export default function ExerciseCard({
                       type="number"
                       value={isEditingThis ? editingValues.rir : (loggedSet ? (loggedSet.rir != null ? loggedSet.rir.toString() : '') : getEditValue(setNumber, 'rir'))}
                       onChange={(e) => handleRowValueChange(setNumber, loggedSet ?? null, 'rir', e.target.value)}
+                      onBlur={commitIfNeeded}
                       placeholder=""
                       className="h-7 text-sm tabular-nums"
                       disabled={loading}
