@@ -112,6 +112,19 @@ Ab sofort arbeiten wir in **Phase 4: Workout Screen**.
 
 **Mobile-Fix:** Allen Karten-Icons `flex-shrink-0` und den `.flex-1`-Containern `min-w-0` hinzugefügt. Verhindert, dass bei schmalen Mobile-Viewports der Icon "verschwindet" (durch Content mit hoher min-width wie lange Set-Texte in der Suggested-Liste geclippt oder aus dem Flow gedrängt wird).
 
+**Phase 4 – Workout Screen (visuelle + UX Migration) als abgeschlossen markiert.**
+
+**Zusammenfassung des abgeschlossenen Schritts (April 2026):**
+- Workout Start Screen: Vollständige shadcn/sera-Migration aller Cards (inkl. Alignment der "Vorgeschlagenes Workout"-Card mit Icon + normaler Typografie), Modals (Gym, Past, Template, Cycle), Flows (Vergangenes tracken mit Steps + Zurück/Weiter).
+- Active Workout Screen + ExerciseCard: Tiefe Refactoring (Entfernung isExerciseComplete + geplant/ungeplant Tracking, Long-Press Drag, Tap-to-Collapse, Table-Layout für Sets, LTR/RTL Swipe für Log/Delete, Collapsed Horizontal Bars, immer editierbare Inputs nach Log, etc.).
+- Completion Flow: Completion Confirmation (Blueprint + Save-as-Template), WorkoutCompletionModal (Slideshow mit Stats, Confetti, PRs) und Save-Template-Input vollständig auf shadcn migriert + poliert (inkl. a11y, Icons, Farben, Mobile-Fixes).
+- Alle Entry-Points (vorgeschlagen, frei, Vorlage, Zyklus, Vergangenes) nutzen nun einheitliche UI-Patterns.
+- Konsistenz: Tabler Icons, semantische Tokens, scharfe Ecken (sera), Card-Composition, keine Hard-Farben.
+- Bugfixes & Polish währenddessen: CORS/Dev für Mobile-Testing, diverse kleine Fixes.
+- Tests/Lint: eslint --max-warnings=0 + tsc clean nach jedem relevanten Schritt, Commits/Pushes regelmäßig.
+
+Der Workout Screen (Start + Active + Completion) ist nun visuell und UX-technisch auf dem gewünschten Niveau und bereit für die Extraktion als wiederverwendbare Komponente.
+
 ---
 
 ### Phase 4 – Vorläufige Ziele (weiterhin gültig)
@@ -121,39 +134,76 @@ Ab sofort arbeiten wir in **Phase 4: Workout Screen**.
 - Gezielte UX-Verbesserungen (nicht nur Optik)
 - Erstellung von hochwertigen, wiederverwendbaren Komponenten (z.B. Exercise Selector, Set Logger, Rest Timer Controls, Workout Header etc.)
 
-**Nächster Schritt:** Gemeinsame Priorisierung der nächsten Themen in Phase 4 (voraussichtlich Active Workout Screen + erste Shared Components).
+**Nächster Schritt:** Phase 4 – Teil 3: Extraktion Shared Components für einheitlichen Workout Screen / WorkoutExercise mit Modi (siehe neuen Abschnitt unten). User hat den UI/UX-Teil des Workout Screens als abgeschlossen betrachtet.
+
+**Erster Schritt der Shared Komponente (dieser Commit):**
+- Zentrale Komponente `ActiveWorkoutScreen` (zukünftig `WorkoutScreen`) erweitert um `mode?: 'active' | 'edit'`.
+- `ExerciseCard` unterstützt jetzt `mode`, im 'edit' Modus wird die Checkhaken-Spalte (Logging) komplett entfernt (Grid auf 4 Spalten, keine Log-Buttons/Swipes für Log).
+- Für den Einstiegspunkt "Vergangenes Workout tracken" wird nun explizit `mode="edit"` verwendet (kein Live-Timer, stattdessen Dauer-Input wie bisher; keine Logging-UI).
+- Timer (Workout + Rest + Pause) nur im 'active' Modus (bzw. !isPast).
+- Alle anderen Funktionen (Add/Remove/Reorder/Replace, Edit Sets, Swipe für Delete bei ungeloggten in active, Additional Sets, etc.) bleiben gleich.
+- Vorbereitung für zukünftige Nutzung in Template-Editor, Cycle Wizard, History Edit (dort wird der parent die Daten/Callbacks liefern, die Komponente rendert die einheitliche Ansicht im edit Modus).
 
 ---
 
-### Phase 4 – Teil 2: Active Workout Screen – Vereinfachung der ExerciseCard & Shared Component (laufend)
+### Phase 4 – Teil 2: Active Workout Screen – Vereinfachung der ExerciseCard & Completion Flow (abgeschlossen)
 
-**Entscheidung (April 2026):**
+**Abschlussdatum:** April 2026
 
-Die strikte Unterscheidung zwischen **geplanten und ungeplanten Sätzen** während der Live-Ausführung wird weitgehend entfernt.
+**Erreichtes (Zusammenfassung):**
+- Entfernung der `isExerciseComplete`-Logik und der Live-Unterscheidung "geplant vs. ungeplant" während der Execution (wie vom User gewünscht und begründet).
+- Tiefe UX-Modernisierung der `ExerciseCard` (Long-Press Drag-Reorder, Tap Header für Collapse/Expand, Table-Layout für Sets mit (2x)-Labels, LTR-Swipe zum Loggen, RTL-Swipe zum Entfernen ungeloggter Sätze, Collapsed Horizontal Bars für Fortschritt, immer editierbare Inputs auch nach dem Loggen, fat Check als reiner Indicator, einheitliche Behandlung von Additional Sets).
+- Completion Flow vollständig auf shadcn/sera (Confirmation mit Blueprint-Update + Save-as-Template, WorkoutCompletionModal mit Slides/Confetti/PRs, Save-Template-Input-Dialog).
+- Alle Entry-Points (vorgeschlagenes, freies, Vorlage, Zyklus, Vergangenes) nutzen einheitliche Patterns und die gleiche `ExerciseCard`-Logik.
+- Konsistenz, Accessibility, Mobile-Fixes, Icons, Tokens durchgängig angewendet.
+- Regelmäßige Lint/TSC/Commits.
 
-**Begründung:**
-- Das Backend persistiert diese Unterscheidung nicht wirklich (außer als initiale `plannedSets` aus dem Blueprint beim Laden eines Workouts).
-- Die gesamte Tracking-Logik (`unplannedSets`, `removedPlannedSets`, komplexe `isExerciseComplete`-Berechnungen etc.) ist ein reines Frontend-Konstrukt für den Live-Modus.
-- Für die gewünschte Flexibilität ("der User kann jederzeit alles ändern") bringt diese Unterscheidung während des Trainings mehr kognitiven Overhead als echten Mehrwert.
-- Geplante Sätze bleiben relevant **beim Laden** eines Workouts aus einem Blueprint oder einer Vorlage (als initiale Anzeige), aber nicht als laufendes Tracking-Konzept während der Ausführung.
+**Fazit Teil 2:** Der aktive Workout Screen (inkl. ExerciseCard und Completion) ist nun visuell, UX-seitig und technisch auf einem hohen, einheitlichen Niveau.
 
-**Auswirkungen auf die Architektur:**
-- Die `ExerciseCard` (bzw. zukünftige Shared Komponente) wird dadurch massiv vereinfacht.
-- Folgende Logik kann entfernt oder stark reduziert werden:
-  - Lokales `unplannedSets`-State-Management
-  - `removedPlannedSets` Tracking im Context
-  - Große Teile der Completion-Validierung, die zwischen geplant/ungeplant unterscheidet
-- Die Shared Component soll in Zukunft folgende Modi unterstützen:
-  - Live Execution (Logging von Sätzen)
-  - Editor (Template-Erstellung, Cycle Wizard, Blueprint-Bearbeitung)
-  - Review (fertiges Workout anschauen / vergangenes Workout nachtragen)
+---
 
-**Nächste Schritte (Phase 4 – Active Workout):**
-1. Deep Dive + Dokumentation der aktuellen Logik in `ExerciseCard` und `WorkoutContext`.
-2. Entfernen der geplant/ungeplant-Tracking-Logik während der Ausführung.
-3. Reines shadcn-Upgrade der äußeren Hülle von `ActiveWorkoutScreen`.
-4. Schrittweise Modernisierung und Vereinfachung der `ExerciseCard`.
-5. Extraktion einer wiederverwendbaren `WorkoutExercise`-Komponente (mit Modus-Unterscheidung).
+### Phase 4 – Teil 3: Extraktion Shared Components – Einheitlicher Workout Screen / WorkoutExercise (neu)
+
+**Ziel (wie vom User im April 2026 formuliert):**
+- Der **Workout Screen** (bzw. der Kern: die Ansicht mit der Liste von Übungen/Sätzen) soll als **eine einzige, wiederverwendbare Shared Component** zur Verfügung stehen.
+- Jeder Einstiegspunkt (vorgeschlagenes Workout, freies Workout, Vorlage, Zyklus, etc.) soll **dieselbe Komponente** laden – keine parallelen Implementierungen mehr.
+- Dieselbe Ansicht soll später an anderen Stellen der App genutzt werden können:
+  - Vorlagenerstellung und -bearbeitung (Editor-Modus)
+  - Cycle Wizard / Blueprint-Bearbeitung
+  - History Review (Review-Modus)
+  - Evtl. weitere Previews
+- **Vorteil:** Änderungen (z. B. neue Swipe-Geste, neues Set-Layout, neue Validierung) müssen nur noch **an einer zentralen Stelle** gemacht werden. Das reduziert Drift, Wartungsaufwand und Inkonsistenzen massiv.
+
+**Aus Sicht des Agenten: Ja, das macht absolut Sinn.**
+- Aktuell gibt es bereits Duplikation (z. B. `workout/exercise-card.tsx` für Live, `templates/template-exercise-card.tsx`, `cycles/blueprint-exercise-editor-card.tsx`, verschiedene SelectedExerciseCards in Analytics/History).
+- Die Philosophie "Flexibilität über Rigidität" gilt für den User-Flow, nicht für die UI-Implementierung. Eine zentrale Komponente mit klaren Modi (execution | editor | review) passt perfekt.
+- Der `WorkoutContext` kann als zentrale State-Logik dienen oder in Modi aufgeteilt werden.
+- Vorbereitung: Die jüngsten Refactorings an `ExerciseCard` (Entfernung geplant/ungeplant, Table, Swipe, etc.) und die Vereinheitlichung der Entry-Points waren genau die notwendige Vorarbeit.
+
+**Geplanter Ansatz (detaillierter Plan folgt nach Analyse):**
+1. **Analyse aller Entry-Points und aktuellen Implementierungen** (start-screen, active-workout-screen, template-editor-screen, cycle editors, history views, analytics).
+2. **Identifikation der gemeinsamen Teile**: Exercise List Rendering, Set Logging/Editing, Add/Remove/Reorder/Replace, Validation, Swipe/Table-UI, etc.
+3. **Design der Shared Component**:
+   - Primär-Kandidat: `WorkoutExercise` (oder `WorkoutView`) mit `mode` Prop (`"execution" | "editor" | "review"`).
+   - Oder eine Komposition aus kleineren Shared Pieces (`ExerciseList`, `SetRow`, `ExerciseHeader` etc.) + Modi.
+   - Props: `exercises`, `onLogSet`, `onUpdateSet`, `onAddExercise`, `readonly`, `showPlannedDefaults`, etc.
+   - Wiederverwendung des bestehenden `WorkoutContext` wo sinnvoll, oder Kontext-Provider pro Modus.
+4. **Migration schrittweise**:
+   - Zuerst die Live-Execution (active-workout) auf die Shared Komponente umstellen.
+   - Dann Template-Editor (ersetzt TemplateExerciseCard).
+   - Dann Cycle/Blueprint.
+   - History Review.
+   - Sicherstellen, dass alle Entry-Points (vorgeschlagen, frei, Vorlage...) die **gleiche Komponente** rendern.
+5. **Dokumentation & Tests**: Jeder Modus mit Beispielen, Unit-Tests für gemeinsame Logik.
+6. **Zusätzliche Shared Pieces** (falls noch nicht vorhanden): ExerciseSelector (bereits ExerciseSelectionModal + EditorDialog), Set-Logger etc.
+
+**Nächste konkrete Schritte (nach User-Bestätigung):**
+- Analyse der aktuellen Code-Basen (Einstiegspunkte, Duplikationen).
+- Erstellung eines detaillierten Design-Dokuments / API-Sketch für die Shared Component.
+- Entscheidung: Eine große `WorkoutScreen`-Komponente oder feingranularere `WorkoutExercise` + Komposition?
+- Implementierung starten (beginnend mit der Live-Execution als Referenz-Implementierung).
+
+Das passt perfekt zur Projekt-Philosophie (Flexibilität für den User, aber saubere, wartbare Architektur) und zu den früheren Plänen ("Bevor wir die Shared Component extrahieren..."). Wir vermeiden zukünftig parallele Implementierungen und gewinnen massiv an Konsistenz und Wartbarkeit.
 
 ---
 

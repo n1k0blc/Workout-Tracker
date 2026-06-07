@@ -28,7 +28,8 @@ export default function WorkoutPage() {
     pendingTemplateSave, 
     cancelTemplateSave, 
     completeTemplateSave,
-    initTemplateSave 
+    initTemplateSave,
+    isPastWorkout 
   } = useWorkout();
   const [templateName, setTemplateName] = useState('');
   const [savingTemplate, setSavingTemplate] = useState(false);
@@ -99,7 +100,10 @@ export default function WorkoutPage() {
             <div className="text-lg text-muted-foreground">Lädt...</div>
           </div>
         ) : activeWorkout?.status === 'IN_PROGRESS' ? (
-          <ActiveWorkoutScreen onWorkoutComplete={handleWorkoutComplete} />
+          <ActiveWorkoutScreen 
+            mode={isPastWorkout ? 'edit' : 'active'} 
+            onWorkoutComplete={handleWorkoutComplete} 
+          />
         ) : (
           <WorkoutStartScreen />
         )}

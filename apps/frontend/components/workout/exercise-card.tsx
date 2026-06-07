@@ -36,12 +36,14 @@ import {
 interface ExerciseCardProps {
   exercise: ExerciseLog;
   exerciseNumber: number;
+  mode?: 'active' | 'edit';
 }
 
 
 export default function ExerciseCard({
   exercise,
   exerciseNumber,
+  mode = 'active',
 }: ExerciseCardProps) {
   const { 
     removeExercise, 
@@ -78,6 +80,11 @@ export default function ExerciseCard({
   };
 
   const hasPlannedSets = exercise.plannedSets && exercise.plannedSets.length > 0;
+
+  const showCheckColumn = mode === 'active';
+  const colTemplate = showCheckColumn
+    ? 'grid-cols-[auto_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)_auto]'
+    : 'grid-cols-[auto_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)]';
 
   // Local drafts for additional/extra sets (free workouts or sets beyond planned).
   // These are UI-only (not persisted in context) – backend only cares about final logs.
@@ -332,7 +339,7 @@ export default function ExerciseCard({
 
   // Render helpers for extra rows (used to render logged extras + unlogged drafts in a single sorted-by-setNumber list)
   const renderDraftRow = (setNumber: number) => {
-    const gridClass = "grid grid-cols-[auto_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)_auto] items-center gap-x-2 py-1.5 border-b border-border last:border-b-0";
+    const gridClass = `grid ${colTemplate} items-center gap-x-2 py-1.5 border-b border-border last:border-b-0`;
     const isWarmup = getEditSetType(setNumber) === SetType.WARMUP;
 
     const swipeKey = `add-${setNumber}`;
@@ -371,18 +378,20 @@ export default function ExerciseCard({
           <Input type="number" value={getEditValue(setNumber, 'reps')} onChange={(e) => handleRowValueChange(setNumber, null, 'reps', e.target.value)} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} />
           <Input type="number" value={getEditValue(setNumber, 'rir')} onChange={(e) => handleRowValueChange(setNumber, null, 'rir', e.target.value)} placeholder="" className="h-7 text-sm tabular-nums" disabled={loading} />
 
-          <div className="flex justify-end">
-            <button onClick={() => handleLogSet(setNumber)} disabled={loading} className="p-0.5" title="Satz loggen (oder Swipe LTR)">
-              <IconCheck className="size-4 text-muted-foreground/60 hover:text-primary" />
-            </button>
-          </div>
+          {showCheckColumn && (
+            <div className="flex justify-end">
+              <button onClick={() => handleLogSet(setNumber)} disabled={loading} className="p-0.5" title="Satz loggen (oder Swipe LTR)">
+                <IconCheck className="size-4 text-muted-foreground/60 hover:text-primary" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
   };
 
   const renderLoggedExtraRow = (set: SetLog) => {
-    const gridClass = "grid grid-cols-[auto_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)_auto] items-center gap-x-2 py-1.5 border-b border-border last:border-b-0";
+    const gridClass = `grid ${colTemplate} items-center gap-x-2 py-1.5 border-b border-border last:border-b-0`;
     const isWarmup = set.setType === SetType.WARMUP;
     const isEditingThis = editingSetId === set.id;
 
@@ -436,11 +445,13 @@ export default function ExerciseCard({
           />
 
           {/* Check cell - fat only, no buttons (delete via swipe) */}
-          <div className="flex justify-end">
-            <button disabled={loading} className="p-0.5" title="Geloggt (nicht entloggen möglich; Swipe RTL zum Löschen)">
-              <IconCheck className="size-4 text-foreground stroke-[3]" />
-            </button>
-          </div>
+          {showCheckColumn && (
+            <div className="flex justify-end">
+              <button disabled={loading} className="p-0.5" title="Geloggt (nicht entloggen möglich; Swipe RTL zum Löschen)">
+                <IconCheck className="size-4 text-foreground stroke-[3]" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -520,12 +531,12 @@ export default function ExerciseCard({
         {!isCollapsed && (
           <CardContent className="p-2 sm:p-3">
             {/* Compact column header (optional, saves space on mobile) */}
-            <div className="grid grid-cols-[auto_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)_auto] items-center gap-x-2 px-1 pb-1 text-[10px] text-muted-foreground font-medium">
+            <div className={`grid ${colTemplate} items-center gap-x-2 px-1 pb-1 text-[10px] text-muted-foreground font-medium`}>
               <div></div>
               <div>Gewicht{exercise.isDoubleWeight ? ' (2x)' : ''}</div>
               <div>Wdh{exercise.isUnilateral ? ' (2x)' : ''}</div>
               <div>RIR</div>
-              <div className="text-center">✓</div>
+              {showCheckColumn && <div className="text-center">✓</div>}
             </div>
 
             {/* Planned Sets as table rows (filter skipped unlogged ones) */}
@@ -538,7 +549,7 @@ export default function ExerciseCard({
               const currentType = loggedSet ? loggedSet.setType : getEditSetType(setNumber);
               const isWarmup = currentType === SetType.WARMUP;
 
-              const gridClass = "grid grid-cols-[auto_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)_auto] items-center gap-x-2 py-1.5 border-b border-border last:border-b-0";
+              const gridClass = `grid ${colTemplate} items-center gap-x-2 py-1.5 border-b border-border last:border-b-0`;
 
               const swipeKey = setNumber;
               const swipeOffset = activeSwipe && activeSwipe.key === swipeKey ? activeSwipe.offset : 0;
@@ -605,18 +616,20 @@ export default function ExerciseCard({
                       disabled={loading}
                     />
 
-                    {/* Check / actions cell - always same columns; no extra buttons on logged (prevents shift); fat check is indicator only */}
-                    <div className="flex justify-end">
-                      {loggedSet ? (
-                        <button disabled={loading} className="p-0.5" title="Geloggt (nicht entloggen möglich; Swipe RTL zum Löschen)">
-                          <IconCheck className="size-4 text-foreground stroke-[3]" />
-                        </button>
-                      ) : (
-                        <button onClick={() => handleLogSet(setNumber)} disabled={loading} className="p-0.5" title="Satz loggen (oder Swipe LTR)">
-                          <IconCheck className="size-4 text-muted-foreground/60 hover:text-primary" />
-                        </button>
-                      )}
-                    </div>
+                    {/* Check / actions cell - only in active mode (no logging in edit mode) */}
+                    {showCheckColumn && (
+                      <div className="flex justify-end">
+                        {loggedSet ? (
+                          <button disabled={loading} className="p-0.5" title="Geloggt (nicht entloggen möglich; Swipe RTL zum Löschen)">
+                            <IconCheck className="size-4 text-foreground stroke-[3]" />
+                          </button>
+                        ) : (
+                          <button onClick={() => handleLogSet(setNumber)} disabled={loading} className="p-0.5" title="Satz loggen (oder Swipe LTR)">
+                            <IconCheck className="size-4 text-muted-foreground/60 hover:text-primary" />
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               );

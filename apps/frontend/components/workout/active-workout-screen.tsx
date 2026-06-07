@@ -44,9 +44,10 @@ import {
 
 interface ActiveWorkoutScreenProps {
   onWorkoutComplete: (workout: Workout, prs: PersonalRecord[], saveAsTemplate: boolean) => void;
+  mode?: 'active' | 'edit';
 }
 
-export default function ActiveWorkoutScreen({ onWorkoutComplete }: ActiveWorkoutScreenProps) {
+export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active' }: ActiveWorkoutScreenProps) {
   const router = useRouter();
   const {
     activeWorkout,
@@ -222,7 +223,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete }: ActiveWorkout
                 )}
               </div>
               <div className="flex items-center gap-3">
-                {!isPastWorkout ? (
+                {mode === 'active' && !isPastWorkout ? (
                   <>
                     <div className="flex flex-col items-end gap-2">
                       <WorkoutTimer workoutDuration={workoutDuration} />
@@ -242,7 +243,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete }: ActiveWorkout
                       )}
                     </Button>
                   </>
-                ) : (
+                ) : isPastWorkout ? (
                   <div className="flex items-center gap-2">
                     <Label className="text-sm">Dauer (Min):</Label>
                     <Input
@@ -256,7 +257,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete }: ActiveWorkout
                       className="w-20"
                     />
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
           </div>
@@ -279,6 +280,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete }: ActiveWorkout
                     key={exercise.id}
                     exercise={exercise}
                     exerciseNumber={idx + 1}
+                    mode={mode}
                   />
                 ))}
               </SortableContext>
