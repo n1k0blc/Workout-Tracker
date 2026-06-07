@@ -215,6 +215,21 @@ export default function ExerciseCard({
         [field]: value,
       },
     }));
+
+    // In edit mode, auto-commit (log) draft/unlogged planned sets as soon as they have valid weight + reps.
+    // This allows saving past workouts / edits without an explicit "log" UI/column.
+    if (mode === 'edit' && (field === 'weight' || field === 'reps')) {
+      // Use microtask so the state update has flushed
+      Promise.resolve().then(() => {
+        const wStr = field === 'weight' ? (value as string) : (editValues[setNumber]?.weight ?? '');
+        const rStr = field === 'reps' ? (value as string) : (editValues[setNumber]?.reps ?? '');
+        const w = parseFloat(wStr || '0');
+        const r = parseInt(rStr || '0');
+        if (w > 0 && r > 0 && !getLoggedSet(setNumber)) {
+          handleLogSet(setNumber);
+        }
+      });
+    }
   };
 
   const getEditValue = (setNumber: number, field: 'weight' | 'reps' | 'rir'): string => {
@@ -548,6 +563,17 @@ export default function ExerciseCard({
               const isEditingThis = editingSetId === loggedSet?.id;
               const currentType = loggedSet ? loggedSet.setType : getEditSetType(setNumber);
               const isWarmup = currentType === SetType.WARMUP;
+
+              // In edit mode (e.g. past workout tracking), auto-commit planned unlogged sets
+              // that have valid values so the user doesn't need a separate "log" step / column.
+              if (mode === 'edit' && !loggedSet) {
+                const ev = editValues[setNumber] || {};
+                const w = parseFloat(ev.weight ?? plannedSet.weight?.toString() ?? '0');
+                const r = parseInt(ev.reps ?? plannedSet.reps?.toString() ?? '0');
+                if (w > 0 && r > 0) {
+                  setTimeout(() => handleLogSet(setNumber), 0);
+                }
+              }
 
               const gridClass = `grid ${colTemplate} items-center gap-x-2 py-1.5 border-b border-border last:border-b-0`;
 
