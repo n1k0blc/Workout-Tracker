@@ -58,6 +58,25 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
       const details = currentAvailable.find((e) => e.id === ex.exerciseId);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- bridge (see Technical Debt in plan for completed/template edit via shared component)
       const raw = ex as any;
+      const templateSetsForEx = raw.sets || [];
+
+      // Pre-populate performed `sets` from the template targets.
+      // This ensures that on load of an existing template, ex.sets.length > 0 immediately.
+      // The card's edit-mode auto-commit effect (which has a w>0 && r>0 guard and setTimeout)
+      // is then skipped by its own getLoggedSet check, avoiding duplicates.
+      // Without this, save validation ("jede Übung muss mind. 1 Satz") could fail for pre-existing data
+      // until the user manually touches a set (which forces a context mutation).
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- template target set -> synthetic SetLog (debt bridge)
+      const performedSets = templateSetsForEx.map((ts: any, sIdx: number) => ({
+        id: `setlog-${Date.now()}-${sIdx}`,
+        setNumber: ts.order || sIdx + 1,
+        setType: ts.isWarmup ? SetType.WARMUP : SetType.WORKING,
+        reps: ts.targetReps ?? 0,
+        weight: ts.targetWeight ?? 0,
+        rir: ts.targetRir ?? 0,
+        completedAt: now,
+      }));
+
       return {
         id: raw.id || `ex-${Date.now()}-${idx}`,
         exerciseId: ex.exerciseId,
@@ -65,8 +84,8 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
         isUnilateral: details?.isUnilateral,
         isDoubleWeight: details?.isDoubleWeight,
         order: ex.order || idx + 1,
-        sets: [], // will be populated via the edit-mode mount commit from plannedSets
-        plannedSets: mapTemplateSetsToPlanned(raw.sets || []),
+        sets: performedSets,
+        plannedSets: mapTemplateSetsToPlanned(templateSetsForEx),
       };
     });
 
@@ -157,8 +176,16 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
       return;
     }
 
-    // Validate every exercise has at least one set (template requirement)
-    const hasEmpty = current.exercises.some((ex) => (ex.sets?.length || 0) === 0);
+    // Validate every exercise has at least one set (template requirement).
+    // We check both .sets (performed, pre-populated for loaded templates or added via UI)
+    // and .plannedSets (fallback for the synthetic bridge). This is defensive because
+    // the shared component's edit-mode auto-commit (from plannedSets -> sets) uses
+    // setTimeout + a w>0/r>0 guard that doesn't always fire immediately for template data.
+    const hasEmpty = current.exercises.some((ex) => {
+      const committed = ex.sets?.length || 0;
+      const planned = ex.plannedSets?.length || 0;
+      return committed === 0 && planned === 0;
+    });
     if (hasEmpty) {
       alert('Jede Übung muss mindestens einen Satz haben.');
       return;
