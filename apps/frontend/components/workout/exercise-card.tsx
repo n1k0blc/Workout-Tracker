@@ -44,6 +44,13 @@ interface ExerciseCardProps {
   allowExerciseActions?: boolean;    // Show Replace and Delete-Exercise buttons in header
   allowSetManagement?: boolean;      // Show "+ Satz hinzufügen" and per-set delete
   allowLogging?: boolean;            // Show check column, enable log behavior and LTR swipe logging
+
+  // Optional handlers for controlled usage (e.g. templates without context hijack)
+  onRemoveExercise?: (exerciseId: string) => void | Promise<void>;
+  onReplaceExercise?: (exerciseId: string, newExerciseId: string) => void | Promise<void>;
+  onAddSet?: (exerciseId: string) => void;
+  onRemoveSet?: (exerciseId: string, setId: string) => void;
+  onUpdateSet?: (exerciseId: string, setId: string, data: { reps?: number; weight?: number; rir?: number; setType?: SetType }) => void | Promise<void>;
 }
 
 
@@ -55,6 +62,11 @@ export default function ExerciseCard({
   allowExerciseActions,
   allowSetManagement,
   allowLogging,
+  onRemoveExercise,
+  onReplaceExercise,
+  onAddSet,
+  onRemoveSet,
+  onUpdateSet,
 }: ExerciseCardProps) {
   // Derive effective flags. For 'active' everything is on.
   // For 'edit' the caller decides (History: all structural/logging off; Blueprint: structural on, logging off).
@@ -63,14 +75,19 @@ export default function ExerciseCard({
   const effectiveAllowSetManagement = allowSetManagement ?? (mode === 'active');
   const effectiveAllowLogging = allowLogging ?? (mode === 'active');
   const { 
-    removeExercise, 
-    replaceExercise, 
+    removeExercise: contextRemoveExercise, 
+    replaceExercise: contextReplaceExercise, 
     logSet, 
-    updateSet, 
+    updateSet: contextUpdateSet, 
     loading,
     activeWorkout,
     setActiveWorkoutDirectly,
   } = useWorkout();
+
+  // Prefer injected handlers (for decoupled template usage, no context hijack) over context
+  const removeExercise = onRemoveExercise || contextRemoveExercise;
+  const replaceExercise = onReplaceExercise || contextReplaceExercise;
+  const updateSet = onUpdateSet || contextUpdateSet;
 
   const [editValues, setEditValues] = useState<{[key: number]: {weight: string, reps: string, rir: string, setType: SetType}}>({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);

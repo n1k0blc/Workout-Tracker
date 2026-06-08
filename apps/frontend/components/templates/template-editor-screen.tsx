@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
-import { Exercise, HomeGym, Workout, WorkoutStatus, SetType, PlannedSet, WorkoutTemplateExercise } from '@/types';
+import { Exercise, HomeGym, ExerciseLog, SetType } from '@/types';
+import { Workout } from '@/types'; // temporary for any remnants, can be removed
 import { ProtectedRoute } from '@/components/protected-route';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,8 +12,9 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Field, FieldLabel } from '@/components/ui/field';
 import ExerciseCard from '@/components/workout/exercise-card';
+import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import { useWorkout } from '@/lib/workout-context';
-import { IconChevronLeft } from '@tabler/icons-react';
+import { IconChevronLeft, IconPlus } from '@tabler/icons-react';
 import {
   DndContext,
   closestCenter,
@@ -34,13 +36,18 @@ interface TemplateEditorScreenProps {
 
 export default function TemplateEditorScreen({ templateId }: TemplateEditorScreenProps) {
   const router = useRouter();
-  const { setActiveWorkoutDirectly, activeWorkout, reorderExercises } = useWorkout();
+  const { activeWorkout } = useWorkout();
 
   const [name, setName] = useState('');
   const [recommendedGymId, setRecommendedGymId] = useState<string>('');
   const [availableGyms, setAvailableGyms] = useState<HomeGym[]>([]);
   const [loading, setLoading] = useState(!!templateId);
   const [saving, setSaving] = useState(false);
+  const [showExerciseModal, setShowExerciseModal] = useState(false);
+
+  // Local exercises state (ExerciseLog shape for compatibility with central ExerciseCard).
+  // This removes the need for context hijack / synthetic workout for templates.
+  const [exercises, setExercises] = useState<ExerciseLog[]>([]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -56,82 +63,35 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over || active.id === over.id || !activeWorkout) return;
+    if (!over || active.id === over.id) return;
 
-    const oldIndex = activeWorkout.exercises.findIndex((ex) => ex.id === active.id);
-    const newIndex = activeWorkout.exercises.findIndex((ex) => ex.id === over.id);
+    const oldIndex = exercises.findIndex((ex) => ex.id === active.id);
+    const newIndex = exercises.findIndex((ex) => ex.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
 
-    const newExercises = [...activeWorkout.exercises];
-    const [moved] = newExercises.splice(oldIndex, 1);
-    newExercises.splice(newIndex, 0, moved);
+    const newList = [...exercises];
+    const [moved] = newList.splice(oldIndex, 1);
+    newList.splice(newIndex, 0, moved);
 
-    // Reorder via context (will use local mutation for our blueprint synthetic)
-    reorderExercises(newExercises.map((ex) => ex.id));
+    setExercises(newList.map((ex, i) => ({ ...ex, order: i + 1 })));
   };
 
-  // Helper: map a template's target sets into PlannedSet shape for the synthetic workout
-  // (input from template model or our synthetic; documented as Technical Debt bridge to shared component)
-  const mapTemplateSetsToPlanned = (sets: unknown[]): PlannedSet[] => {
-    return (sets || []).map((s, idx) => {
-      const raw = s as any; // eslint-disable-line @typescript-eslint/no-explicit-any -- narrow inside bridge helper
-      return {
-        id: raw.id || `planned-${Date.now()}-${idx}`,
-        order: raw.order || idx + 1,
-        setType: (raw.isWarmup ? SetType.WARMUP : SetType.WORKING) as SetType,
-        reps: raw.targetReps ?? 0,
-        weight: raw.targetWeight ?? 0,
-        rir: raw.targetRir ?? 0,
-        restAfterSet: 0,
-      };
-    });
-  };
+  const handleAddExercise = (exerciseId: string) => {
+    const exDetails = availableExercises.find((e) => e.id === exerciseId);
+    if (!exDetails) return;
 
-  // Build a synthetic Workout-shaped object so the shared edit component + context can be used.
-  // We use status COMPLETED to reuse the existing local-only mutation hack (no real API calls for mutations).
-  // Pass the current available list explicitly for unilateral/double-weight enrichment (avoids stale state).
-  const buildSyntheticWorkout = (
-    templateExercises: WorkoutTemplateExercise[] | undefined,
-    idForTemplate?: string,
-    currentAvailable: Exercise[] = []
-  ): Workout => {
-    const now = new Date().toISOString();
-    const exs = (templateExercises || []).map((ex, idx) => {
-      const details = currentAvailable.find((e) => e.id === ex.exerciseId);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- bridge (see Technical Debt in plan for completed/template edit via shared component)
-      const raw = ex as any;
-      const templateSetsForEx = raw.sets || [];
-
-      // Keep sets: [] (only populate plannedSets) for template synthetics.
-      // This way the card treats rows as unlogged planned slots:
-      // - replace button not disabled (guard is sets.length > 0)
-      // - swipe RTL delete allowed (only for !logged)
-      // Save validation + payload already support plannedSets as source for templates.
-      // (We previously pre-populated sets to satisfy old strict validation, but that
-      // activated the "logged sets are immutable" guards in the card, breaking delete/replace.)
-      return {
-        id: raw.id || `ex-${Date.now()}-${idx}`,
-        exerciseId: ex.exerciseId,
-        exerciseName: ex.exerciseName || '',
-        isUnilateral: details?.isUnilateral,
-        isDoubleWeight: details?.isDoubleWeight,
-        order: ex.order || idx + 1,
-        sets: [],
-        plannedSets: mapTemplateSetsToPlanned(templateSetsForEx),
-      };
-    });
-
-    return {
-      id: idForTemplate ? `template-${idForTemplate}` : `new-template-${Date.now()}`,
-      date: now,
-      status: WorkoutStatus.COMPLETED,   // still used for the local-mutation short-circuit (see debt)
-      isFreeWorkout: true,
-      // Clean flag for the shared component + card to know this is a pure plan/blueprint edit
-      // (not a performed session). This replaces scattered ID-prefix checks.
-      blueprintEdit: true,
-      exercises: exs,
-      createdAt: now,
-    } as any;  // eslint-disable-line @typescript-eslint/no-explicit-any -- blueprintEdit + synthetic for edit mode (debt bridge)
+    const newEx: ExerciseLog = {
+      id: `ex-${Date.now()}`,
+      exerciseId,
+      exerciseName: exDetails.name,
+      order: exercises.length + 1,
+      sets: [],
+      plannedSets: [],
+      isUnilateral: exDetails.isUnilateral,
+      isDoubleWeight: exDetails.isDoubleWeight,
+    };
+    setExercises(prev => [...prev, newEx]);
+    setShowExerciseModal(false);
   };
 
   const loadData = useCallback(async () => {
@@ -150,27 +110,37 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
         setName(template.name);
         setRecommendedGymId(template.recommendedGymId || '');
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- API response normalization for template exercises (pre-existing pattern)
-        const fixedExercises = (template.exercises || []).map((ex: any, idx: number) => ({
-          ...ex,
+        // Build local exercises in ExerciseLog shape for the central card (no synthetic/hijack)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- API response normalization
+        const fixed = (template.exercises || []).map((ex: any, idx: number) => ({
+          id: ex.id || `ex-${Date.now()}-${idx}`,
+          exerciseId: ex.exerciseId,
+          exerciseName: ex.exerciseName || '',
           order: ex.order === 0 ? idx + 1 : ex.order,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          sets: (ex.sets || []).map((set: any, setIdx: number) => ({
-            ...set,
-            order: set.order === 0 ? setIdx + 1 : set.order,
+          sets: (ex.sets || []).map((s: any, sIdx: number) => ({
+            id: s.id || `set-${Date.now()}-${sIdx}`,
+            setNumber: s.order === 0 ? sIdx + 1 : s.order,
+            setType: s.isWarmup ? SetType.WARMUP : SetType.WORKING,
+            reps: s.targetReps ?? 0,
+            weight: s.targetWeight ?? 0,
+            rir: s.targetRir ?? 0,
+            completedAt: new Date().toISOString(),
+          })),
+          plannedSets: (ex.sets || []).map((s: any, sIdx: number) => ({
+            id: s.id || `planned-${Date.now()}-${sIdx}`,
+            order: s.order === 0 ? sIdx + 1 : s.order,
+            setType: s.isWarmup ? SetType.WARMUP : SetType.WORKING,
+            reps: s.targetReps ?? 0,
+            weight: s.targetWeight ?? 0,
+            rir: s.targetRir ?? 0,
+            restAfterSet: 0,
           })),
         }));
-
-        synthetic = buildSyntheticWorkout(fixedExercises, templateId, fetchedExercises);
+        setExercises(fixed as ExerciseLog[]);
       } else {
-        // New template: start empty
         setName('');
         setRecommendedGymId('');
-        synthetic = buildSyntheticWorkout([], undefined, fetchedExercises);
-      }
-
-      if (synthetic) {
-        setActiveWorkoutDirectly(synthetic);
+        setExercises([]);
       }
     } catch (error) {
       console.error('Failed to load data for template editor:', error);
@@ -179,21 +149,11 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
     } finally {
       setLoading(false);
     }
-  }, [templateId, router, setActiveWorkoutDirectly]); // eslint-disable-line react-hooks/exhaustive-deps -- buildSyntheticWorkout is pure and defined in render; we intentionally call load once on mount/param change
+  }, [templateId, router]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  // Cleanup: clear the hijacked synthetic workout when leaving the editor
-  // to avoid leaving a fake COMPLETED entry in the global context.
-  useEffect(() => {
-    return () => {
-      // Setting to a null-like value; startWorkout or other flows will overwrite when needed.
-      // Cast to satisfy the typed setter for the synthetic case.
-      setActiveWorkoutDirectly(null as unknown as Workout);
-    };
-  }, [setActiveWorkoutDirectly]);
 
   // No more local exercise list handlers – the shared ActiveWorkoutScreen (edit mode)
   // + WorkoutContext (with COMPLETED local-mutation short-circuit) own the full
@@ -205,22 +165,13 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
       return;
     }
 
-    const current = activeWorkout;
-    if (!current || current.exercises.length === 0) {
+    if (exercises.length === 0) {
       alert('Bitte füge mindestens eine Übung hinzu.');
       return;
     }
 
     // Validate every exercise has at least one set (template requirement).
-    // We check both .sets (performed, pre-populated for loaded templates or added via UI)
-    // and .plannedSets (fallback for the synthetic bridge). This is defensive because
-    // the shared component's edit-mode auto-commit (from plannedSets -> sets) uses
-    // setTimeout + a w>0/r>0 guard that doesn't always fire immediately for template data.
-    const hasEmpty = current.exercises.some((ex) => {
-      const committed = ex.sets?.length || 0;
-      const planned = ex.plannedSets?.length || 0;
-      return committed === 0 && planned === 0;
-    });
+    const hasEmpty = exercises.some((ex) => (ex.sets?.length || 0) === 0);
     if (hasEmpty) {
       alert('Jede Übung muss mindestens einen Satz haben.');
       return;
@@ -228,26 +179,17 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
 
     setSaving(true);
     try {
-      const payloadExercises = current.exercises.map((ex) => {
-        // Prefer the committed performed sets (populated by edit-mode commit + user edits).
-        // Fallback to plannedSets (should not be needed after the mount effect in edit mode).
-        const sourceSets = (ex.sets && ex.sets.length > 0) ? ex.sets : (ex.plannedSets || []);
-        return {
-          exerciseId: ex.exerciseId,
-          order: ex.order,
-          sets: sourceSets.map((s, idx) => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mapping performed/planned (shared) back to template targets (debt bridge)
-            const rawSet = s as any;
-            return {
-              order: rawSet.order || rawSet.setNumber || idx + 1,
-              isWarmup: rawSet.setType === SetType.WARMUP || rawSet.isWarmup === true,
-              targetReps: rawSet.reps ?? rawSet.targetReps ?? 0,
-              targetWeight: rawSet.weight ?? rawSet.targetWeight ?? 0,
-              targetRir: rawSet.rir ?? rawSet.targetRir ?? 0,
-            };
-          }),
-        };
-      });
+      const payloadExercises = exercises.map((ex) => ({
+        exerciseId: ex.exerciseId,
+        order: ex.order,
+        sets: (ex.sets || []).map((s: any, idx: number) => ({
+          order: s.setNumber || s.order || idx + 1,
+          isWarmup: s.setType === SetType.WARMUP || s.isWarmup === true,
+          targetReps: s.reps ?? 0,
+          targetWeight: s.weight ?? 0,
+          targetRir: s.rir ?? 0,
+        })),
+      }));
 
       const payload = {
         name: name.trim(),
@@ -261,8 +203,6 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
         await apiClient.createWorkoutTemplate(payload);
       }
 
-      // Clear synthetic before navigating away (defense in depth)
-      setActiveWorkoutDirectly(null as unknown as Workout);
       router.push('/templates');
     } catch (error) {
       console.error('Failed to save template:', error);
@@ -348,18 +288,18 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
             {/* Exercises – using the central ExerciseCard (with blueprint-edit flags).
                 Full structural editing allowed (reorder, replace, delete exercise, add/remove sets),
                 but no logging (no check column). Own DndContext because reorder is enabled. */}
-            {activeWorkout?.exercises && activeWorkout.exercises.length > 0 ? (
+            {exercises.length > 0 ? (
               <DndContext
                 sensors={sensors}
                 collisionDetection={closestCenter}
                 onDragEnd={handleDragEnd}
               >
                 <SortableContext
-                  items={activeWorkout.exercises.map((ex) => ex.id)}
+                  items={exercises.map((ex) => ex.id)}
                   strategy={verticalListSortingStrategy}
                 >
                   <div className="space-y-4">
-                    {activeWorkout.exercises.map((exercise, idx) => (
+                    {exercises.map((exercise, idx) => (
                       <ExerciseCard
                         key={exercise.id}
                         exercise={exercise}
@@ -369,15 +309,77 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
                         allowExerciseActions={true}
                         allowSetManagement={true}
                         allowLogging={false}
+                        onRemoveExercise={(id) => setExercises(prev => prev.filter(e => e.id !== id))}
+                        onReplaceExercise={(id, newId) => {
+                          const exDetails = availableExercises.find((e) => e.id === newId);
+                          setExercises(prev => prev.map(e => e.id === id 
+                            ? { ...e, exerciseId: newId, exerciseName: exDetails?.name || 'Exercise' } 
+                            : e
+                          ));
+                        }}
+                        onAddSet={(id) => {
+                          setExercises(prev => prev.map(e => {
+                            if (e.id !== id) return e;
+                            const nextOrder = (e.sets?.length || 0) + 1;
+                            const newSet = {
+                              id: `set-${Date.now()}`,
+                              setNumber: nextOrder,
+                              setType: SetType.WORKING,
+                              reps: 10,
+                              weight: 0,
+                              rir: 2,
+                              completedAt: new Date().toISOString(),
+                            };
+                            return { ...e, sets: [...(e.sets || []), newSet] };
+                          }));
+                        }}
+                        onRemoveSet={(id, setId) => {
+                          setExercises(prev => prev.map(e => {
+                            if (e.id !== id) return e;
+                            return { ...e, sets: (e.sets || []).filter(s => s.id !== setId) };
+                          }));
+                        }}
+                        onUpdateSet={(id, setId, data) => {
+                          setExercises(prev => prev.map(e => {
+                            if (e.id !== id) return e;
+                            return {
+                              ...e,
+                              sets: (e.sets || []).map(s => s.id === setId ? { ...s, ...data } : s),
+                            };
+                          }));
+                        }}
                       />
                     ))}
+                  </div>
+
+                  {/* Add exercise button below list */}
+                  <div className="flex justify-center py-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowExerciseModal(true)}
+                      className="h-14 w-14 rounded-lg p-0 flex items-center justify-center"
+                      aria-label="Übung hinzufügen"
+                    >
+                      <IconPlus className="size-7" />
+                    </Button>
                   </div>
                 </SortableContext>
               </DndContext>
             ) : (
               <Card>
-                <CardContent className="p-8 text-center text-muted-foreground">
-                  Noch keine Übungen hinzugefügt. Nutze die Auswahl im Header-Bereich oder füge über die Exercise-Selection hinzu (wird in diesem Editor unterstützt).
+                <CardContent className="p-8 flex flex-col items-center gap-4 text-center">
+                  <p className="text-muted-foreground">
+                    Noch keine Übungen hinzugefügt
+                  </p>
+                  {/* Large centered square + icon */}
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowExerciseModal(true)}
+                    className="h-16 w-16 rounded-lg p-0 flex items-center justify-center"
+                    aria-label="Erste Übung hinzufügen"
+                  >
+                    <IconPlus className="size-8" />
+                  </Button>
                 </CardContent>
               </Card>
             )}
@@ -386,10 +388,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
             <div className="flex gap-3">
               <Button
                 variant="outline"
-                onClick={() => {
-                  setActiveWorkoutDirectly(null as unknown as Workout);
-                  router.push('/templates');
-                }}
+                onClick={() => router.push('/templates')}
                 disabled={saving}
                 className="flex-1"
               >
@@ -403,6 +402,13 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
                 {saving ? 'Speichert...' : 'Speichern'}
               </Button>
             </div>
+
+            {/* Exercise Selection Modal for adding exercises */}
+            <ExerciseSelectionModal
+              open={showExerciseModal}
+              onOpenChange={setShowExerciseModal}
+              onSelect={handleAddExercise}
+            />
           </div>
         </main>
       </div>
