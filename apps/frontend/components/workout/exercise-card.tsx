@@ -525,9 +525,24 @@ export default function ExerciseCard({
       >
         <div className={gridClass}>
           <div className="flex items-center justify-center">
-            <Badge variant={isWarmup ? 'outline' : 'default'} className="p-0.5">
-              {isWarmup ? <IconFlame className="size-4" /> : <IconBarbell className="size-4" />}
-            </Badge>
+            <button
+              type="button"
+              onClick={() => {
+                if (effectiveAllowSetManagement) {
+                  const next = isWarmup ? SetType.WORKING : SetType.WARMUP;
+                  if (onUpdateSet) {
+                    onUpdateSet(exercise.id, set.id, { setType: next });
+                  }
+                }
+              }}
+              disabled={loading || !effectiveAllowSetManagement}
+              className="flex items-center justify-center"
+              title={isWarmup ? 'Aufwärmen' : 'Arbeit'}
+            >
+              <Badge variant={isWarmup ? 'outline' : 'default'} className="p-0.5">
+                {isWarmup ? <IconFlame className="size-4" /> : <IconBarbell className="size-4" />}
+              </Badge>
+            </button>
           </div>
 
           {/* Value cells - always inputs for consistent layout; live edit for logged via updateSet */}
@@ -700,12 +715,17 @@ export default function ExerciseCard({
                     <button
                       type="button"
                       onClick={() => {
-                        if (!loggedSet || isEditingThis) {
+                        if (effectiveAllowSetManagement || !loggedSet || isEditingThis) {
                           const next = isWarmup ? SetType.WORKING : SetType.WARMUP;
-                          updateEditValue(setNumber, 'setType', next);
+                          if (effectiveAllowSetManagement && loggedSet && onUpdateSet) {
+                            // For blueprint: directly update the set type via handler
+                            onUpdateSet(exercise.id, loggedSet.id, { setType: next });
+                          } else {
+                            updateEditValue(setNumber, 'setType', next);
+                          }
                         }
                       }}
-                      disabled={loading || !!loggedSet}
+                      disabled={loading || (!effectiveAllowSetManagement && !!loggedSet)}
                       className="flex items-center justify-center"
                       title={isWarmup ? 'Aufwärmen' : 'Arbeit'}
                     >
@@ -751,16 +771,29 @@ export default function ExerciseCard({
                       onPointerDown={e => e.stopPropagation()}
                     />
 
-                    {/* Check / actions cell - only in active mode (no logging in edit mode) */}
-                    {showCheckColumn && (
+                    {/* Check / actions cell - show check in active, or delete button for sets in setManagement (blueprint) */}
+                    {(showCheckColumn || (effectiveAllowSetManagement && loggedSet)) && (
                       <div className="flex justify-end">
-                        {loggedSet ? (
-                          <button disabled={loading} className="p-0.5" title="Geloggt (nicht entloggen möglich; Swipe RTL zum Löschen)">
-                            <IconCheck className="size-4 text-foreground stroke-[3]" />
-                          </button>
-                        ) : (
-                          <button onClick={() => handleLogSet(setNumber)} disabled={loading} className="p-0.5" title="Satz loggen (oder Swipe LTR)">
-                            <IconCheck className="size-4 text-muted-foreground/60 hover:text-primary" />
+                        {showCheckColumn ? (
+                          loggedSet ? (
+                            <button disabled={loading} className="p-0.5" title="Geloggt (nicht entloggen möglich; Swipe RTL zum Löschen)">
+                              <IconCheck className="size-4 text-foreground stroke-[3]" />
+                            </button>
+                          ) : (
+                            <button onClick={() => handleLogSet(setNumber)} disabled={loading} className="p-0.5" title="Satz loggen (oder Swipe LTR)">
+                              <IconCheck className="size-4 text-muted-foreground/60 hover:text-primary" />
+                            </button>
+                          )
+                        ) : null}
+                        {effectiveAllowSetManagement && loggedSet && onRemoveSet && (
+                          <button
+                            onClick={() => onRemoveSet(exercise.id, loggedSet.id)}
+                            disabled={loading}
+                            className="p-0.5 text-destructive"
+                            title="Satz löschen"
+                            onPointerDown={e => e.stopPropagation()}
+                          >
+                            <IconTrash className="size-4" />
                           </button>
                         )}
                       </div>

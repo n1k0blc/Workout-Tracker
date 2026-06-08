@@ -319,7 +319,11 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
                         onAddSet={(id) => {
                           setExercises(prev => prev.map(e => {
                             if (e.id !== id) return e;
-                            const nextOrder = (e.sets?.length || 0) + 1;
+                            const nextOrder = Math.max(
+                              0,
+                              ...(e.sets || []).map(s => s.setNumber || 0),
+                              ...(e.plannedSets || []).map(p => p.order || 0)
+                            ) + 1;
                             const newSet = {
                               id: `set-${Date.now()}`,
                               setNumber: nextOrder,
@@ -329,13 +333,41 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
                               rir: 2,
                               completedAt: new Date().toISOString(),
                             };
-                            return { ...e, sets: [...(e.sets || []), newSet] };
+                            const newPlanned = {
+                              id: `planned-${Date.now()}`,
+                              order: nextOrder,
+                              setType: SetType.WORKING,
+                              reps: 10,
+                              weight: 0,
+                              rir: 2,
+                              restAfterSet: 0,
+                            };
+                            return {
+                              ...e,
+                              sets: [...(e.sets || []), newSet],
+                              plannedSets: [...(e.plannedSets || []), newPlanned],
+                            };
                           }));
                         }}
                         onRemoveSet={(id, setId) => {
                           setExercises(prev => prev.map(e => {
                             if (e.id !== id) return e;
-                            return { ...e, sets: (e.sets || []).filter(s => s.id !== setId) };
+                            // Find the order of the set being removed (from sets or planned)
+                            let order = null;
+                            const setFromSets = (e.sets || []).find(s => s.id === setId);
+                            if (setFromSets) {
+                              order = setFromSets.setNumber;
+                            } else {
+                              const p = (e.plannedSets || []).find(p => p.id === setId);
+                              if (p) order = p.order;
+                            }
+                            return {
+                              ...e,
+                              sets: (e.sets || []).filter(s => s.id !== setId),
+                              plannedSets: order
+                                ? (e.plannedSets || []).filter(p => p.order !== order)
+                                : (e.plannedSets || []).filter(p => p.id !== setId),
+                            };
                           }));
                         }}
                         onUpdateSet={(id, setId, data) => {
