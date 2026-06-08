@@ -319,11 +319,9 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
                         onAddSet={(id) => {
                           setExercises(prev => prev.map(e => {
                             if (e.id !== id) return e;
-                            const nextOrder = Math.max(
-                              0,
-                              ...(e.sets || []).map(s => s.setNumber || 0),
-                              ...(e.plannedSets || []).map(p => p.order || 0)
-                            ) + 1;
+                            const setNumbers = (e.sets || []).map((s: any) => s.setNumber || s.order || 0); // eslint-disable-line @typescript-eslint/no-explicit-any
+                            const plannedOrders = (e.plannedSets || []).map((p: any) => p.order || p.setNumber || 0); // eslint-disable-line @typescript-eslint/no-explicit-any
+                            const nextOrder = Math.max(0, ...setNumbers, ...plannedOrders) + 1;
                             const newSet = {
                               id: `set-${Date.now()}`,
                               setNumber: nextOrder,
@@ -349,24 +347,13 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
                             };
                           }));
                         }}
-                        onRemoveSet={(id, setId) => {
+                        onRemoveSet={(id, setNumber) => {
                           setExercises(prev => prev.map(e => {
                             if (e.id !== id) return e;
-                            // Find the order of the set being removed (from sets or planned)
-                            let order = null;
-                            const setFromSets = (e.sets || []).find(s => s.id === setId);
-                            if (setFromSets) {
-                              order = setFromSets.setNumber;
-                            } else {
-                              const p = (e.plannedSets || []).find(p => p.id === setId);
-                              if (p) order = p.order;
-                            }
                             return {
                               ...e,
-                              sets: (e.sets || []).filter(s => s.id !== setId),
-                              plannedSets: order
-                                ? (e.plannedSets || []).filter(p => p.order !== order)
-                                : (e.plannedSets || []).filter(p => p.id !== setId),
+                              sets: (e.sets || []).filter(s => (s.setNumber ?? 0) !== setNumber),
+                              plannedSets: (e.plannedSets || []).filter(p => p.order !== setNumber),
                             };
                           }));
                         }}

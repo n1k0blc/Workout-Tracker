@@ -49,7 +49,7 @@ interface ExerciseCardProps {
   onRemoveExercise?: (exerciseId: string) => void | Promise<void>;
   onReplaceExercise?: (exerciseId: string, newExerciseId: string) => void | Promise<void>;
   onAddSet?: (exerciseId: string) => void;
-  onRemoveSet?: (exerciseId: string, setId: string) => void;
+  onRemoveSet?: (exerciseId: string, setNumber: number) => void;
   onUpdateSet?: (exerciseId: string, setId: string, data: { reps?: number; weight?: number; rir?: number; setType?: SetType }) => void | Promise<void>;
 }
 
@@ -342,10 +342,10 @@ export default function ExerciseCard({
     setActiveSwipe(null);
     if (offset > SWIPE_THRESHOLD && setNumber !== undefined && !isLogged) {
       handleLogSet(setNumber);
-    } else if (offset < -SWIPE_THRESHOLD && setNumber !== undefined && (!isLogged || effectiveAllowSetManagement)) {
+    } else if (offset < -(effectiveAllowSetManagement ? 50 : SWIPE_THRESHOLD) && setNumber !== undefined && effectiveAllowSetManagement && (!isLogged || !effectiveAllowLogging)) {
       discardUnloggedSet(setNumber);
     }
-    // RTL on logged: no effect (cannot delete logged sets via swipe) — except when allowSetManagement (blueprint/template edit, where swipe delete is supported like for unlogged in active)
+    // RTL on logged: no effect (cannot delete logged sets via swipe) — except in setManagement mode (blueprint/template), where we allow swipe delete for plan sets (even if represented in 'sets') regardless of 'logged' status. In active (allowLogging), only unlogged sets are deletable via swipe.
   };
 
   const discardUnloggedSet = (setNumber: number) => {
@@ -360,24 +360,16 @@ export default function ExerciseCard({
 
     if (effectiveAllowSetManagement) {
       if (onRemoveSet) {
-        // Use injected handler (for no-hijack template usage)
-        const setForNum = (exercise.sets || []).find((s: any) => (s.setNumber ?? s.order) === setNumber) // eslint-disable-line @typescript-eslint/no-explicit-any
-          || (exercise.plannedSets || []).find((p: any) => p.order === setNumber); // eslint-disable-line @typescript-eslint/no-explicit-any
-        if (setForNum) {
-          const sid = (setForNum as any).id; // eslint-disable-line @typescript-eslint/no-explicit-any
-          onRemoveSet(exercise.id, sid);
-        }
+        // Use injected handler (for no-hijack template usage) - pass setNumber (reliable for blueprint plan sets)
+        onRemoveSet(exercise.id, setNumber);
       } else if (activeWorkout && setActiveWorkoutDirectly) {
         // fallback for cases still using hijack (e.g. history edit)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const updatedExercises = activeWorkout.exercises.map((ex: any) => {
+        const updatedExercises = activeWorkout.exercises.map((ex: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
           if (ex.id !== exercise.id) return ex;
           return {
             ...ex,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            plannedSets: (ex.plannedSets || []).filter((ps: any) => ps.order !== setNumber),
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            sets: (ex.sets || []).filter((s: any) => (s.setNumber ?? s.order) !== setNumber),
+            plannedSets: (ex.plannedSets || []).filter((ps: any) => ps.order !== setNumber), // eslint-disable-line @typescript-eslint/no-explicit-any
+            sets: (ex.sets || []).filter((s: any) => (s.setNumber ?? s.order) !== setNumber), // eslint-disable-line @typescript-eslint/no-explicit-any
           };
         });
         setActiveWorkoutDirectly({
