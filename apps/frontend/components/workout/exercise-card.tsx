@@ -37,6 +37,13 @@ interface ExerciseCardProps {
   exercise: ExerciseLog;
   exerciseNumber: number;
   mode?: 'active' | 'edit';
+
+  // Fine-grained control for edit modes (History vs. Blueprint/Template).
+  // Defaults are derived from mode if not explicitly provided.
+  allowReorder?: boolean;            // Enable Dnd listeners on header for reordering exercises
+  allowExerciseActions?: boolean;    // Show Replace and Delete-Exercise buttons in header
+  allowSetManagement?: boolean;      // Show "+ Satz hinzufügen" and per-set delete
+  allowLogging?: boolean;            // Show check column, enable log behavior and LTR swipe logging
 }
 
 
@@ -44,7 +51,17 @@ export default function ExerciseCard({
   exercise,
   exerciseNumber,
   mode = 'active',
+  allowReorder,
+  allowExerciseActions,
+  allowSetManagement,
+  allowLogging,
 }: ExerciseCardProps) {
+  // Derive effective flags. For 'active' everything is on.
+  // For 'edit' the caller decides (History: all structural/logging off; Blueprint: structural on, logging off).
+  const effectiveAllowReorder = allowReorder ?? (mode === 'active');
+  const effectiveAllowExerciseActions = allowExerciseActions ?? (mode === 'active');
+  const effectiveAllowSetManagement = allowSetManagement ?? (mode === 'active');
+  const effectiveAllowLogging = allowLogging ?? (mode === 'active');
   const { 
     removeExercise, 
     replaceExercise, 
@@ -81,9 +98,11 @@ export default function ExerciseCard({
     opacity: isDragging ? 0.5 : 1,
   };
 
+  // drag listeners are conditionally spread in the name area below when effectiveAllowReorder is true.
+
   const hasPlannedSets = exercise.plannedSets && exercise.plannedSets.length > 0;
 
-  const showCheckColumn = mode === 'active';
+  const showCheckColumn = effectiveAllowLogging;
   const colTemplate = showCheckColumn
     ? 'grid-cols-[auto_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)_auto]'
     : 'grid-cols-[auto_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)]';
@@ -102,8 +121,8 @@ export default function ExerciseCard({
   const initialEditCommitDone = useRef(false);
 
   // Centralized detection via the clean flag set by the caller (template editor, future cycle wizard etc.).
-  // Replaces previous ID-prefix hacks. See Technical Debt section in the plan for origin.
-  const isBlueprintEdit = !!(activeWorkout as any)?.blueprintEdit;
+  // Note: isBlueprintEdit / prefix hacks have been replaced by explicit props (allow*).
+  // See ExerciseCardProps and the centralization plan in UI-REFRACTORING-PLAN.md.
 
   const addAdditionalSet = () => {
     const maxPlanned = hasPlannedSets
@@ -307,7 +326,7 @@ export default function ExerciseCard({
     setActiveSwipe(null);
     if (offset > SWIPE_THRESHOLD && setNumber !== undefined && !isLogged) {
       handleLogSet(setNumber);
-    } else if (offset < -SWIPE_THRESHOLD && setNumber !== undefined && (!isLogged || isBlueprintEdit)) {
+    } else if (offset < -SWIPE_THRESHOLD && setNumber !== undefined && (!isLogged || effectiveAllowSetManagement)) {
       discardUnloggedSet(setNumber);
     }
     // RTL on logged: no effect (cannot delete logged sets via swipe) — except for template synthetic (pure plan edit)
@@ -323,7 +342,7 @@ export default function ExerciseCard({
 
     const isPlannedSlot = hasPlannedSets && exercise.plannedSets?.some(ps => ps.order === setNumber);
 
-    if (isBlueprintEdit) {
+    if (effectiveAllowSetManagement) {
       // For template synthetic (blueprint / pure plan edit): actually remove the set
       // from the plan data in the local synthetic workout. This makes "delete set"
       // and "replace exercise" work for templates (unlike real completed workouts).
@@ -534,11 +553,10 @@ export default function ExerciseCard({
       >
         {/* Exercise Header (compact bar) */}
         <div className="px-4 py-3 flex items-start justify-between bg-muted border-b border-border">
-          {/* Name area + indicators: long-press to drag-reorder; tap name to toggle collapse */}
+          {/* Name area + indicators: long-press to drag-reorder (only if allowed); tap name to toggle collapse */}
           <div
-            {...attributes}
-            {...listeners}
-            className="flex flex-col cursor-grab active:cursor-grabbing"
+            {...(effectiveAllowReorder ? { ...attributes, ...listeners } : {})}
+            className={`flex flex-col ${effectiveAllowReorder ? 'cursor-grab active:cursor-grabbing' : ''}`}
             onClick={(e) => {
               e.stopPropagation();
               setIsCollapsed(!isCollapsed);
@@ -569,29 +587,32 @@ export default function ExerciseCard({
             )}
           </div>
           <div className="flex items-center gap-1 mt-0.5">
-            {/* Replace Exercise Button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowReplaceModal(true)}
-              onPointerDown={(e) => e.stopPropagation()}
-              disabled={exercise.sets.length > 0 && !isBlueprintEdit}
-              className="size-8"
-              title={exercise.sets.length > 0 && !isBlueprintEdit ? "Übung kann nicht ausgetauscht werden nachdem Sets geloggt wurden" : "Übung austauschen"}
-            >
-              <IconRefresh className="size-4" />
-            </Button>
-            {/* Delete Exercise Button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowDeleteConfirm(true)}
-              onPointerDown={(e) => e.stopPropagation()}
-              className="size-8 text-destructive hover:text-destructive"
-              title="Übung entfernen"
-            >
-              <IconTrash className="size-4" />
-            </Button>
+            {/* Replace Exercise Button - only if allowed */}
+            {effectiveAllowExerciseActions && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowReplaceModal(true)}
+                onPointerDown={(e) => e.stopPropagation()}
+                className="size-8"
+                title="Übung austauschen"
+              >
+                <IconRefresh className="size-4" />
+              </Button>
+            )}
+            {/* Delete Exercise Button - only if allowed */}
+            {effectiveAllowExerciseActions && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowDeleteConfirm(true)}
+                onPointerDown={(e) => e.stopPropagation()}
+                className="size-8 text-destructive hover:text-destructive"
+                title="Übung entfernen"
+              >
+                <IconTrash className="size-4" />
+              </Button>
+            )}
           </div>
         </div>
 
@@ -744,11 +765,13 @@ export default function ExerciseCard({
               });
             })()}
 
-            {/* Add set button (table-like) */}
-            <Button variant="outline" onClick={addAdditionalSet} disabled={loading} className="w-full mt-2 border-dashed text-muted-foreground hover:text-foreground h-8">
-              <IconPlus className="size-4 mr-2" />
-              Satz hinzufügen
-            </Button>
+            {/* Add set button (table-like) - only if set management allowed */}
+            {effectiveAllowSetManagement && (
+              <Button variant="outline" onClick={addAdditionalSet} disabled={loading} className="w-full mt-2 border-dashed text-muted-foreground hover:text-foreground h-8">
+                <IconPlus className="size-4 mr-2" />
+                Satz hinzufügen
+              </Button>
+            )}
 
             {!hasPlannedSets && exercise.sets.length === 0 && additionalSetNumbers.length === 0 && (
               <p className="text-muted-foreground text-sm text-center py-2">Noch keine Sätze geloggt</p>

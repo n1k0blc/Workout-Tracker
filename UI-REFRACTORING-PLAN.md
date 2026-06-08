@@ -216,7 +216,132 @@ Mögliche saubere Architektur (ohne Workarounds pro Sonderfall):
 
 Das stellt sicher, dass die **eine** Komponente die zwei Modi sauber unterstützt, ohne dass in der Card oder im Context überall "wenn es ein Template ist..." steht.
 
-(Stand jetzt haben wir die Sonderlogik noch — der User-Request war genau der Anstoß, das sauber zu machen. Nächster Schritt ist ein gezieltes Cleanup.)
+(Stand jetzt haben wir die Sonderlogik noch — der User-Request war genau der Anstoß, das sauber zu machen.)
+
+---
+
+## Entscheidung: Ansatz B – ExerciseCard als primäre zentrale Komponente (Mai 2026)
+
+**User-Entscheidung:** Wir drehen die volle Zentralisierung des gesamten Workout-Screens (`ActiveWorkoutScreen` als universelle Komponente für alle Einstiegspunkte) zurück.
+
+**Begründung (User + Analyse):**
+- Die umgebenden Belange (Header, Metadaten, Save-Flow, Timer vs. keine Timer, Dnd-Scope, Persistence) sind zu unterschiedlich zwischen aktivem Session, History-Edit (performed) und Blueprint-Edit (Templates/Cycles).
+- Die volle Screen-Abstraktion führt zu zu viel Leakage, Context-Hijacking und Sonderlogik (`isBlueprintEdit`, synthetische COMPLETED-Objekte, unterschiedliches Seeding, angepasste Guards).
+- Der wirklich wertvolle, komplexe und UX-kritische Teil ist die **ExerciseCard** (Collapse, Swipe, Table-Rows, Edit-State, Action-Buttons, Add-Set, etc.).
+- Bessere Trennung: ExerciseCard wird die zentrale, mode-fähige Komponente. Die konkreten Screens (Workout-Page, History-Edit, Template-Editor, Cycle-Wizard) bauen ihre eigene Hülle drumherum und nutzen die Card.
+
+**Ziel-Architektur:**
+- `ActiveWorkoutScreen` wird **nur noch** für die aktive Ausführung (/workout Page, inkl. "Vergangenes Workout tracken") verwendet.
+- `ExerciseCard` wird zur **zentralen Shared Component** mit klaren Modi / Konfigurations-Flags.
+- Jeder Screen ist wieder etwas individueller, aber die schwere, duplizierungsanfällige Logik lebt nur einmal in der Card.
+
+### Gewünschte Verhaltens-Matrix für die zentrale ExerciseCard
+
+| Feature                        | Active (Live) | History Edit (Completed) | Template Editor (Blueprint) |
+|--------------------------------|---------------|---------------------------|-----------------------------|
+| Collapse / Expand              | Ja            | Ja                        | Ja                          |
+| Werte eines Satzes ändern      | Ja            | Ja                        | Ja                          |
+| Satz-Typ ändern (Aufwärmen/Arbeit) | Ja         | Ja                        | Ja                          |
+| Reorder Exercises (Dnd)        | Ja            | **Nein**                  | Ja                          |
+| Exercise löschen               | Ja            | **Nein** (Button weg)     | Ja                          |
+| Exercise austauschen (Replace) | Ja            | **Nein** (Button weg)     | Ja                          |
+| Sätze hinzufügen               | Ja            | **Nein**                  | Ja                          |
+| Sätze löschen                  | Ja (unlogged via Swipe) | **Nein**             | Ja                          |
+| Logging (Check-Spalte, Swipe LTR, Log-Button) | Ja     | **Nein** (komplett weg)   | **Nein** (komplett weg)     |
+| Swipe RTL (Delete/Discard)     | Ja (bei unlogged) | **Nein**                | Ja (bei allen Sätzen)       |
+
+**Vorgeschlagene API für die zentrale ExerciseCard (empfohlen):**
+
+```ts
+interface ExerciseCardProps {
+  exercise: ExerciseLog;        // (für Blueprints wird weiterhin gemappt)
+  exerciseNumber: number;
+  mode?: 'active' | 'edit';     // grundsätzliche Unterscheidung
+
+  // Feingranulare Steuerung für Edit-Varianten (besser als viele Modi)
+  allowReorder?: boolean;
+  allowExerciseActions?: boolean;   // Replace-Button + Delete-Exercise-Button
+  allowSetManagement?: boolean;     // "+ Satz hinzufügen" + Delete pro Satz
+  allowLogging?: boolean;           // Check-Spalte + Log-Verhalten + Swipe-Log
+}
+```
+
+Oder alternativ ein `variant`-Enum:
+- `'execution'`
+- `'history-edit'`
+- `'blueprint-edit'`
+
+Die Props-Variante ist flexibler und vermeidet eine Explosion von Modi.
+
+### Rollback- & Migrations-Plan (stück für stück)
+
+**Phase 1: Klärung & Plan (aktuell)**
+- Diese Entscheidung und die Matrix in die UI-REFRACTORING-PLAN.md aufnehmen.
+- Keine Code-Änderungen an der Card oder Screens in diesem Schritt.
+
+**Phase 2: Erweiterung der ExerciseCard (zentrale Komponente)**
+1. Props der `ExerciseCard` um die Steuerungs-Flags erweitern (`allowReorder`, `allowExerciseActions`, `allowSetManagement`, `allowLogging`).
+2. Bestehende `mode` beibehalten (für grundsätzliche Unterschiede wie Check-Spalte).
+3. Alle relevanten Stellen bedingt machen:
+   - `showCheckColumn` → von `allowLogging`
+   - Replace-Button + Delete-Exercise-Button → von `allowExerciseActions`
+   - Dnd-Listeners am Header → von `allowReorder` (ansonsten keine Drag-Attributes)
+   - "+ Satz hinzufügen" Button + Delete-Buttons pro Satz → von `allowSetManagement`
+   - Swipe-Logik (LTR Log, RTL Discard) → entsprechend anpassen (bei History komplett deaktivieren oder auf No-Op)
+   - Auto-Commit-Effekt und `additionalSetNumbers` / `skipped...` Logik vorsichtig nur bei erlaubten Features aktivieren.
+4. `isBlueprintEdit`-Hack aus der Card entfernen und durch die neuen Props ersetzen.
+5. Sicherstellen, dass die Card auch ohne vollen `useWorkout()`-Context sinnvoll genutzt werden kann (für zukünftige Prop-driven Nutzung in Blueprints).
+
+**Phase 3: Rollback der Screen-Zentralisierung**
+1. `/workout/page.tsx`: Bleibt bei `<ActiveWorkoutScreen ... />` (wie bisher).
+2. `app/history/[id]/edit/page.tsx`:
+   - Eigenen Header + Metadaten + Speichern-Button behalten.
+   - Statt `<ActiveWorkoutScreen mode="edit" ... />` eine eigene Liste rendern:
+     - Kein (oder deaktivierter) DndContext.
+     - `<ExerciseCard mode="edit" allowReorder={false} allowExerciseActions={false} allowSetManagement={false} allowLogging={false} ... />` für jede Exercise.
+   - Eigenes `onSave` das die aktuellen Werte aus dem Context oder direkt aus den Cards sammelt.
+3. `components/templates/template-editor-screen.tsx`:
+   - Eigenen Header (Name + empfohlenes Gym) + Speichern-Button.
+   - Eigene (oder beibehaltene) Liste mit DndContext (wenn Reorder erlaubt).
+   - `<ExerciseCard mode="edit" allowReorder={true} allowExerciseActions={true} allowSetManagement={true} allowLogging={false} ... />`
+   - Beim Speichern die Daten aus dem Context (oder zukünftig aus Props) in Template-Payload mappen.
+4. `ActiveWorkoutScreen` selbst:
+   - Kann intern weiter die Card mit `allow*={true}` und `mode="active"` nutzen.
+   - Wird nicht mehr in Templates oder reinen History-Edit-Seiten importiert.
+   - Optional: Umbenennen in `ActiveSessionScreen` oder ähnlich, um Klarheit zu schaffen.
+
+**Phase 4: Aufräumen & Debt-Reduktion**
+- Entfernen oder Deaktivieren der `blueprintEdit`-Flag-Hacks und `isTemplateSynthetic`-Logik.
+- Reduktion der Abhängigkeit der Card vom globalen `WorkoutContext` wo möglich (z. B. Mutations als optionale Props für die Blueprint-Fälle).
+- Aktualisierung der Technical-Debt-Dokumentation (der Hack bleibt für History-Edit von Completed, wird aber nicht mehr für Blueprints benötigt).
+- Entfernen oder Markieren der alten `TemplateExerciseCard` als deprecated.
+- Tests / manuelle Verifikation der drei Szenarien (Active, History-Edit, Template-Edit).
+
+**Phase 5: Zukünftige Nutzung**
+- Cycle-Wizard / Blueprint-Schritte können dann ebenfalls die zentrale ExerciseCard mit `allowLogging={false}` + vollen strukturellen Flags nutzen.
+- Langfristig: Die Card kann stärker prop-driven werden (Exercises + Callbacks statt Context), sodass Blueprints gar keinen Context-Hijack mehr brauchen.
+
+### Vorteile dieses Ansatzes
+- ExerciseCard bleibt die eine Quelle der Wahrheit für das komplexe Verhalten.
+- Keine erzwungene Vereinheitlichung von inkompatiblen Domänen (Session vs. Blueprint).
+- Weniger Sonderlogik und Hacks.
+- Jeder Screen kann sein Datenmodell und seinen Speicherfluss sauber halten.
+- Immer noch große Wartbarkeitsgewinne (keine drei verschiedenen Implementierungen der Card-UX).
+
+Dieser Plan wird nun als verbindliche Richtung in der Dokumentation festgehalten. Implementierung erfolgt schrittweise und nur nach Bestätigung.
+
+---
+
+**Nächste konkrete Schritte nach diesem Plan:**
+1. ExerciseCard Props + interne Guards erweitern (saubere, dokumentierte Flags).
+2. History-Edit-Seite auf individuelle Card-Nutzung umstellen.
+3. Template-Editor analog umstellen.
+4. `ActiveWorkoutScreen` auf seinen Kern-Use-Case reduzieren.
+5. Debt-Doku und Code-Kommentare aktualisieren.
+
+**User-Bestätigung (Mai 2026):** User hat Ansatz B mit der Props-API für ExerciseCard bestätigt und die Umsetzung freigegeben.
+
+**Umsetzungs-Status:** Erste Implementierung abgeschlossen (ExerciseCard Props-API + Callsite-Updates für History-Edit und Template-Editor). ActiveWorkoutScreen auf seinen primären Use-Case reduziert. Siehe nachfolgende Commits und Todo.
 
 **Nächster Schritt: Integration der Shared Komponente in den Template-Editor (Create + Edit benutzerdefinierter Vorlagen) – April 2026**
 

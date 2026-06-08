@@ -10,9 +10,23 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Field, FieldLabel } from '@/components/ui/field';
-import ActiveWorkoutScreen from '@/components/workout/active-workout-screen';
+import ExerciseCard from '@/components/workout/exercise-card';
 import { useWorkout } from '@/lib/workout-context';
 import { IconChevronLeft } from '@tabler/icons-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 
 interface TemplateEditorScreenProps {
   templateId?: string;
@@ -20,13 +34,41 @@ interface TemplateEditorScreenProps {
 
 export default function TemplateEditorScreen({ templateId }: TemplateEditorScreenProps) {
   const router = useRouter();
-  const { setActiveWorkoutDirectly, activeWorkout } = useWorkout();
+  const { setActiveWorkoutDirectly, activeWorkout, reorderExercises } = useWorkout();
 
   const [name, setName] = useState('');
   const [recommendedGymId, setRecommendedGymId] = useState<string>('');
   const [availableGyms, setAvailableGyms] = useState<HomeGym[]>([]);
   const [loading, setLoading] = useState(!!templateId);
   const [saving, setSaving] = useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        delay: 300,
+        tolerance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || !activeWorkout) return;
+
+    const oldIndex = activeWorkout.exercises.findIndex((ex) => ex.id === active.id);
+    const newIndex = activeWorkout.exercises.findIndex((ex) => ex.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const newExercises = [...activeWorkout.exercises];
+    const [moved] = newExercises.splice(oldIndex, 1);
+    newExercises.splice(newIndex, 0, moved);
+
+    // Reorder via context (will use local mutation for our blueprint synthetic)
+    reorderExercises(newExercises.map((ex) => ex.id));
+  };
 
   // Helper: map a template's target sets into PlannedSet shape for the synthetic workout
   // (input from template model or our synthetic; documented as Technical Debt bridge to shared component)
@@ -89,7 +131,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
       blueprintEdit: true,
       exercises: exs,
       createdAt: now,
-    } as any;  // blueprintEdit is extension for edit mode
+    } as any;  // eslint-disable-line @typescript-eslint/no-explicit-any -- blueprintEdit + synthetic for edit mode (debt bridge)
   };
 
   const loadData = useCallback(async () => {
@@ -303,13 +345,42 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
               </CardContent>
             </Card>
 
-            {/* Exercises – using the central shared component in edit mode.
-                No inner header here, the template editor wrapper provides "Vorlage bearbeiten" + metadata. */}
-            <ActiveWorkoutScreen
-              mode="edit"
-              showBottomBar={false}
-              showHeader={false}
-            />
+            {/* Exercises – using the central ExerciseCard (with blueprint-edit flags).
+                Full structural editing allowed (reorder, replace, delete exercise, add/remove sets),
+                but no logging (no check column). Own DndContext because reorder is enabled. */}
+            {activeWorkout?.exercises && activeWorkout.exercises.length > 0 ? (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={activeWorkout.exercises.map((ex) => ex.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-4">
+                    {activeWorkout.exercises.map((exercise, idx) => (
+                      <ExerciseCard
+                        key={exercise.id}
+                        exercise={exercise}
+                        exerciseNumber={idx + 1}
+                        mode="edit"
+                        allowReorder={true}
+                        allowExerciseActions={true}
+                        allowSetManagement={true}
+                        allowLogging={false}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            ) : (
+              <Card>
+                <CardContent className="p-8 text-center text-muted-foreground">
+                  Noch keine Übungen hinzugefügt. Nutze die Auswahl im Header-Bereich oder füge über die Exercise-Selection hinzu (wird in diesem Editor unterstützt).
+                </CardContent>
+              </Card>
+            )}
 
             {/* Save / Cancel Actions (own buttons like in history edit) */}
             <div className="flex gap-3">

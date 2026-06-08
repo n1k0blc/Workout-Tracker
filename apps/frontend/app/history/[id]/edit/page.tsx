@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { DatePicker } from '@/components/date-picker';
-import ActiveWorkoutScreen from '@/components/workout/active-workout-screen';
+import ExerciseCard from '@/components/workout/exercise-card';
 import { useWorkout } from '@/lib/workout-context';
 import {
   IconChevronLeft,
@@ -170,13 +170,23 @@ export default function EditWorkoutPage() {
               </CardContent>
             </Card>
 
-            {/* Exercises - using central shared component in edit mode.
-                Header is provided by this page (title + date picker). */}
-            <ActiveWorkoutScreen 
-              mode="edit" 
-              showBottomBar={false} 
-              showHeader={false} 
-            />
+            {/* Exercises rendered directly with central ExerciseCard in restricted history-edit mode.
+                No reordering, no exercise actions (replace/delete), no set add/delete, no logging.
+                Only value edits, type changes and collapse/expand are allowed. */}
+            <div className="space-y-4">
+              {activeWorkout?.exercises?.map((exercise, idx) => (
+                <ExerciseCard
+                  key={exercise.id}
+                  exercise={exercise}
+                  exerciseNumber={idx + 1}
+                  mode="edit"
+                  allowReorder={false}
+                  allowExerciseActions={false}
+                  allowSetManagement={false}
+                  allowLogging={false}
+                />
+              ))}
+            </div>
 
             <div className="flex justify-end">
               <Button 

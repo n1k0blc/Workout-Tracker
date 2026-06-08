@@ -297,6 +297,10 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
                     exercise={exercise}
                     exerciseNumber={idx + 1}
                     mode={mode}
+                    allowReorder={true}
+                    allowExerciseActions={true}
+                    allowSetManagement={true}
+                    allowLogging={true}
                   />
                 ))}
               </SortableContext>
