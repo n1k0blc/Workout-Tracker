@@ -345,7 +345,7 @@ export default function ExerciseCard({
     } else if (offset < -SWIPE_THRESHOLD && setNumber !== undefined && (!isLogged || effectiveAllowSetManagement)) {
       discardUnloggedSet(setNumber);
     }
-    // RTL on logged: no effect (cannot delete logged sets via swipe) — except for template synthetic (pure plan edit)
+    // RTL on logged: no effect (cannot delete logged sets via swipe) — except when allowSetManagement (blueprint/template edit, where swipe delete is supported like for unlogged in active)
   };
 
   const discardUnloggedSet = (setNumber: number) => {
@@ -769,29 +769,17 @@ export default function ExerciseCard({
                       onPointerDown={e => e.stopPropagation()}
                     />
 
-                    {/* Check / actions cell - show check in active, or delete button for sets in setManagement (blueprint) */}
-                    {(showCheckColumn || (effectiveAllowSetManagement && loggedSet)) && (
+                    {/* Check / actions cell - only in active mode (no logging in edit mode).
+                        Set deletion in blueprint mode is done via RTL swipe (like in active for unlogged sets). */}
+                    {showCheckColumn && (
                       <div className="flex justify-end">
-                        {showCheckColumn ? (
-                          loggedSet ? (
-                            <button disabled={loading} className="p-0.5" title="Geloggt (nicht entloggen möglich; Swipe RTL zum Löschen)">
-                              <IconCheck className="size-4 text-foreground stroke-[3]" />
-                            </button>
-                          ) : (
-                            <button onClick={() => handleLogSet(setNumber)} disabled={loading} className="p-0.5" title="Satz loggen (oder Swipe LTR)">
-                              <IconCheck className="size-4 text-muted-foreground/60 hover:text-primary" />
-                            </button>
-                          )
-                        ) : null}
-                        {effectiveAllowSetManagement && loggedSet && onRemoveSet && (
-                          <button
-                            onClick={() => onRemoveSet(exercise.id, loggedSet.id)}
-                            disabled={loading}
-                            className="p-0.5 text-destructive"
-                            title="Satz löschen"
-                            onPointerDown={e => e.stopPropagation()}
-                          >
-                            <IconTrash className="size-4" />
+                        {loggedSet ? (
+                          <button disabled={loading} className="p-0.5" title="Geloggt (nicht entloggen möglich; Swipe RTL zum Löschen)">
+                            <IconCheck className="size-4 text-foreground stroke-[3]" />
+                          </button>
+                        ) : (
+                          <button onClick={() => handleLogSet(setNumber)} disabled={loading} className="p-0.5" title="Satz loggen (oder Swipe LTR)">
+                            <IconCheck className="size-4 text-muted-foreground/60 hover:text-primary" />
                           </button>
                         )}
                       </div>
