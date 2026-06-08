@@ -528,14 +528,12 @@ export default function ExerciseCard({
             <button
               type="button"
               onClick={() => {
-                if (effectiveAllowSetManagement) {
+                if (mode === 'edit' && onUpdateSet) {
                   const next = isWarmup ? SetType.WORKING : SetType.WARMUP;
-                  if (onUpdateSet) {
-                    onUpdateSet(exercise.id, set.id, { setType: next });
-                  }
+                  onUpdateSet(exercise.id, set.id, { setType: next });
                 }
               }}
-              disabled={loading || !effectiveAllowSetManagement}
+              disabled={loading || mode !== 'edit'}
               className="flex items-center justify-center"
               title={isWarmup ? 'Aufwärmen' : 'Arbeit'}
             >
@@ -715,17 +713,17 @@ export default function ExerciseCard({
                     <button
                       type="button"
                       onClick={() => {
-                        if (effectiveAllowSetManagement || !loggedSet || isEditingThis) {
+                        if (mode === 'edit' || !loggedSet || isEditingThis) {
                           const next = isWarmup ? SetType.WORKING : SetType.WARMUP;
-                          if (effectiveAllowSetManagement && loggedSet && onUpdateSet) {
-                            // For blueprint: directly update the set type via handler
+                          if (mode === 'edit' && loggedSet && onUpdateSet) {
+                            // In edit mode (history or blueprint): directly update via handler
                             onUpdateSet(exercise.id, loggedSet.id, { setType: next });
                           } else {
                             updateEditValue(setNumber, 'setType', next);
                           }
                         }
                       }}
-                      disabled={loading || (!effectiveAllowSetManagement && !!loggedSet)}
+                      disabled={loading || (mode !== 'edit' && !!loggedSet)}
                       className="flex items-center justify-center"
                       title={isWarmup ? 'Aufwärmen' : 'Arbeit'}
                     >
