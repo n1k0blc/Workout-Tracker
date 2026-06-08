@@ -87,7 +87,6 @@ export default function ExerciseCard({
   // Prefer injected handlers (for decoupled template usage, no context hijack) over context
   const removeExercise = onRemoveExercise || contextRemoveExercise;
   const replaceExercise = onReplaceExercise || contextReplaceExercise;
-  const updateSet = onUpdateSet || contextUpdateSet;
 
   const [editValues, setEditValues] = useState<{[key: number]: {weight: string, reps: string, rir: string, setType: SetType}}>({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -360,11 +359,17 @@ export default function ExerciseCard({
     const isPlannedSlot = hasPlannedSets && exercise.plannedSets?.some(ps => ps.order === setNumber);
 
     if (effectiveAllowSetManagement) {
-      // For template synthetic (blueprint / pure plan edit): actually remove the set
-      // from the plan data in the local synthetic workout. This makes "delete set"
-      // and "replace exercise" work for templates (unlike real completed workouts).
-      if (activeWorkout && setActiveWorkoutDirectly) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- template synthetic mutation (debt bridge to allow full plan edits)
+      if (onRemoveSet) {
+        // Use injected handler (for no-hijack template usage)
+        const setForNum = (exercise.sets || []).find((s: any) => (s.setNumber ?? s.order) === setNumber) // eslint-disable-line @typescript-eslint/no-explicit-any
+          || (exercise.plannedSets || []).find((p: any) => p.order === setNumber); // eslint-disable-line @typescript-eslint/no-explicit-any
+        if (setForNum) {
+          const sid = (setForNum as any).id; // eslint-disable-line @typescript-eslint/no-explicit-any
+          onRemoveSet(exercise.id, sid);
+        }
+      } else if (activeWorkout && setActiveWorkoutDirectly) {
+        // fallback for cases still using hijack (e.g. history edit)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const updatedExercises = activeWorkout.exercises.map((ex: any) => {
           if (ex.id !== exercise.id) return ex;
           return {
@@ -378,7 +383,7 @@ export default function ExerciseCard({
         setActiveWorkoutDirectly({
           ...activeWorkout,
           exercises: updatedExercises,
-        } as any); // eslint-disable-line @typescript-eslint/no-explicit-any -- synthetic update for template plan edit
+        } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
       }
       setAdditionalSetNumbers(prev => prev.filter(n => n !== setNumber));
       setSkippedPlannedSetNumbers(prev => {
@@ -425,7 +430,11 @@ export default function ExerciseCard({
       const ri = field === 'rir'
         ? (parseInt(newValStr) || undefined)
         : (editingValues.rir ? parseInt(editingValues.rir) : loggedSet.rir);
-      updateSet(loggedSet.id, { weight: w, reps: r, rir: ri });
+      if (onUpdateSet) {
+        onUpdateSet(exercise.id, loggedSet.id, { weight: w, reps: r, rir: ri });
+      } else {
+        contextUpdateSet(loggedSet.id, { weight: w, reps: r, rir: ri });
+      }
     } else {
       updateEditValue(setNumber, field, newValStr);
     }
@@ -478,9 +487,9 @@ export default function ExerciseCard({
             </Badge>
           </button>
 
-          <Input type="number" step="0.5" value={getEditValue(setNumber, 'weight')} onChange={(e) => handleRowValueChange(setNumber, null, 'weight', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} />
-          <Input type="number" value={getEditValue(setNumber, 'reps')} onChange={(e) => handleRowValueChange(setNumber, null, 'reps', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} />
-          <Input type="number" value={getEditValue(setNumber, 'rir')} onChange={(e) => handleRowValueChange(setNumber, null, 'rir', e.target.value)} onBlur={commitIfNeeded} placeholder="" className="h-7 text-sm tabular-nums" disabled={loading} />
+          <Input type="number" step="0.5" value={getEditValue(setNumber, 'weight')} onChange={(e) => handleRowValueChange(setNumber, null, 'weight', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} onPointerDown={e => e.stopPropagation()} />
+          <Input type="number" value={getEditValue(setNumber, 'reps')} onChange={(e) => handleRowValueChange(setNumber, null, 'reps', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} onPointerDown={e => e.stopPropagation()} />
+          <Input type="number" value={getEditValue(setNumber, 'rir')} onChange={(e) => handleRowValueChange(setNumber, null, 'rir', e.target.value)} onBlur={commitIfNeeded} placeholder="" className="h-7 text-sm tabular-nums" disabled={loading} onPointerDown={e => e.stopPropagation()} />
 
           {showCheckColumn && (
             <div className="flex justify-end">
@@ -530,6 +539,7 @@ export default function ExerciseCard({
             placeholder="0"
             className="h-7 text-sm tabular-nums"
             disabled={loading}
+            onPointerDown={e => e.stopPropagation()}
           />
           <Input
             type="number"
@@ -538,6 +548,7 @@ export default function ExerciseCard({
             placeholder="0"
             className="h-7 text-sm tabular-nums"
             disabled={loading}
+            onPointerDown={e => e.stopPropagation()}
           />
           <Input
             type="number"
@@ -546,6 +557,7 @@ export default function ExerciseCard({
             placeholder=""
             className="h-7 text-sm tabular-nums"
             disabled={loading}
+            onPointerDown={e => e.stopPropagation()}
           />
 
           {/* Check cell - fat only, no buttons (delete via swipe) */}
@@ -591,7 +603,8 @@ export default function ExerciseCard({
             {isCollapsed && (
               <div className="flex items-center gap-1 mt-1 ml-8">
                 {getSetIndicatorSlots().map((slot, i) => {
-                  const logged = !!getLoggedSet(slot);
+                  // For blueprint/template edit (!allowLogging), always show as "unlogged" (gray) since there's no logging concept.
+                  const logged = effectiveAllowLogging && !!getLoggedSet(slot);
                   return (
                     <div
                       key={i}
@@ -711,6 +724,7 @@ export default function ExerciseCard({
                       placeholder="0"
                       className="h-7 text-sm tabular-nums"
                       disabled={loading}
+                      onPointerDown={e => e.stopPropagation()}
                     />
 
                     {/* Reps cell - always input style; for logged: live editable via updateSet */}
@@ -722,6 +736,7 @@ export default function ExerciseCard({
                       placeholder="0"
                       className="h-7 text-sm tabular-nums"
                       disabled={loading}
+                      onPointerDown={e => e.stopPropagation()}
                     />
 
                     {/* RIR cell - always input style; for logged: live editable via updateSet */}
@@ -733,6 +748,7 @@ export default function ExerciseCard({
                       placeholder=""
                       className="h-7 text-sm tabular-nums"
                       disabled={loading}
+                      onPointerDown={e => e.stopPropagation()}
                     />
 
                     {/* Check / actions cell - only in active mode (no logging in edit mode) */}
@@ -784,7 +800,13 @@ export default function ExerciseCard({
 
             {/* Add set button (table-like) - only if set management allowed */}
             {effectiveAllowSetManagement && (
-              <Button variant="outline" onClick={addAdditionalSet} disabled={loading} className="w-full mt-2 border-dashed text-muted-foreground hover:text-foreground h-8">
+              <Button variant="outline" onClick={() => {
+                if (onAddSet) {
+                  onAddSet(exercise.id);
+                } else {
+                  addAdditionalSet();
+                }
+              }} disabled={loading} className="w-full mt-2 border-dashed text-muted-foreground hover:text-foreground h-8">
                 <IconPlus className="size-4 mr-2" />
                 Satz hinzufügen
               </Button>

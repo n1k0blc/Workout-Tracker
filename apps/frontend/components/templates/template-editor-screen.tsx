@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { Exercise, HomeGym, ExerciseLog, SetType } from '@/types';
-import { Workout } from '@/types'; // temporary for any remnants, can be removed
 import { ProtectedRoute } from '@/components/protected-route';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -41,6 +40,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
   const [name, setName] = useState('');
   const [recommendedGymId, setRecommendedGymId] = useState<string>('');
   const [availableGyms, setAvailableGyms] = useState<HomeGym[]>([]);
+  const [availableExercises, setAvailableExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(!!templateId);
   const [saving, setSaving] = useState(false);
   const [showExerciseModal, setShowExerciseModal] = useState(false);
@@ -97,13 +97,12 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [gyms, fetchedExercises] = await Promise.all([
+      const [gyms, exs] = await Promise.all([
         apiClient.getHomeGyms(),
         apiClient.getExercises(),
       ]);
       setAvailableGyms(gyms);
-
-      let synthetic: Workout | null = null;
+      setAvailableExercises(exs);
 
       if (templateId) {
         const template = await apiClient.getWorkoutTemplate(templateId);
@@ -111,13 +110,13 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
         setRecommendedGymId(template.recommendedGymId || '');
 
         // Build local exercises in ExerciseLog shape for the central card (no synthetic/hijack)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- API response normalization
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const fixed = (template.exercises || []).map((ex: any, idx: number) => ({
           id: ex.id || `ex-${Date.now()}-${idx}`,
           exerciseId: ex.exerciseId,
           exerciseName: ex.exerciseName || '',
           order: ex.order === 0 ? idx + 1 : ex.order,
-          sets: (ex.sets || []).map((s: any, sIdx: number) => ({
+          sets: (ex.sets || []).map((s: any, sIdx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
             id: s.id || `set-${Date.now()}-${sIdx}`,
             setNumber: s.order === 0 ? sIdx + 1 : s.order,
             setType: s.isWarmup ? SetType.WARMUP : SetType.WORKING,
@@ -126,7 +125,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
             rir: s.targetRir ?? 0,
             completedAt: new Date().toISOString(),
           })),
-          plannedSets: (ex.sets || []).map((s: any, sIdx: number) => ({
+          plannedSets: (ex.sets || []).map((s: any, sIdx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
             id: s.id || `planned-${Date.now()}-${sIdx}`,
             order: s.order === 0 ? sIdx + 1 : s.order,
             setType: s.isWarmup ? SetType.WARMUP : SetType.WORKING,
@@ -182,7 +181,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
       const payloadExercises = exercises.map((ex) => ({
         exerciseId: ex.exerciseId,
         order: ex.order,
-        sets: (ex.sets || []).map((s: any, idx: number) => ({
+        sets: (ex.sets || []).map((s: any, idx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
           order: s.setNumber || s.order || idx + 1,
           isWarmup: s.setType === SetType.WARMUP || s.isWarmup === true,
           targetReps: s.reps ?? 0,
