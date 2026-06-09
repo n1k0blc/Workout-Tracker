@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { IconPlus, IconEdit, IconTrash, IconBarbell, IconClock, IconTag } from '@tabler/icons-react';
+import { IconPlus, IconTrash, IconBarbell, IconClock, IconTag } from '@tabler/icons-react';
 
 export default function WorkoutTemplatesTab() {
   const router = useRouter();
@@ -105,7 +105,7 @@ export default function WorkoutTemplatesTab() {
                     key={template.id}
                     template={template}
                     onDelete={() => setDeleteTemplateId(template.id)}
-                    onEdit={() => router.push(`/templates/${template.id}/edit`)}
+                    onClick={() => router.push(`/templates/${template.id}/edit`)}
                   />
                 ))}
               </div>
@@ -151,34 +151,29 @@ export default function WorkoutTemplatesTab() {
 interface TemplateCardProps {
   template: WorkoutTemplate;
   onDelete?: () => void;
-  onEdit?: () => void;
+  onClick?: () => void;
 }
 
-function TemplateCard({ template, onDelete, onEdit }: TemplateCardProps) {
+function TemplateCard({ template, onDelete, onClick }: TemplateCardProps) {
   return (
-    <Card className="hover:shadow-sm transition-shadow">
+    <Card 
+      className={`hover:shadow-sm transition-shadow ${onClick ? 'cursor-pointer' : ''}`}
+      onClick={onClick}
+    >
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-3 mb-4">
           <h4 className="font-semibold text-foreground text-lg">{template.name}</h4>
           {template.isCustom && (
             <div className="flex gap-1">
-              {onEdit && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8"
-                  onClick={onEdit}
-                  title="Vorlage bearbeiten"
-                >
-                  <IconEdit className="size-4" />
-                </Button>
-              )}
               {onDelete && (
                 <Button
                   variant="ghost"
                   size="icon"
                   className="size-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                  onClick={onDelete}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete();
+                  }}
                   title="Vorlage löschen"
                 >
                   <IconTrash className="size-4" />
