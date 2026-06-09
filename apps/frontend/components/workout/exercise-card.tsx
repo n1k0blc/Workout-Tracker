@@ -340,7 +340,7 @@ export default function ExerciseCard({
     }
     const offset = activeSwipe.offset;
     setActiveSwipe(null);
-    if (offset > SWIPE_THRESHOLD && setNumber !== undefined && !isLogged) {
+    if (offset > SWIPE_THRESHOLD && setNumber !== undefined && !isLogged && effectiveAllowLogging) {
       handleLogSet(setNumber);
     } else if (offset < -(effectiveAllowSetManagement ? 50 : SWIPE_THRESHOLD) && setNumber !== undefined && effectiveAllowSetManagement && (!isLogged || !effectiveAllowLogging)) {
       discardUnloggedSet(setNumber);
@@ -479,9 +479,9 @@ export default function ExerciseCard({
             </Badge>
           </button>
 
-          <Input type="number" step="0.5" value={getEditValue(setNumber, 'weight')} onChange={(e) => handleRowValueChange(setNumber, null, 'weight', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} onPointerDown={e => e.stopPropagation()} />
-          <Input type="number" value={getEditValue(setNumber, 'reps')} onChange={(e) => handleRowValueChange(setNumber, null, 'reps', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading} onPointerDown={e => e.stopPropagation()} />
-          <Input type="number" value={getEditValue(setNumber, 'rir')} onChange={(e) => handleRowValueChange(setNumber, null, 'rir', e.target.value)} onBlur={commitIfNeeded} placeholder="" className="h-7 text-sm tabular-nums" disabled={loading} onPointerDown={e => e.stopPropagation()} />
+          <Input type="number" step="0.5" value={getEditValue(setNumber, 'weight')} onChange={(e) => handleRowValueChange(setNumber, null, 'weight', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading}  />
+          <Input type="number" value={getEditValue(setNumber, 'reps')} onChange={(e) => handleRowValueChange(setNumber, null, 'reps', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading}  />
+          <Input type="number" value={getEditValue(setNumber, 'rir')} onChange={(e) => handleRowValueChange(setNumber, null, 'rir', e.target.value)} onBlur={commitIfNeeded} placeholder="" className="h-7 text-sm tabular-nums" disabled={loading}  />
 
           {showCheckColumn && (
             <div className="flex justify-end">
@@ -544,7 +544,7 @@ export default function ExerciseCard({
             placeholder="0"
             className="h-7 text-sm tabular-nums"
             disabled={loading}
-            onPointerDown={e => e.stopPropagation()}
+            
           />
           <Input
             type="number"
@@ -553,7 +553,7 @@ export default function ExerciseCard({
             placeholder="0"
             className="h-7 text-sm tabular-nums"
             disabled={loading}
-            onPointerDown={e => e.stopPropagation()}
+            
           />
           <Input
             type="number"
@@ -562,7 +562,7 @@ export default function ExerciseCard({
             placeholder=""
             className="h-7 text-sm tabular-nums"
             disabled={loading}
-            onPointerDown={e => e.stopPropagation()}
+            
           />
 
           {/* Check cell - fat only, no buttons (delete via swipe) */}
@@ -734,7 +734,7 @@ export default function ExerciseCard({
                       placeholder="0"
                       className="h-7 text-sm tabular-nums"
                       disabled={loading}
-                      onPointerDown={e => e.stopPropagation()}
+
                     />
 
                     {/* Reps cell - always input style; for logged: live editable via updateSet */}
@@ -746,7 +746,7 @@ export default function ExerciseCard({
                       placeholder="0"
                       className="h-7 text-sm tabular-nums"
                       disabled={loading}
-                      onPointerDown={e => e.stopPropagation()}
+
                     />
 
                     {/* RIR cell - always input style; for logged: live editable via updateSet */}
@@ -758,7 +758,7 @@ export default function ExerciseCard({
                       placeholder=""
                       className="h-7 text-sm tabular-nums"
                       disabled={loading}
-                      onPointerDown={e => e.stopPropagation()}
+
                     />
 
                     {/* Check / actions cell - only in active mode (no logging in edit mode).
