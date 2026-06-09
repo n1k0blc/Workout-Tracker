@@ -54,7 +54,7 @@ interface WorkoutContextType {
     }
   ) => Promise<void>;
   refreshActiveWorkout: () => Promise<void>;
-  setActiveWorkoutDirectly: (workout: Workout, isPastWorkout?: boolean, pastWorkoutDuration?: number) => void;
+  setActiveWorkoutDirectly: (workout: Workout | null, isPastWorkout?: boolean, pastWorkoutDuration?: number) => void;
   workoutDuration: number;
   restTimer: number; // Elapsed seconds since rest started
   restTimerTarget: number; // Target rest duration in seconds
@@ -270,7 +270,31 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const setActiveWorkoutDirectly = useCallback((workout: Workout, isPast?: boolean, pastDuration?: number) => {
+  const setActiveWorkoutDirectly = useCallback((workout: Workout | null, isPast?: boolean, pastDuration?: number) => {
+    if (!workout) {
+      // Clear hijacked workout (e.g. leaving history edit)
+      setActiveWorkout(null);
+      setIsPastWorkout(false);
+      setPastWorkoutDuration(0);
+      setWorkoutDuration(0);
+      setPausedWorkoutDuration(null);
+      setPausedRestTimer(null);
+      setPausedRestTimerValue(null);
+      setIsPaused(false);
+      setIsRestTimerPaused(false);
+      setWorkoutStartTime(null);
+      setRestTimerStartedAt(null);
+      setRestTimerTarget(0);
+      setRestTimer(0);
+      setRestStartTime(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('workoutStartTime');
+        localStorage.removeItem('restStartTime');
+        localStorage.removeItem('restTimerTarget');
+      }
+      return;
+    }
+
     setActiveWorkout(workout);
     setIsPastWorkout(isPast ?? false);
     setPastWorkoutDuration(pastDuration ?? 0);

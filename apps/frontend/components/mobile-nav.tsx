@@ -35,18 +35,22 @@ export function MobileNav() {
   const { user, logout } = useAuth();
   const { activeWorkout } = useWorkout();
 
-  // Close menu when route changes
+  // Close menu when route changes (async to avoid sync setState-in-effect cascade warnings)
   useEffect(() => {
-    setIsOpen(false);
+    const id = setTimeout(() => setIsOpen(false), 0);
+    return () => clearTimeout(id);
   }, [pathname]);
 
-  // Don't show navigation on auth pages, workout page, or when there's an active workout
+  // Don't show navigation on auth pages, the active workout screen (live or past tracking),
+  // or when there is a real active (IN_PROGRESS) workout session.
+  // Note: completed workouts loaded into context for history edit (via setActiveWorkoutDirectly)
+  // should NOT hide the main site header — they are for viewing/editing historical data.
   if (
     pathname === '/' ||
     pathname === '/login' ||
     pathname === '/register' ||
     pathname?.startsWith('/workout') ||
-    activeWorkout
+    (activeWorkout && activeWorkout.status === 'IN_PROGRESS')
   ) {
     return null;
   }

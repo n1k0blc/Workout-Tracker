@@ -35,6 +35,15 @@ export default function EditWorkoutPage() {
     }
   }, [workout, setActiveWorkoutDirectly]);
 
+  // Clear the hijacked completed workout from global context when leaving this edit view
+  // (browser back, or unmount). This prevents the main site header/nav from staying hidden
+  // (MobileNav hides on any activeWorkout, but we only want that for real IN_PROGRESS sessions).
+  useEffect(() => {
+    return () => {
+      setActiveWorkoutDirectly(null);
+    };
+  }, [setActiveWorkoutDirectly]);
+
   const loadWorkout = useCallback(async () => {
     setLoading(true);
     try {
