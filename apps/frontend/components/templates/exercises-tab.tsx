@@ -18,7 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { IconPlus, IconTrash, IconEdit } from '@tabler/icons-react';
+import { IconPlus, IconTrash } from '@tabler/icons-react';
 
 export default function ExercisesTab() {
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -232,8 +232,14 @@ export default function ExercisesTab() {
           {exercises.map((exercise) => (
             <Card
               key={exercise.id}
-              className={!exercise.isCustom ? 'cursor-pointer hover:shadow-sm transition-shadow' : ''}
-              onClick={() => !exercise.isCustom && setViewExercise(exercise)}
+              className="cursor-pointer hover:shadow-sm transition-shadow"
+              onClick={() => {
+                if (exercise.isCustom) {
+                  setEditingExercise(exercise);
+                } else {
+                  setViewExercise(exercise);
+                }
+              }}
             >
               <CardContent className="p-4">
                 <div className="flex items-start justify-between gap-3">
@@ -265,15 +271,6 @@ export default function ExercisesTab() {
                       <>
                         <Badge variant="secondary" className="text-xs">Custom</Badge>
                         <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8"
-                            onClick={() => setEditingExercise(exercise)}
-                            title="Übung bearbeiten"
-                          >
-                            <IconEdit className="size-4" />
-                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
