@@ -86,7 +86,11 @@ export default function WorkoutTemplatesTab() {
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {systemTemplates.map((template) => (
-                  <TemplateCard key={template.id} template={template} />
+                  <TemplateCard
+                    key={template.id}
+                    template={template}
+                    onClick={() => router.push(`/templates/${template.id}/edit`)}
+                  />
                 ))}
               </div>
             </div>

@@ -47,6 +47,8 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
   // This removes the need for context hijack / synthetic workout for templates.
   const [exercises, setExercises] = useState<ExerciseLog[]>([]);
 
+  const [isReadonlyView, setIsReadonlyView] = useState(false);
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -106,6 +108,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
         const template = await apiClient.getWorkoutTemplate(templateId);
         setName(template.name);
         setRecommendedGymId(template.recommendedGymId || '');
+        setIsReadonlyView(!template.isCustom);
 
         // Build local exercises in ExerciseLog shape for the central card (no synthetic/hijack)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -256,131 +259,153 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
               <CardContent className="p-6 space-y-4">
                 <Field>
                   <FieldLabel>Vorlagenname</FieldLabel>
-                  <Input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="z.B. Upper Body, Push Day, etc."
-                    className="w-full"
-                  />
+                  {isReadonlyView ? (
+                    <div className="px-3 py-2 text-sm font-medium border border-input bg-muted/30 rounded-md">
+                      {name || '—'}
+                    </div>
+                  ) : (
+                    <Input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="z.B. Upper Body, Push Day, etc."
+                      className="w-full"
+                    />
+                  )}
                 </Field>
 
-                <Field>
-                  <FieldLabel>Empfohlenes Studio (Optional)</FieldLabel>
-                  <select
-                    value={recommendedGymId}
-                    onChange={(e) => setRecommendedGymId(e.target.value)}
-                    className="w-full md:w-auto px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring text-sm"
-                  >
-                    <option value="">Kein empfohlenes Studio</option>
-                    {availableGyms.map((gym) => (
-                      <option key={gym.id} value={gym.id}>
-                        {gym.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
+                {!isReadonlyView && (
+                  <Field>
+                    <FieldLabel>Empfohlenes Studio (Optional)</FieldLabel>
+                    <select
+                      value={recommendedGymId}
+                      onChange={(e) => setRecommendedGymId(e.target.value)}
+                      className="w-full md:w-auto px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring text-sm"
+                    >
+                      <option value="">Kein empfohlenes Studio</option>
+                      {availableGyms.map((gym) => (
+                        <option key={gym.id} value={gym.id}>
+                          {gym.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                )}
               </CardContent>
             </Card>
 
-            {/* Exercises – using the central ExerciseCard (with blueprint-edit flags).
-                Full structural editing allowed (reorder, replace, delete exercise, add/remove sets),
-                but no logging (no check column). Own DndContext because reorder is enabled. */}
+            {/* Exercises – using the central ExerciseCard.
+                For readonly (system templates): pure view, no Dnd, no actions, inputs disabled.
+                For edit (custom): full structure with handlers, no logging. */}
             {exercises.length > 0 ? (
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-              >
-                <SortableContext
-                  items={exercises.map((ex) => ex.id)}
-                  strategy={verticalListSortingStrategy}
+              isReadonlyView ? (
+                <div className="space-y-4">
+                  {exercises.map((exercise, idx) => (
+                    <ExerciseCard
+                      key={exercise.id}
+                      exercise={exercise}
+                      exerciseNumber={idx + 1}
+                      mode="edit"
+                      readonly={true}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
                 >
-                  <div className="space-y-4">
-                    {exercises.map((exercise, idx) => (
-                      <ExerciseCard
-                        key={exercise.id}
-                        exercise={exercise}
-                        exerciseNumber={idx + 1}
-                        mode="edit"
-                        allowReorder={true}
-                        allowExerciseActions={true}
-                        allowSetManagement={true}
-                        allowLogging={false}
-                        onRemoveExercise={(id) => setExercises(prev => prev.filter(e => e.id !== id))}
-                        onReplaceExercise={(id, newId) => {
-                          const exDetails = availableExercises.find((e) => e.id === newId);
-                          setExercises(prev => prev.map(e => e.id === id 
-                            ? { ...e, exerciseId: newId, exerciseName: exDetails?.name || 'Exercise' } 
-                            : e
-                          ));
-                        }}
-                        onAddSet={(id) => {
-                          setExercises(prev => prev.map(e => {
-                            if (e.id !== id) return e;
-                            const setNumbers = (e.sets || []).map((s: any) => s.setNumber || s.order || 0); // eslint-disable-line @typescript-eslint/no-explicit-any
-                            const plannedOrders = (e.plannedSets || []).map((p: any) => p.order || p.setNumber || 0); // eslint-disable-line @typescript-eslint/no-explicit-any
-                            const nextOrder = Math.max(0, ...setNumbers, ...plannedOrders) + 1;
-                            const newSet = {
-                              id: `set-${Date.now()}`,
-                              setNumber: nextOrder,
-                              setType: SetType.WORKING,
-                              reps: 10,
-                              weight: 0,
-                              rir: 2,
-                              completedAt: new Date().toISOString(),
-                            };
-                            const newPlanned = {
-                              id: `planned-${Date.now()}`,
-                              order: nextOrder,
-                              setType: SetType.WORKING,
-                              reps: 10,
-                              weight: 0,
-                              rir: 2,
-                              restAfterSet: 0,
-                            };
-                            return {
-                              ...e,
-                              sets: [...(e.sets || []), newSet],
-                              plannedSets: [...(e.plannedSets || []), newPlanned],
-                            };
-                          }));
-                        }}
-                        onRemoveSet={(id, setNumber) => {
-                          setExercises(prev => prev.map(e => {
-                            if (e.id !== id) return e;
-                            return {
-                              ...e,
-                              sets: (e.sets || []).filter(s => (s.setNumber ?? 0) !== setNumber),
-                              plannedSets: (e.plannedSets || []).filter(p => p.order !== setNumber),
-                            };
-                          }));
-                        }}
-                        onUpdateSet={(id, setId, data) => {
-                          setExercises(prev => prev.map(e => {
-                            if (e.id !== id) return e;
-                            return {
-                              ...e,
-                              sets: (e.sets || []).map(s => s.id === setId ? { ...s, ...data } : s),
-                            };
-                          }));
-                        }}
-                      />
-                    ))}
-                  </div>
+                  <SortableContext
+                    items={exercises.map((ex) => ex.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="space-y-4">
+                      {exercises.map((exercise, idx) => (
+                        <ExerciseCard
+                          key={exercise.id}
+                          exercise={exercise}
+                          exerciseNumber={idx + 1}
+                          mode="edit"
+                          allowReorder={true}
+                          allowExerciseActions={true}
+                          allowSetManagement={true}
+                          allowLogging={false}
+                          onRemoveExercise={(id) => setExercises(prev => prev.filter(e => e.id !== id))}
+                          onReplaceExercise={(id, newId) => {
+                            const exDetails = availableExercises.find((e) => e.id === newId);
+                            setExercises(prev => prev.map(e => e.id === id 
+                              ? { ...e, exerciseId: newId, exerciseName: exDetails?.name || 'Exercise' } 
+                              : e
+                            ));
+                          }}
+                          onAddSet={(id) => {
+                            setExercises(prev => prev.map(e => {
+                              if (e.id !== id) return e;
+                              const setNumbers = (e.sets || []).map((s: any) => s.setNumber || s.order || 0); // eslint-disable-line @typescript-eslint/no-explicit-any
+                              const plannedOrders = (e.plannedSets || []).map((p: any) => p.order || p.setNumber || 0); // eslint-disable-line @typescript-eslint/no-explicit-any
+                              const nextOrder = Math.max(0, ...setNumbers, ...plannedOrders) + 1;
+                              const newSet = {
+                                id: `set-${Date.now()}`,
+                                setNumber: nextOrder,
+                                setType: SetType.WORKING,
+                                reps: 10,
+                                weight: 0,
+                                rir: 2,
+                                completedAt: new Date().toISOString(),
+                              };
+                              const newPlanned = {
+                                id: `planned-${Date.now()}`,
+                                order: nextOrder,
+                                setType: SetType.WORKING,
+                                reps: 10,
+                                weight: 0,
+                                rir: 2,
+                                restAfterSet: 0,
+                              };
+                              return {
+                                ...e,
+                                sets: [...(e.sets || []), newSet],
+                                plannedSets: [...(e.plannedSets || []), newPlanned],
+                              };
+                            }));
+                          }}
+                          onRemoveSet={(id, setNumber) => {
+                            setExercises(prev => prev.map(e => {
+                              if (e.id !== id) return e;
+                              return {
+                                ...e,
+                                sets: (e.sets || []).filter(s => (s.setNumber ?? 0) !== setNumber),
+                                plannedSets: (e.plannedSets || []).filter(p => p.order !== setNumber),
+                              };
+                            }));
+                          }}
+                          onUpdateSet={(id, setId, data) => {
+                            setExercises(prev => prev.map(e => {
+                              if (e.id !== id) return e;
+                              return {
+                                ...e,
+                                sets: (e.sets || []).map(s => s.id === setId ? { ...s, ...data } : s),
+                              };
+                            }));
+                          }}
+                        />
+                      ))}
+                    </div>
 
-                  {/* Add exercise button below list */}
-                  <div className="flex justify-center py-3">
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowExerciseModal(true)}
-                      className="h-14 w-14 rounded-lg p-0 flex items-center justify-center"
-                      aria-label="Übung hinzufügen"
-                    >
-                      <IconPlus className="size-7" />
-                    </Button>
-                  </div>
-                </SortableContext>
-              </DndContext>
+                    {/* Add exercise button below list */}
+                    <div className="flex justify-center py-3">
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowExerciseModal(true)}
+                        className="h-14 w-14 rounded-lg p-0 flex items-center justify-center"
+                        aria-label="Übung hinzufügen"
+                      >
+                        <IconPlus className="size-7" />
+                      </Button>
+                    </div>
+                  </SortableContext>
+                </DndContext>
+              )
             ) : (
               <Card>
                 <CardContent className="p-8 flex flex-col items-center gap-4 text-center">
@@ -400,24 +425,26 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
               </Card>
             )}
 
-            {/* Save / Cancel Actions (own buttons like in history edit) */}
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                onClick={() => router.push('/templates')}
-                disabled={saving}
-                className="flex-1"
-              >
-                Abbrechen
-              </Button>
-              <Button
-                onClick={handleSave}
-                disabled={saving || exercises.length === 0}
-                className="flex-1"
-              >
-                {saving ? 'Speichert...' : 'Speichern'}
-              </Button>
-            </div>
+            {/* Save / Cancel Actions (only for editable custom templates) */}
+            {!isReadonlyView && (
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => router.push('/templates')}
+                  disabled={saving}
+                  className="flex-1"
+                >
+                  Abbrechen
+                </Button>
+                <Button
+                  onClick={handleSave}
+                  disabled={saving || exercises.length === 0}
+                  className="flex-1"
+                >
+                  {saving ? 'Speichert...' : 'Speichern'}
+                </Button>
+              </div>
+            )}
 
             {/* Exercise Selection Modal for adding exercises */}
             <ExerciseSelectionModal

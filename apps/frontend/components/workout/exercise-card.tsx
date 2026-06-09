@@ -51,6 +51,9 @@ interface ExerciseCardProps {
   onAddSet?: (exerciseId: string) => void;
   onRemoveSet?: (exerciseId: string, setNumber: number) => void;
   onUpdateSet?: (exerciseId: string, setId: string, data: { reps?: number; weight?: number; rir?: number; setType?: SetType }) => void | Promise<void>;
+
+  /** Pure view mode: everything read-only, no actions, no editing of values/types/sets */
+  readonly?: boolean;
 }
 
 
@@ -67,6 +70,7 @@ export default function ExerciseCard({
   onAddSet,
   onRemoveSet,
   onUpdateSet,
+  readonly,
 }: ExerciseCardProps) {
   // Derive effective flags. For 'active' everything is on.
   // For 'edit' the caller decides (History: all structural/logging off; Blueprint: structural on, logging off).
@@ -74,6 +78,8 @@ export default function ExerciseCard({
   const effectiveAllowExerciseActions = allowExerciseActions ?? (mode === 'active');
   const effectiveAllowSetManagement = allowSetManagement ?? (mode === 'active');
   const effectiveAllowLogging = allowLogging ?? (mode === 'active');
+  const isReadonly = readonly ?? false;
+
   const { 
     removeExercise: contextRemoveExercise, 
     replaceExercise: contextReplaceExercise, 
@@ -340,9 +346,9 @@ export default function ExerciseCard({
     }
     const offset = activeSwipe.offset;
     setActiveSwipe(null);
-    if (offset > SWIPE_THRESHOLD && setNumber !== undefined && !isLogged && effectiveAllowLogging) {
+    if (!isReadonly && offset > SWIPE_THRESHOLD && setNumber !== undefined && !isLogged && effectiveAllowLogging) {
       handleLogSet(setNumber);
-    } else if (offset < -(effectiveAllowSetManagement ? 50 : SWIPE_THRESHOLD) && setNumber !== undefined && effectiveAllowSetManagement && (!isLogged || !effectiveAllowLogging)) {
+    } else if (!isReadonly && offset < -(effectiveAllowSetManagement ? 50 : SWIPE_THRESHOLD) && setNumber !== undefined && effectiveAllowSetManagement && (!isLogged || !effectiveAllowLogging)) {
       discardUnloggedSet(setNumber);
     }
     // RTL on logged: no effect (cannot delete logged sets via swipe) — except in setManagement mode (blueprint/template), where we allow swipe delete for plan sets (even if represented in 'sets') regardless of 'logged' status. In active (allowLogging), only unlogged sets are deletable via swipe.
@@ -467,10 +473,12 @@ export default function ExerciseCard({
           <button
             type="button"
             onClick={() => {
-              const next = isWarmup ? SetType.WORKING : SetType.WARMUP;
-              updateEditValue(setNumber, 'setType', next);
+              if (!isReadonly) {
+                const next = isWarmup ? SetType.WORKING : SetType.WARMUP;
+                updateEditValue(setNumber, 'setType', next);
+              }
             }}
-            disabled={loading}
+            disabled={loading || isReadonly}
             className="flex items-center justify-center"
             title={isWarmup ? 'Aufwärmen' : 'Arbeit'}
           >
@@ -479,9 +487,9 @@ export default function ExerciseCard({
             </Badge>
           </button>
 
-          <Input type="number" step="0.5" value={getEditValue(setNumber, 'weight')} onChange={(e) => handleRowValueChange(setNumber, null, 'weight', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading}  />
-          <Input type="number" value={getEditValue(setNumber, 'reps')} onChange={(e) => handleRowValueChange(setNumber, null, 'reps', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading}  />
-          <Input type="number" value={getEditValue(setNumber, 'rir')} onChange={(e) => handleRowValueChange(setNumber, null, 'rir', e.target.value)} onBlur={commitIfNeeded} placeholder="" className="h-7 text-sm tabular-nums" disabled={loading}  />
+          <Input type="number" step="0.5" value={getEditValue(setNumber, 'weight')} onChange={(e) => handleRowValueChange(setNumber, null, 'weight', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} />
+          <Input type="number" value={getEditValue(setNumber, 'reps')} onChange={(e) => handleRowValueChange(setNumber, null, 'reps', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} />
+          <Input type="number" value={getEditValue(setNumber, 'rir')} onChange={(e) => handleRowValueChange(setNumber, null, 'rir', e.target.value)} onBlur={commitIfNeeded} placeholder="" className="h-7 text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} />
 
           {showCheckColumn && (
             <div className="flex justify-end">
@@ -520,12 +528,12 @@ export default function ExerciseCard({
             <button
               type="button"
               onClick={() => {
-                if (mode === 'edit' && onUpdateSet) {
+                if (!isReadonly && mode === 'edit' && onUpdateSet) {
                   const next = isWarmup ? SetType.WORKING : SetType.WARMUP;
                   onUpdateSet(exercise.id, set.id, { setType: next });
                 }
               }}
-              disabled={loading || mode !== 'edit'}
+              disabled={loading || isReadonly || mode !== 'edit'}
               className="flex items-center justify-center"
               title={isWarmup ? 'Aufwärmen' : 'Arbeit'}
             >
@@ -622,8 +630,8 @@ export default function ExerciseCard({
             )}
           </div>
           <div className="flex items-center gap-1 mt-0.5">
-            {/* Replace Exercise Button - only if allowed */}
-            {effectiveAllowExerciseActions && (
+            {/* Replace Exercise Button - only if allowed and not readonly */}
+            {!isReadonly && effectiveAllowExerciseActions && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -635,8 +643,8 @@ export default function ExerciseCard({
                 <IconRefresh className="size-4" />
               </Button>
             )}
-            {/* Delete Exercise Button - only if allowed */}
-            {effectiveAllowExerciseActions && (
+            {/* Delete Exercise Button - only if allowed and not readonly */}
+            {!isReadonly && effectiveAllowExerciseActions && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -680,7 +688,7 @@ export default function ExerciseCard({
               const swipeClass = swipeOffset > 0 ? 'bg-primary/5' : swipeOffset < 0 ? 'bg-destructive/5' : '';
 
               const commitIfNeeded = () => {
-                if (mode === 'edit' && !loggedSet) {
+                if (!isReadonly && mode === 'edit' && !loggedSet) {
                   const w = parseFloat(getEditValue(setNumber, 'weight') || plannedSet.weight?.toString() || '0');
                   const r = parseInt(getEditValue(setNumber, 'reps') || plannedSet.reps?.toString() || '0');
                   if (w > 0 && r > 0) {
@@ -705,9 +713,9 @@ export default function ExerciseCard({
                     <button
                       type="button"
                       onClick={() => {
-                        if (mode === 'edit' || !loggedSet || isEditingThis) {
+                        if (!isReadonly && (mode === 'edit' || !loggedSet || isEditingThis)) {
                           const next = isWarmup ? SetType.WORKING : SetType.WARMUP;
-                          if (mode === 'edit' && loggedSet && onUpdateSet) {
+                          if (!isReadonly && mode === 'edit' && loggedSet && onUpdateSet) {
                             // In edit mode (history or blueprint): directly update via handler
                             onUpdateSet(exercise.id, loggedSet.id, { setType: next });
                           } else {
@@ -715,7 +723,7 @@ export default function ExerciseCard({
                           }
                         }
                       }}
-                      disabled={loading || (mode !== 'edit' && !!loggedSet)}
+                      disabled={loading || isReadonly || (mode !== 'edit' && !!loggedSet)}
                       className="flex items-center justify-center"
                       title={isWarmup ? 'Aufwärmen' : 'Arbeit'}
                     >
@@ -733,8 +741,8 @@ export default function ExerciseCard({
                       onBlur={commitIfNeeded}
                       placeholder="0"
                       className="h-7 text-sm tabular-nums"
-                      disabled={loading}
-
+                      disabled={loading || isReadonly}
+                      readOnly={isReadonly}
                     />
 
                     {/* Reps cell - always input style; for logged: live editable via updateSet */}
@@ -745,8 +753,8 @@ export default function ExerciseCard({
                       onBlur={commitIfNeeded}
                       placeholder="0"
                       className="h-7 text-sm tabular-nums"
-                      disabled={loading}
-
+                      disabled={loading || isReadonly}
+                      readOnly={isReadonly}
                     />
 
                     {/* RIR cell - always input style; for logged: live editable via updateSet */}
@@ -757,8 +765,8 @@ export default function ExerciseCard({
                       onBlur={commitIfNeeded}
                       placeholder=""
                       className="h-7 text-sm tabular-nums"
-                      disabled={loading}
-
+                      disabled={loading || isReadonly}
+                      readOnly={isReadonly}
                     />
 
                     {/* Check / actions cell - only in active mode (no logging in edit mode).
@@ -809,8 +817,8 @@ export default function ExerciseCard({
               });
             })()}
 
-            {/* Add set button (table-like) - only if set management allowed */}
-            {effectiveAllowSetManagement && (
+            {/* Add set button (table-like) - only if set management allowed and not readonly */}
+            {!isReadonly && effectiveAllowSetManagement && (
               <Button variant="outline" onClick={() => {
                 if (onAddSet) {
                   onAddSet(exercise.id);
