@@ -595,9 +595,9 @@ export class WorkoutsService {
     await this.prisma.setLog.update({
       where: { id: setLogId },
       data: {
-        reps: updateSetDto.reps,
-        weight: updateSetDto.weight,
-        rir: updateSetDto.rir,
+        ...(updateSetDto.reps !== undefined && { reps: updateSetDto.reps }),
+        ...(updateSetDto.weight !== undefined && { weight: updateSetDto.weight }),
+        ...(updateSetDto.rir !== undefined && { rir: updateSetDto.rir }),
         ...(updateSetDto.setType !== undefined && { setType: updateSetDto.setType }),
       },
     });

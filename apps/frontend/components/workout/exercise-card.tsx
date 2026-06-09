@@ -542,7 +542,14 @@ export default function ExerciseCard({
                   if (onUpdateSet) {
                     onUpdateSet(exercise.id, set.id, { setType: next });
                   } else {
-                    contextUpdateSet(set.id, { setType: next });
+                    // contextUpdateSet requires the current reps/weight (backend validation),
+                    // so we send the full current values + the setType change
+                    contextUpdateSet(set.id, {
+                      reps: set.reps,
+                      weight: set.weight,
+                      rir: set.rir,
+                      setType: next,
+                    });
                   }
                 }
               }}
@@ -733,7 +740,14 @@ export default function ExerciseCard({
                             if (onUpdateSet) {
                               onUpdateSet(exercise.id, loggedSet.id, { setType: next });
                             } else {
-                              contextUpdateSet(loggedSet.id, { setType: next });
+                              // contextUpdateSet requires the current reps/weight (backend validation),
+                              // so we send the full current values + the setType change
+                              contextUpdateSet(loggedSet.id, {
+                                reps: loggedSet.reps,
+                                weight: loggedSet.weight,
+                                rir: loggedSet.rir,
+                                setType: next,
+                              });
                             }
                           } else {
                             updateEditValue(setNumber, 'setType', next);
