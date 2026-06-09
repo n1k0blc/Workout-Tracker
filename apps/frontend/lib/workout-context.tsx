@@ -47,9 +47,10 @@ interface WorkoutContextType {
   updateSet: (
     setLogId: string,
     data: {
-      reps: number;
-      weight: number;
+      reps?: number;
+      weight?: number;
       rir?: number;
+      setType?: SetType;
     }
   ) => Promise<void>;
   refreshActiveWorkout: () => Promise<void>;
@@ -722,9 +723,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const updateSet = async (
     setLogId: string,
     data: {
-      reps: number;
-      weight: number;
+      reps?: number;
+      weight?: number;
       rir?: number;
+      setType?: SetType;
     }
   ) => {
     if (!activeWorkout) return;

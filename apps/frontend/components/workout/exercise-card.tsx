@@ -537,12 +537,16 @@ export default function ExerciseCard({
             <button
               type="button"
               onClick={() => {
-                if (!isReadonly && mode === 'edit' && onUpdateSet) {
+                if (!isReadonly) {
                   const next = isWarmup ? SetType.WORKING : SetType.WARMUP;
-                  onUpdateSet(exercise.id, set.id, { setType: next });
+                  if (onUpdateSet) {
+                    onUpdateSet(exercise.id, set.id, { setType: next });
+                  } else {
+                    contextUpdateSet(set.id, { setType: next });
+                  }
                 }
               }}
-              disabled={loading || isReadonly || mode !== 'edit'}
+              disabled={loading || isReadonly}
               className="flex items-center justify-center"
               title={isWarmup ? 'Aufwärmen' : 'Arbeit'}
             >
@@ -722,17 +726,21 @@ export default function ExerciseCard({
                     <button
                       type="button"
                       onClick={() => {
-                        if (!isReadonly && (mode === 'edit' || !loggedSet || isEditingThis)) {
+                        if (!isReadonly) {
                           const next = isWarmup ? SetType.WORKING : SetType.WARMUP;
-                          if (!isReadonly && mode === 'edit' && loggedSet && onUpdateSet) {
-                            // In edit mode (history or blueprint): directly update via handler
-                            onUpdateSet(exercise.id, loggedSet.id, { setType: next });
+                          if (loggedSet) {
+                            // Update already logged set (works for active after log, past tracking, template edit)
+                            if (onUpdateSet) {
+                              onUpdateSet(exercise.id, loggedSet.id, { setType: next });
+                            } else {
+                              contextUpdateSet(loggedSet.id, { setType: next });
+                            }
                           } else {
                             updateEditValue(setNumber, 'setType', next);
                           }
                         }
                       }}
-                      disabled={loading || isReadonly || (mode !== 'edit' && !!loggedSet)}
+                      disabled={loading || isReadonly}
                       className="flex items-center justify-center"
                       title={isWarmup ? 'Aufwärmen' : 'Arbeit'}
                     >

@@ -598,6 +598,7 @@ export class WorkoutsService {
         reps: updateSetDto.reps,
         weight: updateSetDto.weight,
         rir: updateSetDto.rir,
+        ...(updateSetDto.setType !== undefined && { setType: updateSetDto.setType }),
       },
     });
 

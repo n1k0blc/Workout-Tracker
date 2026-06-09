@@ -34,6 +34,7 @@ import {
   DashboardStats,
   NextPlannedWorkout,
   CycleProgress,
+  SetType,
 } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
@@ -365,9 +366,10 @@ class ApiClient {
     workoutId: string,
     setLogId: string,
     data: {
-      reps: number;
-      weight: number;
+      reps?: number;
+      weight?: number;
       rir?: number;
+      setType?: SetType;
     }
   ): Promise<Workout> {
     return this.request<Workout>(

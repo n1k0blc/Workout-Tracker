@@ -86,4 +86,8 @@ export class UpdateSetDto {
   @IsInt()
   @Min(0)
   rir?: number;
+
+  @IsOptional()
+  @IsEnum(SetType)
+  setType?: SetType;
 }
