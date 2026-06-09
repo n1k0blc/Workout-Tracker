@@ -1058,3 +1058,65 @@ Nächster Fokus (stück für stück): Cycle Wizard / Blueprint Editing mit derse
 ---
 
 **Hinweis:** Dieses Dokument ersetzt frühere informelle Phasen-Planungen aus dem Chat und dient als zentrale Referenz für den UI-Refactoring-Fortschritt.
+
+---
+
+## Letzte Anpassung (Mai 2026): „Vergangenes Workout tracken“ auf Template-Edit-Modus der ExerciseCard umgestellt
+
+**User-Feedback (direkt nach der Zentralisierungs-Validierung):**
+> „... wir müssen nochmal an den vergangenes workout tracken modus ran. Hier sieht es aktuell so aus wie als wären alle sets von Anfang an gelogged und das führt zu fehlern wenn ich eine übung austauschen will und ich kann auch keine sets löschen. Aus meiner sicht können wir hier die exercise card im gleichen modus verwenden wie wir sie auch für die bearbeitung von benutzerdefinierten Workoutvorlagen benutzen. Also auch keine Logging spalte etc. Oder würde das dann dazu führen dass man das workout nicht speichern kann weil keine sets gelogged sind?“
+
+**Problemanalyse:**
+- Einstieg: `/workout` (app/workout/page.tsx) + `start-screen.tsx` → bei isPastWorkout wird via `setActiveWorkoutDirectly(...)` + `startWorkout({isPastWorkout: true})` ein Workout (meist aus Template/Cycle/Free) gestartet und ActiveWorkoutScreen mit `mode="edit"` gerendert.
+- `active-workout-screen.tsx` rendert die Liste immer mit:
+  ```tsx
+  <ExerciseCard mode={mode} allowReorder allowExerciseActions allowSetManagement allowLogging={true} />
+  ```
+- Für past tracking liefert das Backend die historischen Werte bereits in `exercise.sets[]` (performed), nicht nur `plannedSets`. `getLoggedSet` → truthy → Card zeigt „logged“-Stil (dunkle Balken, Check-Spalte, isLogged=true).
+- Guards in exercise-card.tsx:
+  - RTL-Swipe-Delete: `effectiveAllowSetManagement && (!isLogged || !effectiveAllowLogging)`
+  - Collapsed Bars: `logged = effectiveAllowLogging && !!getLoggedSet(...)` (dann foreground statt muted)
+  - Check-Column: `showCheckColumn = effectiveAllowLogging`
+  - LTR-Log-Swipe: nur bei `effectiveAllowLogging`
+- Replace-Button selbst war per `effectiveAllowExerciseActions` sichtbar, aber durch das „pre-logged“-Feeling + ggf. API-Verhalten bei Replace auf dem frisch gestarteten past-Workout wirkten Aktionen blockiert oder führten zu Fehlern.
+- `canFinishWorkout` war schon korrekt angepasst (`if (mode === 'edit' || isPastWorkout) return exercises.length > 0;`), mit Kommentar „No requirement for explicit 'logged' sets via log UI (which is hidden in edit).“
+
+**Umsetzung (stück für stück, Props-API beibehalten):**
+- In `active-workout-screen.tsx` (ExerciseCard-Callsite für die Liste):
+  - `allowLogging={!isPastWorkout}` (für live-active: true; für past-tracking: false).
+  - Damit für isPastWorkout exakt dieselbe Konfiguration wie im `template-editor-screen.tsx` für benutzerdefinierte Vorlagen:
+    - `mode="edit"`
+    - allowReorder/allowExerciseActions/allowSetManagement = true
+    - allowLogging = false (keine Logging-Spalte, keine LTR-Log-Gesten, graue Indikator-Balken, RTL-Delete erlaubt auch bei vorhandenen Werten in sets[] dank `|| !effectiveAllowLogging`)
+- Der `mode="edit"` (von page.tsx übergeben) sorgt zusätzlich für:
+  - Dauer-Input statt Live-Timer im Header
+  - Auto-Commit-Logik (useEffect + onBlur commitIfNeeded) die Werte aus Edit-Inputs via handleLogSet/contextUpdateSet in den Workout-State schreibt (auch ohne sichtbaren Check-Button)
+  - Set-Typ-Toggle erlaubt (Badge-Click-Handler prüft mode==='edit')
+- `canFinishWorkout` + „Workout beenden“-Button: bleibt bei `exercises.length > 0`. Die Frage „kann man nicht speichern, weil nichts gelogged ist?“ → **Nein**. Die Commit-Pfade (onBlur für Drafts/Plan, live updateSet für bereits vorhandene, addAdditionalSet + Blur) sorgen dafür, dass beim completeWorkout der aktuelle Stand (mit allen Werten in sets[] oder via Context) ans Backend geht. Analog zur handleSave-Validierung im Template-Editor (nur Anzahl Exercises + Sätze pro Exercise, keine „logged“-Semantik).
+
+**Ergebnis:**
+- Vergangenes-Tracking-Flow verhält sich jetzt identisch zum Custom-Template-Edit: volle strukturelle Flexibilität (Übung ersetzen, Sätze per RTL-Swipe löschen, +Satz, Reorder, Set-Art wechseln, Werte editieren) bis zum finalen „Beenden“.
+- Visuell: keine Check-Spalte, graue Balken im Collapsed, „unlogged“-Feeling.
+- Unterscheidung bewusst erhalten:
+  - „Vergangenes tracken“ (isPastWorkout, status IN_PROGRESS bis Beenden): Erzeugen der performed-Daten → wie Blueprint flexibel editierbar.
+  - `/history/[id]/edit` (echtes COMPLETED): Immutable-Historie → bewusst restriktiv (keine strukturellen Änderungen in der Card-Konfig; Debt-Hack im Context nur für Werte + limited).
+- Keine Änderung an der zentralen `exercise-card.tsx` Props-API nötig (die allow*-Flags + mode + readonly decken den Fall bereits ab).
+
+**Betroffene Dateien:**
+- `apps/frontend/components/workout/active-workout-screen.tsx` (die Callsite-Props)
+- `UI-REFRACTORING-PLAN.md` (dieser Abschnitt + Status-Update)
+
+**Validierungsschritte (wie immer):**
+1. Code-Änderung
+2. `cd apps/frontend && npx eslint ... --max-warnings=0 && npx tsc --noEmit`
+3. Manueller Test-Flow: Start → „Vergangenes Workout tracken“ (Template oder Free) → im Editor: Replace-Button sichtbar + funktional, Swipe RTL auf einem Satz mit Wert löscht ihn, +Satz hinzufügen + Werte eintragen (per Blur commit), Set-Typ togglen, Reorder, Collapsed-Bars grau, keine Check-Spalte → „Workout beenden“ aktiv (auch ohne „explizites Loggen“) → speichert korrekt mit den eingegebenen Werten.
+4. Live-Active-Modus bleibt unverändert (allowLogging=true, volle Logging-UI).
+5. Commit + Push auf UI-Refactoring.
+
+**Status nach diesem Schritt:** Die Konfiguration der zentralen ExerciseCard für den „Vergangenes tracken“-Pfad ist jetzt konsistent mit Custom-Template-Edit. Der aktive Screen dient weiterhin als Shell für diesen Flow (Dnd, Header mit Dauer, Bottom-Bar, Complete-Logik, Completion-Modal), während reine Blueprint-Editoren (Templates) eigene Shell + lokale State + on*-Handler nutzen. Zentrale Card + Props-API ist die eine Quelle für alle Fälle.
+
+**Nächste Schritte (offen):** Cycle-Wizard/Blueprint-Editing mit derselben Card-Konfig; ggf. Review ob replaceExercise für isPastWorkout (IN_PROGRESS) im Context auch den In-Mem-Patch-Pfad nehmen sollte (falls API für past-gestartete Workouts strukturelle Changes blockiert – User-Fehler „beim Austauschen“ nach diesem Fix beobachten); Dokumentation der verbleibenden Debt-Pfade (Context-Hijack nur noch für echte History-Edit von COMPLETED).
+
+---
+
+**Gesamt-Status (Mai 2026):** Ansatz B (ExerciseCard als zentrale Komponente mit Props-API) umgesetzt und validiert. Alle Haupt-Flows (Active, Past-Tracking, Custom-Template-Edit, System-Template-Readonly, History-Edit restricted) nutzen `apps/frontend/components/workout/exercise-card.tsx` via mode + allowReorder/allowExerciseActions/allowSetManagement/allowLogging + readonly. Keine Duplikation der Swipe/Collapse/Table/Gesture-Logik mehr. UI-Refactoring-Plan fortlaufend gepflegt. Lint/TSC/Commit-Routine eingehalten.

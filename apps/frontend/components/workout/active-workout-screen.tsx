@@ -300,7 +300,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
                     allowReorder={true}
                     allowExerciseActions={true}
                     allowSetManagement={true}
-                    allowLogging={true}
+                    allowLogging={!isPastWorkout}
                   />
                 ))}
               </SortableContext>
