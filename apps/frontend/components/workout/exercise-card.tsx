@@ -88,6 +88,8 @@ export default function ExerciseCard({
     loading,
     activeWorkout,
     setActiveWorkoutDirectly,
+    isPastWorkout,
+    pastWorkoutDuration,
   } = useWorkout();
 
   // Prefer injected handlers (for decoupled template usage, no context hijack) over context
@@ -370,18 +372,25 @@ export default function ExerciseCard({
         onRemoveSet(exercise.id, setNumber);
       } else if (activeWorkout && setActiveWorkoutDirectly) {
         // fallback for cases still using hijack (e.g. history edit)
-        const updatedExercises = activeWorkout.exercises.map((ex: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+        // IMPORTANT: for past tracking we MUST pass the current isPast/pastDuration
+        // so that setActiveWorkoutDirectly does not flip isPastWorkout=false
+        // (which would cause the parent to re-render the screen with live timers visible).
+        const updatedExercises = activeWorkout.exercises.map((ex: any) => {
           if (ex.id !== exercise.id) return ex;
           return {
             ...ex,
-            plannedSets: (ex.plannedSets || []).filter((ps: any) => ps.order !== setNumber), // eslint-disable-line @typescript-eslint/no-explicit-any
-            sets: (ex.sets || []).filter((s: any) => (s.setNumber ?? s.order) !== setNumber), // eslint-disable-line @typescript-eslint/no-explicit-any
+            plannedSets: (ex.plannedSets || []).filter((ps: any) => ps.order !== setNumber),
+            sets: (ex.sets || []).filter((s: any) => (s.setNumber ?? s.order) !== setNumber),
           };
         });
-        setActiveWorkoutDirectly({
-          ...activeWorkout,
-          exercises: updatedExercises,
-        } as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+        setActiveWorkoutDirectly(
+          {
+            ...activeWorkout,
+            exercises: updatedExercises,
+          } as any,
+          isPastWorkout,
+          pastWorkoutDuration
+        );
       }
       setAdditionalSetNumbers(prev => prev.filter(n => n !== setNumber));
       setSkippedPlannedSetNumbers(prev => {

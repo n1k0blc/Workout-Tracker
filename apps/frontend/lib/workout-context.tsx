@@ -623,7 +623,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
           reps: data.reps,
           weight: data.weight,
           rir: data.rir,
-          restAfterSet: data.plannedRestAfterSet ?? 90,
+          actualRestDuration: data.plannedRestAfterSet ?? 90,
           completedAt: new Date().toISOString(),
         };
 
@@ -644,8 +644,13 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
     setLoading(true);
     try {
-      // Calculate actual rest duration if timer was running
-      const actualRestDuration = restTimerStartedAt !== null ? restTimer : undefined;
+      // For the performed set, record the "rest after set" as actualRestDuration.
+      // - In live mode: the measured restTimer if one was running.
+      // - In past tracking / edit mode (no live timer): use the plannedRestAfterSet (which is 90 for additional sets,
+      //   or the value from the original blueprint/plan). This fulfills the requirement to send default 90s pauses
+      //   for historical past-tracked workouts.
+      const actualRestDuration =
+        restTimerStartedAt !== null ? restTimer : (data.plannedRestAfterSet ?? 90);
 
       const workout = await apiClient.logSet(
         activeWorkout.id,
@@ -657,9 +662,6 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
           rir: data.rir,
           setType: data.setType,
           actualRestDuration,
-          // Send the intended rest after set (default 90s for additional sets and for past/historical tracking).
-          // This ensures that when saving a past-tracked workout the set pauses are recorded.
-          restAfterSet: data.plannedRestAfterSet ?? 90,
         }
       );
       setActiveWorkout(workout);
