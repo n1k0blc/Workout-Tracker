@@ -271,9 +271,13 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
   const setActiveWorkoutDirectly = useCallback((workout: Workout, isPast?: boolean, pastDuration?: number) => {
     setActiveWorkout(workout);
-    setWorkoutDuration(0);
     setIsPastWorkout(isPast ?? false);
     setPastWorkoutDuration(pastDuration ?? 0);
+
+    // For past tracking the "total duration" is the user-entered historical value (not a live ticking timer).
+    // Set workoutDuration to the provided past duration so that save paths (and anything reading the generic duration)
+    // use the pre-specified time the user entered in the UI.
+    setWorkoutDuration(pastDuration ?? 0);
     setPausedWorkoutDuration(null);
     setPausedRestTimer(null);
     setPausedRestTimerValue(null);
@@ -317,9 +321,13 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     try {
       const workout = await apiClient.startWorkout(data);
       setActiveWorkout(workout);
-      setWorkoutDuration(0);
       setIsPastWorkout(data.isPastWorkout ?? false);
       setPastWorkoutDuration(data.pastWorkoutDuration ?? 0);
+
+      // For past tracking the "total duration" is the user-entered historical value (not a live ticking timer).
+      // Set workoutDuration to the provided past duration so that save paths (and anything reading the generic duration)
+      // use the pre-specified time the user entered in the UI.
+      setWorkoutDuration(data.pastWorkoutDuration ?? 0);
       setPausedWorkoutDuration(null);
       setPausedRestTimer(null);
       setPausedRestTimerValue(null);
@@ -615,6 +623,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
           reps: data.reps,
           weight: data.weight,
           rir: data.rir,
+          restAfterSet: data.plannedRestAfterSet ?? 90,
           completedAt: new Date().toISOString(),
         };
 
@@ -648,6 +657,9 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
           rir: data.rir,
           setType: data.setType,
           actualRestDuration,
+          // Send the intended rest after set (default 90s for additional sets and for past/historical tracking).
+          // This ensures that when saving a past-tracked workout the set pauses are recorded.
+          restAfterSet: data.plannedRestAfterSet ?? 90,
         }
       );
       setActiveWorkout(workout);

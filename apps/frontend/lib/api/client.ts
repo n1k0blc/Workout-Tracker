@@ -338,6 +338,8 @@ class ApiClient {
       rir?: number;
       setType?: string;
       actualRestDuration?: number;
+      /** Intended/planned rest after this set (in seconds). Default 90s for free/additional sets and past tracking. */
+      restAfterSet?: number;
     }
   ): Promise<Workout> {
     return this.request<Workout>(

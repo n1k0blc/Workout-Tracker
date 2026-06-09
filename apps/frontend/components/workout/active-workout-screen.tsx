@@ -238,7 +238,9 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
                   )}
                 </div>
                 <div className="flex items-center gap-3">
-                  {mode === 'active' && !isPastWorkout ? (
+                  {/* For past workout tracking we *always* show the manual duration input and never the live timers.
+                      This prevents the overall workout timer from appearing after set operations (delete, etc.). */}
+                  {!isPastWorkout && mode === 'active' ? (
                     <>
                       <div className="flex flex-col items-end gap-2">
                         <WorkoutTimer workoutDuration={workoutDuration} />
