@@ -2,7 +2,7 @@
 
 **Status:** Aktiv  
 **Branch:** `UI-Refactoring`  
-**Letztes Update:** April 2026 (Shared Component first step: history edit integration using ActiveWorkoutScreen mode="edit"; Technical Debt for completed workouts full mutations documented; local in-memory context hack for COMPLETED/DISCARDED)
+**Letztes Update:** Mai 2026 (Ansatz B abgeschlossen: ExerciseCard als primäre zentrale Komponente validiert und dokumentiert. Alle Haupt-Flows (Active, History-Edit, Custom-Template-Edit, System-Template-Readonly-View) nutzen die eine `exercise-card.tsx` via Props-API + readonly. Legacy-Duplikation in Cycles notiert.)
 
 ---
 
@@ -327,6 +327,34 @@ Die Props-Variante ist flexibler und vermeidet eine Explosion von Modi.
 - Weniger Sonderlogik und Hacks.
 - Jeder Screen kann sein Datenmodell und seinen Speicherfluss sauber halten.
 - Immer noch große Wartbarkeitsgewinne (keine drei verschiedenen Implementierungen der Card-UX).
+
+---
+
+### Validierung & Dokumentation: Zentrale ExerciseCard-Komponente (Mai 2026)
+
+**Validierung (Code-Inspection):**
+- **Eine einzige zentrale Komponente**: `apps/frontend/components/workout/exercise-card.tsx` (mit Props-API für Mode + feingranulare Steuerung + readonly).
+  - Wird verwendet für **alle relevanten Einstiegspunkte**:
+    - Aktives Workout + Past-Tracking: `components/workout/active-workout-screen.tsx` (mode="active", alle allow* true).
+    - History-Edit von Completed Workouts: `app/history/[id]/edit/page.tsx` (direkt Cards, mode="edit", alle allow* false – nur Werte/Typ/Collapse).
+    - Template-Editor (Custom + System-Vorlagen): `components/templates/template-editor-screen.tsx` (mode="edit"; Custom: allow structural true + allowLogging=false + Handler; System: readonly=true, keine Actions, Inputs disabled/readOnly, Name/Gym static).
+    - Benutzerdefinierte Übungen: `components/templates/exercises-tab.tsx` (direkt Cards mit onClick → Edit für Custom; View für System).
+    - Vorlagen-Liste: `components/templates/workout-templates-tab.tsx` (Custom + System Cards klickbar → Edit bzw. Readonly-View).
+- **Kein Hijack mehr für Blueprints**: Templates/Editor nutzen lokalen State + injizierte `on*`-Handler (Props-driven).
+- **Readonly/View für System-Vorlagen** vollständig unterstützt (keine Buttons, keine Editierbarkeit, reiner Display + Collapse).
+- **Swipe/Collapse/Type/Value-Edit** zentral in einer Komponente (keine Duplizierung in den Haupt-Flows).
+- **Verbleibende Duplikate (niedrige Priorität)**: Cycles (`BlueprintExerciseCard`), Analytics (`SelectedExerciseCard` – reine Anzeige). Alte `template-exercise-card.tsx` deprecated.
+
+**Dokumentierter Stand im Plan:**
+- Ansatz B (nur ExerciseCard zentral, individuelle Screens drumherum) ist umgesetzt und validiert.
+- Props-API (mode + allowReorder/ExerciseActions/SetManagement/Logging + readonly + Handler) ermöglicht die gesamte Matrix ohne Sonderfälle pro Screen.
+- `ActiveWorkoutScreen` ist nicht mehr die universelle "eine Komponente für alles" (wird nur noch für aktive Sessions genutzt).
+- Technical Debt (Context-Hijack, Performed-Modell für Pläne) reduziert; zentrale Card ist wartbar und erweiterbar (z. B. für Cycle-Wizard).
+
+**Zusammenfassung Validierung:**
+Alles Wesentliche für Exercise Cards (Live-Execution, Blueprint-Edit, History-Edit, Readonly-View für System) lebt in **einer** Komponente. Die UI-Refactoring-Ziele (keine parallelen Implementierungen, einfache Änderungen an einer Stelle, Flexibilität per Props) sind für die Haupt-Flows erreicht. Nächster logischer Schritt: Migration der Cycle-Cards.
+
+(Stand der Codebase: siehe aktuelle Commits auf Branch `UI-Refactoring`.)
 
 Dieser Plan wird nun als verbindliche Richtung in der Dokumentation festgehalten. Implementierung erfolgt schrittweise und nur nach Bestätigung.
 
