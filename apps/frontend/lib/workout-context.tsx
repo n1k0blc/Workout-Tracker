@@ -288,6 +288,20 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('workoutStartTime', now.toString());
       }
     }
+
+    // For past workout tracking we must never have an active live rest timer
+    // (historical entry, not a real-time session). Clear any pending rest state
+    // and localStorage to avoid leaking into a subsequent live workout.
+    if (isPast) {
+      setRestTimerStartedAt(null);
+      setRestTimerTarget(0);
+      setRestTimer(0);
+      setRestStartTime(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('restStartTime');
+        localStorage.removeItem('restTimerTarget');
+      }
+    }
   }, []);
 
   const startWorkout = async (data: {
@@ -318,6 +332,20 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         setWorkoutStartTime(now);
         if (typeof window !== 'undefined') {
           localStorage.setItem('workoutStartTime', now.toString());
+        }
+      }
+
+      // For past workout tracking we must never have an active live rest timer
+      // (historical entry, not a real-time session). Clear any pending rest state
+      // and localStorage to avoid leaking into a subsequent live workout.
+      if (data.isPastWorkout) {
+        setRestTimerStartedAt(null);
+        setRestTimerTarget(0);
+        setRestTimer(0);
+        setRestStartTime(null);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('restStartTime');
+          localStorage.removeItem('restTimerTarget');
         }
       }
     } catch (error) {
@@ -624,8 +652,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       );
       setActiveWorkout(workout);
 
-      // Start new rest timer with this set's planned rest duration
-      if (data.plannedRestAfterSet !== undefined && data.plannedRestAfterSet > 0) {
+      // Start new rest timer with this set's planned rest duration.
+      // IMPORTANT: Never start live rest timer for past workout tracking (historical data entry)
+      // or blueprint-style edits. Rest timer is only for real-time active sessions.
+      if (!isPastWorkout && data.plannedRestAfterSet !== undefined && data.plannedRestAfterSet > 0) {
         const now = Date.now();
         setRestTimerStartedAt(now);
         setRestStartTime(now);

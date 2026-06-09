@@ -3,9 +3,10 @@
 import { useWorkout } from '@/lib/workout-context';
 
 export function RestTimerDisplay() {
-  const { restTimer, restTimerTarget, isRestTimerPaused, toggleRestTimerPause } = useWorkout();
+  const { restTimer, restTimerTarget, isRestTimerPaused, toggleRestTimerPause, isPastWorkout } = useWorkout();
 
-  if (restTimer === 0 && restTimerTarget === 0) {
+  // Never show live rest timer during past workout tracking (historical data entry only).
+  if (isPastWorkout || (restTimer === 0 && restTimerTarget === 0)) {
     return null;
   }
 
