@@ -12,7 +12,6 @@ import { Badge } from '@/components/ui/badge';
 import { Field, FieldLabel } from '@/components/ui/field';
 import ExerciseCard from '@/components/workout/exercise-card';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
-import { useWorkout } from '@/lib/workout-context';
 import { IconChevronLeft, IconPlus } from '@tabler/icons-react';
 import {
   DndContext,
@@ -35,7 +34,6 @@ interface TemplateEditorScreenProps {
 
 export default function TemplateEditorScreen({ templateId }: TemplateEditorScreenProps) {
   const router = useRouter();
-  const { activeWorkout } = useWorkout();
 
   const [name, setName] = useState('');
   const [recommendedGymId, setRecommendedGymId] = useState<string>('');
@@ -414,7 +412,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
               </Button>
               <Button
                 onClick={handleSave}
-                disabled={saving || !activeWorkout}
+                disabled={saving || exercises.length === 0}
                 className="flex-1"
               >
                 {saving ? 'Speichert...' : 'Speichern'}
