@@ -5,6 +5,12 @@ import { CSS } from '@dnd-kit/utilities';
 import { useState } from 'react';
 import { SetType, Exercise } from '@/types';
 import { BlueprintSetData } from './cycle-wizard';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { IconGripVertical, IconTrash, IconPlus, IconFlame, IconBarbell } from '@tabler/icons-react';
 
 interface BlueprintExercise {
   exerciseId: string;
@@ -17,7 +23,7 @@ interface BlueprintExerciseCardProps {
   exercise: Exercise | undefined;
   exerciseIndex: number;
   onRemove: () => void;
-  onUpdateSet: (setIdx: number, field: keyof BlueprintSetData, value: any) => void;
+  onUpdateSet: (setIdx: number, field: keyof BlueprintSetData, value: any) => void; // eslint-disable-line @typescript-eslint/no-explicit-any
   onRemoveSet: (setIdx: number) => void;
   onAddSet: () => void;
 }
@@ -51,194 +57,143 @@ export function BlueprintExerciseCard({
   };
 
   return (
-    <div
+    <Card
       ref={setNodeRef}
       style={style}
-      className="border border-gray-200 rounded-lg overflow-hidden"
+      className="overflow-hidden"
     >
-      {/* Header with Drag Handle and Collapse */}
-      <div className="flex items-center justify-between p-4 bg-white">
+      {/* Header with Drag + Collapse + Remove (sera style) */}
+      <div className="flex items-center justify-between p-4 bg-muted border-b border-border">
         <div className="flex items-center gap-3 flex-1">
           {/* Drag Handle */}
           <button
             {...attributes}
             {...listeners}
-            className="cursor-grab active:cursor-grabbing touch-none p-1 hover:bg-gray-100 rounded"
+            className="cursor-grab active:cursor-grabbing touch-none p-1 hover:bg-muted-foreground/10 rounded"
+            aria-label="Übung verschieben"
           >
-            <svg
-              className="w-5 h-5 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 8h16M4 16h16"
-              />
-            </svg>
+            <IconGripVertical className="size-4 text-muted-foreground" />
           </button>
 
-          {/* Collapse Button */}
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-1 hover:bg-gray-100 rounded"
-          >
-            <svg
-              className={`w-5 h-5 text-gray-600 transition-transform ${
-                isCollapsed ? '-rotate-90' : ''
-              }`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 9l-7 7-7-7"
-              />
-            </svg>
-          </button>
-
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-500">
-              #{blueprintExercise.order}
-            </span>
-            <h4 className="font-semibold text-gray-900">
-              {exercise?.name || 'Übung geladen...'}
-            </h4>
+          <div>
+            <div className="font-medium text-foreground">
+              {exercise?.name || 'Übung'}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {blueprintExercise.sets.length} Sätze
+            </div>
           </div>
         </div>
 
-        <button
-          onClick={onRemove}
-          className="text-red-600 hover:text-red-800"
-          title="Übung entfernen"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="size-8"
+            aria-label={isCollapsed ? 'Aufklappen' : 'Zuklappen'}
+          >
+            {isCollapsed ? '▼' : '▲'}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onRemove}
+            className="size-8 text-destructive hover:text-destructive"
+            aria-label="Übung entfernen"
+          >
+            <IconTrash className="size-4" />
+          </Button>
+        </div>
       </div>
 
-      {/* Expanded Content */}
+      {/* Expanded Content (sera) */}
       {!isCollapsed && (
-        <div className="p-4 bg-white border-t border-gray-200">
-          {/* Sets List */}
-          <div className="space-y-2 mb-3">
-            <div className="text-sm font-medium text-gray-700 mb-2">
-              Sätze:
-            </div>
-            {blueprintExercise.sets.map((set, setIdx) => (
-              <div
-                key={setIdx}
-                className="bg-gray-50 rounded-lg p-3 border border-gray-200"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex-1"></div>
-                  <button
-                    onClick={() => onRemoveSet(setIdx)}
-                    className="text-red-600 hover:text-red-800 text-xs"
-                  >
-                    ✕
-                  </button>
+        <CardContent className="p-4 bg-background border-t border-border space-y-3">
+          {blueprintExercise.sets.map((set, setIdx) => (
+            <div key={setIdx} className="border border-border rounded-md p-3 bg-card">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-muted-foreground">
+                  Satz {set.order}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onRemoveSet(setIdx)}
+                  className="h-6 px-2 text-destructive hover:text-destructive text-xs"
+                >
+                  <IconTrash className="size-3 mr-1" /> Entfernen
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Typ</Label>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant={set.setType === 'WARMUP' ? 'outline' : 'default'}
+                      className="cursor-pointer"
+                      onClick={() => onUpdateSet(setIdx, 'setType', set.setType === 'WARMUP' ? 'WORKING' : 'WARMUP')}
+                    >
+                      {set.setType === 'WARMUP' ? <IconFlame className="size-3 mr-1" /> : <IconBarbell className="size-3 mr-1" />}
+                      {set.setType === 'WARMUP' ? 'Aufwärmen' : 'Arbeit'}
+                    </Badge>
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">
-                      Typ
-                    </label>
-                    <select
-                      value={set.setType}
-                      onChange={(e) =>
-                        onUpdateSet(setIdx, 'setType', e.target.value as SetType)
-                      }
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value={SetType.WORKING}>Arbeit</option>
-                      <option value={SetType.WARMUP}>Aufwärmen</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">
-                      {`Wdh${exercise?.isUnilateral ? ' (2x)' : ''}`}
-                    </label>
-                    <input
-                      type="number"
-                      value={set.reps ?? ''}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        onUpdateSet(setIdx, 'reps', value === '' ? null : parseInt(value));
-                      }}
-                      min="1"
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">
-                      {`Gewicht (kg)${exercise?.isDoubleWeight ? ' (2x)' : ''}`}
-                    </label>
-                    <input
-                      type="number"
-                      step="0.5"
-                      value={set.weight ?? ''}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        onUpdateSet(setIdx, 'weight', value === '' ? null : parseFloat(value));
-                      }}
-                      min="0"
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">
-                      RIR
-                    </label>
-                    <input
-                      type="number"
-                      value={set.rir ?? ''}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        onUpdateSet(setIdx, 'rir', value === '' ? null : parseInt(value));
-                      }}
-                      min="0"
-                      max="10"
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">
-                      Pause (s)
-                    </label>
-                    <input
-                      type="number"
-                      value={set.restAfterSet ?? ''}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        onUpdateSet(setIdx, 'restAfterSet', value === '' ? null : parseInt(value));
-                      }}
-                      min="0"
-                      step="15"
-                      placeholder="90"
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Gewicht (kg)</Label>
+                  <Input
+                    type="number"
+                    step="0.5"
+                    value={set.weight}
+                    onChange={(e) => onUpdateSet(setIdx, 'weight', parseFloat(e.target.value) || 0)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Wiederholungen</Label>
+                  <Input
+                    type="number"
+                    value={set.reps}
+                    onChange={(e) => onUpdateSet(setIdx, 'reps', parseInt(e.target.value) || 0)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">RIR</Label>
+                  <Input
+                    type="number"
+                    value={set.rir}
+                    onChange={(e) => onUpdateSet(setIdx, 'rir', parseInt(e.target.value) || 0)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+
+                <div className="col-span-2 space-y-1">
+                  <Label className="text-xs text-muted-foreground">Pause nach Satz (s)</Label>
+                  <Input
+                    type="number"
+                    value={set.restAfterSet}
+                    onChange={(e) => onUpdateSet(setIdx, 'restAfterSet', parseInt(e.target.value) || 90)}
+                    className="h-8 text-sm"
+                  />
                 </div>
               </div>
-            ))}
+            </div>
+          ))}
 
-            <button
-              onClick={onAddSet}
-              className="w-full py-2 px-3 border border-dashed border-gray-300 text-gray-600 text-sm font-medium rounded-lg hover:border-blue-500 hover:text-blue-600"
-            >
-              + Satz hinzufügen
-            </button>
-          </div>
-        </div>
+          <Button
+            variant="outline"
+            onClick={onAddSet}
+            className="w-full"
+          >
+            <IconPlus className="size-4 mr-2" /> Satz hinzufügen
+          </Button>
+        </CardContent>
       )}
-    </div>
+    </Card>
   );
 }

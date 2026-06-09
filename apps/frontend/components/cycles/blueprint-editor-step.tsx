@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
-import { CycleFormData, WorkoutDayData, BlueprintSetData } from './cycle-wizard';
+import { CycleFormData, BlueprintSetData } from './cycle-wizard';
 import { SetType, Exercise } from '@/types';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import TemplateSelectionModal from '@/components/workout/template-selection-modal';
 import { BlueprintExerciseCard } from './blueprint-exercise-card';
 import { apiClient } from '@/lib/api/client';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { IconPlus } from '@tabler/icons-react';
 import {
   DndContext,
   closestCenter,
@@ -141,9 +144,10 @@ export default function BlueprintEditorStep({
       alert('Vorlage erfolgreich erstellt!');
       setShowSaveTemplateModal(false);
       setTemplateName('');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to save template:', error);
-      if (error.response?.status === 409) {
+      const err = error as { response?: { status?: number } };
+      if (err.response?.status === 409) {
         alert('Eine Vorlage mit diesem Namen existiert bereits');
       } else {
         alert('Fehler beim Speichern der Vorlage');
@@ -306,27 +310,7 @@ export default function BlueprintEditorStep({
       value = 0;
     }
 
-    (set as any)[field] = value;
-
-    updateFormData({ workoutDays: updatedDays });
-  };
-
-  const updateExercise = (
-    exerciseIndex: number,
-    field: string,
-    value: number
-  ) => {
-    if (currentDayIndex === null) return;
-
-    const updatedDays = [...formData.workoutDays];
-    const exercise = updatedDays[currentDayIndex].blueprint.exercises[exerciseIndex];
-
-    // Prevent NaN values
-    if (isNaN(value)) {
-      value = 0;
-    }
-
-    (exercise as any)[field] = value;
+    (set as any)[field] = value; // eslint-disable-line @typescript-eslint/no-explicit-any
 
     updateFormData({ workoutDays: updatedDays });
   };
@@ -343,34 +327,34 @@ export default function BlueprintEditorStep({
   return (
     <>
       <div className="space-y-6">
-        {/* Day Tabs */}
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex flex-wrap gap-2">
-            {formData.workoutDays.map((day, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentDayIndex(index)}
-                className={`px-4 py-2 rounded-lg font-medium text-sm ${
-                  currentDayIndex === index
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {day.name || getWeekday(day.weekday)}
-                {day.blueprint.exercises.length > 0 && (
-                  <span className="ml-2 text-xs">
-                    ({day.blueprint.exercises.length})
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* Day Tabs (sera style) */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-wrap gap-2">
+              {formData.workoutDays.map((day, index) => (
+                <Button
+                  key={index}
+                  variant={currentDayIndex === index ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setCurrentDayIndex(index)}
+                  className="text-sm"
+                >
+                  {day.name || getWeekday(day.weekday)}
+                  {day.blueprint.exercises.length > 0 && (
+                    <span className="ml-1.5 text-xs opacity-80">
+                      ({day.blueprint.exercises.length})
+                    </span>
+                  )}
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Blueprint Editor */}
         {currentDay && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-foreground mb-3">
               Blueprint für {currentDay.name || getWeekday(currentDay.weekday)}
             </h3>
 
@@ -408,57 +392,81 @@ export default function BlueprintEditorStep({
                 </SortableContext>
               </DndContext>
             ) : (
-              <p className="text-gray-600 text-center py-8 mb-4">
-                Noch keine Übungen hinzugefügt
-              </p>
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <p className="text-muted-foreground mb-4">
+                    Noch keine Übungen hinzugefügt
+                  </p>
+                  {/* Large centered + as primary CTA (consistent with active workout) */}
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowExerciseModal(true)}
+                    className="h-16 w-16 rounded-lg p-0"
+                    aria-label="Erste Übung hinzufügen"
+                  >
+                    <IconPlus className="size-8" />
+                  </Button>
+                </CardContent>
+              </Card>
             )}
 
-            {/* Load from Template Button - disabled after exercises are added to prevent messy state */}
-            <button
-              onClick={() => setShowTemplateSelectionModal(true)}
-              disabled={currentDay.blueprint.exercises.length > 0}
-              className="w-full py-3 px-4 mb-3 border border-purple-600 bg-purple-50 text-purple-700 font-medium rounded-lg hover:bg-purple-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-purple-50"
-            >
-              📋 Aus Vorlage wählen
-            </button>
+            {/* Add Exercise Button (large + when list not empty, consistent style) */}
+            {currentDay.blueprint.exercises.length > 0 && (
+              <div className="flex justify-center py-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowExerciseModal(true)}
+                  className="h-14 w-14 rounded-lg p-0"
+                  aria-label="Übung hinzufügen"
+                >
+                  <IconPlus className="size-7" />
+                </Button>
+              </div>
+            )}
 
-            {/* Add Exercise Button */}
-            <button
-              onClick={() => setShowExerciseModal(true)}
-              className="w-full py-3 px-4 border-2 border-dashed border-gray-300 text-gray-600 font-medium rounded-lg hover:border-blue-500 hover:text-blue-600"
-            >
-              + Übung hinzufügen
-            </button>
+            {/* Load from Template Button (kept for functionality, styled sera) */}
+            <div className="mt-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowTemplateSelectionModal(true)}
+                disabled={currentDay.blueprint.exercises.length > 0}
+                className="w-full"
+              >
+                Aus Vorlage laden
+              </Button>
+            </div>
 
             {/* Save as Template Button */}
             {currentDay.blueprint.exercises.length > 0 && (
-              <button
+              <Button
+                variant="outline"
                 onClick={() => setShowSaveTemplateModal(true)}
-                className="w-full mt-3 py-3 px-4 border border-blue-600 text-blue-600 font-medium rounded-lg hover:bg-blue-50"
+                className="w-full mt-2"
               >
-                📋 Als Vorlage speichern
-              </button>
+                Als Vorlage speichern
+              </Button>
             )}
           </div>
         )}
 
-        {/* Navigation */}
-        <div className="flex gap-3">
-          <button
+        {/* Navigation (consistent with other steps) */}
+        <div className="flex gap-3 pt-2">
+          <Button
             type="button"
+            variant="outline"
             onClick={onBack}
-            className="flex-1 py-3 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50"
+            className="flex-1"
           >
             Zurück
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={onNext}
             disabled={!allDaysHaveExercises}
-            className="flex-1 py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1"
           >
             Weiter zur Überprüfung
-          </button>
+          </Button>
         </div>
       </div>
 

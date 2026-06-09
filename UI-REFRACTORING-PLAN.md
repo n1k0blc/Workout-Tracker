@@ -1120,3 +1120,72 @@ Nächster Fokus (stück für stück): Cycle Wizard / Blueprint Editing mit derse
 ---
 
 **Gesamt-Status (Mai 2026):** Ansatz B (ExerciseCard als zentrale Komponente mit Props-API) umgesetzt und validiert. Alle Haupt-Flows (Active, Past-Tracking, Custom-Template-Edit, System-Template-Readonly, History-Edit restricted) nutzen `apps/frontend/components/workout/exercise-card.tsx` via mode + allowReorder/allowExerciseActions/allowSetManagement/allowLogging + readonly. Keine Duplikation der Swipe/Collapse/Table/Gesture-Logik mehr. UI-Refactoring-Plan fortlaufend gepflegt. Lint/TSC/Commit-Routine eingehalten.
+
+---
+
+## Nächster Schritt: Cycle Wizard (Zyklus-Wizard) – shadcn/sera UI Refactoring (Blueprint Editing)
+
+**User-Request (Juni 2026):** Nach Abschluss der zentralen ExerciseCard und Vergangenes-Tracking-Alignment nun den Cycle Wizard (`/cycles/new`) auf shadcn/sera migrieren und UX an den Rest der App anpassen (wie Workout-Start, Templates, History, Active Screen).
+
+**Aktueller Stand der Cycles:**
+- Cycles List (`/cycles`) und Cycle-Detail bereits in Phase 3 auf shadcn/sera migriert (Cards, Badges, Buttons, semantic Tokens, Tabler Icons).
+- CycleWorkoutSelectionModal bereits im Workout-Start-Flow modernisiert.
+- **Cycle Wizard / Blueprint-Editor** noch legacy: alte gray/blue Hard-Farben, custom divs mit shadow/p-6, native inputs, custom Progress-Bar aus divs, eigene `BlueprintExerciseCard` + `BlueprintExerciseEditorCard` (Duplikation zur alten Template-Card und zur zentralen ExerciseCard).
+- Die Editor-Logik (per WorkoutDay Blueprint mit exercises + sets inkl. restAfterSet, Dnd pro Day, Exercise- + Template-Selection Modals, Review) ist funktional korrekt und muss 1:1 erhalten bleiben (keine Änderung an Datenmodell, Payload, Validierung, Dnd, Add/Remove/Reorder Sets/Exercises).
+
+**Ziel (UI/UX-Konsistenz):**
+- Visuell: 100% sera (bg-background/card, text-foreground/muted-foreground, border-border, primary, rounded-lg, Tabler Icons, shadcn Card/Button/Input/Label/Badge/Dialog/Select wo sinnvoll).
+- UX: Konsistente Step-Navigation mit expliziten Zurück/Weiter-Buttons (wie in PastWorkoutSetup und Template-Flows), große zentrierte + Icons für Add-Exercise wo passend, Card-basierte Step-Inhalte statt custom shadow-divs, moderne Progress-Indikator (Badges oder Steps statt harter blue-bar), einheitliche Form-Controls, gute Mobile-Tap-Targets, keine Hard-Farben (kein gray-*, blue-600, orange-600 etc.).
+- Strukturell: Wrapper + einfache Steps (BasicInfo, WorkoutDays, Review) schnell auf shadcn umstellen. Der komplexe BlueprintEditorStep und seine Karten stückweise migrieren (ähnlich wie Template-Editor → zentrale Card).
+- Langfristig (wie im Plan notiert): Cycle-Wizard/Blueprint-Editing mit derselben zentralen `ExerciseCard` (mode="edit", allowLogging=false, volle strukturelle Flags + on* Handler für lokale FormData) nutzen, um Duplikation zu eliminieren (wie bei Templates geschehen).
+- Keine Funktionalitätsänderung: Datenfluss (formData → WorkoutDayData → Blueprint → Payload für createCycle), Dnd-Logik, Modals, Submit, Validierung bleiben identisch.
+
+**Betroffene Dateien (ohne Funktionsänderung):**
+- `apps/frontend/app/cycles/new/page.tsx` (einfach)
+- `apps/frontend/components/cycles/cycle-wizard.tsx` (Wrapper + Progress + Step-Routing)
+- `apps/frontend/components/cycles/basic-info-step.tsx`
+- `apps/frontend/components/cycles/workout-days-step.tsx`
+- `apps/frontend/components/cycles/blueprint-editor-step.tsx`
+- `apps/frontend/components/cycles/review-step.tsx`
+- `apps/frontend/components/cycles/blueprint-exercise-card.tsx` + `blueprint-exercise-editor-card.tsx` (die Duplikat-Karten)
+- Optional: Nutzung der bereits migrierten `ExerciseSelectionModal` + `TemplateSelectionModal` (bereits shadcn).
+- `UI-REFRACTORING-PLAN.md` (Dokumentation + Status)
+
+**Reihenfolge (stück für stück, nach jedem Commit/Lint):**
+1. Plan in diesem Doc + User-Confirm.
+2. Wrapper + Progress + Header auf shadcn/Card/Button/semantic + konsistente Cancel/Abbrechen.
+3. BasicInfoStep (Form mit Card + shadcn Input/Label/Button).
+4. WorkoutDaysStep (Card-Liste für Tage, Checkbox/Input/Select auf shadcn-Patterns, Buttons).
+5. ReviewStep (Summary-Cards, konsistente Buttons).
+6. BlueprintEditorStep (äußere Struktur + Integration der Modals + Step-Buttons).
+7. Die inneren Blueprint-Cards stückweise (Header, Collapse, Table für Sets, Inputs für weight/reps/rir/restAfterSet, Badges für SetType mit IconFlame/Barbell, Add/Remove Buttons, Dnd-Handle auf IconGrip oder Long-Press wie in zentraler Card).
+8. Optional: Erste Schritte zur Nutzung der zentralen ExerciseCard im Blueprint-Kontext (für zukünftige Vereinheitlichung, wie bei Templates).
+9. Lint (eslint --max-warnings=0 auf betroffene Files), tsc, manuelle Verifizierung (Create Flow mit mehreren Days, Exercise hinzufügen via Modal, Sets editieren/add/remove, Reorder, Review, Submit – Datenstruktur muss identisch bleiben).
+10. Plan-Doc aktualisieren (neuer Abschnitt "Cycle Wizard abgeschlossen"), Commit/Push auf UI-Refactoring.
+
+**Vorsichtsmaßnahmen (Refactoring-Skill + AGENTS):**
+- Keine Änderung an `CycleFormData`, `WorkoutDayData`, `BlueprintSetData`, Payload-Mapping oder API-Call.
+- Dnd-Logik (dnd-kit), State-Management pro Step, currentDayIndex etc. unverändert.
+- Modals bleiben (bereits migriert).
+- Bei Blueprint-Cards: Die Edit-Logik (onUpdateSet etc.) bleibt, nur Styling + Komponenten (Card statt div, Input statt native, Badge + Tabler Icons statt hard colors + svg).
+- Mobile-First, Accessibility (Labels, ARIA wo sinnvoll), Dark/Light via Tokens.
+- Nach jedem größeren Schritt: eslint + tsc auf den Files, Commit mit klarer Message.
+
+**Erwartetes Ergebnis:**
+Der Zyklus-Wizard sieht aus und fühlt sich an wie der Rest der App (Workout-Start mit Steps + Modals, Template-Editor, History, Active-Screen): sera-Konsistenz, Card-basiert, Tabler, semantische Farben, einheitliche Navigation und Buttons. Funktional identisch, keine Regression bei Cycle-Erstellung oder Blueprint-Daten.
+
+**Stand der Migration (Juni 2026):**
+- Wrapper (cycle-wizard.tsx): Header, Progress, Error, Content-Card auf sera + shadcn.
+- BasicInfoStep: shadcn Input/Label/Button, sera tokens.
+- WorkoutDaysStep: Card per Tag, shadcn Input/Label/Button, semantic.
+- ReviewStep: Card Summary + per Day, Badge, Tabler icons for set types, shadcn Buttons.
+- BlueprintEditorStep (outer): Day tabs as Buttons, editor container, large + CTA, consistent nav Buttons, sera.
+- blueprint-exercise-card.tsx: Card, Input, Label, Badge, Button, Tabler (Grip, Trash, Plus, Flame, Barbell).
+- (WIP) blueprint-exercise-editor-card.tsx still legacy (next piece).
+- Functionality unchanged (blueprint data, dnd per day, modals, submit payload identical).
+
+**Nächste Schritte nach diesem:** Finish the editor-card styling, then consider deeper integration of the central ExerciseCard for blueprint editing (to remove the last duplication noted in the plan). Update this doc + commit.
+
+---
+
+**Hinweis:** Dieses Dokument ersetzt frühere informelle Phasen-Planungen aus dem Chat und dient als zentrale Referenz für den UI-Refactoring-Fortschritt. Der Cycle Wizard ist der logische nächste Kandidat nach der zentralen ExerciseCard und den Template-Integrationen.
