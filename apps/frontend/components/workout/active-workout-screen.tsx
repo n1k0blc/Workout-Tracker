@@ -24,12 +24,32 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  IconPlayerPlay,
+  IconPlayerPause,
+  IconPlus,
+} from '@tabler/icons-react';
 
 interface ActiveWorkoutScreenProps {
-  onWorkoutComplete: (workout: Workout, prs: PersonalRecord[], saveAsTemplate: boolean) => void;
+  onWorkoutComplete?: (workout: Workout, prs: PersonalRecord[], saveAsTemplate: boolean) => void;
+  mode?: 'active' | 'edit';
+  showBottomBar?: boolean;
+  showHeader?: boolean;
 }
 
-export default function ActiveWorkoutScreen({ onWorkoutComplete }: ActiveWorkoutScreenProps) {
+export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active', showBottomBar = true, showHeader = true }: ActiveWorkoutScreenProps) {
   const router = useRouter();
   const {
     activeWorkout,
@@ -44,9 +64,6 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete }: ActiveWorkout
     isPastWorkout,
     pastWorkoutDuration,
     setPastWorkoutDuration,
-    removedPlannedSets,
-    unplannedSets,
-    initTemplateSave,
   } = useWorkout();
 
   const [showExerciseModal, setShowExerciseModal] = useState(false);
@@ -57,8 +74,10 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete }: ActiveWorkout
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
+      // Long-press to drag (for reordering exercises without visible grip handle)
       activationConstraint: {
-        distance: 8,
+        delay: 300,
+        tolerance: 8,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -72,35 +91,24 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete }: ActiveWorkout
 
   const hasBlueprint = !activeWorkout.isFreeWorkout && activeWorkout.workoutDayId && activeWorkout.homeGymId !== null;
 
-  // Check if all exercises have at least one logged set AND all planned sets are either logged or removed
-  // AND all unplanned sets are either logged or removed
+  // Simplified: An exercise is considered "handled" if it has at least one logged set.
+  // We no longer distinguish between planned/unplanned sets during execution.
   const areAllSetsLogged = (): boolean => {
     if (activeWorkout.exercises.length === 0) return false;
 
     return activeWorkout.exercises.every((exercise) => {
-      // Every exercise must have at least one logged set
-      const hasLoggedSets = exercise.sets.length > 0;
-      
-      // If there are planned sets, all must be either logged or removed
-      let allPlannedHandled = true;
-      if (exercise.plannedSets && exercise.plannedSets.length > 0) {
-        const removedSets = removedPlannedSets.get(exercise.id) || new Set();
-        
-        allPlannedHandled = exercise.plannedSets.every((plannedSet) => {
-          // Both setNumber and order are 1-based
-          const isLogged = exercise.sets.some(s => s.setNumber === plannedSet.order);
-          const isRemoved = removedSets.has(plannedSet.order);
-          return isLogged || isRemoved;
-        });
-      }
-      
-      // Check if all unplanned sets have been logged or removed
-      // If there are still unplanned sets in the context for this exercise, they haven't been logged yet
-      const pendingUnplannedSets = unplannedSets.get(exercise.id);
-      const allUnplannedHandled = !pendingUnplannedSets || pendingUnplannedSets.size === 0;
-      
-      return hasLoggedSets && allPlannedHandled && allUnplannedHandled;
+      return exercise.sets.length > 0;
     });
+  };
+
+  const canFinishWorkout = (): boolean => {
+    if (mode === 'edit' || isPastWorkout) {
+      // In edit mode (e.g. past workout tracking), allow finishing as long as there are exercises.
+      // The values in the input fields (edit state or planned) will be used on save.
+      // No requirement for explicit "logged" sets via log UI (which is hidden in edit).
+      return activeWorkout.exercises.length > 0;
+    }
+    return areAllSetsLogged();
   };
 
   const handleAddExercise = async (exerciseId: string) => {
@@ -177,8 +185,8 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete }: ActiveWorkout
         // Continue anyway with empty array
       }
 
-      // Call parent handler to show completion modal
-      onWorkoutComplete(workout, prs, saveAsTemplate);
+      // Call parent handler to show completion modal (only when provided, e.g. not in pure edit mode for history/templates)
+      onWorkoutComplete?.(workout, prs, saveAsTemplate);
       
     } catch (error) {
       console.error('Failed to complete workout:', error);
@@ -209,74 +217,69 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete }: ActiveWorkout
 
   return (
     <>
-      <div className="min-h-screen bg-gray-50 pb-32">
-        {/* Header */}
-        <div className="bg-white shadow-sm sticky top-0 z-10">
-          <div className="max-w-4xl mx-auto px-4 py-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {activeWorkout.isFreeWorkout
-                    ? activeWorkout.templateName || 'Freies Workout'
-                    : activeWorkout.workoutDayName || 'Workout'}
-                </h1>
-                {activeWorkout.cycleName && (
-                  <p className="text-sm text-gray-600 mt-1">
-                    {activeWorkout.cycleName}
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center gap-3">
-                {!isPastWorkout ? (
-                  <>
-                    <div className="flex flex-col items-end gap-2">
-                      <WorkoutTimer workoutDuration={workoutDuration} />
-                      <RestTimerDisplay />
+      <div className="min-h-screen bg-background pb-32">
+        {/* Header - hidden for pure edit usages (e.g. template editor, history edit of completed)
+            where the parent provides its own chrome. For isPastWorkout (past tracking) the header
+            provides the duration input, so it stays unless explicitly hidden. */}
+        {showHeader && (
+          <div className="bg-card border-b sticky top-0 z-10">
+            <div className="max-w-4xl mx-auto px-4 py-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-2xl font-bold text-foreground">
+                    {activeWorkout.isFreeWorkout
+                      ? activeWorkout.templateName || 'Freies Workout'
+                      : activeWorkout.workoutDayName || 'Workout'}
+                  </h1>
+                  {activeWorkout.cycleName && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {activeWorkout.cycleName}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  {/* For past workout tracking we *always* show the manual duration input and never the live timers.
+                      This prevents the overall workout timer from appearing after set operations (delete, etc.). */}
+                  {!isPastWorkout && mode === 'active' ? (
+                    <>
+                      <div className="flex flex-col items-end gap-2">
+                        <WorkoutTimer workoutDuration={workoutDuration} />
+                        <RestTimerDisplay />
+                      </div>
+                      {/* Pause/Play Button */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={togglePause}
+                        title={isPaused ? 'Training fortsetzen' : 'Training pausieren'}
+                      >
+                        {isPaused ? (
+                          <IconPlayerPlay className="size-6" />
+                        ) : (
+                          <IconPlayerPause className="size-6" />
+                        )}
+                      </Button>
+                    </>
+                  ) : isPastWorkout ? (
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm">Dauer (Min):</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={Math.floor(pastWorkoutDuration / 60)}
+                        onChange={(e) => {
+                          const minutes = parseInt(e.target.value) || 0;
+                          setPastWorkoutDuration(minutes * 60);
+                        }}
+                        className="w-20"
+                      />
                     </div>
-                    {/* Pause/Play Button */}
-                    <button
-                      onClick={togglePause}
-                      className={`p-2 rounded-lg transition-colors ${
-                        isPaused
-                          ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                      title={isPaused ? 'Training fortsetzen' : 'Training pausieren'}
-                    >
-                      {isPaused ? (
-                        // Play Icon
-                        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M8 5v14l11-7z"/>
-                        </svg>
-                      ) : (
-                        // Pause Icon
-                        <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
-                        </svg>
-                      )}
-                    </button>
-                  </>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700">
-                      Dauer (Min):
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={Math.floor(pastWorkoutDuration / 60)}
-                      onChange={(e) => {
-                        const minutes = parseInt(e.target.value) || 0;
-                        setPastWorkoutDuration(minutes * 60);
-                      }}
-                      className="w-20 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                )}
+                  ) : null}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
           {/* Exercises */}
@@ -295,170 +298,196 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete }: ActiveWorkout
                     key={exercise.id}
                     exercise={exercise}
                     exerciseNumber={idx + 1}
+                    mode={mode}
+                    allowReorder={true}
+                    allowExerciseActions={true}
+                    allowSetManagement={true}
+                    allowLogging={!isPastWorkout}
                   />
                 ))}
               </SortableContext>
             </DndContext>
           ) : (
-            <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-              <p className="text-gray-600 mb-4">
-                Noch keine Übungen hinzugefügt
-              </p>
-              <button
-                onClick={() => setShowExerciseModal(true)}
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700"
-              >
-                Erste Übung hinzufügen
-              </button>
-            </div>
+            <Card>
+              <CardContent className="p-8 flex flex-col items-center gap-4 text-center">
+                <p className="text-muted-foreground">
+                  Noch keine Übungen hinzugefügt
+                </p>
+                {/* Large centered square + icon as primary CTA (eckig, mittig) */}
+                <Button
+                  variant="outline"
+                  onClick={() => setShowExerciseModal(true)}
+                  className="h-16 w-16 rounded-lg p-0 flex items-center justify-center"
+                  aria-label="Erste Übung hinzufügen"
+                >
+                  <IconPlus className="size-8" />
+                </Button>
+              </CardContent>
+            </Card>
           )}
 
-          {/* Add Exercise Button */}
+          {/* Add Exercise: large centered square + icon (instead of text button) */}
           {activeWorkout.exercises.length > 0 && (
-            <button
-              onClick={() => setShowExerciseModal(true)}
-              className="w-full py-3 px-4 border-2 border-dashed border-gray-300 text-gray-600 font-medium rounded-lg hover:border-blue-500 hover:text-blue-600 transition-colors"
-            >
-              + Übung hinzufügen
-            </button>
+            <div className="flex justify-center py-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowExerciseModal(true)}
+                className="h-14 w-14 rounded-lg p-0 flex items-center justify-center"
+                aria-label="Übung hinzufügen"
+              >
+                <IconPlus className="size-7" />
+              </Button>
+            </div>
           )}
         </div>
       </div>
 
       {/* Bottom Actions Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex gap-3">
-          <button
-            onClick={() => setShowDiscardConfirm(true)}
-            disabled={loading}
-            className="flex-1 py-3 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 disabled:opacity-50"
-          >
-            Verwerfen
-          </button>
-          <button
-            onClick={() => setShowCompleteConfirm(true)}
-            disabled={loading || !areAllSetsLogged()}
-            className="flex-1 py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Workout beenden
-          </button>
+      {showBottomBar && (
+        <div className="fixed bottom-0 left-0 right-0 bg-card border-t shadow-lg">
+          <div className="max-w-4xl mx-auto px-4 py-4 flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowDiscardConfirm(true)}
+              disabled={loading}
+              className="flex-1"
+            >
+              Verwerfen
+            </Button>
+            <Button
+              onClick={() => setShowCompleteConfirm(true)}
+              disabled={loading || !canFinishWorkout()}
+              className="flex-1"
+            >
+              Workout beenden
+            </Button>
+          </div>
         </div>
-      </div>
-
-      {/* Exercise Selection Modal */}
-      {showExerciseModal && (
-        <ExerciseSelectionModal
-          onClose={() => setShowExerciseModal(false)}
-          onSelect={handleAddExercise}
-        />
       )}
 
-      {/* Complete Confirmation Modal */}
-      {showCompleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Workout beenden?
-            </h3>
-            <p className="text-gray-600 mb-4">
-              Dein Workout wird mit {formatTime(isPastWorkout ? pastWorkoutDuration : workoutDuration)} Dauer gespeichert.
-            </p>
+      {/* Exercise Selection Modal (shadcn Dialog, controlled) */}
+      <ExerciseSelectionModal
+        open={showExerciseModal}
+        onOpenChange={setShowExerciseModal}
+        onSelect={handleAddExercise}
+      />
 
-            {/* Blueprint Update Checkbox */}
-            {hasBlueprint && (
-              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+      {/* Complete Confirmation Modal */}
+      <Dialog open={showCompleteConfirm} onOpenChange={(open) => {
+        if (!open) {
+          setShowCompleteConfirm(false);
+          setUpdateBlueprint(false);
+          setSaveAsTemplate(false);
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Workout beenden?</DialogTitle>
+            <DialogDescription>
+              Dein Workout wird mit {formatTime(isPastWorkout ? pastWorkoutDuration : workoutDuration)} Dauer gespeichert.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Blueprint Update Option */}
+          {hasBlueprint && (
+            <Card className="bg-muted/50 border">
+              <CardContent className="p-4">
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={updateBlueprint}
                     onChange={(e) => setUpdateBlueprint(e.target.checked)}
-                    className="mt-1 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    className="mt-1 size-4 accent-primary"
                   />
                   <div>
-                    <div className="font-medium text-gray-900">
+                    <div className="font-medium text-foreground">
                       Blueprint aktualisieren
                     </div>
-                    <div className="text-sm text-gray-600 mt-1">
+                    <div className="text-sm text-muted-foreground mt-1">
                       Überschreibe den Blueprint mit den heutigen Werten (Gewicht, Wiederholungen, RIR).
                       Diese werden beim nächsten Training vorgeschlagen.
                     </div>
                   </div>
                 </label>
-              </div>
-            )}
+              </CardContent>
+            </Card>
+          )}
 
-            {/* Save as Template Checkbox */}
-            <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+          {/* Save as Template Option */}
+          <Card className="bg-muted/50 border">
+            <CardContent className="p-4">
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={saveAsTemplate}
                   onChange={(e) => setSaveAsTemplate(e.target.checked)}
-                  className="mt-1 w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                  className="mt-1 size-4 accent-primary"
                 />
                 <div>
-                  <div className="font-medium text-gray-900">
+                  <div className="font-medium text-foreground">
                     Als Vorlage speichern
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">
+                  <div className="text-sm text-muted-foreground mt-1">
                     Speichere dieses Workout als wiederverwendbare Vorlage mit deinen heutigen Werten.
                   </div>
                 </div>
               </label>
-            </div>
+            </CardContent>
+          </Card>
 
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowCompleteConfirm(false);
-                  setUpdateBlueprint(false);
-                  setSaveAsTemplate(false);
-                }}
-                className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50"
-              >
-                Abbrechen
-              </button>
-              <button
-                onClick={handleComplete}
-                disabled={loading}
-                className="flex-1 py-2 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {loading ? 'Wird gespeichert...' : 'Beenden'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          <DialogFooter className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCompleteConfirm(false);
+                setUpdateBlueprint(false);
+                setSaveAsTemplate(false);
+              }}
+              className="flex-1"
+            >
+              Abbrechen
+            </Button>
+            <Button
+              onClick={handleComplete}
+              disabled={loading}
+              className="flex-1"
+            >
+              {loading ? 'Wird gespeichert...' : 'Beenden'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Discard Confirmation Modal */}
-      {showDiscardConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Workout verwerfen?
-            </h3>
-            <p className="text-gray-600 mb-6">
+      <Dialog open={showDiscardConfirm} onOpenChange={(open) => !open && setShowDiscardConfirm(false)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Workout verwerfen?</DialogTitle>
+            <DialogDescription>
               Alle nicht gespeicherten Daten gehen verloren. Dies kann nicht
               rückgängig gemacht werden.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowDiscardConfirm(false)}
-                className="flex-1 py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50"
-              >
-                Abbrechen
-              </button>
-              <button
-                onClick={handleDiscard}
-                disabled={loading}
-                className="flex-1 py-2 px-4 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 disabled:opacity-50"
-              >
-                {loading ? 'Wird verworfen...' : 'Verwerfen'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowDiscardConfirm(false)}
+              className="flex-1"
+            >
+              Abbrechen
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleDiscard}
+              disabled={loading}
+              className="flex-1 border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
+            >
+              {loading ? 'Wird verworfen...' : 'Verwerfen'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
