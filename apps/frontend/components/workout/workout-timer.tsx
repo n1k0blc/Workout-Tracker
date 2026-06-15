@@ -20,8 +20,8 @@ export default function WorkoutTimer({
 
   return (
     <div className="flex flex-col items-end">
-      <div className="text-sm text-muted-foreground">Dauer</div>
-      <div className="text-2xl font-bold text-foreground tabular-nums">
+      <div className="text-sm text-gray-600">Dauer</div>
+      <div className="text-2xl font-bold text-gray-900 tabular-nums">
         {formatTime(workoutDuration)}
       </div>
     </div>

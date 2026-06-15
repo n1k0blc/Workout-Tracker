@@ -5,28 +5,9 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { apiClient } from '@/lib/api/client';
 import { HomeGym } from '@/types';
-import {
-  IconUserCircle,
-  IconPlus,
-  IconX,
-  IconEdit,
-  IconCheck,
-  IconTrash,
-} from '@tabler/icons-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DatePicker } from '@/components/date-picker';
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { UserCircle, Plus, X, Edit2, Check } from 'lucide-react';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -200,271 +181,273 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <IconUserCircle className="size-8" />
+          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+            <UserCircle className="h-8 w-8" />
             Mein Profil
           </h1>
         </div>
 
         {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
+            {error}
+          </div>
         )}
 
         {success && (
-          <Alert className="mb-4">
-            <AlertDescription>{success}</AlertDescription>
-          </Alert>
+          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-600">
+            {success}
+          </div>
         )}
 
         {/* Profile Section */}
-        <Card className="mb-6">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Profildaten</CardTitle>
+        <div className="bg-white rounded-lg shadow mb-6">
+          <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+            <h2 className="text-xl font-semibold text-gray-900">Profildaten</h2>
             {!isEditingProfile ? (
-              <Button
-                variant="outline"
+              <button
                 onClick={() => setIsEditingProfile(true)}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
               >
-                <IconEdit className="mr-2 size-4" />
+                <Edit2 className="h-4 w-4 mr-2" />
                 Bearbeiten
-              </Button>
+              </button>
             ) : (
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
+                <button
                   onClick={() => setIsEditingProfile(false)}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
                 >
                   Abbrechen
-                </Button>
-                <Button
+                </button>
+                <button
                   onClick={handleUpdateProfile}
                   disabled={loading}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
                 >
-                  <IconCheck className="mr-2 size-4" />
+                  <Check className="h-4 w-4 mr-2" />
                   Speichern
-                </Button>
+                </button>
               </div>
             )}
-          </CardHeader>
+          </div>
 
-          <CardContent>
-            <FieldGroup>
+          <div className="p-6">
+            <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Field>
-                  <FieldLabel>Vorname</FieldLabel>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Vorname
+                  </label>
                   {isEditingProfile ? (
-                    <Input
+                    <input
+                      type="text"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   ) : (
-                    <p className="text-foreground py-2">{firstName || '-'}</p>
+                    <p className="text-gray-900">{firstName || '-'}</p>
                   )}
-                </Field>
+                </div>
 
-                <Field>
-                  <FieldLabel>Nachname</FieldLabel>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nachname
+                  </label>
                   {isEditingProfile ? (
-                    <Input
+                    <input
+                      type="text"
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   ) : (
-                    <p className="text-foreground py-2">{lastName || '-'}</p>
+                    <p className="text-gray-900">{lastName || '-'}</p>
                   )}
-                </Field>
+                </div>
               </div>
 
-              <Field>
-                <FieldLabel>Email</FieldLabel>
-                <p className="text-foreground py-2">{user?.email}</p>
-              </Field>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <p className="text-gray-900">{user?.email}</p>
+              </div>
 
-              <Field>
-                <FieldLabel>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Geburtsdatum {dateOfBirth && `(${calculateAge(dateOfBirth)} Jahre)`}
-                </FieldLabel>
+                </label>
                 {isEditingProfile ? (
                   <DatePicker
-                    date={dateOfBirth}
-                    onSelect={setDateOfBirth}
-                    placeholder="TT.MM.JJJJ"
+                    selected={dateOfBirth}
+                    onChange={(date: Date | null) => setDateOfBirth(date)}
+                    dateFormat="dd.MM.yyyy"
+                    showYearDropdown
+                    scrollableYearDropdown
+                    yearDropdownItemNumber={100}
+                    maxDate={new Date()}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 ) : (
-                  <p className="text-foreground py-2">
+                  <p className="text-gray-900">
                     {dateOfBirth ? dateOfBirth.toLocaleDateString('de-DE') : '-'}
                   </p>
                 )}
-              </Field>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Field>
-                  <FieldLabel>Größe (cm)</FieldLabel>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Größe (cm)
+                  </label>
                   {isEditingProfile ? (
-                    <Input
+                    <input
                       type="number"
                       value={height}
                       onChange={(e) => setHeight(e.target.value)}
                       min="50"
                       max="300"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   ) : (
-                    <p className="text-foreground py-2">{height ? `${height} cm` : '-'}</p>
+                    <p className="text-gray-900">{height ? `${height} cm` : '-'}</p>
                   )}
-                </Field>
+                </div>
 
-                <Field>
-                  <FieldLabel>Gewicht (kg)</FieldLabel>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Gewicht (kg)
+                  </label>
                   {isEditingProfile ? (
-                    <Input
+                    <input
                       type="number"
                       value={weight}
                       onChange={(e) => setWeight(e.target.value)}
                       min="20"
                       max="500"
                       step="0.1"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   ) : (
-                    <p className="text-foreground py-2">{weight ? `${weight} kg` : '-'}</p>
+                    <p className="text-gray-900">{weight ? `${weight} kg` : '-'}</p>
                   )}
-                </Field>
+                </div>
               </div>
-            </FieldGroup>
-          </CardContent>
-        </Card>
+            </div>
+          </div>
+        </div>
 
         {/* HomeGyms Section */}
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Meine Gyms</CardTitle>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button>
-                    <IconPlus className="mr-2 size-4" />
-                    Gym hinzufügen
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Neues Gym hinzufügen</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 py-4">
-                    <Field>
-                      <FieldLabel>Gym-Name</FieldLabel>
-                      <Input
-                        value={newGymName}
-                        onChange={(e) => setNewGymName(e.target.value)}
-                        placeholder="z.B. Fitness Studio Mitte"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleAddGym();
-                        }}
-                      />
-                    </Field>
-                  </div>
-                  <DialogFooter>
-                    <Button
-                      onClick={handleAddGym}
-                      disabled={loading || !newGymName.trim()}
-                    >
-                      Hinzufügen
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </CardHeader>
+        <div className="bg-white rounded-lg shadow mb-6">
+          <div className="p-6 border-b border-gray-200">
+            <h2 className="text-xl font-semibold text-gray-900">Meine Gyms</h2>
+          </div>
 
-          <CardContent>
-            {homeGyms.length === 0 ? (
-              <p className="text-muted-foreground text-center py-4">
-                Noch keine Gyms hinzugefügt
-              </p>
-            ) : (
-              <div className="divide-y rounded-md border">
-                {homeGyms.map((gym) => (
+          <div className="p-6">
+            {/* Add New Gym */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Neues Gym hinzufügen
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newGymName}
+                  onChange={(e) => setNewGymName(e.target.value)}
+                  placeholder="Gym-Name"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onKeyPress={(e) => e.key === 'Enter' && handleAddGym()}
+                />
+                <button
+                  onClick={handleAddGym}
+                  disabled={loading || !newGymName.trim()}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Hinzufügen
+                </button>
+              </div>
+            </div>
+
+            {/* Gym List */}
+            <div className="space-y-2">
+              {homeGyms.length === 0 ? (
+                <p className="text-gray-500 text-center py-4">
+                  Noch keine Gyms hinzugefügt
+                </p>
+              ) : (
+                homeGyms.map((gym) => (
                   <div
                     key={gym.id}
-                    className="flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors"
+                    className="flex items-center justify-between p-3 border border-gray-200 rounded-md hover:bg-gray-50"
                   >
-                    <span className="font-medium">{gym.name}</span>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setEditingGymId(gym.id);
-                          setEditingGymName(gym.name);
-                        }}
-                      >
-                        <IconEdit className="size-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteGym(gym.id)}
-                        disabled={loading}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <IconTrash className="size-4" />
-                      </Button>
-                    </div>
+                    {editingGymId === gym.id ? (
+                      <>
+                        <input
+                          type="text"
+                          value={editingGymName}
+                          onChange={(e) => setEditingGymName(e.target.value)}
+                          className="flex-1 px-3 py-1 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          onKeyPress={(e) => e.key === 'Enter' && handleUpdateGym(gym.id)}
+                        />
+                        <div className="flex gap-2 ml-2">
+                          <button
+                            onClick={() => handleUpdateGym(gym.id)}
+                            className="p-1 text-green-600 hover:text-green-700"
+                          >
+                            <Check className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingGymId(null);
+                              setEditingGymName('');
+                            }}
+                            className="p-1 text-gray-600 hover:text-gray-700"
+                          >
+                            <X className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-gray-900 font-medium">{gym.name}</span>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingGymId(gym.id);
+                              setEditingGymName(gym.name);
+                            }}
+                            className="p-1 text-blue-600 hover:text-blue-700"
+                          >
+                            <Edit2 className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteGym(gym.id)}
+                            disabled={loading}
+                            className="p-1 text-red-600 hover:text-red-700 disabled:opacity-50"
+                          >
+                            <X className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Edit Gym Dialog */}
-        <Dialog open={!!editingGymId} onOpenChange={(open) => !open && setEditingGymId(null)}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Gym bearbeiten</DialogTitle>
-            </DialogHeader>
-            <div className="py-4">
-              <Field>
-                <FieldLabel>Gym-Name</FieldLabel>
-                <Input
-                  value={editingGymName}
-                  onChange={(e) => setEditingGymName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && editingGymId) {
-                      handleUpdateGym(editingGymId);
-                    }
-                  }}
-                />
-              </Field>
+                ))
+              )}
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setEditingGymId(null)}>
-                Abbrechen
-              </Button>
-              <Button
-                onClick={() => editingGymId && handleUpdateGym(editingGymId)}
-                disabled={loading || !editingGymName.trim()}
-              >
-                Speichern
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          </div>
+        </div>
 
         {/* Logout Section */}
-        <Card>
-          <CardContent className="pt-6">
-            <Button
-              variant="destructive"
-              className="w-full"
-              size="lg"
-              onClick={handleLogout}
-            >
-              Abmelden
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="bg-white rounded-lg shadow p-6">
+          <button
+            onClick={handleLogout}
+            className="w-full inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-red-600 hover:bg-red-700"
+          >
+            Abmelden
+          </button>
+        </div>
       </div>
     </div>
   );

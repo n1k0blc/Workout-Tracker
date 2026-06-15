@@ -1,8 +1,7 @@
 'use client';
 
 import { Exercise } from '@/types';
-import { IconTrash, IconRefresh } from '@tabler/icons-react';
-import { Button } from '@/components/ui/button';
+import { Trash2, ArrowLeftRight } from 'lucide-react';
 
 interface SelectedExerciseCardProps {
   exercise: Exercise;
@@ -16,33 +15,28 @@ export default function SelectedExerciseCard({
   onReplace,
 }: SelectedExerciseCardProps) {
   return (
-    <div className="bg-card border border-border rounded-lg p-4 relative">
+    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 relative">
       {/* Action buttons - top right */}
-      <div className="absolute top-3 right-3 flex gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8"
+      <div className="absolute top-3 right-3 flex gap-2">
+        <button
           onClick={onReplace}
+          className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-100 transition-colors"
           title="Übung tauschen"
         >
-          <IconRefresh className="size-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-8 text-destructive hover:text-destructive"
+          <ArrowLeftRight className="h-4 w-4" />
+        </button>
+        <button
           onClick={onRemove}
+          className="p-1.5 rounded-lg text-red-600 hover:bg-red-100 transition-colors"
           title="Übung entfernen"
         >
-          <IconTrash className="size-4" />
-        </Button>
+          <Trash2 className="h-4 w-4" />
+        </button>
       </div>
 
       {/* Exercise details */}
       <div className="pr-20">
-        <div className="font-semibold text-foreground">{exercise.name}</div>
-        <div className="text-xs text-muted-foreground mt-0.5">Gefiltert nach Übung</div>
+        <h4 className="font-semibold text-gray-900">{exercise.name}</h4>
       </div>
     </div>
   );

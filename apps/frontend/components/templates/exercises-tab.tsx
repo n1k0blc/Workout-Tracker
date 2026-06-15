@@ -3,22 +3,10 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
 import { Exercise, MuscleGroup, Equipment } from '@/types';
-import { ExerciseEditorDialog } from '@/components/exercises/exercise-editor-dialog';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { IconPlus, IconTrash } from '@tabler/icons-react';
+import CreateExerciseModal from '@/components/exercises/create-exercise-modal';
+import EditExerciseModal from '@/components/exercises/edit-exercise-modal';
+import ViewExerciseModal from '@/components/exercises/view-exercise-modal';
+import { Plus, Trash2, Pencil } from 'lucide-react';
 
 export default function ExercisesTab() {
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -26,8 +14,8 @@ export default function ExercisesTab() {
   const [search, setSearch] = useState('');
   const [muscleGroupFilter, setMuscleGroupFilter] = useState<MuscleGroup | undefined>();
   const [equipmentFilter, setEquipmentFilter] = useState<Equipment | undefined>();
-  // 'create' | Exercise | null
-  const [editingExercise, setEditingExercise] = useState<Exercise | 'create' | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editExercise, setEditExercise] = useState<Exercise | null>(null);
   const [viewExercise, setViewExercise] = useState<Exercise | null>(null);
   const [deleteExerciseId, setDeleteExerciseId] = useState<string | null>(null);
 
@@ -52,16 +40,16 @@ export default function ExercisesTab() {
     }
   };
 
-  const handleExerciseSaved = (exercise: Exercise) => {
-    setExercises((prev) => {
-      const exists = prev.some((ex) => ex.id === exercise.id);
-      if (exists) {
-        return prev.map((ex) => (ex.id === exercise.id ? exercise : ex));
-      } else {
-        return [exercise, ...prev];
-      }
-    });
-    setEditingExercise(null);
+  const handleExerciseCreated = (exercise: Exercise) => {
+    setExercises((prev) => [exercise, ...prev]);
+    setShowCreateModal(false);
+  };
+
+  const handleExerciseUpdated = (updatedExercise: Exercise) => {
+    setExercises((prev) =>
+      prev.map((ex) => (ex.id === updatedExercise.id ? updatedExercise : ex))
+    );
+    setEditExercise(null);
   };
 
   const handleDeleteExercise = async () => {
@@ -142,202 +130,223 @@ export default function ExercisesTab() {
     <div className="space-y-6">
       {/* Header with count */}
       <div>
-        <p className="text-sm text-muted-foreground">{exercises.length} Übungen verfügbar</p>
+        <p className="text-sm text-gray-600">{exercises.length} Übungen verfügbar</p>
       </div>
 
       {/* Search */}
-      <div className="bg-card border rounded-lg p-4">
-        <Input
+      <div className="bg-white rounded-lg shadow-sm p-4">
+        <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Übung suchen..."
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </div>
 
       {/* Filters */}
-      <Card>
-        <CardContent className="p-6 space-y-6">
-          {/* Muscle Group Filter */}
-          <div>
-            <div className="text-sm font-medium text-muted-foreground mb-3">
-              Muskelgruppe
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant={!muscleGroupFilter ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setMuscleGroupFilter(undefined)}
+      <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
+        {/* Muscle Group Filter */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Muskelgruppe
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setMuscleGroupFilter(undefined)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                !muscleGroupFilter
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Alle
+            </button>
+            {muscleGroups.map((mg) => (
+              <button
+                key={mg}
+                onClick={() => setMuscleGroupFilter(mg)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  muscleGroupFilter === mg
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
               >
-                Alle
-              </Button>
-              {muscleGroups.map((mg) => (
-                <Button
-                  key={mg}
-                  variant={muscleGroupFilter === mg ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setMuscleGroupFilter(mg)}
-                >
-                  {translateMuscleGroup(mg)}
-                </Button>
-              ))}
-            </div>
+                {translateMuscleGroup(mg)}
+              </button>
+            ))}
           </div>
+        </div>
 
-          {/* Equipment Filter */}
-          <div>
-            <div className="text-sm font-medium text-muted-foreground mb-3">
-              Equipment
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant={!equipmentFilter ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setEquipmentFilter(undefined)}
+        {/* Equipment Filter */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Equipment</label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setEquipmentFilter(undefined)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                !equipmentFilter
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Alle
+            </button>
+            {equipments.map((eq) => (
+              <button
+                key={eq}
+                onClick={() => setEquipmentFilter(eq)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  equipmentFilter === eq
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
               >
-                Alle
-              </Button>
-              {equipments.map((eq) => (
-                <Button
-                  key={eq}
-                  variant={equipmentFilter === eq ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setEquipmentFilter(eq)}
-                >
-                  {translateEquipment(eq)}
-                </Button>
-              ))}
-            </div>
+                {translateEquipment(eq)}
+              </button>
+            ))}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Create Custom Exercise Button */}
-      <Button
-        onClick={() => setEditingExercise('create')}
-        className="w-full"
-        size="lg"
+      <button
+        onClick={() => setShowCreateModal(true)}
+        className="w-full py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
       >
-        <IconPlus className="mr-2 size-5" />
+        <Plus className="h-5 w-5" />
         Benutzerdefinierte Übung erstellen
-      </Button>
+      </button>
 
       {/* Exercise List */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <div className="text-lg text-muted-foreground">Lädt Übungen...</div>
+          <div className="text-lg text-gray-600">Lädt Übungen...</div>
         </div>
       ) : exercises.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {exercises.map((exercise) => (
-            <Card
+            <div
               key={exercise.id}
-              className="cursor-pointer hover:shadow-sm transition-shadow"
-              onClick={() => {
-                if (exercise.isCustom) {
-                  setEditingExercise(exercise);
-                } else {
-                  setViewExercise(exercise);
-                }
-              }}
+              onClick={() => !exercise.isCustom && setViewExercise(exercise)}
+              className={`bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-shadow ${
+                !exercise.isCustom ? 'cursor-pointer' : ''
+              }`}
             >
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-foreground truncate">{exercise.name}</h3>
-                    <div className="mt-2 space-y-1 text-sm">
-                      <div className="text-muted-foreground">
-                        <span className="font-medium text-foreground">Muskel:</span>{' '}
-                        {translateMuscleGroup(exercise.muscleGroup)}
-                      </div>
-                      <div className="text-muted-foreground">
-                        <span className="font-medium text-foreground">Equipment:</span>{' '}
-                        {translateEquipment(exercise.equipment)}
-                      </div>
-                      {(exercise.isUnilateral || exercise.isDoubleWeight) && (
-                        <div className="flex gap-1.5 mt-2">
-                          {exercise.isUnilateral && (
-                            <Badge variant="outline" className="text-xs">Unilateral</Badge>
-                          )}
-                          {exercise.isDoubleWeight && (
-                            <Badge variant="outline" className="text-xs">2x Gewicht</Badge>
-                          )}
-                        </div>
-                      )}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-gray-900 truncate">{exercise.name}</h3>
+                  <div className="mt-2 space-y-1">
+                    <div className="text-sm text-gray-600">
+                      <span className="font-medium">Muskel:</span>{' '}
+                      {translateMuscleGroup(exercise.muscleGroup)}
                     </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-2 shrink-0">
-                    {exercise.isCustom && (
-                      <>
-                        <Badge variant="secondary" className="text-xs">Custom</Badge>
-                        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={() => setDeleteExerciseId(exercise.id)}
-                            title="Übung löschen"
-                          >
-                            <IconTrash className="size-4" />
-                          </Button>
-                        </div>
-                      </>
+                    <div className="text-sm text-gray-600">
+                      <span className="font-medium">Equipment:</span>{' '}
+                      {translateEquipment(exercise.equipment)}
+                    </div>
+                    {(exercise.isUnilateral || exercise.isDoubleWeight) && (
+                      <div className="flex gap-1 mt-2">
+                        {exercise.isUnilateral && (
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                            Unilateral
+                          </span>
+                        )}
+                        {exercise.isDoubleWeight && (
+                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                            2x Gewicht
+                          </span>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="flex flex-col items-end gap-2">
+                  {exercise.isCustom && (
+                    <>
+                      <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded whitespace-nowrap">
+                        Custom
+                      </span>
+                      <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => setEditExercise(exercise)}
+                          className="text-blue-600 hover:text-blue-800 transition-colors"
+                          title="Übung bearbeiten"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteExerciseId(exercise.id)}
+                          className="text-red-600 hover:text-red-800 transition-colors"
+                          title="Übung löschen"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       ) : (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <p className="text-muted-foreground">Keine Übungen gefunden</p>
-          </CardContent>
-        </Card>
+        <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+          <p className="text-gray-600">Keine Übungen gefunden</p>
+        </div>
       )}
 
-      {/* Exercise Editor (Create + Edit) */}
-      <ExerciseEditorDialog
-        open={editingExercise !== null}
-        onOpenChange={(open) => {
-          if (!open) setEditingExercise(null);
-        }}
-        exercise={editingExercise === 'create' ? undefined : editingExercise ?? undefined}
-        onSuccess={handleExerciseSaved}
-      />
+      {/* Create Exercise Modal */}
+      {showCreateModal && (
+        <CreateExerciseModal
+          onClose={() => setShowCreateModal(false)}
+          onCreated={handleExerciseCreated}
+        />
+      )}
 
-      {/* View Exercise (readonly) */}
-      <ExerciseEditorDialog
-        open={!!viewExercise}
-        onOpenChange={(open) => {
-          if (!open) setViewExercise(null);
-        }}
-        exercise={viewExercise ?? undefined}
-        readonly
-      />
+      {/* Edit Exercise Modal (Custom Exercises) */}
+      {editExercise && (
+        <EditExerciseModal
+          exercise={editExercise}
+          onClose={() => setEditExercise(null)}
+          onUpdated={handleExerciseUpdated}
+        />
+      )}
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deleteExerciseId} onOpenChange={(open) => !open && setDeleteExerciseId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Übung löschen?</AlertDialogTitle>
-            <AlertDialogDescription>
+      {/* View Exercise Modal (System Exercises) */}
+      {viewExercise && (
+        <ViewExerciseModal
+          exercise={viewExercise}
+          onClose={() => setViewExercise(null)}
+        />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteExerciseId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Übung löschen?</h3>
+            <p className="text-sm text-gray-600 mb-6">
               Möchten Sie diese benutzerdefinierte Übung wirklich löschen? Diese Aktion kann nicht
               rückgängig gemacht werden.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteExercise}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Löschen
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleDeleteExercise}
+                className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 font-medium transition-colors"
+              >
+                Löschen
+              </button>
+              <button
+                onClick={() => setDeleteExerciseId(null)}
+                className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 font-medium transition-colors"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Workout, SetType } from '@/types';
 import { apiClient } from '@/lib/api';
 
@@ -14,6 +14,11 @@ interface WorkoutContextType {
   isPastWorkout: boolean;
   pastWorkoutDuration: number;
   setPastWorkoutDuration: (duration: number) => void;
+  removedPlannedSets: Map<string, Set<number>>; // exerciseLogId -> set of setNumbers that were removed
+  markPlannedSetAsRemoved: (exerciseLogId: string, setNumber: number) => void;
+  unplannedSets: Map<string, Set<number>>; // exerciseLogId -> set of setNumbers for unplanned sets
+  addUnplannedSet: (exerciseLogId: string, setNumber: number) => void;
+  removeUnplannedSet: (exerciseLogId: string, setNumber: number) => void;
   startWorkout: (data: {
     cycleId?: string;
     workoutDayId?: string;
@@ -47,14 +52,13 @@ interface WorkoutContextType {
   updateSet: (
     setLogId: string,
     data: {
-      reps?: number;
-      weight?: number;
+      reps: number;
+      weight: number;
       rir?: number;
-      setType?: SetType;
     }
   ) => Promise<void>;
   refreshActiveWorkout: () => Promise<void>;
-  setActiveWorkoutDirectly: (workout: Workout | null, isPastWorkout?: boolean, pastWorkoutDuration?: number) => void;
+  setActiveWorkoutDirectly: (workout: Workout, isPastWorkout?: boolean, pastWorkoutDuration?: number) => void;
   workoutDuration: number;
   restTimer: number; // Elapsed seconds since rest started
   restTimerTarget: number; // Target rest duration in seconds
@@ -73,6 +77,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const [isRestTimerPaused, setIsRestTimerPaused] = useState(false);
   const [isPastWorkout, setIsPastWorkout] = useState(false);
   const [pastWorkoutDuration, setPastWorkoutDuration] = useState(0);
+  const [removedPlannedSets, setRemovedPlannedSets] = useState<Map<string, Set<number>>>(new Map());
+  const [unplannedSets, setUnplannedSets] = useState<Map<string, Set<number>>>(new Map());
   const [workoutDuration, setWorkoutDuration] = useState(0);
   const [restTimer, setRestTimer] = useState(0); // Elapsed seconds
   const [restTimerTarget, setRestTimerTarget] = useState(0); // Target seconds
@@ -144,6 +150,44 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       }
       
       return newPausedState;
+    });
+  };
+
+  const markPlannedSetAsRemoved = (exerciseLogId: string, setNumber: number) => {
+    setRemovedPlannedSets(prev => {
+      const newMap = new Map(prev);
+      const exerciseSet = newMap.get(exerciseLogId) || new Set();
+      exerciseSet.add(setNumber);
+      newMap.set(exerciseLogId, exerciseSet);
+      return newMap;
+    });
+  };
+
+  const addUnplannedSet = (exerciseLogId: string, setNumber: number) => {
+    setUnplannedSets(prev => {
+      const newMap = new Map(prev);
+      const exerciseSet = newMap.get(exerciseLogId) || new Set();
+      const newExerciseSet = new Set(exerciseSet);  // Clone the Set!
+      newExerciseSet.add(setNumber);
+      newMap.set(exerciseLogId, newExerciseSet);
+      return newMap;
+    });
+  };
+
+  const removeUnplannedSet = (exerciseLogId: string, setNumber: number) => {
+    setUnplannedSets(prev => {
+      const newMap = new Map(prev);
+      const exerciseSet = newMap.get(exerciseLogId);
+      if (exerciseSet) {
+        const newExerciseSet = new Set(exerciseSet);  // Clone the Set!
+        newExerciseSet.delete(setNumber);
+        if (newExerciseSet.size === 0) {
+          newMap.delete(exerciseLogId);
+        } else {
+          newMap.set(exerciseLogId, newExerciseSet);
+        }
+      }
+      return newMap;
     });
   };
 
@@ -270,39 +314,13 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const setActiveWorkoutDirectly = useCallback((workout: Workout | null, isPast?: boolean, pastDuration?: number) => {
-    if (!workout) {
-      // Clear hijacked workout (e.g. leaving history edit)
-      setActiveWorkout(null);
-      setIsPastWorkout(false);
-      setPastWorkoutDuration(0);
-      setWorkoutDuration(0);
-      setPausedWorkoutDuration(null);
-      setPausedRestTimer(null);
-      setPausedRestTimerValue(null);
-      setIsPaused(false);
-      setIsRestTimerPaused(false);
-      setWorkoutStartTime(null);
-      setRestTimerStartedAt(null);
-      setRestTimerTarget(0);
-      setRestTimer(0);
-      setRestStartTime(null);
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('workoutStartTime');
-        localStorage.removeItem('restStartTime');
-        localStorage.removeItem('restTimerTarget');
-      }
-      return;
-    }
-
+  const setActiveWorkoutDirectly = (workout: Workout, isPast?: boolean, pastDuration?: number) => {
     setActiveWorkout(workout);
+    setWorkoutDuration(0);
     setIsPastWorkout(isPast ?? false);
     setPastWorkoutDuration(pastDuration ?? 0);
-
-    // For past tracking the "total duration" is the user-entered historical value (not a live ticking timer).
-    // Set workoutDuration to the provided past duration so that save paths (and anything reading the generic duration)
-    // use the pre-specified time the user entered in the UI.
-    setWorkoutDuration(pastDuration ?? 0);
+    setRemovedPlannedSets(new Map());
+    setUnplannedSets(new Map());
     setPausedWorkoutDuration(null);
     setPausedRestTimer(null);
     setPausedRestTimerValue(null);
@@ -317,21 +335,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('workoutStartTime', now.toString());
       }
     }
-
-    // For past workout tracking we must never have an active live rest timer
-    // (historical entry, not a real-time session). Clear any pending rest state
-    // and localStorage to avoid leaking into a subsequent live workout.
-    if (isPast) {
-      setRestTimerStartedAt(null);
-      setRestTimerTarget(0);
-      setRestTimer(0);
-      setRestStartTime(null);
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('restStartTime');
-        localStorage.removeItem('restTimerTarget');
-      }
-    }
-  }, []);
+  };
 
   const startWorkout = async (data: {
     cycleId?: string;
@@ -346,13 +350,11 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     try {
       const workout = await apiClient.startWorkout(data);
       setActiveWorkout(workout);
+      setWorkoutDuration(0);
       setIsPastWorkout(data.isPastWorkout ?? false);
       setPastWorkoutDuration(data.pastWorkoutDuration ?? 0);
-
-      // For past tracking the "total duration" is the user-entered historical value (not a live ticking timer).
-      // Set workoutDuration to the provided past duration so that save paths (and anything reading the generic duration)
-      // use the pre-specified time the user entered in the UI.
-      setWorkoutDuration(data.pastWorkoutDuration ?? 0);
+      setRemovedPlannedSets(new Map()); // Reset removed sets for new workout
+      setUnplannedSets(new Map()); // Reset unplanned sets for new workout
       setPausedWorkoutDuration(null);
       setPausedRestTimer(null);
       setPausedRestTimerValue(null);
@@ -365,20 +367,6 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         setWorkoutStartTime(now);
         if (typeof window !== 'undefined') {
           localStorage.setItem('workoutStartTime', now.toString());
-        }
-      }
-
-      // For past workout tracking we must never have an active live rest timer
-      // (historical entry, not a real-time session). Clear any pending rest state
-      // and localStorage to avoid leaking into a subsequent live workout.
-      if (data.isPastWorkout) {
-        setRestTimerStartedAt(null);
-        setRestTimerTarget(0);
-        setRestTimer(0);
-        setRestStartTime(null);
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('restStartTime');
-          localStorage.removeItem('restTimerTarget');
         }
       }
     } catch (error) {
@@ -463,41 +451,6 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const addExercise = async (exerciseId: string) => {
     if (!activeWorkout) return;
 
-    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
-      // local add for history edit / completed via shared edit component
-      try {
-        const exDetails = await apiClient.getExercise(exerciseId);
-        const newEx = {
-          id: `local-ex-${Date.now()}`,
-          exerciseId,
-          exerciseName: exDetails.name || 'Exercise',
-          isUnilateral: exDetails.isUnilateral,
-          isDoubleWeight: exDetails.isDoubleWeight,
-          order: (activeWorkout.exercises.length || 0) + 1,
-          sets: [],
-          plannedSets: [],
-        };
-        setActiveWorkout({
-          ...activeWorkout,
-          exercises: [...activeWorkout.exercises, newEx],
-        } as Workout);
-      } catch {
-        // fallback stub
-        const stub = {
-          id: `local-ex-${Date.now()}`,
-          exerciseId,
-          exerciseName: 'Exercise',
-          sets: [],
-          order: (activeWorkout.exercises.length || 0) + 1,
-        };
-        setActiveWorkout({
-          ...activeWorkout,
-          exercises: [...activeWorkout.exercises, stub],
-        } as Workout);
-      }
-      return;
-    }
-
     setLoading(true);
     try {
       const workout = await apiClient.addExerciseToWorkout(
@@ -516,15 +469,6 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const removeExercise = async (exerciseLogId: string) => {
     if (!activeWorkout) return;
 
-    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
-      const updated = {
-        ...activeWorkout,
-        exercises: activeWorkout.exercises.filter((ex: { id: string }) => ex.id !== exerciseLogId),
-      };
-      setActiveWorkout(updated as Workout);
-      return;
-    }
-
     setLoading(true);
     try {
       const workout = await apiClient.removeExerciseFromWorkout(
@@ -542,37 +486,6 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
   const replaceExercise = async (exerciseLogId: string, newExerciseId: string) => {
     if (!activeWorkout) return;
-
-    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
-      try {
-        const exDetails = await apiClient.getExercise(newExerciseId);
-        const updated = {
-          ...activeWorkout,
-          exercises: activeWorkout.exercises.map((ex: { id: string; sets?: unknown }) =>
-            ex.id === exerciseLogId
-              ? {
-                  ...ex,
-                  exerciseId: newExerciseId,
-                  exerciseName: exDetails.name || 'Exercise',
-                  sets: ex.sets || [],
-                }
-              : ex
-          ),
-        };
-        setActiveWorkout(updated as Workout);
-      } catch {
-        const updated = {
-          ...activeWorkout,
-          exercises: activeWorkout.exercises.map((ex: { id: string; sets?: unknown }) =>
-            ex.id === exerciseLogId
-              ? { ...ex, exerciseId: newExerciseId, exerciseName: 'Exercise', sets: ex.sets || [] }
-              : ex
-          ),
-        };
-        setActiveWorkout(updated as Workout);
-      }
-      return;
-    }
 
     setLoading(true);
     try {
@@ -593,7 +506,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const reorderExercises = async (exerciseIds: string[]) => {
     if (!activeWorkout) return;
 
-    // Optimistic update (works for both active and completed/history edit)
+    // Optimistic update
     const reorderedExercises = exerciseIds
       .map(id => activeWorkout.exercises.find(ex => ex.id === id))
       .filter(Boolean) as typeof activeWorkout.exercises;
@@ -602,10 +515,6 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       ...activeWorkout,
       exercises: reorderedExercises,
     });
-
-    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
-      return; // no API for completed
-    }
 
     try {
       const workout = await apiClient.reorderExercises(
@@ -634,48 +543,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   ) => {
     if (!activeWorkout) return;
 
-    // For completed workouts (e.g. history edit using the shared component in 'edit' mode),
-    // perform local update only. Do not hit the active workout mutation APIs.
-    // Persistence happens on the parent's explicit save via updateCompletedWorkout.
-    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
-      const updatedExercises = activeWorkout.exercises.map((ex) => {
-        if (ex.id !== exerciseLogId) return ex;
-
-        const newSet = {
-          id: `local-${Date.now()}-${data.setNumber}`,
-          setNumber: data.setNumber,
-          setType: data.setType || SetType.WORKING,
-          reps: data.reps,
-          weight: data.weight,
-          rir: data.rir,
-          actualRestDuration: data.plannedRestAfterSet ?? 90,
-          completedAt: new Date().toISOString(),
-        };
-
-        const existingIndex = ex.sets.findIndex((s) => s.setNumber === data.setNumber);
-        let newSets = [...ex.sets];
-        if (existingIndex >= 0) {
-          newSets[existingIndex] = { ...newSets[existingIndex], ...newSet, id: newSets[existingIndex].id };
-        } else {
-          newSets = [...newSets, newSet].sort((a, b) => a.setNumber - b.setNumber);
-        }
-        return { ...ex, sets: newSets };
-      });
-
-      setActiveWorkout({ ...activeWorkout, exercises: updatedExercises } as Workout);
-      // no rest timer side effects for completed
-      return;
-    }
-
     setLoading(true);
     try {
-      // For the performed set, record the "rest after set" as actualRestDuration.
-      // - In live mode: the measured restTimer if one was running.
-      // - In past tracking / edit mode (no live timer): use the plannedRestAfterSet (which is 90 for additional sets,
-      //   or the value from the original blueprint/plan). This fulfills the requirement to send default 90s pauses
-      //   for historical past-tracked workouts.
-      const actualRestDuration =
-        restTimerStartedAt !== null ? restTimer : (data.plannedRestAfterSet ?? 90);
+      // Calculate actual rest duration if timer was running
+      const actualRestDuration = restTimerStartedAt !== null ? restTimer : undefined;
 
       const workout = await apiClient.logSet(
         activeWorkout.id,
@@ -691,10 +562,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       );
       setActiveWorkout(workout);
 
-      // Start new rest timer with this set's planned rest duration.
-      // IMPORTANT: Never start live rest timer for past workout tracking (historical data entry)
-      // or blueprint-style edits. Rest timer is only for real-time active sessions.
-      if (!isPastWorkout && data.plannedRestAfterSet !== undefined && data.plannedRestAfterSet > 0) {
+      // Start new rest timer with this set's planned rest duration
+      if (data.plannedRestAfterSet !== undefined && data.plannedRestAfterSet > 0) {
         const now = Date.now();
         setRestTimerStartedAt(now);
         setRestStartTime(now);
@@ -720,15 +589,6 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const deleteSet = async (setLogId: string) => {
     if (!activeWorkout) return;
 
-    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
-      const updatedExercises = activeWorkout.exercises.map((ex) => ({
-        ...ex,
-        sets: ex.sets.filter((s) => s.id !== setLogId),
-      }));
-      setActiveWorkout({ ...activeWorkout, exercises: updatedExercises } as Workout);
-      return;
-    }
-
     setLoading(true);
     try {
       const workout = await apiClient.deleteSet(
@@ -747,23 +607,12 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const updateSet = async (
     setLogId: string,
     data: {
-      reps?: number;
-      weight?: number;
+      reps: number;
+      weight: number;
       rir?: number;
-      setType?: SetType;
     }
   ) => {
     if (!activeWorkout) return;
-
-    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
-      // local update for completed (history edit via shared component)
-      const updatedExercises = activeWorkout.exercises.map((ex) => ({
-        ...ex,
-        sets: ex.sets.map((s) => (s.id === setLogId ? { ...s, ...data } : s)),
-      }));
-      setActiveWorkout({ ...activeWorkout, exercises: updatedExercises } as Workout);
-      return;
-    }
 
     setLoading(true);
     try {
@@ -831,6 +680,11 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         isPastWorkout,
         pastWorkoutDuration,
         setPastWorkoutDuration,
+        removedPlannedSets,
+        markPlannedSetAsRemoved,
+        unplannedSets,
+        addUnplannedSet,
+        removeUnplannedSet,
         startWorkout,
         completeWorkout,
         discardWorkout,

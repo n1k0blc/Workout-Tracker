@@ -9,16 +9,6 @@ import WorkoutStartScreen from '@/components/workout/start-screen';
 import ActiveWorkoutScreen from '@/components/workout/active-workout-screen';
 import { WorkoutCompletionModal } from '@/components/WorkoutCompletionModal';
 import { Workout, PersonalRecord } from '@/types';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 
 export default function WorkoutPage() {
   const router = useRouter();
@@ -28,8 +18,7 @@ export default function WorkoutPage() {
     pendingTemplateSave, 
     cancelTemplateSave, 
     completeTemplateSave,
-    initTemplateSave,
-    isPastWorkout 
+    initTemplateSave 
   } = useWorkout();
   const [templateName, setTemplateName] = useState('');
   const [savingTemplate, setSavingTemplate] = useState(false);
@@ -53,10 +42,9 @@ export default function WorkoutPage() {
       setTemplateName('');
       completeTemplateSave();
       router.push('/dashboard');
-    } catch (error: unknown) {
+    } catch (error: any) {
       console.error('Failed to save template:', error);
-      const err = error as { response?: { status?: number } };
-      if (err.response?.status === 409) {
+      if (error.response?.status === 409) {
         alert('Eine Vorlage mit diesem Namen existiert bereits');
       } else {
         alert('Fehler beim Speichern der Vorlage');
@@ -94,79 +82,69 @@ export default function WorkoutPage() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-gray-50">
         {loading && !activeWorkout ? (
           <div className="flex items-center justify-center min-h-screen">
-            <div className="text-lg text-muted-foreground">Lädt...</div>
+            <div className="text-lg text-gray-600">Lädt...</div>
           </div>
         ) : activeWorkout?.status === 'IN_PROGRESS' ? (
-          <ActiveWorkoutScreen 
-            mode={isPastWorkout ? 'edit' : 'active'} 
-            onWorkoutComplete={handleWorkoutComplete} 
-          />
+          <ActiveWorkoutScreen onWorkoutComplete={handleWorkoutComplete} />
         ) : (
           <WorkoutStartScreen />
         )}
 
-        {/* Save Template Modal (shadcn) */}
-        <Dialog 
-          open={!!pendingTemplateSave} 
-          onOpenChange={(open) => { 
-            if (!open) handleSkipTemplate(); 
-          }}
-        >
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Workout als Vorlage speichern</DialogTitle>
-              <DialogDescription>
+        {/* Save Template Modal */}
+        {pendingTemplateSave && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                Workout als Vorlage speichern
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
                 Gib einen Namen für deine Workout-Vorlage ein. Diese Vorlage enthält
                 alle Übungen mit deinen heutigen Werten.
-              </DialogDescription>
-            </DialogHeader>
+              </p>
+              <input
+                type="text"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                placeholder="z.B. Mein starkes Push Workout"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 mb-4"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && !savingTemplate) {
+                    handleSaveAsTemplate();
+                  }
+                }}
+                autoFocus
+              />
+              <div className="flex gap-3">
+                <button
+                  onClick={handleSkipTemplate}
+                  disabled={savingTemplate}
+                  className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 font-medium transition-colors disabled:opacity-50"
+                >
+                  Überspringen
+                </button>
+                <button
+                  onClick={handleSaveAsTemplate}
+                  disabled={savingTemplate || !templateName.trim()}
+                  className="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-medium transition-colors disabled:opacity-50"
+                >
+                  {savingTemplate ? 'Speichert...' : 'Speichern'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
-            <Input
-              value={templateName}
-              onChange={(e) => setTemplateName(e.target.value)}
-              placeholder="z.B. Mein starkes Push Workout"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !savingTemplate) {
-                  handleSaveAsTemplate();
-                }
-              }}
-              autoFocus
-            />
-
-            <DialogFooter className="flex gap-3">
-              <Button
-                variant="outline"
-                onClick={handleSkipTemplate}
-                disabled={savingTemplate}
-                className="flex-1"
-              >
-                Überspringen
-              </Button>
-              <Button
-                onClick={handleSaveAsTemplate}
-                disabled={savingTemplate || !templateName.trim()}
-                className="flex-1"
-              >
-                {savingTemplate ? 'Speichert...' : 'Speichern'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Workout Completion Modal (shadcn Dialog, controlled) */}
-        <WorkoutCompletionModal
-          open={showCompletionModal}
-          onOpenChange={(isOpen) => {
-            if (!isOpen) {
-              handleCompletionModalClose();
-            }
-          }}
-          workout={completedWorkout ?? undefined}
-          personalRecords={personalRecords}
-        />
+        {/* Workout Completion Modal */}
+        {showCompletionModal && completedWorkout && (
+          <WorkoutCompletionModal
+            workout={completedWorkout}
+            personalRecords={personalRecords}
+            onClose={handleCompletionModalClose}
+          />
+        )}
       </div>
     </ProtectedRoute>
   );

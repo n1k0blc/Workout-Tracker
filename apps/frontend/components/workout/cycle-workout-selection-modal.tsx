@@ -2,15 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { IconChevronRight } from '@tabler/icons-react';
 
 interface CycleWorkoutDay {
   workoutDayId: string;
@@ -29,18 +20,14 @@ interface CurrentCycleWorkouts {
 interface CycleWorkoutSelectionModalProps {
   onClose: () => void;
   onSelect: (cycleId: string, workoutDayId: string) => void;
-  /** When provided, the modal acts in "selection + confirm" mode (used for past workout tracking) */
-  onProceedToDetails?: (cycleId: string, workoutDayId: string) => void;
 }
 
 export default function CycleWorkoutSelectionModal({
   onClose,
   onSelect,
-  onProceedToDetails,
 }: CycleWorkoutSelectionModalProps) {
   const [cycleWorkouts, setCycleWorkouts] = useState<CurrentCycleWorkouts | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedWorkoutDayId, setSelectedWorkoutDayId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadCycleWorkouts = async () => {
@@ -63,102 +50,93 @@ export default function CycleWorkoutSelectionModal({
   };
 
   return (
-    <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-0">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <DialogHeader className="px-6 pt-6 pb-4 border-b">
-          <DialogTitle>Workout aus aktuellem Zyklus wählen</DialogTitle>
+        <div className="px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-900">
+              Workout aus aktuellem Zyklus wählen
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
           {cycleWorkouts && (
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-sm text-gray-600 mt-1">
               {cycleWorkouts.cycleName}
             </p>
           )}
-        </DialogHeader>
+        </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           {loading ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-8 text-gray-600">
               Lädt Workouts...
             </div>
           ) : cycleWorkouts && cycleWorkouts.workoutDays.length > 0 ? (
             <div className="space-y-3">
-              {cycleWorkouts.workoutDays.map((workoutDay) => {
-                const isSelected = selectedWorkoutDayId === workoutDay.workoutDayId;
-                const isHighlighted = workoutDay.isSuggested || isSelected;
-
-                return (
-                  <button
-                    key={workoutDay.workoutDayId}
-                    onClick={() => {
-                      if (onProceedToDetails) {
-                        // In "proceed" mode (past workout), just select
-                        setSelectedWorkoutDayId(workoutDay.workoutDayId);
-                      } else {
-                        onSelect(cycleWorkouts.cycleId, workoutDay.workoutDayId);
-                      }
-                    }}
-                    className={`w-full text-left px-4 py-4 border rounded-lg transition-colors hover:border-primary hover:bg-muted/50 ${
-                      isHighlighted
-                        ? 'border-primary bg-muted/30'
-                        : 'border-border'
-                    } ${isSelected ? 'ring-2 ring-primary ring-offset-2' : ''}`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-foreground">
-                            {workoutDay.workoutDayName}
-                          </h3>
-                          {workoutDay.isSuggested && (
-                            <Badge variant="default" className="text-xs">
-                              Heute empfohlen
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="text-sm text-muted-foreground mt-1">
-                          {getWeekdayName(workoutDay.weekday)} • {workoutDay.exerciseCount} Übungen
-                        </div>
+              {cycleWorkouts.workoutDays.map((workoutDay) => (
+                <button
+                  key={workoutDay.workoutDayId}
+                  onClick={() => onSelect(cycleWorkouts.cycleId, workoutDay.workoutDayId)}
+                  className={`w-full text-left px-4 py-4 border rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors ${
+                    workoutDay.isSuggested
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-gray-900">
+                          {workoutDay.workoutDayName}
+                        </h3>
+                        {workoutDay.isSuggested && (
+                          <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded font-medium">
+                            Heute empfohlen
+                          </span>
+                        )}
                       </div>
-                      <IconChevronRight className="size-5 text-muted-foreground flex-shrink-0 mt-1" />
+                      <div className="text-sm text-gray-600 mt-1">
+                        {getWeekdayName(workoutDay.weekday)} • {workoutDay.exerciseCount} Übungen
+                      </div>
                     </div>
-                  </button>
-                );
-              })}
+                    <svg 
+                      className="w-5 h-5 text-gray-400 flex-shrink-0 mt-1"
+                      fill="none" 
+                      viewBox="0 0 24 24" 
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </button>
+              ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-8 text-gray-600">
               Keine Workouts im aktuellen Zyklus verfügbar
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="border-t p-6">
-          {onProceedToDetails ? (
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={onClose} className="flex-1">
-                Zurück
-              </Button>
-              <Button
-                onClick={() => {
-                  if (selectedWorkoutDayId && cycleWorkouts) {
-                    onProceedToDetails(cycleWorkouts.cycleId, selectedWorkoutDayId);
-                  }
-                }}
-                disabled={!selectedWorkoutDayId}
-                className="flex-1"
-              >
-                Weiter zu Workout Details
-              </Button>
-            </div>
-          ) : (
-            <Button variant="outline" onClick={onClose} className="w-full">
-              Abbrechen
-            </Button>
-          )}
+        <div className="px-6 py-4 border-t border-gray-200">
+          <button
+            onClick={onClose}
+            className="w-full py-2 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50"
+          >
+            Abbrechen
+          </button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }

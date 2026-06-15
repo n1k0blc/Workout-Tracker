@@ -23,30 +23,31 @@ import {
 } from '@/types';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import SelectedExerciseCard from '@/components/analytics/selected-exercise-card';
-import {
-  CHART_ACCENT,
-  getRIRBarFill,
-} from '@/components/analytics/chart-styles';
-import AnalyticsChart from '@/components/analytics/AnalyticsChart';
-import { formatNumber, formatDate } from '@/components/analytics/chart-utils';
+import ScrollableChart from '@/components/analytics/scrollable-chart';
 import { PersonalRecordCard } from '@/components/PersonalRecordCard';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
 import { 
-  IconPlus, 
-  IconClock, 
-  IconChevronRight,
-  IconArrowLeft,
-  IconCalendar,
-  IconBarbell,
-  IconTrendingUp,
-  IconTrophy,
-  IconMapPin,
-} from '@tabler/icons-react';
+  ArrowLeft, 
+  Calendar, 
+  Dumbbell, 
+  TrendingUp, 
+  Trophy,
+  MapPin,
+} from 'lucide-react';
 import Confetti from 'react-confetti';
 import CircularProgress from '@/components/CircularProgress';
-import { Bar } from 'recharts';
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 
 export default function CycleDetailPage() {
   const params = useParams();
@@ -76,10 +77,10 @@ export default function CycleDetailPage() {
   type ChartLineConfig = {
     dataKey: string;
     name: string;
+    color: string;
     yAxisId: string;
     unit: string;
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [mergedChartData, setMergedChartData] = useState<any[]>([]);
   const [chartLineConfigs, setChartLineConfigs] = useState<ChartLineConfig[]>([]);
 
@@ -96,7 +97,6 @@ export default function CycleDetailPage() {
 
   useEffect(() => {
     loadData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycleId]);
 
   // Reload analytics when filters change
@@ -104,7 +104,6 @@ export default function CycleDetailPage() {
     if (!loading && cycleDetails) {
       loadAnalyticsData();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedViews, selectedMuscles, selectedEquipment, gymFilter, cycleDetails, aggregationMode, selectedExercise]);
 
   useEffect(() => {
@@ -221,10 +220,13 @@ export default function CycleDetailPage() {
         }
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMuscles, selectedEquipment]);
 
-  // Colors now come from the shared chart-styles (imported at top) for consistency with main analytics page.
+  // Color palette for chart lines
+  const COLORS = [
+    '#3b82f6', '#ef4444', '#10b981', '#f59e0b',
+    '#8b5cf6', '#ec4899', '#06b6d4', '#6366f1',
+  ];
 
   // Translation helpers
   const translateMuscleGroup = (mg: string): string => {
@@ -273,7 +275,6 @@ export default function CycleDetailPage() {
   };
 
   // Helper function to merge data from multiple API results
-  /* eslint-disable @typescript-eslint/no-explicit-any */
   const mergeChartData = (
     results: any[],
     filterCombinations: Array<{ view: string; muscle?: MuscleGroup; equipment?: Equipment }>
@@ -316,10 +317,12 @@ export default function CycleDetailPage() {
       const combo = filterCombinations[index];
       const lineName = generateLineName(combo.view, combo.muscle, combo.equipment);
       const viewConfig = getViewConfig(combo.view);
+      const color = COLORS[index % COLORS.length];
 
       lineConfigs.push({
         dataKey: lineName,
         name: lineName,
+        color,
         yAxisId: viewToYAxis[combo.view],
         unit: viewConfig.unit,
       });
@@ -351,10 +354,8 @@ export default function CycleDetailPage() {
     setMergedChartData(filteredData);
     setChartLineConfigs(lineConfigs);
   };
-  /* eslint-enable @typescript-eslint/no-explicit-any */
 
   // Load analytics data for the current cycle
-  /* eslint-disable @typescript-eslint/no-explicit-any */
   const loadAnalyticsData = async () => {
     if (!cycleDetails) return;
 
@@ -495,7 +496,54 @@ export default function CycleDetailPage() {
       console.error('Failed to load analytics data:', error);
     }
   };
-  /* eslint-enable @typescript-eslint/no-explicit-any */
+
+  const formatNumber = (num: number) => {
+    return new Intl.NumberFormat('de-DE').format(Math.round(num));
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return new Intl.DateTimeFormat('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(date);
+  };
+
+  const formatXAxisLabel = (entry: any) => {
+    // If weekLabel exists, use it; otherwise format the date
+    if (entry.weekLabel) {
+      return entry.weekLabel;
+    }
+    const date = new Date(entry.date);
+    return new Intl.DateTimeFormat('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+    }).format(date);
+  };
+
+  const formatTooltipLabel = (entry: any) => {
+    // For week aggregation, show date range and workout count
+    if (entry.weekStartDate && entry.weekEndDate) {
+      const start = new Intl.DateTimeFormat('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+      }).format(new Date(entry.weekStartDate));
+      const end = new Intl.DateTimeFormat('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+      }).format(new Date(entry.weekEndDate));
+      const workoutCount = entry.workoutCount || 0;
+      return `${start} - ${end} (${workoutCount} Workout${workoutCount !== 1 ? 's' : ''})`;
+    }
+    // For day aggregation, just show the date
+    const date = new Date(entry.date);
+    return new Intl.DateTimeFormat('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(date);
+  };
 
   const formatVolume = (volume: number): string => {
     return new Intl.NumberFormat('de-DE').format(Math.round(volume));
@@ -511,11 +559,41 @@ export default function CycleDetailPage() {
     return `${minutes} min`;
   };
 
+  const formatPRType = (type: string) => {
+    switch (type) {
+      case 'weight':
+        return 'Gewicht';
+      case 'reps':
+        return 'Wiederholungen';
+      case 'volume':
+        return 'Volumen';
+      case 'one_rm':
+        return '1RM';
+      default:
+        return type;
+    }
+  };
+
+  const formatPRValue = (pr: PersonalRecord) => {
+    switch (pr.type) {
+      case 'weight':
+        return `${pr.value} kg`;
+      case 'reps':
+        return `${pr.value} Wdh`;
+      case 'volume':
+        return `${Math.round(pr.value)} kg`;
+      case 'one_rm':
+        return `${Math.round(pr.value)} kg`;
+      default:
+        return `${pr.value}`;
+    }
+  };
+
   if (loading) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-background flex items-center justify-center">
-          <div className="text-lg text-muted-foreground">Lädt Zyklusdetails...</div>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-lg text-gray-600">Lädt Zyklusdetails...</div>
         </div>
       </ProtectedRoute>
     );
@@ -524,8 +602,8 @@ export default function CycleDetailPage() {
   if (!cycleDetails) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-background flex items-center justify-center">
-          <div className="text-lg text-muted-foreground">Zyklus nicht gefunden</div>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-lg text-gray-600">Zyklus nicht gefunden</div>
         </div>
       </ProtectedRoute>
     );
@@ -533,7 +611,7 @@ export default function CycleDetailPage() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-gray-50">
         {/* Confetti */}
         {showConfetti && (
           <Confetti
@@ -548,34 +626,32 @@ export default function CycleDetailPage() {
           <div className="px-4 py-6 sm:px-0 space-y-6">
             {/* Header */}
             <div>
-              <Button
-                variant="ghost"
-                size="sm"
+              <button
                 onClick={() => router.push('/cycles')}
-                className="flex items-center gap-2 mb-4 px-0 text-muted-foreground hover:text-foreground"
+                className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
               >
-                <IconArrowLeft className="size-4" />
+                <ArrowLeft className="h-4 w-4" />
                 Zurück zu Zyklen
-              </Button>
+              </button>
 
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-3">
-                    <h1 className="text-3xl font-bold text-foreground">
+                    <h1 className="text-3xl font-bold text-gray-900">
                       {cycleDetails.name}
                     </h1>
                     <span
                       className={`px-3 py-1 rounded-full text-sm font-semibold ${ 
                         cycleDetails.status === 'ACTIVE'
-                          ? 'bg-foreground text-background'
-                          : 'bg-muted text-muted-foreground'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-600'
                       }`}
                     >
                       {cycleDetails.status === 'ACTIVE' ? 'Aktiv' : 'Abgeschlossen'}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 mt-2 text-muted-foreground">
-                    <IconCalendar className="size-4" />
+                  <div className="flex items-center gap-2 mt-2 text-gray-600">
+                    <Calendar className="h-4 w-4" />
                     <span>
                       {formatDate(cycleDetails.startDate)} - {formatDate(cycleDetails.endDate)}
                     </span>
@@ -593,8 +669,8 @@ export default function CycleDetailPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {/* Circular Progress (for active cycles) */}
               {cycleDetails.status === 'ACTIVE' && cycleDetails.currentWeek && cycleDetails.totalWeeks && (
-                <div className="bg-card border rounded-lg p-6">
-                  <div className="text-sm font-medium text-muted-foreground mb-4">
+                <div className="bg-white rounded-lg shadow p-6">
+                  <div className="text-sm font-medium text-gray-600 mb-4">
                     Fortschritt
                   </div>
                   <div className="flex justify-center">
@@ -608,55 +684,55 @@ export default function CycleDetailPage() {
               )}
 
               {/* Total Volume */}
-              <div className="bg-card border rounded-lg p-6">
+              <div className="bg-white rounded-lg shadow p-6">
                 <div className="flex items-center justify-between mb-2">
-                  <div className="text-sm font-medium text-muted-foreground">
+                  <div className="text-sm font-medium text-gray-600">
                     Gesamtvolumen
                   </div>
-                  <IconTrendingUp className="size-5 text-muted-foreground" />
+                  <TrendingUp className="h-5 w-5 text-blue-600" />
                 </div>
-                <div className="text-3xl font-bold text-foreground">
+                <div className="text-3xl font-bold text-gray-900">
                   {formatVolume(cycleDetails.totalVolume)}
                 </div>
-                <div className="text-sm text-muted-foreground mt-1">kg bewegt</div>
+                <div className="text-sm text-gray-500 mt-1">kg bewegt</div>
               </div>
 
               {/* Workout Count */}
-              <div className="bg-card border rounded-lg p-6">
+              <div className="bg-white rounded-lg shadow p-6">
                 <div className="flex items-center justify-between mb-2">
-                  <div className="text-sm font-medium text-muted-foreground">
+                  <div className="text-sm font-medium text-gray-600">
                     Workouts
                   </div>
-                  <IconBarbell className="size-5 text-muted-foreground" />
+                  <Dumbbell className="h-5 w-5 text-blue-600" />
                 </div>
-                <div className="text-3xl font-bold text-foreground mb-3">
+                <div className="text-3xl font-bold text-gray-900 mb-3">
                   {cycleDetails.workoutCount}
                 </div>
                 <div className="space-y-1">
                   {cycleDetails.workoutsByGym.map((gym, idx) => (
                     <div key={idx} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        {gym.isHome && <IconMapPin className="size-3" />}
+                      <div className="flex items-center gap-1 text-gray-600">
+                        {gym.isHome && <MapPin className="h-3 w-3" />}
                         <span>{gym.gymName}</span>
                       </div>
-                      <span className="font-medium text-foreground">{gym.count}</span>
+                      <span className="font-medium text-gray-900">{gym.count}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
               {/* PRs */}
-              <div className="bg-card border rounded-lg p-6">
+              <div className="bg-white rounded-lg shadow p-6">
                 <div className="flex items-center justify-between mb-2">
-                  <div className="text-sm font-medium text-muted-foreground">
+                  <div className="text-sm font-medium text-gray-600">
                     Personal Records
                   </div>
-                  <IconTrophy className="size-5 text-muted-foreground" />
+                  <Trophy className="h-5 w-5 text-yellow-600" />
                 </div>
-                <div className="text-3xl font-bold text-foreground">
+                <div className="text-3xl font-bold text-gray-900">
                   {personalRecords.length}
                 </div>
-                <div className="text-sm text-muted-foreground mt-1">neue PRs</div>
+                <div className="text-sm text-gray-500 mt-1">neue PRs</div>
               </div>
             </div>
 
@@ -664,135 +740,110 @@ export default function CycleDetailPage() {
             <div className="space-y-6">
               {/* Analytics Header */}
               <div>
-                <h2 className="text-2xl font-semibold text-foreground mb-2">
+                <h2 className="text-2xl font-semibold text-gray-900 mb-2">
                   Statistiken
                 </h2>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-gray-600">
                   Analysiere deine Performance während dieses Zyklus
                 </p>
               </div>
 
-              {/* Filters - reordered per spec: Gym dropdown first, then Aggregation (Tage/Wochen), then the rest */}
-              <div className="bg-card border rounded-lg p-6 space-y-6">
-                {/* 1. Gym as Dropdown (first as requested) */}
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground mb-1.5 block">
-                    Gym
-                  </label>
-                  <select
-                    value={gymFilter}
-                    onChange={(e) => setGymFilter(e.target.value)}
-                    className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  >
-                    <option value="alle">Alle</option>
-                    {homeGyms.map((gym) => (
-                      <option key={gym.id} value={gym.id}>
-                        {gym.name}
-                      </option>
-                    ))}
-                    <option value="andere">Andere</option>
-                  </select>
-                </div>
-
-                {/* 2. Aggregation (Tage / Wochen) - directly after Gym */}
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground mb-1.5 block">
-                    Ansicht
-                  </label>
-                  <div className="flex gap-2">
-                    <Button
-                      variant={aggregationMode === 'day' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setAggregationMode('day')}
-                    >
-                      Tage
-                    </Button>
-                    <Button
-                      variant={aggregationMode === 'week' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setAggregationMode('week')}
-                    >
-                      Wochen
-                    </Button>
-                  </div>
-                </div>
-
-                {/* 3. The rest of the filters (Views, Muscle, Equipment, Exercise) */}
+              {/* Filters */}
+              <div className="bg-white rounded-lg shadow p-6 space-y-6">
                 {/* Views Filter */}
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground mb-1.5 block">
-                    Ansichten (max. 2 für Vergleich)
-                  </label>
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Ansichten (max. 2 für Vergleich)</h3>
                   <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant={selectedViews.includes('volume') ? 'default' : 'outline'}
-                      size="sm"
+                    <button
                       onClick={() => toggleView('volume')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedViews.includes('volume')
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
                     >
                       Volumen
-                    </Button>
-                    <Button
-                      variant={selectedViews.includes('orm') ? 'default' : 'outline'}
-                      size="sm"
+                    </button>
+                    <button
                       onClick={() => toggleView('orm')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedViews.includes('orm')
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      } ${gymFilter === 'andere' ? 'opacity-50 cursor-not-allowed' : ''}`}
                       disabled={gymFilter === 'andere'}
                       title={gymFilter === 'andere' ? 'ORM nur für Home Gyms verfügbar' : ''}
                     >
                       ORM%
-                    </Button>
-                    <Button
-                      variant={selectedViews.includes('rir') ? 'default' : 'outline'}
-                      size="sm"
+                    </button>
+                    <button
                       onClick={() => toggleView('rir')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedViews.includes('rir')
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
                     >
                       RIR
-                    </Button>
-                    <Button
-                      variant={selectedViews.includes('duration') ? 'default' : 'outline'}
-                      size="sm"
+                    </button>
+                    <button
                       onClick={() => toggleView('duration')}
-                      disabled={!selectedMuscles.includes('ALL') || !selectedEquipment.includes('ALL')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedViews.includes('duration')
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      } ${!selectedMuscles.includes('ALL') || !selectedEquipment.includes('ALL') ? 'opacity-50 cursor-not-allowed' : ''}`}
                       title={!selectedMuscles.includes('ALL') || !selectedEquipment.includes('ALL') ? 'Dauer nur mit Alle/Alle verfügbar' : ''}
                     >
                       Dauer
-                    </Button>
-                    <Button
-                      variant={selectedViews.includes('restTime') ? 'default' : 'outline'}
-                      size="sm"
+                    </button>
+                    <button
                       onClick={() => toggleView('restTime')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedViews.includes('restTime')
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
                     >
                       Satzpause
-                    </Button>
-                    <Button
-                      variant={selectedViews.includes('reps') ? 'default' : 'outline'}
-                      size="sm"
+                    </button>
+                    <button
                       onClick={() => toggleView('reps')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedViews.includes('reps')
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
                     >
                       Wiederholungen
-                    </Button>
-                    <Button
-                      variant={selectedViews.includes('sets') ? 'default' : 'outline'}
-                      size="sm"
+                    </button>
+                    <button
                       onClick={() => toggleView('sets')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedViews.includes('sets')
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
                     >
                       Sätze
-                    </Button>
+                    </button>
                   </div>
                 </div>
 
                 {/* Muscle Group Filter */}
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground mb-1.5 block">
-                    Muskelgruppe
-                  </label>
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Muskelgruppe</h3>
                   <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant={selectedMuscles.includes('ALL') ? 'default' : 'outline'}
-                      size="sm"
+                    <button
                       onClick={() => toggleMuscle('ALL')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedMuscles.includes('ALL')
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
                     >
                       Alle
-                    </Button>
+                    </button>
                     {[
                       MuscleGroup.ABDOMEN,
                       MuscleGroup.LATISSIMUS,
@@ -807,50 +858,57 @@ export default function CycleDetailPage() {
                       MuscleGroup.CALVES,
                       MuscleGroup.TRICEPS,
                     ].map((muscle) => (
-                      <Button
+                      <button
                         key={muscle}
-                        variant={selectedMuscles.includes(muscle) ? 'default' : 'outline'}
-                        size="sm"
                         onClick={() => toggleMuscle(muscle)}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          selectedMuscles.includes(muscle)
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
                       >
                         {translateMuscleGroup(muscle)}
-                      </Button>
+                      </button>
                     ))}
                   </div>
                 </div>
 
                 {/* Equipment Filter */}
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground mb-1.5 block">
-                    Equipment
-                  </label>
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Equipment</h3>
                   <div className="flex flex-wrap gap-2">
-                    <Button
-                      variant={selectedEquipment.includes('ALL') ? 'default' : 'outline'}
-                      size="sm"
+                    <button
                       onClick={() => toggleEquipment('ALL')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        selectedEquipment.includes('ALL')
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
                     >
                       Alle
-                    </Button>
+                    </button>
                     {(['CABLE', 'MACHINE', 'DUMBBELL', 'BARBELL', 'BODYWEIGHT', 'SMITH_MACHINE', 'EZ_BAR'] as Equipment[]).map((equip) => (
-                      <Button
+                      <button
                         key={equip}
-                        variant={selectedEquipment.includes(equip) ? 'default' : 'outline'}
-                        size="sm"
                         onClick={() => toggleEquipment(equip)}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          selectedEquipment.includes(equip)
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
                       >
                         {translateEquipment(equip)}
-                      </Button>
+                      </button>
                     ))}
                   </div>
                 </div>
 
-                {/* Exercise Filter - Alternative to Muscle/Equipment (kept in the "rest" group) */}
-                <div className="border-t border-border pt-4">
+                {/* Exercise Filter - Alternative to Muscle/Equipment */}
+                <div className="border-t border-gray-200 pt-4">
                   <div className="text-center mb-3">
-                    <span className="text-sm text-muted-foreground italic">ODER</span>
+                    <span className="text-sm text-gray-500 italic">ODER</span>
                   </div>
-
+                  
                   {selectedExercise ? (
                     <SelectedExerciseCard
                       exercise={selectedExercise}
@@ -858,17 +916,80 @@ export default function CycleDetailPage() {
                       onReplace={() => setShowExerciseModal(true)}
                     />
                   ) : (
-                    <div className="flex justify-center py-2">
-                      <Button
-                        variant="outline"
-                        onClick={() => setShowExerciseModal(true)}
-                        className="h-14 w-14 rounded-lg p-0"
-                        aria-label="Übung zum Filtern hinzufügen"
-                      >
-                        <IconPlus className="size-7" />
-                      </Button>
-                    </div>
+                    <button
+                      onClick={() => setShowExerciseModal(true)}
+                      className="w-full px-4 py-3 rounded-lg text-sm font-medium text-blue-600 bg-blue-50 border-2 border-dashed border-blue-300 hover:bg-blue-100 transition-colors"
+                    >
+                      + Übung hinzufügen
+                    </button>
                   )}
+                </div>
+
+                {/* Gym Filter */}
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Gym</h3>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setGymFilter('alle')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        gymFilter === 'alle'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Alle
+                    </button>
+                    {homeGyms.map((gym) => (
+                      <button
+                        key={gym.id}
+                        onClick={() => setGymFilter(gym.id)}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          gymFilter === gym.id
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {gym.name}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setGymFilter('andere')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        gymFilter === 'andere'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Andere
+                    </button>
+                  </div>
+                </div>
+
+                {/* Aggregation Mode Toggle */}
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Aggregation</h3>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setAggregationMode('day')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        aggregationMode === 'day'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      Tage
+                    </button>
+                    <button
+                      onClick={() => setAggregationMode('week')}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        aggregationMode === 'week'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      Wochen
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -877,75 +998,206 @@ export default function CycleDetailPage() {
                 <div className="space-y-6">
                   {/* Comparison Chart (Multi-line) */}
                   {selectedViews.length > 1 && mergedChartData.length > 0 && (
-                    <AnalyticsChart
-                      data={mergedChartData}
-                      title="Vergleich"
-                      height={300}
-                      isComparison={true}
-                      lineConfigs={chartLineConfigs}
-                    />
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        Vergleich
+                      </h3>
+                      <ScrollableChart dataPointCount={mergedChartData.length}>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={mergedChartData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis
+                              dataKey="date"
+                              tickFormatter={(date, index) => formatXAxisLabel(mergedChartData[index])}
+                              style={{ fontSize: '12px' }}
+                            />
+                            {/* Left Y-Axis */}
+                            {chartLineConfigs.some(config => config.yAxisId === 'left') && (
+                              <YAxis
+                                yAxisId="left"
+                                label={{
+                                  value: chartLineConfigs.find(c => c.yAxisId === 'left')?.unit || '',
+                                  angle: -90,
+                                  position: 'insideLeft',
+                                }}
+                                style={{ fontSize: '12px' }}
+                              />
+                            )}
+                            {/* Right Y-Axis */}
+                            {chartLineConfigs.some(config => config.yAxisId === 'right') && (
+                              <YAxis
+                                yAxisId="right"
+                                orientation="right"
+                                label={{
+                                  value: chartLineConfigs.find(c => c.yAxisId === 'right')?.unit || '',
+                                  angle: 90,
+                                  position: 'insideRight',
+                                }}
+                                style={{ fontSize: '12px' }}
+                              />
+                            )}
+                            <Tooltip
+                              labelFormatter={(label: any, payload: readonly any[]) => {
+                                if (payload && payload.length > 0) {
+                                  return formatTooltipLabel(payload[0].payload);
+                                }
+                                const date = new Date(label as string);
+                                return new Intl.DateTimeFormat('de-DE', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric',
+                                }).format(date);
+                              }}
+                            />
+                            <Legend />
+                            {chartLineConfigs.map((config) => (
+                              <Line
+                                key={config.dataKey}
+                                type="monotone"
+                                dataKey={config.dataKey}
+                                name={config.name}
+                                stroke={config.color}
+                                yAxisId={config.yAxisId}
+                                strokeWidth={2}
+                                dot={{ r: 3 }}
+                                activeDot={{ r: 5 }}
+                                connectNulls={true}
+                              />
+                            ))}
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </ScrollableChart>
+                    </div>
                   )}
 
-                  {/* Volume Chart - using central component */}
+                  {/* Volume Chart */}
                   {selectedViews.length === 1 && selectedViews.includes('volume') && volumeData && volumeData.dataPoints.length > 0 && (
-                    <AnalyticsChart
-                      data={volumeData.dataPoints}
-                      title="Volumen-Entwicklung"
-                      height={300}
-                      chartType="line"
-                      dataKey="volume"
-                      name="Volumen"
-                      stroke={CHART_ACCENT}
-                      yAxisTickFormatter={(value) => `${formatNumber(value)}kg`}
-                      footer={
-                        <div className="mt-4 text-center">
-                          <div className="text-sm text-muted-foreground">
-                            Gesamtes Volumen
-                          </div>
-                          <div className="text-2xl font-bold text-foreground">
-                            {formatNumber(volumeData.totalVolume)} kg
-                          </div>
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        Volumen-Entwicklung
+                      </h3>
+                      <ScrollableChart dataPointCount={volumeData.dataPoints.length}>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={volumeData.dataPoints}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="date"
+                            tickFormatter={(date, index) => formatXAxisLabel(volumeData.dataPoints[index])}
+                            style={{ fontSize: '12px' }}
+                          />
+                          <YAxis
+                            tickFormatter={(value) => `${formatNumber(value)}kg`}
+                            style={{ fontSize: '12px' }}
+                          />
+                          <Tooltip
+                            formatter={(value: any) => [
+                              `${formatNumber(value as number)} kg`,
+                              'Volumen',
+                            ]}
+                            labelFormatter={(label: any, payload: readonly any[]) => {
+                              if (payload && payload.length > 0) {
+                                return formatTooltipLabel(payload[0].payload);
+                              }
+                              const date = new Date(label as string);
+                              return new Intl.DateTimeFormat('de-DE', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              }).format(date);
+                            }}
+                          />
+                          <Legend />
+                          <Line
+                            type="monotone"
+                            dataKey="volume"
+                            stroke="#3b82f6"
+                            strokeWidth={2}
+                            dot={{ r: 4 }}
+                            name="Volumen"
+                          />
+                        </LineChart>
+                        </ResponsiveContainer>
+                      </ScrollableChart>
+                      <div className="mt-4 text-center">
+                        <div className="text-sm text-gray-600">
+                          Gesamtes Volumen
                         </div>
-                      }
-                    />
+                        <div className="text-2xl font-bold text-gray-900">
+                          {formatNumber(volumeData.totalVolume)} kg
+                        </div>
+                      </div>
+                    </div>
                   )}
 
                   {/* ORM Chart */}
                   {selectedViews.length === 1 && selectedViews.includes('orm') && (
-                    <div className="bg-card border rounded-lg p-6">
+                    <div className="bg-white rounded-lg shadow p-6">
                       {gymFilter === 'andere' ? (
                         <div className="text-center py-12">
-                          <p className="text-muted-foreground">
+                          <p className="text-gray-600">
                             %ORM Tracking ist nur für Home Gym Workouts verfügbar.
                           </p>
-                          <p className="text-sm text-muted-foreground mt-2">
-                            Bitte wähle ein Home Gym oder &quot;Alle&quot; aus.
+                          <p className="text-sm text-gray-500 mt-2">
+                            Bitte wähle ein Home Gym oder "Alle" aus.
                           </p>
                         </div>
                       ) : ormData && ormData.dataPoints.length > 0 ? (
-                        <AnalyticsChart
-                          data={ormData.dataPoints}
-                          title="%ORM-Entwicklung"
-                          height={300}
-                          chartType="line"
-                          dataKey="percentORM"
-                          name="%ORM"
-                          stroke={CHART_ACCENT}
-                          yAxisTickFormatter={(value) => `${value}%`}
-                          footer={
-                            <div className="mt-4 text-center">
-                              <div className="text-sm text-muted-foreground">
-                                Durchschnitt %ORM
-                              </div>
-                              <div className="text-2xl font-bold text-foreground">
-                                {ormData.averagePercentORM}%
-                              </div>
+                        <>
+                          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                            %ORM-Entwicklung
+                          </h3>
+                          <ScrollableChart dataPointCount={ormData.dataPoints.length}>
+                            <ResponsiveContainer width="100%" height={300}>
+                              <LineChart data={ormData.dataPoints}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis
+                                dataKey="date"
+                                tickFormatter={(date, index) => formatXAxisLabel(ormData.dataPoints[index])}
+                                style={{ fontSize: '12px' }}
+                              />
+                              <YAxis
+                                tickFormatter={(value) => `${value}%`}
+                                style={{ fontSize: '12px' }}
+                              />
+                              <Tooltip
+                                formatter={(value: any) => [`${value}%`, '%ORM']}
+                                labelFormatter={(label: any, payload: readonly any[]) => {
+                                  if (payload && payload.length > 0) {
+                                    return formatTooltipLabel(payload[0].payload);
+                                  }
+                                  const date = new Date(label as string);
+                                  return new Intl.DateTimeFormat('de-DE', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric',
+                                  }).format(date);
+                                }}
+                              />
+                              <Legend />
+                              <Line
+                                type="monotone"
+                                dataKey="percentORM"
+                                stroke="#10b981"
+                                strokeWidth={2}
+                                dot={{ r: 4 }}
+                                name="%ORM"
+                                connectNulls={true}
+                              />
+                            </LineChart>
+                            </ResponsiveContainer>
+                          </ScrollableChart>
+                          <div className="mt-4 text-center">
+                            <div className="text-sm text-gray-600">
+                              Durchschnitt %ORM
                             </div>
-                          }
-                        />
+                            <div className="text-2xl font-bold text-gray-900">
+                              {ormData.averagePercentORM}%
+                            </div>
+                          </div>
+                        </>
                       ) : (
                         <div className="text-center py-12">
-                          <p className="text-muted-foreground">
+                          <p className="text-gray-600">
                             Keine ORM Daten verfügbar für die ausgewählten Filter.
                           </p>
                         </div>
@@ -955,21 +1207,49 @@ export default function CycleDetailPage() {
 
                   {/* RIR Chart */}
                   {selectedViews.length === 1 && selectedViews.includes('rir') && (
-                    <div className="bg-card border rounded-lg p-6">
+                    <div className="bg-white rounded-lg shadow p-6">
                       {rirData && rirData.dataPoints.length > 0 ? (
-                        <AnalyticsChart
-                          data={rirData.dataPoints}
-                          title="RIR-Verteilung"
-                          height={300}
-                          chartType="bar"
-                        >
-                          <Bar dataKey="rir0Count" fill={getRIRBarFill(0)} name="RIR 0" />
-                          <Bar dataKey="rir1Count" fill={getRIRBarFill(1)} name="RIR 1" />
-                          <Bar dataKey="rir2Count" fill={getRIRBarFill(2)} name="RIR 2" />
-                        </AnalyticsChart>
+                        <>
+                          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                            RIR-Verteilung
+                          </h3>
+                          <ScrollableChart dataPointCount={rirData.dataPoints.length}>
+                            <ResponsiveContainer width="100%" height={300}>
+                              <BarChart data={rirData.dataPoints}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis
+                                dataKey="date"
+                                tickFormatter={(date, index) => formatXAxisLabel(rirData.dataPoints[index])}
+                                style={{ fontSize: '12px' }}
+                              />
+                              <YAxis
+                                label={{ value: 'Anzahl Sätze', angle: -90, position: 'insideLeft' }}
+                                style={{ fontSize: '12px' }}
+                              />
+                              <Tooltip
+                                labelFormatter={(label: any, payload: readonly any[]) => {
+                                  if (payload && payload.length > 0) {
+                                    return formatTooltipLabel(payload[0].payload);
+                                  }
+                                  const date = new Date(label as string);
+                                  return new Intl.DateTimeFormat('de-DE', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric',
+                                  }).format(date);
+                                }}
+                              />
+                              <Legend />
+                              <Bar dataKey="rir0Count" fill="#ef4444" name="RIR 0" />
+                              <Bar dataKey="rir1Count" fill="#eab308" name="RIR 1" />
+                              <Bar dataKey="rir2Count" fill="#22c55e" name="RIR 2" />
+                            </BarChart>
+                            </ResponsiveContainer>
+                          </ScrollableChart>
+                        </>
                       ) : (
                         <div className="text-center py-12">
-                          <p className="text-muted-foreground">
+                          <p className="text-gray-600">
                             Keine RIR Daten verfügbar für die ausgewählten Filter.
                           </p>
                         </div>
@@ -979,98 +1259,226 @@ export default function CycleDetailPage() {
 
                   {/* Duration Chart */}
                   {selectedViews.length === 1 && selectedViews.includes('duration') && durationData && durationData.dataPoints.length > 0 && (
-                    <AnalyticsChart
-                      data={durationData.dataPoints}
-                      title="Dauer-Entwicklung"
-                      height={300}
-                      chartType="line"
-                      dataKey="duration"
-                      name="Dauer"
-                      stroke={CHART_ACCENT}
-                      yAxisTickFormatter={(value) => `${value}min`}
-                      footer={
-                        <div className="mt-4 text-center">
-                          <div className="text-sm text-muted-foreground">
-                            Durchschnittliche Dauer
-                          </div>
-                          <div className="text-2xl font-bold text-foreground">
-                            {Math.round(durationData.averageDuration)} min
-                          </div>
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        Dauer-Entwicklung
+                      </h3>
+                      <ScrollableChart dataPointCount={durationData.dataPoints.length}>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={durationData.dataPoints}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="date"
+                            tickFormatter={(date, index) => formatXAxisLabel(durationData.dataPoints[index])}
+                            style={{ fontSize: '12px' }}
+                          />
+                          <YAxis
+                            tickFormatter={(value) => `${value}min`}
+                            style={{ fontSize: '12px' }}
+                          />
+                          <Tooltip
+                            formatter={(value: any) => [`${value} min`, 'Dauer']}
+                            labelFormatter={(label: any, payload: readonly any[]) => {
+                              if (payload && payload.length > 0) {
+                                return formatTooltipLabel(payload[0].payload);
+                              }
+                              const date = new Date(label as string);
+                              return new Intl.DateTimeFormat('de-DE', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              }).format(date);
+                            }}
+                          />
+                          <Legend />
+                          <Line
+                            type="monotone"
+                            dataKey="duration"
+                            stroke="#f59e0b"
+                            strokeWidth={2}
+                            dot={{ r: 4 }}
+                            name="Dauer"
+                          />
+                        </LineChart>
+                        </ResponsiveContainer>
+                      </ScrollableChart>
+                      <div className="mt-4 text-center">
+                        <div className="text-sm text-gray-600">
+                          Durchschnittliche Dauer
                         </div>
-                      }
-                    />
+                        <div className="text-2xl font-bold text-gray-900">
+                          {Math.round(durationData.averageDuration)} min
+                        </div>
+                      </div>
+                    </div>
                   )}
 
                   {/* Rest Time Chart */}
                   {selectedViews.length === 1 && selectedViews.includes('restTime') && restTimeData && restTimeData.dataPoints.length > 0 && (
-                    <AnalyticsChart
-                      data={restTimeData.dataPoints}
-                      title="Satzpausen-Entwicklung"
-                      height={300}
-                      chartType="line"
-                      dataKey="averageRestTime"
-                      name="Satzpause"
-                      stroke={CHART_ACCENT}
-                      yAxisTickFormatter={(value) => `${value}s`}
-                      footer={
-                        <div className="mt-4 text-center">
-                          <div className="text-sm text-muted-foreground">
-                            Durchschnittliche Satzpause
-                          </div>
-                          <div className="text-2xl font-bold text-foreground">
-                            {Math.round(restTimeData.overallAverage)} s
-                          </div>
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        Satzpausen-Entwicklung
+                      </h3>
+                      <ScrollableChart dataPointCount={restTimeData.dataPoints.length}>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={restTimeData.dataPoints}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="date"
+                            tickFormatter={(date, index) => formatXAxisLabel(restTimeData.dataPoints[index])}
+                            style={{ fontSize: '12px' }}
+                          />
+                          <YAxis
+                            tickFormatter={(value) => `${value}s`}
+                            style={{ fontSize: '12px' }}
+                          />
+                          <Tooltip
+                            formatter={(value: any) => [`${value} s`, 'Pause']}
+                            labelFormatter={(label: any, payload: readonly any[]) => {
+                              if (payload && payload.length > 0) {
+                                return formatTooltipLabel(payload[0].payload);
+                              }
+                              const date = new Date(label as string);
+                              return new Intl.DateTimeFormat('de-DE', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              }).format(date);
+                            }}
+                          />
+                          <Legend />
+                          <Line
+                            type="monotone"
+                            dataKey="averageRestTime"
+                            stroke="#8b5cf6"
+                            strokeWidth={2}
+                            dot={{ r: 4 }}
+                            name="Satzpause"
+                          />
+                        </LineChart>
+                        </ResponsiveContainer>
+                      </ScrollableChart>
+                      <div className="mt-4 text-center">
+                        <div className="text-sm text-gray-600">
+                          Durchschnittliche Satzpause
                         </div>
-                      }
-                    />
+                        <div className="text-2xl font-bold text-gray-900">
+                          {Math.round(restTimeData.overallAverage)} s
+                        </div>
+                      </div>
+                    </div>
                   )}
 
                   {/* Reps Chart */}
                   {selectedViews.length === 1 && selectedViews.includes('reps') && repsData && repsData.dataPoints.length > 0 && (
-                    <AnalyticsChart
-                      data={repsData.dataPoints}
-                      title="Wiederholungen-Entwicklung"
-                      height={300}
-                      chartType="line"
-                      dataKey="reps"
-                      name="Wiederholungen"
-                      stroke={CHART_ACCENT}
-                      yAxisTickFormatter={(value) => `${value}`}
-                      footer={
-                        <div className="mt-4 text-center">
-                          <div className="text-sm text-muted-foreground">
-                            Gesamte Wiederholungen
-                          </div>
-                          <div className="text-2xl font-bold text-foreground">
-                            {formatNumber(repsData.totalReps)}
-                          </div>
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        Wiederholungen-Entwicklung
+                      </h3>
+                      <ScrollableChart dataPointCount={repsData.dataPoints.length}>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={repsData.dataPoints}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="date"
+                            tickFormatter={(date, index) => formatXAxisLabel(repsData.dataPoints[index])}
+                            style={{ fontSize: '12px' }}
+                          />
+                          <YAxis
+                            tickFormatter={(value) => `${value}`}
+                            style={{ fontSize: '12px' }}
+                          />
+                          <Tooltip
+                            formatter={(value: any) => [`${value}`, 'Wiederholungen']}
+                            labelFormatter={(label: any, payload: readonly any[]) => {
+                              if (payload && payload.length > 0) {
+                                return formatTooltipLabel(payload[0].payload);
+                              }
+                              const date = new Date(label as string);
+                              return new Intl.DateTimeFormat('de-DE', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              }).format(date);
+                            }}
+                          />
+                          <Legend />
+                          <Line
+                            type="monotone"
+                            dataKey="reps"
+                            stroke="#ec4899"
+                            strokeWidth={2}
+                            dot={{ r: 4 }}
+                            name="Wiederholungen"
+                          />
+                        </LineChart>
+                        </ResponsiveContainer>
+                      </ScrollableChart>
+                      <div className="mt-4 text-center">
+                        <div className="text-sm text-gray-600">
+                          Gesamte Wiederholungen
                         </div>
-                      }
-                    />
+                        <div className="text-2xl font-bold text-gray-900">
+                          {formatNumber(repsData.totalReps)}
+                        </div>
+                      </div>
+                    </div>
                   )}
 
                   {/* Sets Chart */}
                   {selectedViews.length === 1 && selectedViews.includes('sets') && setsData && setsData.dataPoints.length > 0 && (
-                    <AnalyticsChart
-                      data={setsData.dataPoints}
-                      title="Sätze-Entwicklung"
-                      height={300}
-                      chartType="line"
-                      dataKey="sets"
-                      name="Sätze"
-                      stroke={CHART_ACCENT}
-                      yAxisTickFormatter={(value) => `${value}`}
-                      footer={
-                        <div className="mt-4 text-center">
-                          <div className="text-sm text-muted-foreground">
-                            Gesamte Sätze
-                          </div>
-                          <div className="text-2xl font-bold text-foreground">
-                            {setsData.totalSets}
-                          </div>
+                    <div className="bg-white rounded-lg shadow p-6">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                        Sätze-Entwicklung
+                      </h3>
+                      <ScrollableChart dataPointCount={setsData.dataPoints.length}>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart data={setsData.dataPoints}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis
+                            dataKey="date"
+                            tickFormatter={(date, index) => formatXAxisLabel(setsData.dataPoints[index])}
+                            style={{ fontSize: '12px' }}
+                          />
+                          <YAxis
+                            tickFormatter={(value) => `${value}`}
+                            style={{ fontSize: '12px' }}
+                          />
+                          <Tooltip
+                            formatter={(value: any) => [`${value}`, 'Sätze']}
+                            labelFormatter={(label: any, payload: readonly any[]) => {
+                              if (payload && payload.length > 0) {
+                                return formatTooltipLabel(payload[0].payload);
+                              }
+                              const date = new Date(label as string);
+                              return new Intl.DateTimeFormat('de-DE', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              }).format(date);
+                            }}
+                          />
+                          <Legend />
+                          <Line
+                            type="monotone"
+                            dataKey="sets"
+                            stroke="#06b6d4"
+                            strokeWidth={2}
+                            dot={{ r: 4 }}
+                            name="Sätze"
+                          />
+                        </LineChart>
+                        </ResponsiveContainer>
+                      </ScrollableChart>
+                      <div className="mt-4 text-center">
+                        <div className="text-sm text-gray-600">
+                          Gesamte Sätze
                         </div>
-                      }
-                    />
+                        <div className="text-2xl font-bold text-gray-900">
+                          {setsData.totalSets}
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
@@ -1078,81 +1486,91 @@ export default function CycleDetailPage() {
 
             {/* PRs List */}
             {personalRecords.length > 0 && (
-              <Card>
-                <div className="px-6 py-4 border-b border-border">
-                  <h2 className="text-lg font-semibold text-foreground">
+              <div className="bg-white rounded-lg shadow">
+                <div className="px-6 py-4 border-b border-gray-200">
+                  <h2 className="text-lg font-semibold text-gray-900">
                     Personal Records
                   </h2>
                 </div>
-                <CardContent className="p-6 space-y-3">
+                <div className="p-6 space-y-3">
                   {personalRecords.map((pr, index) => (
                     <PersonalRecordCard key={index} pr={pr} />
                   ))}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             )}
 
             {/* Workout History */}
             {workouts.length > 0 && (
               <div className="space-y-4">
                 <div>
-                  <h2 className="text-xl font-semibold text-foreground">
+                  <h2 className="text-xl font-semibold text-gray-900">
                     Workout-Verlauf
                   </h2>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="text-sm text-gray-600 mt-1">
                     {workouts.length} Workout{workouts.length !== 1 ? 's' : ''} in diesem Zyklus
                   </p>
                 </div>
                 {workouts.map((workout) => (
-                  <Card
+                  <div
                     key={workout.id}
-                    className="hover:shadow-sm transition-shadow cursor-pointer"
-                    onClick={() => router.push(`/history/${workout.id}/edit?from=cycle&cycleId=${cycleId}`)}
+                    className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-6"
                   >
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2 flex-wrap">
-                            <h3 className="text-lg font-semibold text-foreground">
-                              {workout.isFreeWorkout
-                                ? workout.templateName || 'Freies Workout'
-                                : workout.workoutDayName || 'Workout'}
-                            </h3>
-                            {workout.homeGym ? (
-                              <Badge variant="secondary" className="text-xs">
-                                {workout.homeGym.name}
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-xs">
-                                Anderes Gym
-                              </Badge>
-                            )}
+                    <div className="flex items-start justify-between">
+                      <Link
+                        href={`/history/${workout.id}?from=cycle&cycleId=${cycleId}`}
+                        className="flex-1"
+                      >
+                        <div className="flex items-center gap-3 mb-2 flex-wrap">
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            {workout.isFreeWorkout
+                              ? workout.templateName || 'Freies Workout'
+                              : workout.workoutDayName || 'Workout'}
+                          </h3>
+                          {workout.homeGym ? (
+                            <span className="text-xs bg-violet-100 text-violet-800 px-2 py-1 rounded">
+                              {workout.homeGym.name}
+                            </span>
+                          ) : (
+                            <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                              Anderes Gym
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-4 h-4" />
+                            <span>{formatDate(workout.date)}</span>
                           </div>
-                          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                          {workout.totalDuration && (
                             <div className="flex items-center gap-1">
-                              <IconCalendar className="size-4" />
-                              <span>{formatDate(workout.date)}</span>
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <span>{formatDuration(workout.totalDuration)}</span>
                             </div>
-                            {workout.totalDuration && (
-                              <div className="flex items-center gap-1">
-                                <IconClock className="size-4" />
-                                <span>{formatDuration(workout.totalDuration)}</span>
-                              </div>
-                            )}
-                            <div className="flex items-center gap-1">
-                              <IconBarbell className="size-4" />
-                              <span>{workout.exerciseCount} Übung{workout.exerciseCount !== 1 ? 'en' : ''}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <IconTrendingUp className="size-4" />
-                              <span>{formatVolume(workout.totalVolume)} kg</span>
-                            </div>
+                          )}
+                          <div className="flex items-center gap-1">
+                            <Dumbbell className="w-4 h-4" />
+                            <span>{workout.exerciseCount} Übung{workout.exerciseCount !== 1 ? 'en' : ''}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <TrendingUp className="w-4 h-4" />
+                            <span>{formatVolume(workout.totalVolume)} kg</span>
                           </div>
                         </div>
-                        <IconChevronRight className="w-5 h-5 text-muted-foreground" />
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </Link>
+                      <Link
+                        href={`/history/${workout.id}?from=cycle&cycleId=${cycleId}`}
+                        className="ml-4 p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                        title="Details anzeigen"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </Link>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
@@ -1160,37 +1578,38 @@ export default function CycleDetailPage() {
             {/* New Cycle Button (for completed cycles) */}
             {cycleDetails.status === 'COMPLETED' && (
               <div className="flex justify-center mt-8">
-                <Button
+                <button
                   onClick={() => router.push('/cycles/new')}
-                  className="px-6 py-3"
+                  className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   Neuen Zyklus anlegen
-                </Button>
+                </button>
               </div>
             )}
           </div>
         </main>
       </div>
 
-      {/* Exercise Selection Modal (shadcn Dialog, controlled) */}
-      <ExerciseSelectionModal
-        open={showExerciseModal}
-        onOpenChange={setShowExerciseModal}
-        onSelect={async (exerciseId: string, exercise?: Exercise) => {
-          if (exercise) {
-            setSelectedExercise(exercise);
-          } else {
-            // Fetch exercise details if not provided
-            try {
-              const fetchedExercise = await apiClient.getExercise(exerciseId);
-              setSelectedExercise(fetchedExercise);
-            } catch (error) {
-              console.error('Failed to fetch exercise:', error);
+      {/* Exercise Selection Modal */}
+      {showExerciseModal && (
+        <ExerciseSelectionModal
+          onClose={() => setShowExerciseModal(false)}
+          onSelect={async (exerciseId: string, exercise?: Exercise) => {
+            if (exercise) {
+              setSelectedExercise(exercise);
+            } else {
+              // Fetch exercise details if not provided
+              try {
+                const fetchedExercise = await apiClient.getExercise(exerciseId);
+                setSelectedExercise(fetchedExercise);
+              } catch (error) {
+                console.error('Failed to fetch exercise:', error);
+              }
             }
-          }
-          setShowExerciseModal(false);
-        }}
-      />
+            setShowExerciseModal(false);
+          }}
+        />
+      )}
     </ProtectedRoute>
   );
 }

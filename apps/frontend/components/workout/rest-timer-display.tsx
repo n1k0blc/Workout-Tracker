@@ -3,10 +3,9 @@
 import { useWorkout } from '@/lib/workout-context';
 
 export function RestTimerDisplay() {
-  const { restTimer, restTimerTarget, isRestTimerPaused, toggleRestTimerPause, isPastWorkout } = useWorkout();
+  const { restTimer, restTimerTarget, isRestTimerPaused, toggleRestTimerPause } = useWorkout();
 
-  // Never show live rest timer during past workout tracking (historical data entry only).
-  if (isPastWorkout || (restTimer === 0 && restTimerTarget === 0)) {
+  if (restTimer === 0 && restTimerTarget === 0) {
     return null;
   }
 
@@ -21,10 +20,10 @@ export function RestTimerDisplay() {
       onClick={toggleRestTimerPause}
       className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer hover:opacity-90 ${
         isRestTimerPaused
-          ? 'bg-muted text-muted-foreground'
+          ? 'bg-gray-500 text-white'
           : isOvertime
-          ? 'bg-destructive text-destructive-foreground'
-          : 'bg-primary text-primary-foreground'
+          ? 'bg-red-600 text-white'
+          : 'bg-blue-600 text-white'
       }`}
       title={isRestTimerPaused ? 'Satzpause fortsetzen' : 'Satzpause anhalten'}
     >

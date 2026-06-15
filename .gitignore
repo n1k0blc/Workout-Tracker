@@ -59,7 +59,3 @@ ssl/
 
 # Cloudflare
 .cloudflared/
-
-# Local Grok skills / agent configuration (personal tooling)
-.agents/
-skills-lock.json
