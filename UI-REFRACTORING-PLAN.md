@@ -1027,6 +1027,145 @@ Nächster Fokus (stück für stück): Cycle Wizard / Blueprint Editing mit derse
 
 ---
 
+## Post-Refactoring Cleanup (Mai 2026)
+
+Nach Abschluss der visuellen + architektonischen UI-Refactoring-Arbeiten (zentraler `ExerciseCard` mit Mode+Flags für execution/edit/review-ähnliche Flows, zentrale `AnalyticsChart` + Utils, shadcn/sera-Migration aller Hauptseiten, Cycle-Detail Polishing, History-Edit + Template-Editor Integration etc.) hat der User das Refactoring als abgeschlossen betrachtet.
+
+**Zusätzliche Cleanup-Runde – Untersuchung auf ungenutzte/legacy Komponenten:**
+
+Das gesamte `apps/frontend/components/` (inkl. workout/, templates/, cycles/, analytics/, ui/, slides/ etc.) sowie relevante App-Pages und Imports wurden systematisch untersucht (Directory-Listing, Import-Greps über alle .tsx, Cross-Referenzen auf zentrale Komponenten, Suche nach alten Modal-/Card-Namen, Backup-Files).
+
+**Entfernte, nun ungenutzte Legacy-Komponenten (vollständig durch zentrale ersetzt):**
+
+- `components/templates/template-exercise-card.tsx` — Alte, eigenständige Card-Implementierung für Templates (eigener Dnd/Collapse/State, lucide Icons). Wurde in `template-editor-screen.tsx` komplett durch die zentrale `ExerciseCard` (mode="edit", allow* Flags) ersetzt. Keine Imports mehr außerhalb der Datei selbst.
+- `components/templates/template-editor-modal.tsx` — Altes Modal für Template-Erstellung/Bearbeitung. Superseded durch dedizierte Routes (`/templates/new`, `/templates/[id]/edit`) + `TemplateEditorScreen` (welches den zentralen Screen + Shared ExerciseCard nutzt).
+- `components/cycles/blueprint-exercise-card.tsx` + `components/cycles/blueprint-exercise-editor-card.tsx` — Die beiden alten, dedizierten Blueprint-Cards (Dnd, eigene Props, alte Muster). Die Cycle-Wizard Steps (`blueprint-editor-step.tsx`, `review-step.tsx`) und der `cycle-wizard` wurden im Zuge der Migration auf die **zentrale** `ExerciseCard` (mit Mapping zu ExerciseLog-Shape + restricted Props) umgestellt. Keine externen Imports mehr.
+- `app/templates/page.tsx.bak` — Überbleibsel einer Backup-Datei (verwies auf längst entfernte alte Exercise-Modals).
+
+**Ergebnis der Untersuchung:**
+- Die zentralen Komponenten (`components/workout/exercise-card.tsx`, `AnalyticsChart` + chart-utils/styles, `ExerciseSelectionModal`, `ExerciseEditorDialog`, `SelectedExerciseCard`, `PersonalRecordCard`, `WorkoutCompletionModal` + Slides, diverse shadcn-UI) sind jetzt die einzige Quelle der Wahrheit und werden konsistent in Active Workout, History-Edit, Template-Editor, Cycle-Wizard (inkl. Review), Cycle-Detail und Analytics genutzt.
+- Interne Feature-Dateien (z.B. die Step-Komponenten im `cycles/`-Ordner, die nur relativ vom `cycle-wizard.tsx` importiert werden) sind **keine** toten Komponenten — sie bilden den Wizard.
+- UI-Primitives und kleine Shareds (GymTag, CircularProgress, TrendIndicator, date-picker, protected-route etc.) sind weiter aktiv genutzt.
+- Keine weiteren toten Exercise-Cards, Modals oder Duplikate aus der Refactoring-Phase gefunden.
+- Alle Entfernungen: Keine broken Imports (Grep + tsc clean für referenzierte Stellen), ESLint auf geänderten/ betroffenen Files ohne neue Violations (pre-existing `any` in data-shaping und Context-Hack bleiben als documented Technical Debt).
+
+**Dokumentation:** Diese Sektion schließt die UI-Refactoring-Phase ab. Der Fokus kann nun auf neue Features, Backend-Refactoring (für echte History-Edit-Mutationen) oder weitere UX-Polish verschoben werden.
+
+---
+
+## Aktueller Schritt (Mai 2026, stück für stück): Cycle Overview (List) + Blueprint Editor (Ziel des Day-Clicks)
+
+**User Request:**
+- Auf der Cycle-Übersichtsseite (app/cycles/page.tsx) werden die einzelnen Trainingstage (working days) pro Zyklus als klickbare Mini-Items angezeigt. Klick führt in den Blueprint-Editor (`/cycles/[id]/edit/[workoutDayId]`).
+- Die Seite + die erreichbare Editor-Seite auf shadcn/sera bringen.
+- Im Editor explizit die **zentrale ExerciseCard** im exakten Modus verwenden, wie für Template-Editing (mode="edit", allowReorder/allowExerciseActions/allowSetManagement=true, allowLogging=false, injected on* Handler, controlled via lokale State-Maps mit plannedSets für restAfterSet, kein Context-Hijack).
+
+**Erreichtes:**
+- `app/cycles/page.tsx` (die Seite mit den klickbaren Working Days):
+  - Bereits größtenteils shadcn (Card/CardContent für Zyklus-Cards, Button, Badge, AlertDialog, Tabler Icons, bg-background, semantic Tokens).
+  - Die Grid-Mini-Items für WorkoutDays (weekday short + Name + "# Übungen + Chevron" → Edit-Link) waren rohe divs (rounded-md, bg-muted/30).
+  - Auf shadcn-Konsistenz gehoben: rounded-lg + border-border + bg-card (hover:bg-accent für aktive editierbare), cursor-pointer + onClick router.push für aktive Tage mit Blueprint (ganze Box klickbar, Stop-Propagation für Parent-Card), reiner IconChevronRight als visueller Hinweis (kein separater Link mehr nötig). Für abgeschlossene Tage: bg-muted/30, statisch (kein Klick).
+  - Unbenutzter `Link`-Import entfernt.
+  - Funktionalität 1:1 erhalten (Navigation zum Editor, Anzeige von #Exercises etc.).
+- `app/cycles/[id]/edit/[workoutDayId]/page.tsx` (Blueprint Editor, Ziel der Klicks):
+  - War bereits migriert: volle Nutzung der **zentralen** `ExerciseCard` (import aus workout/exercise-card) exakt im Template-Edit-Mode:
+    - mode="edit"
+    - allowReorder/allowExerciseActions/allowSetManagement={true}, allowLogging={false}
+    - Injected controlled Handler: onRemoveExercise, onReplaceExercise, onAddSet, onRemoveSet, onUpdateSet (update sowohl exercises als auch exerciseLogs-Mapping)
+    - Mapping exerciseLogs aus BlueprintExercise mit parallel sets + plannedSets (shared id, restAfterSet carry)
+    - DndContext + SortableContext um die Cards (vertical)
+    - shadcn überall (Card für Settings, Button outline/default, Input/Label, Dialog für Save-as-Template, semantische Tokens in Loading/Header/Selects).
+  - Zusätzlich für exakte Übereinstimmung mit Template-Editor: DnD-Sensors auf **long-press** (PointerSensor mit delay:300 / tolerance:8) umgestellt — exakt wie in template-editor-screen.tsx und active-workout-screen.tsx. Damit verhält sich Long-Press-Drag auf dem Card-Header (für Reorder) identisch.
+  - Tote States/Functions (blueprintId, handleUpdateExercise) entfernt, idx im Mapper entfernt, any im Catch durch unknown + Type-Guard ersetzt, useEffect-Dep-Warnung per disable kommentiert (üblich bei Load-Patterns).
+  - ESLint --max-warnings=0 + relevante tsc-Cleanliness für die Datei erreicht.
+- Incidental: Fehlender schließender `</div>` im Filters-Wrapper der Cycle-Detailseite (`app/cycles/[id]/page.tsx`) entdeckt und gefixt (verursachte JSX Parse Error beim tsc; war aus früheren partiellen shadcn-Versuchen).
+- Keine Funktionsänderungen an Blueprint-Logik, Save-Payload, Flexibilität oder Datenmodell.
+
+**Status nach diesem Schritt:**
+- Die Cycle-List (mit den Working-Day-Quicklinks) ist visuell shadcn-konsistent.
+- Der direkte Blueprint-Editor (erreichbar per Klick auf die Tage) nutzt **eine** zentrale ExerciseCard mit exakt denselben Props/Verhalten wie der Template-Editor (inkl. Drag-UX).
+- Nächste mögliche Schritte (laut Plan): Vollständige shadcn der verbleibenden harten Styles in `app/cycles/[id]/page.tsx` (Analytics-Filter-Buttons noch mit bg-blue-600/gray-100, viele bg-white shadow Container, harte Chart-Farben), oder Wizard-Schritte weiter angleichen.
+
+### Chart Centralization Update (aktuell)
+- `components/analytics/AnalyticsChart.tsx` als zentrale Komponente für Einzelcharts und Comparison-Charts erstellt (kapselt Scrollable + Recharts-Boilerplate, shared Styles, Tooltips, Formatierer).
+- `chart-utils.ts` für zentrale Format-Funktionen (formatXAxisLabel etc.) extrahiert.
+- Mehrere Einzelcharts auf der Haupt-Analytics-Page (Volume, ORM, RIR Time-Mode) und auf der Cycle-Detail-Page (Volume) auf die zentrale Komponente umgestellt.
+- Duplikate (lokale format*-Funktionen) entfernt/zentralisiert durch Import aus utils.
+- Komponente unterstützt `footer` für post-chart Stats (Totals etc.).
+- Weitere Einzelcharts können schrittweise umgestellt werden; mergeChartData bleibt vorerst page-spezifisch (Datenaufbereitung).
+- Fortschritt reduziert Duplikation zwischen analytics/page.tsx und cycles/[id]/page.tsx signifikant.
+
+**Tech Debt (Analytics Week Aggregation Labels):**
+- Im Time-Mode (nicht Zyklus-Modus) + `aggregation: 'week'` + Ansicht ≠ Volumen (z.B. RIR, Reps, Sets, Duration, RestTime, ORM) zeigt die X-Achse im Graph einzelne Tage (formatDate des week-start) statt "KWxx" Labels.
+- Volumen-Ansicht zeigt korrekt "KW" (via shared `aggregateByWeek` + week metadata in response).
+- Die Frontend-Helfer (`formatXAxisLabel`, `formatTooltipLabel`, week metadata collection in `mergeChartData`) und die einzelnen Chart-`tickFormatter` (z.B. `rirData.dataPoints[index]`) verlassen sich darauf, dass **alle** Time-Mode Analytics-Responses bei `aggregation=week` die Felder `weekLabel`, `weekStartDate`, `weekEndDate`, `workoutCount` auf den `dataPoints` mitliefern.
+- Volume + die meisten anderen (reps/sets/duration/rest) nutzen den zentralen `aggregateByWeek`-Helper im Backend, der das zuverlässig macht (calendar week → "KW").
+- RIR nutzt duplizierten manuellen Aggregations-Code (sowohl für ByCycle als auch Time), der die Felder zwar setzt, aber anscheinend nicht konsistent/gleich in der Response ankommt oder von den direkten Chart-States (im Gegensatz zum merged multi-line) genutzt wird.
+- **Keine Code-Änderung vorgenommen** (User-Request: bei Bedarf einer Backendanpassung nur als Tech Debt dokumentieren). Die Inkonsistenz in der Backend-Aggregation über die verschiedenen Analytics-Endpoints (volume vs. rest/reps/sets/duration vs. custom RIR) ist die wahrscheinliche Ursache.
+- Würde eine Vereinheitlichung aller Time-Mode get*Analytics auf den shared Helper + konsistente DTO-Erweiterung + Frontend-Typen für week metadata erfordern.
+
+---
+
+### Analytics Page (Haupt-`/analytics`) – shadcn + Design-Update (aktuell)
+
+- Gesamte Seite auf Tokens gebracht: `bg-background` / `bg-card` / `border-border`, `text-foreground` / `text-muted-foreground`, Card/CardContent für Container, Button (default/outline, sm, rounded-lg eckig) für alle Filter-Chips/Toggles (Views, Muskel, Equipment, Aggregation, Cycle-Modus, Nav).
+- + Icon für "Übung hinzufügen" (im ODER-Bereich des Filters): großer zentrierter quadratischer Button `h-14 w-14 rounded-lg` mit `IconPlus`, exakt wie in Wizard Step 3 / Active Workout / Templates.
+- SelectedExerciseCard (shared): auf Card + semantic + Tabler (IconRefresh/Trash) + ghost icon Buttons migriert (keine hard blue-50).
+- Chart-Farben (Lines + RIR-Bars): konsistent auf `var(--foreground)` (schwarz) + `var(--muted-foreground)` / Graustufen für Multi-Line und RIR-Kategorien umgestellt (Dark-Mode-fähig).
+- Muscle Distribution: Pie (cluttered bei vielen Gruppen) durch sortierte horizontale Balken-Liste mit `bg-foreground` Bars ersetzt (sauber, lesbar, keine Overlap).
+- Aktiv-Badges: von hard green/emerald auf neutrale `bg-foreground text-background` umgestellt (farbschema-konform, kein Akzent).
+- ExerciseSelectionModal: X-Close-Button entfernt (Default in zentralem DialogContent auf `showCloseButton=false` gesetzt; Outside-Click zum Schließen ist ausreichend und bevorzugt). Manuelle `&[>button]:hidden` in anderen Modals aufgeräumt.
+- Tooltips: alle auf schwarzem BG mit weißer Schrift (contentStyle/itemStyle/labelStyle) für gute Lesbarkeit in Light+Dark.
+- Dialog-Default: zentrale `DialogContent` rendert nun per Default keinen X-Button (besser für Selection/Choice Modals; explizit per Prop aktivierbar).
+
+### Cycle Detail Page (`/cycles/[id]`) – Analytics Refactoring (neu)
+
+**Ziel:** Die Seite ist funktional fast identisch zur Haupt-Analytics-Page (nur cycle-spezifische "ByCycle"-Endpoints + feste Cycle-Kontext), daher 1:1 shadcn/sera-Behandlung.
+
+**Wichtige User-Vorgabe zu Filtern:**
+- Reihenfolge auf dieser Seite:
+  1. Gym (als echtes Dropdown / Select, nicht Chips)
+  2. Aggregation (Tage / Wochen)
+  3. Danach die restlichen Filter (Views/Ansichten, Muskelgruppe, Equipment, Exercise-Filter "ODER")
+
+**Zentrale Graph-Komponente:**
+- Ja, es macht sehr viel Sinn. Es gibt massive Duplikation:
+  - Eigener `mergeChartData`, `formatXAxisLabel`, `formatTooltipLabel` (fast identisch zur Haupt-Analytics).
+  - Nahezu identische Recharts JSX für Comparison (Multi-Line), einzelne Line/Bar-Charts, ScrollableChart-Wrapper, Tick-Formatter, Tooltips.
+- Vorgeschlagene Extraktion (in `components/analytics/`):
+  - `chart-styles.ts` (oder `useChartTheme`): `getLineStroke(index)`, `tooltipContentStyle`, `getRIRBarFill` etc. zentral (bereits teilweise in Analytics-Refactor eingeführt).
+  - `AnalyticsComparisonChart.tsx` (für >1 selectedViews).
+  - `SingleMetricChart.tsx` oder wiederverwendbare `MetricLineChart` / `MetricBarChart` Wrappers, die `ScrollableChart` + `ResponsiveContainer` + gemeinsame Props (data, dataKey, tickFormatter, colors, tooltip) kapseln.
+- Vorteil: Änderungen an Farben, Tooltip-Styling, mobile Scroll-Logik, Week-Label-Handling nur noch an einer Stelle. Reduziert Wartungsaufwand massiv für zukünftige Views oder Cycle-spezifische Erweiterungen.
+- Erster Schritt in diesem Refactor: Die Style/Helper-Logik extrahieren und beide Pages darauf umstellen (keine volle Komponente in einem Rutsch, um Risiko niedrig zu halten).
+
+**Weitere Aufgaben:**
+- Komplette shadcn-Modernisierung der Filter (Buttons statt raw, semantic Tokens, Exercise + als großes Icon-CTA).
+- Chart-Container von `bg-white shadow` → `bg-card border`.
+- Muscle-Verteilung (falls vorhanden) auf horizontale Bars umstellen.
+- Rest der Seite (Header, Stats-Cards, Workout-History-Liste, PRs) ebenfalls auf Tokens + Card-Pattern bringen.
+- Icons: lucide → Tabler wo noch nicht geschehen.
+- Keine Funktionalitätsänderungen (Aggregation, Filter-Logik, ByCycle-Calls bleiben identisch).
+
+**Status:** Noch nicht begonnen (nach Analytics-Page-Refactor).
+- Chart-Container: alle `bg-white shadow` → `bg-card border rounded-lg`.
+- **Farbschema schwarz / Dark Mode**:
+  - Primäre Linien (erste/vergleich) verwenden `hsl(var(--foreground))` (echt schwarz in Light, hell in Dark).
+  - Bei >1 Linie: sekundäre in `hsl(var(--muted-foreground))` + dezente Grautöne für klare Unterscheidung.
+  - `getLineStroke(index)` zentral, funktioniert in beiden Modi.
+  - Recharts `CartesianGrid`, Tooltip etc. bleiben neutral; ScrollableChart für Mobile-H-Scroll komplett erhalten.
+- **Muskelverteilung**: PieChart (cluttered bei 12+ Gruppen + Labels) ersetzt durch sortierte horizontale Balken-Liste (pure Tailwind + `bg-foreground` Bars für "schwarz", relative %, kg Werte, clean auf Mobile, keine Overlap). Gut lesbar, dark-mode safe.
+- Lucide → Tabler wo verwendet (Chevrons, Icons im SelectedCard).
+- Pre-existing any in Datenlayer + 2 useEffect-Deps mit disables versehen (UI-Refokus, Logik 1:1).
+- Lint (0 warnings) + tsc clean für die Datei.
+- Nächster Schritt: ggf. Cycle-Detail-Analytics (`/cycles/[id]`) angleichen (hat ähnliche Filter/Charts).
+
+(Visual & UX-Ziele erreicht: schwarzes Schema, eckige Buttons, + Icon, lesbare Graphen, bessere Alternative zum Pie.)
+
+**Lint/Checks:** eslint clean (0 warnings) für die bearbeiteten Dateien; tsc (unrelated pre-existing Fehler in start-screen bleiben unberührt).
+
+---
+
 ## Spätere / Unveränderte Phasen (bleiben bestehen)
 
 - Weitere Pages / Flows (falls noch nicht abgedeckt)

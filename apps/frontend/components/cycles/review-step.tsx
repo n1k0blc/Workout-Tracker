@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { CycleFormData } from './cycle-wizard';
 import { Exercise } from '@/types';
+import type { ExerciseLog } from '@/types';
 import { apiClient } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { IconFlame, IconBarbell } from '@tabler/icons-react';
+import ExerciseCard from '@/components/workout/exercise-card';
 
 interface ReviewStepProps {
   formData: CycleFormData;
@@ -35,6 +36,40 @@ export default function ReviewStep({
     const id = setTimeout(() => loadExercises(), 0);
     return () => clearTimeout(id);
   }, []);
+
+  // Map day blueprint exercises to ExerciseLog shape for the central readonly ExerciseCard
+  // (same as system template readonly view and the editable mapping in step 3)
+  const mapDayExercisesToLogs = (dayExercises: any[]): ExerciseLog[] => { // eslint-disable-line @typescript-eslint/no-explicit-any
+    return (dayExercises || []).map((ex: any, idx: number) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+      const exercise = exercises.find((e) => e.id === ex.exerciseId);
+      const sets = (ex.sets || []).map((s: any, sIdx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
+        id: s.id || `set-${ex.exerciseId}-${sIdx}`,
+        setNumber: s.order || sIdx + 1,
+        setType: s.setType,
+        reps: s.reps ?? 0,
+        weight: s.weight ?? 0,
+        rir: s.rir ?? 0,
+        completedAt: new Date().toISOString(),
+      }));
+      const plannedSets = (ex.sets || []).map((s: any, sIdx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
+        id: `planned-${ex.exerciseId}-${sIdx}`,
+        order: s.order || sIdx + 1,
+        setType: s.setType,
+        reps: s.reps ?? 0,
+        weight: s.weight ?? 0,
+        rir: s.rir ?? 0,
+        restAfterSet: s.restAfterSet ?? 90,
+      }));
+      return {
+        id: ex.id || `ex-${ex.exerciseId}-${idx}`,
+        exerciseId: ex.exerciseId,
+        exerciseName: exercise?.name || 'Übung lädt...',
+        order: ex.order || idx + 1,
+        sets,
+        plannedSets,
+      } as ExerciseLog;
+    });
+  };
 
   const getWeekday = (weekday: number): string => {
     const days = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
@@ -110,49 +145,16 @@ export default function ReviewStep({
             </div>
 
             {day.blueprint.exercises.length > 0 ? (
-              <div className="space-y-3">
-                {day.blueprint.exercises.map((ex, idx) => {
-                  const exercise = exercises.find((e) => e.id === ex.exerciseId);
-                  return (
-                    <div
-                      key={idx}
-                      className="border border-border rounded-lg p-4 bg-muted/30"
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-muted-foreground">
-                            #{ex.order}
-                          </span>
-                          <h4 className="font-semibold text-foreground">
-                            {exercise?.name || 'Übung lädt...'}
-                          </h4>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="text-sm font-medium text-muted-foreground">
-                          Sätze ({ex.sets.length}):
-                        </div>
-                        {ex.sets.map((set, setIdx) => (
-                          <div key={setIdx} className="bg-card rounded p-2 text-sm border border-border">
-                            <span className="inline-flex items-center gap-1">
-                              {set.setType === 'WARMUP' ? (
-                                <IconFlame className="size-4 text-orange-500" />
-                              ) : (
-                                <IconBarbell className="size-4 text-foreground" />
-                              )}
-                              {set.setType === 'WARMUP' ? 'Aufwärmen' : 'Arbeit'}
-                            </span>
-                            {' • '}
-                            {set.reps} Wdh × {set.weight}kg @ RIR {set.rir}
-                            {' • '}
-                            <span className="text-muted-foreground">Pause: {set.restAfterSet}s</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="space-y-4">
+                {mapDayExercisesToLogs(day.blueprint.exercises).map((exercise, idx) => (
+                  <ExerciseCard
+                    key={exercise.id}
+                    exercise={exercise}
+                    exerciseNumber={idx + 1}
+                    mode="edit"
+                    readonly={true}
+                  />
+                ))}
               </div>
             ) : (
               <p className="text-muted-foreground text-center py-4">

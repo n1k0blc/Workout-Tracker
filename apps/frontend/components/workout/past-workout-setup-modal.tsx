@@ -40,7 +40,7 @@ export default function PastWorkoutSetupModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md [&>button]:hidden">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="text-center text-2xl">Vergangenes Workout tracken</DialogTitle>
           <DialogDescription className="text-center">

@@ -34,7 +34,7 @@ export default function GymLocationModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md [&>button]:hidden">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="text-center text-2xl">Wo trainierst du heute?</DialogTitle>
           <DialogDescription className="text-center">

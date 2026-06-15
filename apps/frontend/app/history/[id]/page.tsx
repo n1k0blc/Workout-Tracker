@@ -6,12 +6,10 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
 import { Workout, SetType } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  IconArrowLeft,
-  IconClock,
   IconBarbell,
   IconChevronLeft,
   IconFlame,
@@ -35,6 +33,7 @@ export default function WorkoutDetailPage() {
     if (workoutId) {
       loadWorkout();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workoutId]);
 
   const loadWorkout = async () => {
@@ -251,9 +250,18 @@ export default function WorkoutDetailPage() {
               <Card>
                 <CardContent className="p-12 text-center">
                   <p className="text-muted-foreground mb-4">Workout nicht gefunden</p>
-                  <Link href="/history">
-                    <Button variant="outline">Zurück zum Verlauf</Button>
-                  </Link>
+                  {fromCycle && cycleId ? (
+                    <Button
+                      variant="outline"
+                      onClick={() => router.push(`/cycles/${cycleId}`)}
+                    >
+                      Zurück zu Zyklusdetails
+                    </Button>
+                  ) : (
+                    <Link href="/history">
+                      <Button variant="outline">Zurück zum Verlauf</Button>
+                    </Link>
+                  )}
                 </CardContent>
               </Card>
             )}

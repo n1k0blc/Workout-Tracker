@@ -1,7 +1,6 @@
 'use client';
 
 import { ProtectedRoute } from '@/components/protected-route';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
@@ -207,13 +206,19 @@ export default function CyclesPage() {
                               </div>
                             </div>
 
-                            {/* Workout Days */}
+                            {/* Workout Days - quick access to blueprint editor (shadcn cards) */}
                             {cycle.workoutDays.length > 0 && (
                               <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
                                 {cycle.workoutDays.map((day) => (
                                   <div
                                     key={day.id}
-                                    className="rounded-md border bg-muted/30 p-3"
+                                    onClick={(e) => {
+                                      if (day.blueprint) {
+                                        e.stopPropagation();
+                                        router.push(`/cycles/${cycle.id}/edit/${day.id}`);
+                                      }
+                                    }}
+                                    className={`rounded-lg border border-border p-3 ${day.blueprint ? 'bg-card cursor-pointer hover:bg-accent active:bg-accent/80 transition-colors' : 'bg-muted/30'}`}
                                   >
                                     <div className="flex items-center gap-2 mb-1">
                                       <span className="text-xs font-semibold text-muted-foreground">
@@ -228,13 +233,7 @@ export default function CyclesPage() {
                                         <div className="text-xs text-muted-foreground">
                                           {day.blueprint.exercises.length} Übungen
                                         </div>
-                                        <Link
-                                          href={`/cycles/${cycle.id}/edit/${day.id}`}
-                                          onClick={(e) => e.stopPropagation()}
-                                          className="text-muted-foreground hover:text-foreground"
-                                        >
-                                          <IconChevronRight className="size-4" />
-                                        </Link>
+                                        <IconChevronRight className="size-4 text-muted-foreground" />
                                       </div>
                                     )}
                                   </div>
@@ -310,13 +309,13 @@ export default function CyclesPage() {
                                   </Button>
                                 </div>
 
-                                {/* Workout Days */}
+                                {/* Workout Days (read-only preview for completed) */}
                                 {cycle.workoutDays.length > 0 && (
                                   <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
                                     {cycle.workoutDays.map((day) => (
                                       <div
                                         key={day.id}
-                                        className="rounded-md border bg-muted/30 p-3"
+                                        className="rounded-lg border border-border bg-muted/30 p-3"
                                       >
                                         <div className="flex items-center gap-2 mb-1">
                                           <span className="text-xs font-semibold text-muted-foreground">

@@ -58,7 +58,7 @@ export default function TemplateSelectionModal({
 
   return (
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-0 [&>button]:hidden">
+      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-0">
         {/* Header */}
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle>Workout-Vorlage wählen</DialogTitle>

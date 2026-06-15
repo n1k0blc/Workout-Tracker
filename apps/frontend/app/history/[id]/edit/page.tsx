@@ -1,7 +1,7 @@
 'use client';
 
 import { ProtectedRoute } from '@/components/protected-route';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/lib/api';
 import { Workout } from '@/types';
@@ -20,7 +20,12 @@ import {
 export default function EditWorkoutPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const workoutId = params.id as string;
+
+  // Support navigation context: coming from cycle detail or regular history
+  const fromCycle = searchParams.get('from') === 'cycle';
+  const cycleId = searchParams.get('cycleId');
 
   const { setActiveWorkoutDirectly, activeWorkout } = useWorkout();
 
@@ -28,6 +33,14 @@ export default function EditWorkoutPage() {
   const [workoutDate, setWorkoutDate] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const navigateBack = () => {
+    if (fromCycle && cycleId) {
+      router.push(`/cycles/${cycleId}`);
+    } else {
+      router.push('/history');
+    }
+  };
 
   useEffect(() => {
     if (workout) {
@@ -57,10 +70,15 @@ export default function EditWorkoutPage() {
     } catch (error) {
       console.error('Failed to load workout:', error);
       alert('Fehler beim Laden des Workouts');
-      router.push('/history');
+      if (fromCycle && cycleId) {
+        router.push(`/cycles/${cycleId}`);
+      } else {
+        router.push('/history');
+      }
     } finally {
       setLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workoutId, router]);
 
   useEffect(() => {
@@ -87,7 +105,7 @@ export default function EditWorkoutPage() {
         exercises,
       });
 
-      router.push('/history');
+      navigateBack();
     } catch (error) {
       console.error('Failed to save workout:', error);
       alert('Fehler beim Speichern des Workouts');
@@ -126,11 +144,11 @@ export default function EditWorkoutPage() {
             {/* Back Button */}
             <Button
               variant="ghost"
-              onClick={() => router.push('/history')}
+              onClick={navigateBack}
               className="flex items-center gap-2 -ml-2"
             >
               <IconChevronLeft className="size-4" />
-              Zurück zum Verlauf
+              {fromCycle && cycleId ? 'Zurück zu Zyklusdetails' : 'Zurück zum Verlauf'}
             </Button>
 
             {/* Header */}

@@ -115,7 +115,7 @@ export default function WorkoutPage() {
             if (!open) handleSkipTemplate(); 
           }}
         >
-          <DialogContent className="max-w-md [&>button]:hidden">
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Workout als Vorlage speichern</DialogTitle>
               <DialogDescription>

@@ -460,7 +460,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
 
       {/* Discard Confirmation Modal */}
       <Dialog open={showDiscardConfirm} onOpenChange={(open) => !open && setShowDiscardConfirm(false)}>
-        <DialogContent className="max-w-md [&>button]:hidden">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Workout verwerfen?</DialogTitle>
             <DialogDescription>
