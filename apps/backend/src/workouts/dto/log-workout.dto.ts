@@ -74,16 +74,22 @@ export class StartFromTemplateDto {
 }
 
 export class UpdateSetDto {
+  @IsOptional()
   @IsInt()
   @Min(0)
-  reps: number;
+  reps?: number;
 
+  @IsOptional()
   @IsNumber()
   @Min(0)
-  weight: number;
+  weight?: number;
 
   @IsOptional()
   @IsInt()
   @Min(0)
   rir?: number;
+
+  @IsOptional()
+  @IsEnum(SetType)
+  setType?: SetType;
 }

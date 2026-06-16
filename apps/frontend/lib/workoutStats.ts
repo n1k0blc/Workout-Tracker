@@ -1,4 +1,4 @@
-import { Workout, PersonalRecord } from '@/types';
+import { Workout, PersonalRecord, SetType } from '@/types';
 
 export interface WorkoutStats {
   totalVolume: number; // in kg
@@ -22,7 +22,7 @@ export function calculateWorkoutStats(
   for (const exerciseLog of workout.exercises) {
     for (const set of exerciseLog.sets) {
       // Skip warmup sets
-      if (set.setType === 'WARMUP') continue;
+      if (set.setType === SetType.WARMUP) continue;
 
       // Calculate set volume
       const baseVolume = set.reps * set.weight;

@@ -1,10 +1,22 @@
-import { useState, useEffect } from 'react';
-import { CycleFormData, WorkoutDayData, BlueprintSetData } from './cycle-wizard';
+import { useState, useEffect, useCallback } from 'react';
+import { CycleFormData } from './cycle-wizard';
 import { SetType, Exercise } from '@/types';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import TemplateSelectionModal from '@/components/workout/template-selection-modal';
-import { BlueprintExerciseCard } from './blueprint-exercise-card';
+import ExerciseCard from '@/components/workout/exercise-card';
 import { apiClient } from '@/lib/api/client';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { IconPlus } from '@tabler/icons-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import type { ExerciseLog } from '@/types';
 import {
   DndContext,
   closestCenter,
@@ -45,6 +57,10 @@ export default function BlueprintEditorStep({
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [showTemplateSelectionModal, setShowTemplateSelectionModal] = useState(false);
 
+  // Local state for current day's exercises, mapped to ExerciseLog shape for the central card
+  // (same pattern as template editor: mode=edit, allow* structural true, allowLogging=false)
+  const [currentExercises, setCurrentExercises] = useState<ExerciseLog[]>([]);
+
   // Load exercises
   useEffect(() => {
     const loadExercises = async () => {
@@ -58,6 +74,8 @@ export default function BlueprintEditorStep({
     loadExercises();
   }, []);
 
+
+
   // Setup sensors for drag and drop
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -70,7 +88,93 @@ export default function BlueprintEditorStep({
     })
   );
 
-  // Handle drag end for reordering exercises
+  // Helpers to map between cycle blueprint format and the ExerciseLog shape used by central ExerciseCard
+  const mapBlueprintToExerciseLogs = useCallback((blueprintExercises: any[]): ExerciseLog[] => { // eslint-disable-line @typescript-eslint/no-explicit-any
+    return (blueprintExercises || []).map((ex: any, idx: number) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+      const exDetails = exercises.find((e) => e.id === ex.exerciseId);
+      // Use the *same* id for the corresponding entry in sets and plannedSets
+      // so that onUpdateSet (which the card calls with the id from the edited set)
+      // can update both sides with a single setId.
+      const sets = (ex.sets || []).map((s: any, sIdx: number) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+        const sid = s.id || `set-${ex.exerciseId || idx}-${sIdx}`;
+        return {
+          id: sid,
+          setNumber: s.order || sIdx + 1,
+          setType: s.setType || SetType.WORKING,
+          reps: s.reps ?? 0,
+          weight: s.weight ?? 0,
+          rir: s.rir ?? 0,
+          completedAt: new Date().toISOString(),
+        };
+      });
+      const plannedSets = (ex.sets || []).map((s: any, sIdx: number) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+        const sid = s.id || `set-${ex.exerciseId || idx}-${sIdx}`; // reuse the same id
+        return {
+          id: sid,
+          order: s.order || sIdx + 1,
+          setType: s.setType || SetType.WORKING,
+          reps: s.reps ?? 0,
+          weight: s.weight ?? 0,
+          rir: s.rir ?? 0,
+          restAfterSet: s.restAfterSet ?? 90,
+        };
+      });
+      return {
+        id: ex.id || `ex-${ex.exerciseId || idx}`,
+        exerciseId: ex.exerciseId,
+        exerciseName: ex.exerciseName || exDetails?.name || '',
+        order: ex.order || idx + 1,
+        sets,
+        plannedSets,
+      } as ExerciseLog;
+    });
+  }, [exercises]);
+
+  const mapExerciseLogsToBlueprint = useCallback((exLogs: ExerciseLog[]) => {
+    return exLogs.map((ex) => ({
+      exerciseId: ex.exerciseId,
+      order: ex.order,
+      sets: (ex.plannedSets || ex.sets || []).map((s: any, idx: number) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+        const p = (ex.plannedSets || []).find((pp: any) => (pp.order || pp.setNumber) === (s.setNumber || s.order)) || s; // eslint-disable-line @typescript-eslint/no-explicit-any
+        return {
+          order: s.setNumber || s.order || idx + 1,
+          setType: s.setType,
+          reps: s.reps ?? 0,
+          weight: s.weight ?? 0,
+          rir: s.rir ?? 0,
+          restAfterSet: p.restAfterSet ?? 90,
+        };
+      }),
+    }));
+  }, []);
+
+  // Sync helper: after local changes to currentExercises, push back to formData
+  const syncCurrentExercisesToFormData = (exLogs: ExerciseLog[]) => {
+    if (currentDayIndex === null) return;
+    const bpExercises = mapExerciseLogsToBlueprint(exLogs);
+    const updatedDays = [...formData.workoutDays];
+    updatedDays[currentDayIndex] = {
+      ...updatedDays[currentDayIndex],
+      blueprint: { exercises: bpExercises },
+    };
+    updateFormData({ workoutDays: updatedDays });
+  };
+
+  // Load / sync current day's exercises into local ExerciseLog state when day changes
+  // (so we can render the central ExerciseCard with local handlers, like in template editor)
+  useEffect(() => {
+    if (currentDayIndex !== null) {
+      const day = formData.workoutDays[currentDayIndex];
+      if (day) {
+        const mapped = mapBlueprintToExerciseLogs(day.blueprint.exercises);
+        setCurrentExercises(mapped);
+      }
+    } else {
+      setCurrentExercises([]);
+    }
+  }, [currentDayIndex, formData.workoutDays, exercises, mapBlueprintToExerciseLogs]);
+
+  // Handle drag end for reordering exercises (now on the mapped currentExercises, same as template editor)
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
@@ -78,29 +182,18 @@ export default function BlueprintEditorStep({
       return;
     }
 
-    const updatedDays = [...formData.workoutDays];
-    const currentExercises = [...updatedDays[currentDayIndex].blueprint.exercises];
-
-    // Find old and new indices
-    const oldIndex = currentExercises.findIndex(
-      (ex) => `${ex.exerciseId}-${ex.order}` === active.id
-    );
-    const newIndex = currentExercises.findIndex(
-      (ex) => `${ex.exerciseId}-${ex.order}` === over.id
-    );
+    const oldIndex = currentExercises.findIndex((ex) => ex.id === active.id);
+    const newIndex = currentExercises.findIndex((ex) => ex.id === over.id);
 
     if (oldIndex === -1 || newIndex === -1) return;
 
-    // Reorder array
-    const reorderedExercises = arrayMove(currentExercises, oldIndex, newIndex);
-
-    // Update order numbers
-    reorderedExercises.forEach((ex, idx) => {
+    const reordered = arrayMove(currentExercises, oldIndex, newIndex);
+    reordered.forEach((ex, idx) => {
       ex.order = idx + 1;
     });
 
-    updatedDays[currentDayIndex].blueprint.exercises = reorderedExercises;
-    updateFormData({ workoutDays: updatedDays });
+    setCurrentExercises(reordered);
+    syncCurrentExercisesToFormData(reordered);
   };
 
   const handleSaveAsTemplate = async () => {
@@ -141,9 +234,10 @@ export default function BlueprintEditorStep({
       alert('Vorlage erfolgreich erstellt!');
       setShowSaveTemplateModal(false);
       setTemplateName('');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to save template:', error);
-      if (error.response?.status === 409) {
+      const err = error as { response?: { status?: number } };
+      if (err.response?.status === 409) {
         alert('Eine Vorlage mit diesem Namen existiert bereits');
       } else {
         alert('Fehler beim Speichern der Vorlage');
@@ -214,122 +308,45 @@ export default function BlueprintEditorStep({
       setExercises(prev => [exercise, ...prev]);
     }
 
-    const updatedDays = [...formData.workoutDays];
-    const currentExercises = updatedDays[currentDayIndex].blueprint.exercises;
-
-    updatedDays[currentDayIndex].blueprint.exercises = [
-      ...currentExercises,
-      {
-        exerciseId,
-        order: currentExercises.length + 1,
-        sets: [
-          {
-            order: 1,
-            setType: SetType.WORKING,
-            reps: 10,
-            weight: 0,
-            rir: 2,
-            restAfterSet: 90,
-          },
-        ],
-      },
-    ];
-
-    updateFormData({ workoutDays: updatedDays });
-    setShowExerciseModal(false);
-
-  };
-
-  const removeExercise = (exerciseIndex: number) => {
-    if (currentDayIndex === null) return;
-
-    const updatedDays = [...formData.workoutDays];
-    const currentExercises = [...updatedDays[currentDayIndex].blueprint.exercises];
-    currentExercises.splice(exerciseIndex, 1);
-
-    // Reorder
-    currentExercises.forEach((ex, idx) => {
-      ex.order = idx + 1;
-    });
-
-    updatedDays[currentDayIndex].blueprint.exercises = currentExercises;
-    updateFormData({ workoutDays: updatedDays });
-  };
-
-  const addSetToExercise = (exerciseIndex: number) => {
-    if (currentDayIndex === null) return;
-
-    const updatedDays = [...formData.workoutDays];
-    const exercise = updatedDays[currentDayIndex].blueprint.exercises[exerciseIndex];
-    
-    exercise.sets.push({
-      order: exercise.sets.length + 1,
+    // Create mapped ExerciseLog entry with default set (including restAfterSet in planned)
+    const exDetails = exercises.find((e) => e.id === exerciseId) || exercise;
+    const sharedSetId = `set-${Date.now()}`;
+    const defaultSet = {
+      id: sharedSetId,
+      setNumber: 1,
+      setType: SetType.WORKING,
+      reps: 10,
+      weight: 0,
+      rir: 2,
+      completedAt: new Date().toISOString(),
+    };
+    const defaultPlanned = {
+      id: sharedSetId, // same id so type updates etc. affect both representations
+      order: 1,
       setType: SetType.WORKING,
       reps: 10,
       weight: 0,
       rir: 2,
       restAfterSet: 90,
-    });
+    };
 
-    updateFormData({ workoutDays: updatedDays });
+    const newExLog: ExerciseLog = {
+      id: `ex-${exerciseId}-${Date.now()}`,
+      exerciseId,
+      exerciseName: exDetails?.name || '',
+      order: currentExercises.length + 1,
+      sets: [defaultSet],
+      plannedSets: [defaultPlanned],
+    };
+
+    const newList = [...currentExercises, newExLog];
+    setCurrentExercises(newList);
+    syncCurrentExercisesToFormData(newList);
+
+    setShowExerciseModal(false);
   };
 
-  const removeSet = (exerciseIndex: number, setIndex: number) => {
-    if (currentDayIndex === null) return;
 
-    const updatedDays = [...formData.workoutDays];
-    const exercise = updatedDays[currentDayIndex].blueprint.exercises[exerciseIndex];
-    
-    exercise.sets.splice(setIndex, 1);
-    
-    // Reorder sets
-    exercise.sets.forEach((set, idx) => {
-      set.order = idx + 1;
-    });
-
-    updateFormData({ workoutDays: updatedDays });
-  };
-
-  const updateSet = (
-    exerciseIndex: number,
-    setIndex: number,
-    field: keyof BlueprintSetData,
-    value: number | SetType
-  ) => {
-    if (currentDayIndex === null) return;
-
-    const updatedDays = [...formData.workoutDays];
-    const set = updatedDays[currentDayIndex].blueprint.exercises[exerciseIndex].sets[setIndex];
-
-    // Prevent NaN values for numeric fields
-    if (field !== 'setType' && typeof value === 'number' && isNaN(value)) {
-      value = 0;
-    }
-
-    (set as any)[field] = value;
-
-    updateFormData({ workoutDays: updatedDays });
-  };
-
-  const updateExercise = (
-    exerciseIndex: number,
-    field: string,
-    value: number
-  ) => {
-    if (currentDayIndex === null) return;
-
-    const updatedDays = [...formData.workoutDays];
-    const exercise = updatedDays[currentDayIndex].blueprint.exercises[exerciseIndex];
-
-    // Prevent NaN values
-    if (isNaN(value)) {
-      value = 0;
-    }
-
-    (exercise as any)[field] = value;
-
-    updateFormData({ workoutDays: updatedDays });
-  };
 
   const getWeekday = (weekday: number): string => {
     const days = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
@@ -343,179 +360,278 @@ export default function BlueprintEditorStep({
   return (
     <>
       <div className="space-y-6">
-        {/* Day Tabs */}
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex flex-wrap gap-2">
-            {formData.workoutDays.map((day, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentDayIndex(index)}
-                className={`px-4 py-2 rounded-lg font-medium text-sm ${
-                  currentDayIndex === index
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {day.name || getWeekday(day.weekday)}
-                {day.blueprint.exercises.length > 0 && (
-                  <span className="ml-2 text-xs">
-                    ({day.blueprint.exercises.length})
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* Day Tabs (sera style) */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-wrap gap-2">
+              {formData.workoutDays.map((day, index) => (
+                <Button
+                  key={index}
+                  variant={currentDayIndex === index ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setCurrentDayIndex(index)}
+                  className="text-sm"
+                >
+                  {day.name || getWeekday(day.weekday)}
+                  {day.blueprint.exercises.length > 0 && (
+                    <span className="ml-1.5 text-xs opacity-80">
+                      ({day.blueprint.exercises.length})
+                    </span>
+                  )}
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Blueprint Editor */}
         {currentDay && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-foreground mb-3">
               Blueprint für {currentDay.name || getWeekday(currentDay.weekday)}
             </h3>
 
-            {currentDay.blueprint.exercises.length > 0 ? (
+            {currentExercises.length > 0 ? (
               <DndContext
                 sensors={sensors}
                 collisionDetection={closestCenter}
                 onDragEnd={handleDragEnd}
               >
                 <SortableContext
-                  items={currentDay.blueprint.exercises.map(
-                    (ex) => `${ex.exerciseId}-${ex.order}`
-                  )}
+                  items={currentExercises.map((ex) => ex.id)}
                   strategy={verticalListSortingStrategy}
                 >
                   <div className="space-y-4 mb-4">
-                    {currentDay.blueprint.exercises.map((ex, exIdx) => {
-                      const exercise = exercises.find((e) => e.id === ex.exerciseId);
-                      return (
-                        <BlueprintExerciseCard
-                          key={`${ex.exerciseId}-${ex.order}`}
-                          blueprintExercise={ex}
-                          exercise={exercise}
-                          exerciseIndex={exIdx}
-                          onRemove={() => removeExercise(exIdx)}
-                          onUpdateSet={(setIdx, field, value) =>
-                            updateSet(exIdx, setIdx, field, value)
-                          }
-                          onRemoveSet={(setIdx) => removeSet(exIdx, setIdx)}
-                          onAddSet={() => addSetToExercise(exIdx)}
-                        />
-                      );
-                    })}
+                    {currentExercises.map((exercise, idx) => (
+                      <ExerciseCard
+                        key={exercise.id}
+                        exercise={exercise}
+                        exerciseNumber={idx + 1}
+                        mode="edit"
+                        allowReorder={true}
+                        allowExerciseActions={true}
+                        allowSetManagement={true}
+                        allowLogging={false}
+                        onRemoveExercise={(exId) => {
+                          const newList = currentExercises.filter((e) => e.id !== exId);
+                          newList.forEach((e, i) => (e.order = i + 1));
+                          setCurrentExercises(newList);
+                          syncCurrentExercisesToFormData(newList);
+                        }}
+                        onReplaceExercise={(exId, newExId) => {
+                          const exDetails = exercises.find((e) => e.id === newExId);
+                          const newList = currentExercises.map((e) =>
+                            e.id === exId
+                              ? { ...e, exerciseId: newExId, exerciseName: exDetails?.name || 'Exercise' }
+                              : e
+                          );
+                          setCurrentExercises(newList);
+                          syncCurrentExercisesToFormData(newList);
+                        }}
+                        onAddSet={(exId) => {
+                          const newList = currentExercises.map((e) => {
+                            if (e.id !== exId) return e;
+                            const setNumbers = (e.sets || []).map((s: any) => s.setNumber || s.order || 0); // eslint-disable-line @typescript-eslint/no-explicit-any
+                            const plannedOrders = (e.plannedSets || []).map((p: any) => p.order || p.setNumber || 0); // eslint-disable-line @typescript-eslint/no-explicit-any
+                            const nextOrder = Math.max(0, ...setNumbers, ...plannedOrders) + 1;
+                            const sharedSetId = `set-${Date.now()}`;
+                            const newSet = {
+                              id: sharedSetId,
+                              setNumber: nextOrder,
+                              setType: SetType.WORKING,
+                              reps: 10,
+                              weight: 0,
+                              rir: 2,
+                              completedAt: new Date().toISOString(),
+                            };
+                            const newPlanned = {
+                              id: sharedSetId, // same id so updates work for both
+                              order: nextOrder,
+                              setType: SetType.WORKING,
+                              reps: 10,
+                              weight: 0,
+                              rir: 2,
+                              restAfterSet: 90,
+                            };
+                            return {
+                              ...e,
+                              sets: [...(e.sets || []), newSet],
+                              plannedSets: [...(e.plannedSets || []), newPlanned],
+                            };
+                          });
+                          setCurrentExercises(newList);
+                          syncCurrentExercisesToFormData(newList);
+                        }}
+                        onRemoveSet={(exId, setNumber) => {
+                          const newList = currentExercises.map((e) => {
+                            if (e.id !== exId) return e;
+                            return {
+                              ...e,
+                              sets: (e.sets || []).filter((s: any) => (s.setNumber || s.order) !== setNumber), // eslint-disable-line @typescript-eslint/no-explicit-any
+                              plannedSets: (e.plannedSets || []).filter((p: any) => (p.order || p.setNumber) !== setNumber), // eslint-disable-line @typescript-eslint/no-explicit-any
+                            };
+                          });
+                          setCurrentExercises(newList);
+                          syncCurrentExercisesToFormData(newList);
+                        }}
+                        onUpdateSet={(exId, setId, data) => {
+                          const newList = currentExercises.map((e) => {
+                            if (e.id !== exId) return e;
+                            const updateFn = (list: any[]) => // eslint-disable-line @typescript-eslint/no-explicit-any
+                              list.map((s: any) => // eslint-disable-line @typescript-eslint/no-explicit-any
+                                s.id === setId ? { ...s, ...data } : s
+                              );
+                            return {
+                              ...e,
+                              sets: updateFn(e.sets || []),
+                              plannedSets: updateFn(e.plannedSets || []),
+                            };
+                          });
+                          setCurrentExercises(newList);
+                          syncCurrentExercisesToFormData(newList);
+                        }}
+                      />
+                    ))}
                   </div>
                 </SortableContext>
               </DndContext>
             ) : (
-              <p className="text-gray-600 text-center py-8 mb-4">
-                Noch keine Übungen hinzugefügt
-              </p>
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <p className="text-muted-foreground mb-4">
+                    Noch keine Übungen hinzugefügt
+                  </p>
+                  {/* Large centered + as primary CTA (consistent with active workout) */}
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowExerciseModal(true)}
+                    className="h-16 w-16 rounded-lg p-0"
+                    aria-label="Erste Übung hinzufügen"
+                  >
+                    <IconPlus className="size-8" />
+                  </Button>
+                </CardContent>
+              </Card>
             )}
 
-            {/* Load from Template Button - disabled after exercises are added to prevent messy state */}
-            <button
-              onClick={() => setShowTemplateSelectionModal(true)}
-              disabled={currentDay.blueprint.exercises.length > 0}
-              className="w-full py-3 px-4 mb-3 border border-purple-600 bg-purple-50 text-purple-700 font-medium rounded-lg hover:bg-purple-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-purple-50"
-            >
-              📋 Aus Vorlage wählen
-            </button>
+            {/* Add Exercise Button (large + when list not empty, consistent style) */}
+            {currentExercises.length > 0 && (
+              <div className="flex justify-center py-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowExerciseModal(true)}
+                  className="h-14 w-14 rounded-lg p-0"
+                  aria-label="Übung hinzufügen"
+                >
+                  <IconPlus className="size-7" />
+                </Button>
+              </div>
+            )}
 
-            {/* Add Exercise Button */}
-            <button
-              onClick={() => setShowExerciseModal(true)}
-              className="w-full py-3 px-4 border-2 border-dashed border-gray-300 text-gray-600 font-medium rounded-lg hover:border-blue-500 hover:text-blue-600"
-            >
-              + Übung hinzufügen
-            </button>
+            {/* Load from Template Button (kept for functionality, styled sera) */}
+            <div className="mt-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowTemplateSelectionModal(true)}
+                disabled={currentDay.blueprint.exercises.length > 0}
+                className="w-full"
+              >
+                Aus Vorlage laden
+              </Button>
+            </div>
 
             {/* Save as Template Button */}
             {currentDay.blueprint.exercises.length > 0 && (
-              <button
+              <Button
+                variant="outline"
                 onClick={() => setShowSaveTemplateModal(true)}
-                className="w-full mt-3 py-3 px-4 border border-blue-600 text-blue-600 font-medium rounded-lg hover:bg-blue-50"
+                className="w-full mt-2"
               >
-                📋 Als Vorlage speichern
-              </button>
+                Als Vorlage speichern
+              </Button>
             )}
           </div>
         )}
 
-        {/* Navigation */}
-        <div className="flex gap-3">
-          <button
+        {/* Navigation (consistent with other steps) */}
+        <div className="flex gap-3 pt-2">
+          <Button
             type="button"
+            variant="outline"
             onClick={onBack}
-            className="flex-1 py-3 px-4 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50"
+            className="flex-1"
           >
             Zurück
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             onClick={onNext}
             disabled={!allDaysHaveExercises}
-            className="flex-1 py-3 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1"
           >
             Weiter zur Überprüfung
-          </button>
+          </Button>
         </div>
       </div>
 
-      {/* Exercise Selection Modal */}
-      {showExerciseModal && (
-        <ExerciseSelectionModal
-          onClose={() => setShowExerciseModal(false)}
-          onSelect={addExerciseToBlueprint}
-        />
-      )}
+      {/* Exercise Selection Modal (shadcn Dialog, controlled) */}
+      <ExerciseSelectionModal
+        open={showExerciseModal}
+        onOpenChange={setShowExerciseModal}
+        onSelect={addExerciseToBlueprint}
+      />
 
-      {/* Save Template Modal */}
-      {showSaveTemplateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Blueprint als Vorlage speichern
-            </h3>
-            <p className="text-sm text-gray-600 mb-4">
+      {/* Save Template Modal (shadcn Dialog) */}
+      <Dialog
+        open={showSaveTemplateModal}
+        onOpenChange={(open) => {
+          setShowSaveTemplateModal(open);
+          if (!open) {
+            setTemplateName('');
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Blueprint als Vorlage speichern</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
               Gib einen Namen für deine Workout-Vorlage ein. Diese Vorlage kannst du
               später wiederverwenden oder direkt als Workout starten.
             </p>
-            <input
-              type="text"
+            <Input
               value={templateName}
               onChange={(e) => setTemplateName(e.target.value)}
               placeholder="z.B. Mein Push Day"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
-              onKeyPress={(e) => {
+              onKeyDown={(e) => {
                 if (e.key === 'Enter' && !savingTemplate) {
                   handleSaveAsTemplate();
                 }
               }}
               autoFocus
             />
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowSaveTemplateModal(false);
-                  setTemplateName('');
-                }}
-                disabled={savingTemplate}
-                className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 font-medium transition-colors disabled:opacity-50"
-              >
-                Abbrechen
-              </button>
-              <button
-                onClick={handleSaveAsTemplate}
-                disabled={savingTemplate || !templateName.trim()}
-                className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium transition-colors disabled:opacity-50"
-              >
-                {savingTemplate ? 'Speichert...' : 'Speichern'}
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+          <DialogFooter className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowSaveTemplateModal(false);
+                setTemplateName('');
+              }}
+              disabled={savingTemplate}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              onClick={handleSaveAsTemplate}
+              disabled={savingTemplate || !templateName.trim()}
+            >
+              {savingTemplate ? 'Speichert...' : 'Speichern'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Template Selection Modal */}
       {showTemplateSelectionModal && (

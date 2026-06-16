@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable @typescript-eslint/no-explicit-any -- Analytics data layer uses flexible any for API responses and recharts data (pre-existing, preserved during UI refactor) */
+
 import { ProtectedRoute } from '@/components/protected-route';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
@@ -29,9 +31,6 @@ import {
   Line,
   BarChart,
   Bar,
-  PieChart,
-  Pie,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -39,11 +38,22 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { IconChevronLeft, IconChevronRight, IconPlus } from '@tabler/icons-react';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import SelectedExerciseCard from '@/components/analytics/selected-exercise-card';
 import ScrollableChart from '@/components/analytics/scrollable-chart';
+import AnalyticsChart from '@/components/analytics/AnalyticsChart';
+import {
+  CHART_ACCENT,
+  getRIRBarFill,
+  tooltipContentStyle,
+  tooltipItemStyle,
+  tooltipLabelStyle,
+} from '@/components/analytics/chart-styles';
+import { formatNumber, formatDate, formatXAxisLabel, formatTooltipLabel } from '@/components/analytics/chart-utils';
 import { PersonalRecordCard } from '@/components/PersonalRecordCard';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 
 export default function AnalyticsPage() {
   // Data states
@@ -100,6 +110,7 @@ export default function AnalyticsPage() {
     if (!loading) {
       loadAnalyticsData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycleMode, timeFilter, gymFilter, selectedMuscles, selectedEquipment, selectedCycleIndex, selectedViews, aggregationMode, selectedExercise]);
 
   // Calculate dynamic max allowed selections for each filter type
@@ -187,19 +198,11 @@ export default function AnalyticsPage() {
         }
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMuscles, selectedEquipment]);
 
-  // Color palette for chart lines
-  const COLORS = [
-    '#3b82f6', // blue
-    '#ef4444', // red
-    '#10b981', // green
-    '#f59e0b', // amber
-    '#8b5cf6', // purple
-    '#ec4899', // pink
-    '#06b6d4', // cyan
-    '#6366f1', // indigo
-  ];
+  // Chart colors, RIR fills and tooltip styles are now imported from the central chart-styles.ts
+  // (to avoid duplication with the cycle detail page and keep presentation logic centralized).
 
   // Translation helpers
   const translateMuscleGroup = (mg: string): string => {
@@ -324,12 +327,10 @@ export default function AnalyticsPage() {
       const combo = filterCombinations[index];
       const lineName = generateLineName(combo.view, combo.muscle, combo.equipment);
       const viewConfig = getViewConfig(combo.view);
-      const color = COLORS[index % COLORS.length];
 
       lineConfigs.push({
         dataKey: lineName,
         name: lineName,
-        color,
         yAxisId: viewToYAxis[combo.view], // Dynamic Y-axis assignment
         unit: viewConfig.unit,
       });
@@ -878,38 +879,6 @@ export default function AnalyticsPage() {
     setPrs(records.allTimePRs || []);
   };
 
-  const formatNumber = (num: number) => {
-    return new Intl.NumberFormat('de-DE').format(Math.round(num));
-  };
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return new Intl.DateTimeFormat('de-DE', {
-      day: '2-digit',
-      month: '2-digit',
-    }).format(date);
-  };
-
-  const formatXAxisLabel = (entry: any) => {
-    // If weekLabel exists, use it; otherwise format the date
-    if (entry.weekLabel) {
-      return entry.weekLabel;
-    }
-    return formatDate(entry.date);
-  };
-
-  const formatTooltipLabel = (entry: any) => {
-    // For week aggregation, show date range and workout count
-    if (entry.weekStartDate && entry.weekEndDate) {
-      const start = formatDate(entry.weekStartDate);
-      const end = formatDate(entry.weekEndDate);
-      const workoutCount = entry.workoutCount || 0;
-      return `${start} - ${end} (${workoutCount} Workout${workoutCount !== 1 ? 's' : ''})`;
-    }
-    // For day aggregation, just show the date
-    return formatDate(entry.date);
-  };
-
   const muscleGroups = [
     MuscleGroup.ABDOMEN,
     MuscleGroup.LATISSIMUS,
@@ -943,43 +912,41 @@ export default function AnalyticsPage() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-background">
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              <h2 className="text-2xl font-bold text-foreground mb-4">
                 Trainingsanalyse
               </h2>
 
-              {/* Filter Section - ALWAYS ON TOP */}
-              <div className="bg-white rounded-lg shadow p-6 space-y-4">
+              {/* Filter Section - ALWAYS ON TOP (shadcn) */}
+              <Card>
+                <CardContent className="p-6 space-y-4">
                 {/* Row 1: Cycle Mode Toggle + Time/Gym Filter */}
                 <div className="flex flex-wrap gap-4 items-center">
                   {/* Cycle Mode Button */}
-                  <button
+                  <Button
+                    variant={cycleMode ? 'default' : 'outline'}
+                    size="sm"
                     onClick={() => {
                       setCycleMode(!cycleMode);
                       setSelectedViews(['volume']); // Reset to volume when switching modes
                     }}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                      cycleMode
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
                   >
                     Zyklus-Modus
-                  </button>
+                  </Button>
 
                   {/* Time Filter (only in Time Mode) */}
                   {!cycleMode && (
                     <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-gray-700">
+                      <label className="text-sm font-medium text-muted-foreground">
                         Zeitraum:
                       </label>
                       <select
                         value={timeFilter}
                         onChange={(e) => setTimeFilter(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                        className="px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                       >
                         <option value="7">7 Tage</option>
                         <option value="14">14 Tage</option>
@@ -995,13 +962,13 @@ export default function AnalyticsPage() {
                   {/* Gym Filter (hidden in Cycle Mode when ORM is selected) */}
                   {!(cycleMode && selectedViews.includes('orm')) && (
                     <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-gray-700">
+                      <label className="text-sm font-medium text-muted-foreground">
                         Gym:
                       </label>
                       <select
                         value={gymFilter}
                         onChange={(e) => setGymFilter(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
+                        className="px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                       >
                         <option value="alle">Alle</option>
                         {homeGyms.map((gym) => (
@@ -1018,65 +985,65 @@ export default function AnalyticsPage() {
                 {/* Row 2: Cycle Navigation (only in Cycle Mode) */}
                 {cycleMode && allCycles.length > 0 && (
                   <div className="flex items-center justify-between">
-                    <button
+                    <Button
+                      variant="outline"
+                      size="icon"
                       onClick={() => setSelectedCycleIndex(Math.min(allCycles.length - 1, selectedCycleIndex + 1))}
                       disabled={selectedCycleIndex === allCycles.length - 1}
-                      className="p-2 rounded-lg text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="size-9"
                     >
-                      <ChevronLeft className="h-5 w-5" />
-                    </button>
+                      <IconChevronLeft className="size-4" />
+                    </Button>
 
                     <div className="text-center">
-                      <div className="text-lg font-semibold text-gray-900">
+                      <div className="text-lg font-semibold text-foreground">
                         {selectedCycle?.name}
                       </div>
-                      <div className="text-sm text-gray-600">
+                      <div className="text-sm text-muted-foreground">
                         {formatDate(selectedCycle?.startDate || '')}
                         {selectedCycle?.completedAt && ` - ${formatDate(selectedCycle.completedAt)}`}
                         <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
-                          isActiveCycle ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+                          isActiveCycle 
+                            ? 'bg-foreground text-background' 
+                            : 'bg-muted text-muted-foreground'
                         }`}>
                           {isActiveCycle ? 'Aktiv' : 'Abgeschlossen'}
                         </span>
                       </div>
                     </div>
 
-                    <button
+                    <Button
+                      variant="outline"
+                      size="icon"
                       onClick={() => setSelectedCycleIndex(Math.max(0, selectedCycleIndex - 1))}
                       disabled={selectedCycleIndex === 0}
-                      className="p-2 rounded-lg text-gray-700 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="size-9"
                     >
-                      <ChevronRight className="h-5 w-5" />
-                    </button>
+                      <IconChevronRight className="size-4" />
+                    </Button>
                   </div>
                 )}
 
                 {/* Row 3: Aggregation Mode Toggle */}
                 <div>
-                  <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  <label className="text-sm font-medium text-muted-foreground mb-2 block">
                     Aggregation:
                   </label>
                   <div className="flex gap-2">
-                    <button
+                    <Button
+                      variant={aggregationMode === 'day' ? 'default' : 'outline'}
+                      size="sm"
                       onClick={() => setAggregationMode('day')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        aggregationMode === 'day'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                      }`}
                     >
                       Tage
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant={aggregationMode === 'week' ? 'default' : 'outline'}
+                      size="sm"
                       onClick={() => setAggregationMode('week')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        aggregationMode === 'week'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                      }`}
                     >
                       Wochen
-                    </button>
+                    </Button>
                   </div>
                 </div>
 
@@ -1084,141 +1051,113 @@ export default function AnalyticsPage() {
                 <div className="space-y-4">
                   {/* View Mode Buttons */}
                   <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">
+                    <label className="text-sm font-medium text-muted-foreground mb-2 block">
                       Ansicht (max. 2):
                     </label>
                     <div className="flex flex-wrap gap-2">
-                      <button
+                      <Button
+                        variant={selectedViews.includes('volume') ? 'default' : 'outline'}
+                        size="sm"
                         onClick={() => toggleView('volume')}
                         disabled={
                           !selectedViews.includes('volume') && 
                           selectedViews.length >= calculateMaxAllowed('view')
                         }
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          selectedViews.includes('volume')
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
-                        }`}
                       >
                         Volumen
-                      </button>
+                      </Button>
                       {cycleMode && (
-                        <button
+                        <Button
+                          variant={selectedViews.includes('orm') ? 'default' : 'outline'}
+                          size="sm"
                           onClick={() => toggleView('orm')}
                           disabled={
                             !selectedViews.includes('orm') && 
                             selectedViews.length >= calculateMaxAllowed('view')
                           }
-                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                            selectedViews.includes('orm')
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
-                          }`}
                         >
                           %ORM
-                        </button>
+                        </Button>
                       )}
-                      <button
+                      <Button
+                        variant={selectedViews.includes('rir') ? 'default' : 'outline'}
+                        size="sm"
                         onClick={() => toggleView('rir')}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          selectedViews.includes('rir')
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                        }`}
                       >
                         RIR
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant={selectedViews.includes('duration') ? 'default' : 'outline'}
+                        size="sm"
                         onClick={() => toggleView('duration')}
                         disabled={
                           (!selectedViews.includes('duration') && selectedViews.length >= calculateMaxAllowed('view')) ||
                           !selectedMuscles.includes('ALL') || 
                           !selectedEquipment.includes('ALL')
                         }
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          selectedViews.includes('duration')
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
-                        }`}
                       >
                         Dauer
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant={selectedViews.includes('restTime') ? 'default' : 'outline'}
+                        size="sm"
                         onClick={() => toggleView('restTime')}
                         disabled={
                           !selectedViews.includes('restTime') && 
                           selectedViews.length >= calculateMaxAllowed('view')
                         }
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          selectedViews.includes('restTime')
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
-                        }`}
                       >
                         Satzpause
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant={selectedViews.includes('reps') ? 'default' : 'outline'}
+                        size="sm"
                         onClick={() => toggleView('reps')}
                         disabled={
                           !selectedViews.includes('reps') && 
                           selectedViews.length >= calculateMaxAllowed('view')
                         }
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          selectedViews.includes('reps')
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
-                        }`}
                       >
                         Wiederholungen
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant={selectedViews.includes('sets') ? 'default' : 'outline'}
+                        size="sm"
                         onClick={() => toggleView('sets')}
                         disabled={
                           !selectedViews.includes('sets') && 
                           selectedViews.length >= calculateMaxAllowed('view')
                         }
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          selectedViews.includes('sets')
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed'
-                        }`}
                       >
                         Sätze
-                      </button>
+                      </Button>
                     </div>
                   </div>
 
                   {/* Muscle Group Buttons */}
                   <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">
+                    <label className="text-sm font-medium text-muted-foreground mb-2 block">
                       Muskelgruppe:
                     </label>
                     <div className="flex flex-wrap gap-2">
-                      <button
+                      <Button
+                        variant={selectedMuscles.includes('ALL') ? 'default' : 'outline'}
+                        size="sm"
                         onClick={() => toggleMuscle('ALL')}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          selectedMuscles.includes('ALL')
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                        }`}
                       >
                         Alle
-                      </button>
+                      </Button>
                       {muscleGroups.map((mg) => {
                         const isSelected = selectedMuscles.includes(mg);
-                        
                         return (
-                          <button
+                          <Button
                             key={mg}
+                            variant={isSelected ? 'default' : 'outline'}
+                            size="sm"
                             onClick={() => toggleMuscle(mg)}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                              isSelected
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                            }`}
                           >
                             {translateMuscleGroup(mg)}
-                          </button>
+                          </Button>
                         );
                       })}
                     </div>
@@ -1226,44 +1165,37 @@ export default function AnalyticsPage() {
 
                   {/* Equipment Buttons */}
                   <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">
+                    <label className="text-sm font-medium text-muted-foreground mb-2 block">
                       Equipment:
                     </label>
                     <div className="flex flex-wrap gap-2">
-                      <button
+                      <Button
+                        variant={selectedEquipment.includes('ALL') ? 'default' : 'outline'}
+                        size="sm"
                         onClick={() => toggleEquipment('ALL')}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                          selectedEquipment.includes('ALL')
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                        }`}
                       >
                         Alle
-                      </button>
+                      </Button>
                       {equipments.map((eq) => {
                         const isSelected = selectedEquipment.includes(eq);
-                        
                         return (
-                          <button
+                          <Button
                             key={eq}
+                            variant={isSelected ? 'default' : 'outline'}
+                            size="sm"
                             onClick={() => toggleEquipment(eq)}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                              isSelected
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
-                            }`}
                           >
                             {translateEquipment(eq)}
-                          </button>
+                          </Button>
                         );
                       })}
                     </div>
                   </div>
 
-                  {/* Exercise Filter - Alternative to Muscle/Equipment */}
-                  <div className="border-t border-gray-200 pt-4">
+                  {/* Exercise Filter - Alternative to Muscle/Equipment (shadcn + large + icon) */}
+                  <div className="border-t border-border pt-4">
                     <div className="text-center mb-3">
-                      <span className="text-sm text-gray-500 italic">ODER</span>
+                      <span className="text-sm text-muted-foreground italic">ODER</span>
                     </div>
                     
                     {selectedExercise ? (
@@ -1273,219 +1205,99 @@ export default function AnalyticsPage() {
                         onReplace={() => setShowExerciseModal(true)}
                       />
                     ) : (
-                      <button
-                        onClick={() => setShowExerciseModal(true)}
-                        className="w-full px-4 py-3 rounded-lg text-sm font-medium text-blue-600 bg-blue-50 border-2 border-dashed border-blue-300 hover:bg-blue-100 transition-colors"
-                      >
-                        + Übung hinzufügen
-                      </button>
+                      <div className="flex justify-center py-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => setShowExerciseModal(true)}
+                          className="h-14 w-14 rounded-lg p-0"
+                          aria-label="Übung zum Filtern hinzufügen"
+                        >
+                          <IconPlus className="size-7" />
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
 
             {loading ? (
               <div className="flex items-center justify-center py-12">
-                <div className="text-lg text-gray-600">Lädt Analytics...</div>
+                <div className="text-lg text-muted-foreground">Lädt Analytics...</div>
               </div>
             ) : (
               <div className="space-y-6">
-                {/* Multi-Line Chart (when multiple views are selected) */}
+                {/* Multi-Line Chart (when multiple views are selected) - now using central AnalyticsChart */}
                 {selectedViews.length > 1 && mergedChartData.length > 0 && chartLineConfigs.length > 0 && (
-                  <div className="bg-white rounded-lg shadow p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Vergleichsansicht
-                    </h3>
-                    <ScrollableChart dataPointCount={mergedChartData.length}>
-                      <ResponsiveContainer width="100%" height={400}>
-                        <LineChart data={mergedChartData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis
-                          dataKey="date"
-                          tickFormatter={(date, index) => {
-                            const entry = mergedChartData[index];
-                            return formatXAxisLabel(entry);
-                          }}
-                          style={{ fontSize: '12px' }}
-                        />
-                        
-                        {/* Left Y-Axis (for first view type) */}
-                        <YAxis
-                          yAxisId="left"
-                          style={{ fontSize: '12px' }}
-                          tickFormatter={(value) => {
-                            const leftConfig = chartLineConfigs.find(c => c.yAxisId === 'left');
-                            return `${formatNumber(value)} ${leftConfig?.unit || ''}`;
-                          }}
-                        />
-                        
-                        {/* Right Y-Axis (for second view type if exists) */}
-                        {chartLineConfigs.some(config => config.yAxisId === 'right') && (
-                          <YAxis
-                            yAxisId="right"
-                            orientation="right"
-                            style={{ fontSize: '12px' }}
-                            tickFormatter={(value) => {
-                              const rightConfig = chartLineConfigs.find(c => c.yAxisId === 'right');
-                              return `${formatNumber(value)} ${rightConfig?.unit || ''}`;
-                            }}
-                          />
-                        )}
-                        
-                        <Tooltip
-                          formatter={(value: any, name?: string | number) => {
-                            const config = chartLineConfigs.find(c => c.dataKey === name);
-                            return [`${formatNumber(value as number)} ${config?.unit || ''}`, String(name || '')];
-                          }}
-                          labelFormatter={(label, payload) => {
-                            if (payload && payload.length > 0) {
-                              return formatTooltipLabel(payload[0].payload);
-                            }
-                            return formatDate(label as string);
-                          }}
-                        />
-                        <Legend />
-                        
-                        {/* Dynamically render lines for each filter combination */}
-                        {chartLineConfigs.map((config) => (
-                          <Line
-                            key={config.dataKey}
-                            type="monotone"
-                            dataKey={config.dataKey}
-                            name={config.name}
-                            stroke={config.color}
-                            yAxisId={config.yAxisId}
-                            strokeWidth={2}
-                            dot={{ r: 3 }}
-                            activeDot={{ r: 5 }}
-                            connectNulls={true}
-                          />
-                        ))}
-                      </LineChart>
-                    </ResponsiveContainer>
-                    </ScrollableChart>
-                  </div>
+                  <AnalyticsChart
+                    data={mergedChartData}
+                    title="Vergleichsansicht"
+                    height={400}
+                    isComparison={true}
+                    lineConfigs={chartLineConfigs}
+                  />
                 )}
                 
-                {/* Volume Chart */}
+                {/* Volume Chart - using central AnalyticsChart */}
                 {selectedViews.length === 1 && selectedViews.includes('volume') && volumeData && volumeData.dataPoints.length > 0 && (
-                  <div className="bg-white rounded-lg shadow p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Volumen-Entwicklung
-                    </h3>
-                    <ScrollableChart dataPointCount={volumeData.dataPoints.length}>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={volumeData.dataPoints}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis
-                          dataKey={cycleMode ? "date" : "date"}
-                          tickFormatter={(date, index) => formatXAxisLabel(volumeData.dataPoints[index])}
-                          style={{ fontSize: '12px' }}
-                        />
-                        <YAxis
-                          tickFormatter={(value) => `${formatNumber(value)}kg`}
-                          style={{ fontSize: '12px' }}
-                        />
-                        <Tooltip
-                          formatter={(value: any) => [
-                            `${formatNumber(value as number)} kg`,
-                            'Volumen',
-                          ]}
-                          labelFormatter={(label, payload) => {
-                            if (payload && payload.length > 0) {
-                              return formatTooltipLabel(payload[0].payload);
-                            }
-                            return formatDate(label as string);
-                          }}
-                        />
-                        <Legend />
-                        <Line
-                          type="monotone"
-                          dataKey="volume"
-                          stroke="#3b82f6"
-                          strokeWidth={2}
-                          dot={{ r: 4 }}
-                          name="Volumen"
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                    </ScrollableChart>
-                    <div className="mt-4 text-center">
-                      <div className="text-sm text-gray-600">
-                        Gesamtes Volumen
+                  <AnalyticsChart
+                    data={volumeData.dataPoints}
+                    title="Volumen-Entwicklung"
+                    height={300}
+                    chartType="line"
+                    dataKey="volume"
+                    name="Volumen"
+                    stroke={CHART_ACCENT}
+                    yAxisTickFormatter={(value) => `${formatNumber(value)}kg`}
+                    footer={
+                      <div className="mt-4 text-center">
+                        <div className="text-sm text-muted-foreground">
+                          Gesamtes Volumen
+                        </div>
+                        <div className="text-2xl font-bold text-foreground">
+                          {formatNumber(volumeData.totalVolume)} kg
+                        </div>
                       </div>
-                      <div className="text-2xl font-bold text-gray-900">
-                        {formatNumber(volumeData.totalVolume)} kg
-                      </div>
-                    </div>
-                  </div>
+                    }
+                  />
                 )}
 
                 {/* ORM Chart (only in Cycle Mode) */}
                 {selectedViews.length === 1 && cycleMode && selectedViews.includes('orm') && (
-                  <div className="bg-white rounded-lg shadow p-6">
+                  <div className="bg-card border rounded-lg p-6">
                     {gymFilter === 'andere' ? (
                       <div className="text-center py-12">
-                        <p className="text-gray-600">
+                        <p className="text-muted-foreground">
                           %ORM Tracking ist nur für Home Gym Workouts verfügbar.
                         </p>
-                        <p className="text-sm text-gray-500 mt-2">
-                          Bitte wähle ein Home Gym oder "Alle" aus.
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Bitte wähle ein Home Gym oder &apos;Alle&apos; aus.
                         </p>
                       </div>
                     ) : ormData && ormData.dataPoints.length > 0 ? (
-                      <>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                          %ORM-Entwicklung
-                        </h3>
-                        <ScrollableChart dataPointCount={ormData.dataPoints.length}>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <LineChart data={ormData.dataPoints}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              dataKey="date"
-                              tickFormatter={(date, index) => formatXAxisLabel(ormData.dataPoints[index])}
-                              style={{ fontSize: '12px' }}
-                            />
-                            <YAxis
-                              tickFormatter={(value) => `${value}%`}
-                              style={{ fontSize: '12px' }}
-                            />
-                            <Tooltip
-                              formatter={(value: any) => [`${value}%`, '%ORM']}
-                              labelFormatter={(label, payload) => {
-                                if (payload && payload.length > 0) {
-                                  return formatTooltipLabel(payload[0].payload);
-                                }
-                                return formatDate(label as string);
-                              }}
-                            />
-                            <Legend />
-                            <Line
-                              type="monotone"
-                              dataKey="percentORM"
-                              stroke="#10b981"
-                              strokeWidth={2}
-                              dot={{ r: 4 }}
-                              name="%ORM"
-                              connectNulls={true}
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
-                        </ScrollableChart>
-                        <div className="mt-4 text-center">
-                          <div className="text-sm text-gray-600">
-                            Durchschnitt %ORM
+                      <AnalyticsChart
+                        data={ormData.dataPoints}
+                        title="%ORM-Entwicklung"
+                        height={300}
+                        chartType="line"
+                        dataKey="percentORM"
+                        name="%ORM"
+                        stroke={CHART_ACCENT}
+                        yAxisTickFormatter={(value) => `${value}%`}
+                        footer={
+                          <div className="mt-4 text-center">
+                            <div className="text-sm text-muted-foreground">
+                              Durchschnitt %ORM
+                            </div>
+                            <div className="text-2xl font-bold text-foreground">
+                              {ormData.averagePercentORM}%
+                            </div>
                           </div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {ormData.averagePercentORM}%
-                          </div>
-                        </div>
-                      </>
+                        }
+                      />
                     ) : (
                       <div className="text-center py-12">
-                        <p className="text-gray-600">
+                        <p className="text-muted-foreground">
                           Keine ORM Daten verfügbar für die ausgewählten Filter.
                         </p>
                       </div>
@@ -1495,47 +1307,34 @@ export default function AnalyticsPage() {
 
                 {/* RIR Chart (Cycle Mode) */}
                 {selectedViews.length === 1 && cycleMode && selectedViews.includes('rir') && (
-                  <div className="bg-white rounded-lg shadow p-6">
+                  <div className="bg-card border rounded-lg p-6">
                     {rirData && rirData.dataPoints.length > 0 ? (
-                      <>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                          RIR-Verteilung
-                        </h3>
-                        <ScrollableChart dataPointCount={rirData.dataPoints.length}>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={rirData.dataPoints}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              dataKey="date"
-                              tickFormatter={formatDate}
-                              style={{ fontSize: '12px' }}
-                            />
-                            <YAxis
-                              label={{ value: 'Anzahl Sätze', angle: -90, position: 'insideLeft' }}
-                              style={{ fontSize: '12px' }}
-                            />
-                            <Tooltip
-                              labelFormatter={(label: any) => formatDate(label as string)}
-                            />
-                            <Legend />
-                            <Bar dataKey="rir0Count" fill="#ef4444" name="RIR 0" />
-                            <Bar dataKey="rir1Count" fill="#eab308" name="RIR 1" />
-                            <Bar dataKey="rir2Count" fill="#22c55e" name="RIR 2" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                        </ScrollableChart>
-                        <div className="mt-4 text-center">
-                          <div className="text-sm text-gray-600">
-                            Gesamte Sets
+                      <AnalyticsChart
+                        data={rirData.dataPoints}
+                        title="RIR-Verteilung"
+                        height={300}
+                        chartType="bar"
+                        children={
+                          <>
+                            <Bar dataKey="rir0Count" fill={getRIRBarFill(0)} name="RIR 0" />
+                            <Bar dataKey="rir1Count" fill={getRIRBarFill(1)} name="RIR 1" />
+                            <Bar dataKey="rir2Count" fill={getRIRBarFill(2)} name="RIR 2" />
+                          </>
+                        }
+                        footer={
+                          <div className="mt-4 text-center">
+                            <div className="text-sm text-muted-foreground">
+                              Gesamte Sets
+                            </div>
+                            <div className="text-2xl font-bold text-foreground">
+                              {rirData.totalSets}
+                            </div>
                           </div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {rirData.totalSets}
-                          </div>
-                        </div>
-                      </>
+                        }
+                      />
                     ) : (
                       <div className="text-center py-12">
-                        <p className="text-gray-600">
+                        <p className="text-muted-foreground">
                           Keine RIR Daten verfügbar für die ausgewählten Filter.
                         </p>
                       </div>
@@ -1545,52 +1344,34 @@ export default function AnalyticsPage() {
 
                 {/* RIR Chart (Time Mode) */}
                 {selectedViews.length === 1 && !cycleMode && selectedViews.includes('rir') && (
-                  <div className="bg-white rounded-lg shadow p-6">
+                  <div className="bg-card border rounded-lg p-6">
                     {rirData && rirData.dataPoints.length > 0 ? (
-                      <>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                          RIR-Verteilung
-                        </h3>
-                        <ScrollableChart dataPointCount={rirData.dataPoints.length}>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={rirData.dataPoints}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              dataKey="date"
-                              tickFormatter={(date, index) => formatXAxisLabel(rirData.dataPoints[index])}
-                              style={{ fontSize: '12px' }}
-                            />
-                            <YAxis
-                              label={{ value: 'Anzahl Sätze', angle: -90, position: 'insideLeft' }}
-                              style={{ fontSize: '12px' }}
-                            />
-                            <Tooltip
-                              labelFormatter={(label, payload) => {
-                                if (payload && payload.length > 0) {
-                                  return formatTooltipLabel(payload[0].payload);
-                                }
-                                return formatDate(label as string);
-                              }}
-                            />
-                            <Legend />
-                            <Bar dataKey="rir0Count" fill="#ef4444" name="RIR 0" />
-                            <Bar dataKey="rir1Count" fill="#eab308" name="RIR 1" />
-                            <Bar dataKey="rir2Count" fill="#22c55e" name="RIR 2" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                        </ScrollableChart>
-                        <div className="mt-4 text-center">
-                          <div className="text-sm text-gray-600">
-                            Gesamte Sets
+                      <AnalyticsChart
+                        data={rirData.dataPoints}
+                        title="RIR-Verteilung"
+                        height={300}
+                        chartType="bar"
+                        children={
+                          <>
+                            <Bar dataKey="rir0Count" fill={getRIRBarFill(0)} name="RIR 0" />
+                            <Bar dataKey="rir1Count" fill={getRIRBarFill(1)} name="RIR 1" />
+                            <Bar dataKey="rir2Count" fill={getRIRBarFill(2)} name="RIR 2" />
+                          </>
+                        }
+                        footer={
+                          <div className="mt-4 text-center">
+                            <div className="text-sm text-muted-foreground">
+                              Gesamte Sätze
+                            </div>
+                            <div className="text-2xl font-bold text-foreground">
+                              {rirData.totalSets}
+                            </div>
                           </div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {rirData.totalSets}
-                          </div>
-                        </div>
-                      </>
+                        }
+                      />
                     ) : (
                       <div className="text-center py-12">
-                        <p className="text-gray-600">
+                        <p className="text-muted-foreground">
                           Keine RIR Daten verfügbar für die ausgewählten Filter.
                         </p>
                       </div>
@@ -1600,65 +1381,44 @@ export default function AnalyticsPage() {
 
                 {/* Duration Chart (Time Mode) */}
                 {selectedViews.length === 1 && !cycleMode && selectedViews.includes('duration') && (
-                  <div className="bg-white rounded-lg shadow p-6">
+                  <div className="bg-card border rounded-lg p-6">
                     {!selectedMuscles.includes('ALL') || !selectedEquipment.includes('ALL') ? (
                       <div className="text-center py-12">
-                        <p className="text-gray-600">
+                        <p className="text-muted-foreground">
                           Workout-Dauer bezieht sich auf das gesamte Training.
                         </p>
-                        <p className="text-sm text-gray-500 mt-2">
-                          Bitte wähle "Alle" bei Muskelgruppe und Equipment aus.
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Bitte wähle &apos;Alle&apos; bei Muskelgruppe und Equipment aus.
                         </p>
                       </div>
                     ) : durationData && durationData.dataPoints.length > 0 ? (
-                      <>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                          Workout-Dauer
-                        </h3>
-                        <ScrollableChart dataPointCount={durationData.dataPoints.length}>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <LineChart data={durationData.dataPoints}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              dataKey="date"
-                              tickFormatter={formatDate}
-                              style={{ fontSize: '12px' }}
-                            />
-                            <YAxis
-                              label={{ value: 'Minuten', angle: -90, position: 'insideLeft' }}
-                              style={{ fontSize: '12px' }}
-                            />
-                            <Tooltip
-                              formatter={(value: any) => [`${value} min`, 'Dauer']}
-                              labelFormatter={(label: any) => formatDate(label as string)}
-                            />
-                            <Legend />
-                            <Line
-                              type="monotone"
-                              dataKey="duration"
-                              stroke="#8b5cf6"
-                              strokeWidth={2}
-                              dot={{ r: 4 }}
-                              name="Dauer"
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
-                        </ScrollableChart>
-                        <div className="mt-4 text-center">
-                          <div className="text-sm text-gray-600">
-                            Durchschnittliche Dauer
+                      <AnalyticsChart
+                        data={durationData.dataPoints}
+                        title="Workout-Dauer"
+                        height={300}
+                        chartType="line"
+                        dataKey="duration"
+                        name="Dauer"
+                        stroke={CHART_ACCENT}
+                        yAxisTickFormatter={(value) => `${value} min`}
+                        yAxisLabel="Minuten"
+                        footer={
+                          <div className="mt-4 text-center">
+                            <div className="text-sm text-muted-foreground">
+                              Durchschnittliche Dauer
+                            </div>
+                            <div className="text-2xl font-bold text-foreground">
+                              {Math.round(
+                                durationData.dataPoints.reduce((sum, point) => sum + point.duration, 0) /
+                                  durationData.dataPoints.length
+                              )} min
+                            </div>
                           </div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {Math.round(
-                              durationData.dataPoints.reduce((sum, point) => sum + point.duration, 0) /
-                                durationData.dataPoints.length
-                            )} min
-                          </div>
-                        </div>
-                      </>
+                        }
+                      />
                     ) : (
                       <div className="text-center py-12">
-                        <p className="text-gray-600">
+                        <p className="text-muted-foreground">
                           Keine Dauer-Daten verfügbar für die ausgewählten Filter.
                         </p>
                       </div>
@@ -1668,70 +1428,44 @@ export default function AnalyticsPage() {
 
                 {/* Duration Chart (Cycle Mode) */}
                 {selectedViews.length === 1 && cycleMode && selectedViews.includes('duration') && (
-                  <div className="bg-white rounded-lg shadow p-6">
+                  <div className="bg-card border rounded-lg p-6">
                     {!selectedMuscles.includes('ALL') || !selectedEquipment.includes('ALL') ? (
                       <div className="text-center py-12">
-                        <p className="text-gray-600">
+                        <p className="text-muted-foreground">
                           Workout-Dauer bezieht sich auf das gesamte Training.
                         </p>
-                        <p className="text-sm text-gray-500 mt-2">
-                          Bitte wähle "Alle" bei Muskelgruppe und Equipment aus.
+                        <p className="text-sm text-muted-foreground mt-2">
+                          Bitte wähle &apos;Alle&apos; bei Muskelgruppe und Equipment aus.
                         </p>
                       </div>
                     ) : durationData && durationData.dataPoints.length > 0 ? (
-                      <>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                          Workout-Dauer
-                        </h3>
-                        <ScrollableChart dataPointCount={durationData.dataPoints.length}>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <LineChart data={durationData.dataPoints}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              dataKey="date"
-                              tickFormatter={(date, index) => formatXAxisLabel(durationData.dataPoints[index])}
-                              style={{ fontSize: '12px' }}
-                            />
-                            <YAxis
-                              label={{ value: 'Minuten', angle: -90, position: 'insideLeft' }}
-                              style={{ fontSize: '12px' }}
-                            />
-                            <Tooltip
-                              formatter={(value: any) => [`${value} min`, 'Dauer']}
-                              labelFormatter={(label, payload) => {
-                                if (payload && payload.length > 0) {
-                                  return formatTooltipLabel(payload[0].payload);
-                                }
-                                return formatDate(label as string);
-                              }}
-                            />
-                            <Legend />
-                            <Line
-                              type="monotone"
-                              dataKey="duration"
-                              stroke="#8b5cf6"
-                              strokeWidth={2}
-                              dot={{ r: 4 }}
-                              name="Dauer"
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
-                        </ScrollableChart>
-                        <div className="mt-4 text-center">
-                          <div className="text-sm text-gray-600">
-                            Durchschnittliche Dauer
+                      <AnalyticsChart
+                        data={durationData.dataPoints}
+                        title="Workout-Dauer"
+                        height={300}
+                        chartType="line"
+                        dataKey="duration"
+                        name="Dauer"
+                        stroke={CHART_ACCENT}
+                        yAxisTickFormatter={(value) => `${value} min`}
+                        yAxisLabel="Minuten"
+                        footer={
+                          <div className="mt-4 text-center">
+                            <div className="text-sm text-muted-foreground">
+                              Durchschnittliche Dauer
+                            </div>
+                            <div className="text-2xl font-bold text-foreground">
+                              {Math.round(
+                                durationData.dataPoints.reduce((sum, point) => sum + point.duration, 0) /
+                                  durationData.dataPoints.length
+                              )} min
+                            </div>
                           </div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {Math.round(
-                              durationData.dataPoints.reduce((sum, point) => sum + point.duration, 0) /
-                                durationData.dataPoints.length
-                            )} min
-                          </div>
-                        </div>
-                      </>
+                        }
+                      />
                     ) : (
                       <div className="text-center py-12">
-                        <p className="text-gray-600">
+                        <p className="text-muted-foreground">
                           Keine Dauer-Daten verfügbar für die ausgewählten Filter.
                         </p>
                       </div>
@@ -1741,53 +1475,32 @@ export default function AnalyticsPage() {
 
                 {/* RestTime Chart (Time Mode) */}
                 {selectedViews.length === 1 && !cycleMode && selectedViews.includes('restTime') && (
-                  <div className="bg-white rounded-lg shadow p-6">
+                  <div className="bg-card border rounded-lg p-6">
                     {restTimeData && restTimeData.dataPoints.length > 0 ? (
-                      <>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                          Durchschnittliche Satzpause
-                        </h3>
-                        <ScrollableChart dataPointCount={restTimeData.dataPoints.length}>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <LineChart data={restTimeData.dataPoints}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              dataKey="date"
-                              tickFormatter={formatDate}
-                              style={{ fontSize: '12px' }}
-                            />
-                            <YAxis
-                              label={{ value: 'Sekunden', angle: -90, position: 'insideLeft' }}
-                              style={{ fontSize: '12px' }}
-                            />
-                            <Tooltip
-                              formatter={(value: any) => [`${value}s`, 'Satzpause']}
-                              labelFormatter={(label: any) => formatDate(label as string)}
-                            />
-                            <Legend />
-                            <Line
-                              type="monotone"
-                              dataKey="averageRestTime"
-                              stroke="#f59e0b"
-                              strokeWidth={2}
-                              dot={{ r: 4 }}
-                              name="Satzpause"
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
-                        </ScrollableChart>
-                        <div className="mt-4 text-center">
-                          <div className="text-sm text-gray-600">
-                            Durchschnittliche Pause
+                      <AnalyticsChart
+                        data={restTimeData.dataPoints}
+                        title="Durchschnittliche Satzpause"
+                        height={300}
+                        chartType="line"
+                        dataKey="averageRestTime"
+                        name="Satzpause"
+                        stroke={CHART_ACCENT}
+                        yAxisTickFormatter={(value) => `${value}s`}
+                        yAxisLabel="Sekunden"
+                        footer={
+                          <div className="mt-4 text-center">
+                            <div className="text-sm text-muted-foreground">
+                              Durchschnittliche Pause
+                            </div>
+                            <div className="text-2xl font-bold text-foreground">
+                              {restTimeData.overallAverage}s
+                            </div>
                           </div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {restTimeData.overallAverage}s
-                          </div>
-                        </div>
-                      </>
+                        }
+                      />
                     ) : (
                       <div className="text-center py-12">
-                        <p className="text-gray-600">
+                        <p className="text-muted-foreground">
                           Keine Satzpausen-Daten verfügbar für die ausgewählten Filter.
                         </p>
                       </div>
@@ -1797,58 +1510,32 @@ export default function AnalyticsPage() {
 
                 {/* RestTime Chart (Cycle Mode) */}
                 {selectedViews.length === 1 && cycleMode && selectedViews.includes('restTime') && (
-                  <div className="bg-white rounded-lg shadow p-6">
+                  <div className="bg-card border rounded-lg p-6">
                     {restTimeData && restTimeData.dataPoints.length > 0 ? (
-                      <>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                          Durchschnittliche Satzpause
-                        </h3>
-                        <ScrollableChart dataPointCount={restTimeData.dataPoints.length}>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <LineChart data={restTimeData.dataPoints}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis
-                                dataKey="date"
-                                tickFormatter={(date, index) => formatXAxisLabel(restTimeData.dataPoints[index])}
-                                style={{ fontSize: '12px' }}
-                              />
-                              <YAxis
-                                label={{ value: 'Sekunden', angle: -90, position: 'insideLeft' }}
-                                style={{ fontSize: '12px' }}
-                              />
-                              <Tooltip
-                                formatter={(value: any) => [`${value}s`, 'Satzpause']}
-                                labelFormatter={(label, payload) => {
-                                  if (payload && payload.length > 0) {
-                                    return formatTooltipLabel(payload[0].payload);
-                                  }
-                                  return formatDate(label as string);
-                                }}
-                              />
-                              <Legend />
-                              <Line
-                                type="monotone"
-                                dataKey="averageRestTime"
-                                stroke="#f59e0b"
-                                strokeWidth={2}
-                                dot={{ r: 4 }}
-                                name="Satzpause"
-                              />
-                            </LineChart>
-                          </ResponsiveContainer>
-                        </ScrollableChart>
-                        <div className="mt-4 text-center">
-                          <div className="text-sm text-gray-600">
-                            Durchschnittliche Pause
+                      <AnalyticsChart
+                        data={restTimeData.dataPoints}
+                        title="Durchschnittliche Satzpause"
+                        height={300}
+                        chartType="line"
+                        dataKey="averageRestTime"
+                        name="Satzpause"
+                        stroke={CHART_ACCENT}
+                        yAxisTickFormatter={(value) => `${value}s`}
+                        yAxisLabel="Sekunden"
+                        footer={
+                          <div className="mt-4 text-center">
+                            <div className="text-sm text-muted-foreground">
+                              Durchschnittliche Pause
+                            </div>
+                            <div className="text-2xl font-bold text-foreground">
+                              {restTimeData.overallAverage}s
+                            </div>
                           </div>
-                          <div className="text-2xl font-bold text-gray-900">
-                            {restTimeData.overallAverage}s
-                          </div>
-                        </div>
-                      </>
+                        }
+                      />
                     ) : (
                       <div className="text-center py-12">
-                        <p className="text-gray-600">
+                        <p className="text-muted-foreground">
                           Keine Satzpausen-Daten verfügbar für die ausgewählten Filter.
                         </p>
                       </div>
@@ -1858,61 +1545,42 @@ export default function AnalyticsPage() {
 
                 {/* Reps Chart (Time Mode) */}
                 {selectedViews.length === 1 && !cycleMode && selectedViews.includes('reps') && (
-                  <div className="bg-white rounded-lg shadow p-6">
+                  <div className="bg-card border rounded-lg p-6">
                     {repsData && repsData.dataPoints.length > 0 ? (
-                      <>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                          Wiederholungen pro Workout
-                        </h3>
-                        <ScrollableChart dataPointCount={repsData.dataPoints.length}>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <LineChart data={repsData.dataPoints}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis
-                                dataKey="date"
-                                tickFormatter={formatDate}
-                                style={{ fontSize: '12px' }}
-                              />
-                              <YAxis
-                                label={{ value: 'Wiederholungen', angle: -90, position: 'insideLeft' }}
-                                style={{ fontSize: '12px' }}
-                              />
-                              <Tooltip
-                                formatter={(value: any) => [value, 'Wiederholungen']}
-                                labelFormatter={(label: any) => formatDate(label as string)}
-                              />
-                              <Legend />
-                              <Line
-                                dataKey="reps"
-                                stroke="#10b981"
-                                strokeWidth={2}
-                                name="Wiederholungen"
-                              />
-                            </LineChart>
-                          </ResponsiveContainer>
-                        </ScrollableChart>
-                        <div className="mt-4 grid grid-cols-2 gap-4 text-center">
-                          <div>
-                            <div className="text-sm text-gray-600">
-                              Gesamt
+                      <AnalyticsChart
+                        data={repsData.dataPoints}
+                        title="Wiederholungen pro Workout"
+                        height={300}
+                        chartType="line"
+                        dataKey="reps"
+                        name="Wiederholungen"
+                        stroke={CHART_ACCENT}
+                        yAxisTickFormatter={(value) => `${value}`}
+                        yAxisLabel="Wiederholungen"
+                        footer={
+                          <div className="mt-4 grid grid-cols-2 gap-4 text-center">
+                            <div>
+                              <div className="text-sm text-muted-foreground">
+                                Gesamt
+                              </div>
+                              <div className="text-2xl font-bold text-foreground">
+                                {formatNumber(repsData.totalReps)}
+                              </div>
                             </div>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {formatNumber(repsData.totalReps)}
+                            <div>
+                              <div className="text-sm text-muted-foreground">
+                                Ø pro Workout
+                              </div>
+                              <div className="text-2xl font-bold text-foreground">
+                                {formatNumber(repsData.averageReps)}
+                              </div>
                             </div>
                           </div>
-                          <div>
-                            <div className="text-sm text-gray-600">
-                              Ø pro Workout
-                            </div>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {formatNumber(repsData.averageReps)}
-                            </div>
-                          </div>
-                        </div>
-                      </>
+                        }
+                      />
                     ) : (
                       <div className="text-center py-12">
-                        <p className="text-gray-600">
+                        <p className="text-muted-foreground">
                           Keine Wiederholungs-Daten verfügbar für die ausgewählten Filter.
                         </p>
                       </div>
@@ -1922,61 +1590,42 @@ export default function AnalyticsPage() {
 
                 {/* Sets Chart (Time Mode) */}
                 {selectedViews.length === 1 && !cycleMode && selectedViews.includes('sets') && (
-                  <div className="bg-white rounded-lg shadow p-6">
+                  <div className="bg-card border rounded-lg p-6">
                     {setsData && setsData.dataPoints.length > 0 ? (
-                      <>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                          Arbeitssätze pro Workout
-                        </h3>
-                        <ScrollableChart dataPointCount={setsData.dataPoints.length}>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <LineChart data={setsData.dataPoints}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis
-                                dataKey="date"
-                                tickFormatter={formatDate}
-                                style={{ fontSize: '12px' }}
-                              />
-                              <YAxis
-                                label={{ value: 'Sätze', angle: -90, position: 'insideLeft' }}
-                                style={{ fontSize: '12px' }}
-                              />
-                              <Tooltip
-                                formatter={(value: any) => [value, 'Sätze']}
-                                labelFormatter={(label: any) => formatDate(label as string)}
-                              />
-                              <Legend />
-                              <Line
-                                dataKey="sets"
-                                stroke="#f59e0b"
-                                strokeWidth={2}
-                                name="Sätze"
-                              />
-                            </LineChart>
-                          </ResponsiveContainer>
-                        </ScrollableChart>
-                        <div className="mt-4 grid grid-cols-2 gap-4 text-center">
-                          <div>
-                            <div className="text-sm text-gray-600">
-                              Gesamt
+                      <AnalyticsChart
+                        data={setsData.dataPoints}
+                        title="Arbeitssätze pro Workout"
+                        height={300}
+                        chartType="line"
+                        dataKey="sets"
+                        name="Sätze"
+                        stroke={CHART_ACCENT}
+                        yAxisTickFormatter={(value) => `${value}`}
+                        yAxisLabel="Sätze"
+                        footer={
+                          <div className="mt-4 grid grid-cols-2 gap-4 text-center">
+                            <div>
+                              <div className="text-sm text-muted-foreground">
+                                Gesamt
+                              </div>
+                              <div className="text-2xl font-bold text-foreground">
+                                {formatNumber(setsData.totalSets)}
+                              </div>
                             </div>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {formatNumber(setsData.totalSets)}
+                            <div>
+                              <div className="text-sm text-muted-foreground">
+                                Ø pro Workout
+                              </div>
+                              <div className="text-2xl font-bold text-foreground">
+                                {formatNumber(setsData.averageSets)}
+                              </div>
                             </div>
                           </div>
-                          <div>
-                            <div className="text-sm text-gray-600">
-                              Ø pro Workout
-                            </div>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {formatNumber(setsData.averageSets)}
-                            </div>
-                          </div>
-                        </div>
-                      </>
+                        }
+                      />
                     ) : (
                       <div className="text-center py-12">
-                        <p className="text-gray-600">
+                        <p className="text-muted-foreground">
                           Keine Satz-Daten verfügbar für die ausgewählten Filter.
                         </p>
                       </div>
@@ -1986,66 +1635,42 @@ export default function AnalyticsPage() {
 
                 {/* Reps Chart (Cycle Mode) */}
                 {selectedViews.length === 1 && cycleMode && selectedViews.includes('reps') && (
-                  <div className="bg-white rounded-lg shadow p-6">
+                  <div className="bg-card border rounded-lg p-6">
                     {repsData && repsData.dataPoints.length > 0 ? (
-                      <>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                          Wiederholungen pro Workout
-                        </h3>
-                        <ScrollableChart dataPointCount={repsData.dataPoints.length}>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <LineChart data={repsData.dataPoints}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis
-                                dataKey="date"
-                                tickFormatter={(date, index) => formatXAxisLabel(repsData.dataPoints[index])}
-                                style={{ fontSize: '12px' }}
-                              />
-                              <YAxis
-                                label={{ value: 'Wiederholungen', angle: -90, position: 'insideLeft' }}
-                                style={{ fontSize: '12px' }}
-                              />
-                              <Tooltip
-                                formatter={(value: any) => [value, 'Wiederholungen']}
-                                labelFormatter={(label, payload) => {
-                                  if (payload && payload.length > 0) {
-                                    return formatTooltipLabel(payload[0].payload);
-                                  }
-                                  return formatDate(label as string);
-                                }}
-                              />
-                              <Legend />
-                              <Line
-                                dataKey="reps"
-                                stroke="#10b981"
-                                strokeWidth={2}
-                                name="Wiederholungen"
-                              />
-                            </LineChart>
-                          </ResponsiveContainer>
-                        </ScrollableChart>
-                        <div className="mt-4 grid grid-cols-2 gap-4 text-center">
-                          <div>
-                            <div className="text-sm text-gray-600">
-                              Gesamt
+                      <AnalyticsChart
+                        data={repsData.dataPoints}
+                        title="Wiederholungen pro Workout"
+                        height={300}
+                        chartType="line"
+                        dataKey="reps"
+                        name="Wiederholungen"
+                        stroke={CHART_ACCENT}
+                        yAxisTickFormatter={(value) => `${value}`}
+                        yAxisLabel="Wiederholungen"
+                        footer={
+                          <div className="mt-4 grid grid-cols-2 gap-4 text-center">
+                            <div>
+                              <div className="text-sm text-muted-foreground">
+                                Gesamt
+                              </div>
+                              <div className="text-2xl font-bold text-foreground">
+                                {formatNumber(repsData.totalReps)}
+                              </div>
                             </div>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {formatNumber(repsData.totalReps)}
+                            <div>
+                              <div className="text-sm text-muted-foreground">
+                                Ø pro Workout
+                              </div>
+                              <div className="text-2xl font-bold text-foreground">
+                                {formatNumber(repsData.averageReps)}
+                              </div>
                             </div>
                           </div>
-                          <div>
-                            <div className="text-sm text-gray-600">
-                              Ø pro Workout
-                            </div>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {formatNumber(repsData.averageReps)}
-                            </div>
-                          </div>
-                        </div>
-                      </>
+                        }
+                      />
                     ) : (
                       <div className="text-center py-12">
-                        <p className="text-gray-600">
+                        <p className="text-muted-foreground">
                           Keine Wiederholungs-Daten verfügbar für die ausgewählten Filter.
                         </p>
                       </div>
@@ -2055,66 +1680,42 @@ export default function AnalyticsPage() {
 
                 {/* Sets Chart (Cycle Mode) */}
                 {selectedViews.length === 1 && cycleMode && selectedViews.includes('sets') && (
-                  <div className="bg-white rounded-lg shadow p-6">
+                  <div className="bg-card border rounded-lg p-6">
                     {setsData && setsData.dataPoints.length > 0 ? (
-                      <>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                          Arbeitssätze pro Workout
-                        </h3>
-                        <ScrollableChart dataPointCount={setsData.dataPoints.length}>
-                          <ResponsiveContainer width="100%" height={300}>
-                            <LineChart data={setsData.dataPoints}>
-                              <CartesianGrid strokeDasharray="3 3" />
-                              <XAxis
-                                dataKey="date"
-                                tickFormatter={(date, index) => formatXAxisLabel(setsData.dataPoints[index])}
-                                style={{ fontSize: '12px' }}
-                              />
-                              <YAxis
-                                label={{ value: 'Sätze', angle: -90, position: 'insideLeft' }}
-                                style={{ fontSize: '12px' }}
-                              />
-                              <Tooltip
-                                formatter={(value: any) => [value, 'Sätze']}
-                                labelFormatter={(label, payload) => {
-                                  if (payload && payload.length > 0) {
-                                    return formatTooltipLabel(payload[0].payload);
-                                  }
-                                  return formatDate(label as string);
-                                }}
-                              />
-                              <Legend />
-                              <Line
-                                dataKey="sets"
-                                stroke="#f59e0b"
-                                strokeWidth={2}
-                                name="Sätze"
-                              />
-                            </LineChart>
-                          </ResponsiveContainer>
-                        </ScrollableChart>
-                        <div className="mt-4 grid grid-cols-2 gap-4 text-center">
-                          <div>
-                            <div className="text-sm text-gray-600">
-                              Gesamt
+                      <AnalyticsChart
+                        data={setsData.dataPoints}
+                        title="Arbeitssätze pro Workout"
+                        height={300}
+                        chartType="line"
+                        dataKey="sets"
+                        name="Sätze"
+                        stroke={CHART_ACCENT}
+                        yAxisTickFormatter={(value) => `${value}`}
+                        yAxisLabel="Sätze"
+                        footer={
+                          <div className="mt-4 grid grid-cols-2 gap-4 text-center">
+                            <div>
+                              <div className="text-sm text-muted-foreground">
+                                Gesamt
+                              </div>
+                              <div className="text-2xl font-bold text-foreground">
+                                {formatNumber(setsData.totalSets)}
+                              </div>
                             </div>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {formatNumber(setsData.totalSets)}
+                            <div>
+                              <div className="text-sm text-muted-foreground">
+                                Ø pro Workout
+                              </div>
+                              <div className="text-2xl font-bold text-foreground">
+                                {formatNumber(setsData.averageSets)}
+                              </div>
                             </div>
                           </div>
-                          <div>
-                            <div className="text-sm text-gray-600">
-                              Ø pro Workout
-                            </div>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {formatNumber(setsData.averageSets)}
-                            </div>
-                          </div>
-                        </div>
-                      </>
+                        }
+                      />
                     ) : (
                       <div className="text-center py-12">
-                        <p className="text-gray-600">
+                        <p className="text-muted-foreground">
                           Keine Satz-Daten verfügbar für die ausgewählten Filter.
                         </p>
                       </div>
@@ -2122,84 +1723,54 @@ export default function AnalyticsPage() {
                   </div>
                 )}
 
-                {/* Muscle Distribution Chart */}
+                {/* Muscle Distribution - alternative to pie (horizontal bars, clean even with many groups) */}
                 {selectedViews.includes('volume') && selectedMuscles.includes('ALL') && volumeData && volumeData.byMuscleGroup && volumeData.byMuscleGroup.length > 0 && (
-                  <div className="bg-white rounded-lg shadow p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                      Muskelgruppen-Verteilung
-                    </h3>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <ResponsiveContainer width="100%" height={300}>
-                        <PieChart>
-                          <Pie
-                            data={volumeData.byMuscleGroup}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            label={(entry: any) =>
-                              `${translateMuscleGroup(entry.muscleGroup)} (${Math.round(entry.percentage)}%)`
-                            }
-                            outerRadius={80}
-                            fill="#8884d8"
-                            dataKey="volume"
-                          >
-                            {volumeData.byMuscleGroup.map((entry, index) => (
-                              <Cell
-                                key={`cell-${index}`}
-                                fill={COLORS[index % COLORS.length]}
-                              />
-                            ))}
-                          </Pie>
-                          <Tooltip
-                            formatter={(value: any) => [
-                              `${formatNumber(value as number)} kg`,
-                              'Volumen',
-                            ]}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                      <div className="space-y-2">
-                        {volumeData.byMuscleGroup.map((mg, idx) => (
-                          <div
-                            key={mg.muscleGroup}
-                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div
-                                className="w-4 h-4 rounded"
-                                style={{
-                                  backgroundColor: COLORS[idx % COLORS.length],
-                                }}
-                              />
-                              <span className="font-medium text-gray-900">
-                                {translateMuscleGroup(mg.muscleGroup)}
-                              </span>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-sm font-semibold text-gray-900">
-                                {formatNumber(mg.volume)} kg
+                  <Card>
+                    <CardContent className="p-6">
+                      <h3 className="text-lg font-semibold text-foreground mb-4">
+                        Muskelgruppen-Verteilung (Volumen)
+                      </h3>
+                      <div className="space-y-3">
+                        {[...volumeData.byMuscleGroup]
+                          .sort((a, b) => b.percentage - a.percentage)
+                          .map((mg) => {
+                            const pct = Math.round(mg.percentage);
+                            return (
+                              <div key={mg.muscleGroup} className="flex items-center gap-3">
+                                <div className="w-28 text-sm text-foreground truncate" title={translateMuscleGroup(mg.muscleGroup)}>
+                                  {translateMuscleGroup(mg.muscleGroup)}
+                                </div>
+                                <div className="flex-1 h-2.5 bg-muted rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-foreground rounded-full transition-all"
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                                <div className="w-12 text-right text-sm font-medium tabular-nums text-foreground">
+                                  {pct}%
+                                </div>
+                                <div className="w-20 text-right text-xs text-muted-foreground tabular-nums">
+                                  {formatNumber(mg.volume)} kg
+                                </div>
                               </div>
-                              <div className="text-xs text-gray-600">
-                                {Math.round(mg.percentage)}%
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                            );
+                          })}
                       </div>
-                    </div>
-                  </div>
+                      <p className="text-[10px] text-muted-foreground mt-3">Sortiert nach Anteil • Relative Balken zeigen die Verteilung des Volumens</p>
+                    </CardContent>
+                  </Card>
                 )}
 
                 {/* Personal Records (only for Home Gyms) */}
                 {gymFilter !== 'andere' && (
-                  <div className="bg-white rounded-lg shadow">
-                    <div className="px-6 py-4 border-b border-gray-200">
-                      <h3 className="text-lg font-semibold text-gray-900">
+                  <Card>
+                    <div className="px-6 py-4 border-b border-border">
+                      <h3 className="text-lg font-semibold text-foreground">
                         Persönliche Rekorde
                       </h3>
                     </div>
 
-                    <div className="p-6">
+                    <CardContent className="p-6">
                       {prs.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {prs.map((pr) => (
@@ -2210,57 +1781,59 @@ export default function AnalyticsPage() {
                           ))}
                         </div>
                       ) : (
-                        <p className="text-gray-500 text-center py-8">
+                        <p className="text-muted-foreground text-center py-8">
                           {!selectedMuscles.includes('ALL') || !selectedEquipment.includes('ALL')
                             ? 'Keine persönlichen Rekorde für die ausgewählten Filter gefunden'
                             : 'Noch keine persönlichen Rekorde vorhanden'}
                         </p>
                       )}
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
                 )}
 
                 {/* Empty State */}
                 {(!volumeData || volumeData.dataPoints.length === 0) && (
-                  <div className="bg-white rounded-lg shadow p-12 text-center">
-                    <p className="text-gray-500">
-                      Noch keine Trainingsdaten für den ausgewählten Zeitraum
-                      vorhanden.
-                    </p>
-                    <Link
-                      href="/workout"
-                      className="mt-4 inline-block text-blue-600 hover:text-blue-800"
-                    >
-                      Zum Workout →
-                    </Link>
-                  </div>
+                  <Card>
+                    <CardContent className="p-12 text-center">
+                      <p className="text-muted-foreground">
+                        Noch keine Trainingsdaten für den ausgewählten Zeitraum
+                        vorhanden.
+                      </p>
+                      <Link
+                        href="/workout"
+                        className="mt-4 inline-block text-primary hover:underline"
+                      >
+                        Zum Workout →
+                      </Link>
+                    </CardContent>
+                  </Card>
                 )}
               </div>
             )}
           </div>
+        </div>
         </main>
       </div>
 
-      {/* Exercise Selection Modal */}
-      {showExerciseModal && (
-        <ExerciseSelectionModal
-          onClose={() => setShowExerciseModal(false)}
-          onSelect={async (exerciseId: string, exercise?: Exercise) => {
-            if (exercise) {
-              setSelectedExercise(exercise);
-            } else {
-              // Fetch exercise details if not provided
-              try {
-                const fetchedExercise = await apiClient.getExercise(exerciseId);
-                setSelectedExercise(fetchedExercise);
-              } catch (error) {
-                console.error('Failed to fetch exercise:', error);
-              }
+      {/* Exercise Selection Modal (shadcn Dialog, controlled) */}
+      <ExerciseSelectionModal
+        open={showExerciseModal}
+        onOpenChange={setShowExerciseModal}
+        onSelect={async (exerciseId: string, exercise?: Exercise) => {
+          if (exercise) {
+            setSelectedExercise(exercise);
+          } else {
+            // Fetch exercise details if not provided
+            try {
+              const fetchedExercise = await apiClient.getExercise(exerciseId);
+              setSelectedExercise(fetchedExercise);
+            } catch (error) {
+              console.error('Failed to fetch exercise:', error);
             }
-            setShowExerciseModal(false);
-          }}
-        />
-      )}
+          }
+          setShowExerciseModal(false);
+        }}
+      />
     </ProtectedRoute>
   );
 }

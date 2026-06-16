@@ -21,8 +21,21 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { BlueprintExerciseCard } from '../../../../../components/cycles/blueprint-exercise-editor-card';
+import ExerciseCard from '@/components/workout/exercise-card';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { IconPlus } from '@tabler/icons-react';
+import type { ExerciseLog } from '@/types';
 
 export default function EditBlueprintPage() {
   const params = useParams();
@@ -35,7 +48,6 @@ export default function EditBlueprintPage() {
   const [workoutDayName, setWorkoutDayName] = useState<string>('');
   const [plannedWeekday, setPlannedWeekday] = useState<number>(1);
   const [plannedHomeGymId, setPlannedHomeGymId] = useState<string>('');
-  const [blueprintId, setBlueprintId] = useState<string | null>(null);
   const [exercises, setExercises] = useState<BlueprintExercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -45,9 +57,14 @@ export default function EditBlueprintPage() {
   const [templateName, setTemplateName] = useState('');
   const [savingTemplate, setSavingTemplate] = useState(false);
 
-  // DnD Kit sensors
+  // DnD Kit sensors (long-press on title, same as template editor and active workout)
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        delay: 300,
+        tolerance: 8,
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
@@ -55,6 +72,7 @@ export default function EditBlueprintPage() {
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycleId, workoutDayId]);
 
   const loadData = async () => {
@@ -75,7 +93,6 @@ export default function EditBlueprintPage() {
       setPlannedHomeGymId(workoutDay.plannedHomeGymId || (user?.homeGyms && user.homeGyms.length > 0 ? user.homeGyms[0].id : ''));
 
       if (workoutDay.blueprint) {
-        setBlueprintId(workoutDay.blueprint.id);
         setExercises(workoutDay.blueprint.exercises);
       }
     } catch (error) {
@@ -168,15 +185,6 @@ export default function EditBlueprintPage() {
     }
   };
 
-  const handleUpdateExercise = (
-    exerciseId: string,
-    updates: Partial<BlueprintExercise>
-  ) => {
-    setExercises(
-      exercises.map((ex) => (ex.id === exerciseId ? { ...ex, ...updates } : ex))
-    );
-  };
-
   const handleSave = async () => {
     if (!workoutDayName.trim()) {
       alert('Bitte gib einen Workout-Namen ein');
@@ -256,9 +264,10 @@ export default function EditBlueprintPage() {
       alert('Vorlage erfolgreich erstellt!');
       setShowSaveTemplateModal(false);
       setTemplateName('');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to save template:', error);
-      if (error.response?.status === 409) {
+      const err = error as { response?: { status?: number } };
+      if (err.response?.status === 409) {
         alert('Eine Vorlage mit diesem Namen existiert bereits');
       } else {
         alert('Fehler beim Speichern der Vorlage');
@@ -278,11 +287,40 @@ export default function EditBlueprintPage() {
     setShowExerciseModal(true);
   };
 
+  const exerciseLogs: ExerciseLog[] = exercises.map((ex) => {
+    const sets = ex.sets.map((s) => ({
+      id: s.id,
+      setNumber: s.order,
+      setType: s.setType,
+      reps: s.reps,
+      weight: s.weight,
+      rir: s.rir,
+      completedAt: new Date().toISOString(),
+    }));
+    const plannedSets = ex.sets.map((s) => ({
+      id: s.id,
+      order: s.order,
+      setType: s.setType,
+      reps: s.reps,
+      weight: s.weight,
+      rir: s.rir,
+      restAfterSet: s.restAfterSet,
+    }));
+    return {
+      id: ex.id,
+      exerciseId: ex.exerciseId,
+      exerciseName: ex.exerciseName,
+      order: ex.order,
+      sets,
+      plannedSets,
+    } as ExerciseLog;
+  });
+
   if (loading) {
     return (
       <ProtectedRoute>
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-lg text-gray-600">Lädt Blueprint...</div>
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="text-lg text-muted-foreground">Lädt Blueprint...</div>
         </div>
       </ProtectedRoute>
     );
@@ -290,45 +328,46 @@ export default function EditBlueprintPage() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-background">
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
             {/* Header */}
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">
+              <h2 className="text-2xl font-bold text-foreground">
                 Blueprint bearbeiten
               </h2>
-              <p className="mt-1 text-sm text-gray-600">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {cycle?.name}
               </p>
             </div>
 
             {/* Workout Day Settings */}
-            <div className="bg-white rounded-lg shadow p-6 mb-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                Workout-Einstellungen
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="mb-6">
+              <CardContent className="p-6">
+                <h3 className="text-lg font-medium text-foreground mb-4">
+                  Workout-Einstellungen
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Label className="block text-sm font-medium text-foreground mb-2">
                     Workout-Name
-                  </label>
-                  <input
+                  </Label>
+                  <Input
                     type="text"
                     value={workoutDayName}
                     onChange={(e) => setWorkoutDayName(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full"
                     placeholder="z.B. Push Day, Pull Day, Legs"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Label className="block text-sm font-medium text-foreground mb-2">
                     Geplanter Wochentag
-                  </label>
+                  </Label>
                   <select
                     value={plannedWeekday}
                     onChange={(e) => setPlannedWeekday(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                   >
                     <option value={1}>Montag</option>
                     <option value={2}>Dienstag</option>
@@ -340,13 +379,13 @@ export default function EditBlueprintPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Label className="block text-sm font-medium text-foreground mb-2">
                     Geplantes Gym
-                  </label>
+                  </Label>
                   <select
                     value={plannedHomeGymId}
                     onChange={(e) => setPlannedHomeGymId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    className="w-full px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                   >
                     {user?.homeGyms && user.homeGyms.length > 0 ? (
                       [...user.homeGyms]
@@ -362,141 +401,211 @@ export default function EditBlueprintPage() {
                   </select>
                 </div>
               </div>
-            </div>
+              </CardContent>
+            </Card>
 
             {/* Exercise List Header */}
             <div className="mb-4">
-              <h3 className="text-lg font-medium text-gray-900">
+              <h3 className="text-lg font-medium text-foreground">
                 Übungen
               </h3>
             </div>
 
-            {/* Exercise List */}
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext
-                items={exercises.map((ex) => ex.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                <div className="space-y-4 mb-6">
-                  {exercises.map((exercise, index) => (
-                    <BlueprintExerciseCard
-                      key={exercise.id}
-                      exercise={exercise}
-                      index={index}
-                      onRemove={() => handleRemoveExercise(exercise.id)}
-                      onUpdate={(updates) => handleUpdateExercise(exercise.id, updates)}
-                      onReplace={() => openReplaceModal(exercise.id)}
-                    />
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
-
-            {/* Add Exercise Button */}
-            <button
-              onClick={openAddModal}
-              className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-blue-500 hover:text-blue-600 font-medium"
-            >
-              + Weitere Übung hinzufügen
-            </button>
-
-            {/* Save as Template Button */}
-            {exercises.length > 0 && (
-              <div className="mt-4">
-                <button
-                  onClick={() => setShowSaveTemplateModal(true)}
-                  disabled={saving}
-                  className="w-full py-3 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 font-medium disabled:opacity-50"
+            {/* Exercise List / Empty State (matching wizard step 3 + central card) */}
+            {exercises.length === 0 ? (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <p className="text-muted-foreground mb-4">
+                    Noch keine Übungen hinzugefügt
+                  </p>
+                  {/* Large centered + as primary CTA (consistent with active workout + wizard step 3) */}
+                  <Button
+                    variant="outline"
+                    onClick={openAddModal}
+                    className="h-16 w-16 rounded-lg p-0"
+                    aria-label="Erste Übung hinzufügen"
+                  >
+                    <IconPlus className="size-8" />
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
                 >
-                  📋 Als Vorlage speichern
-                </button>
-              </div>
+                  <SortableContext
+                    items={exercises.map((ex) => ex.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="space-y-4 mb-4">
+                      {exerciseLogs.map((log, index) => (
+                        <ExerciseCard
+                          key={log.id}
+                          exercise={log}
+                          exerciseNumber={index + 1}
+                          mode="edit"
+                          allowReorder={true}
+                          allowExerciseActions={true}
+                          allowSetManagement={true}
+                          allowLogging={false}
+                          onRemoveExercise={() => handleRemoveExercise(log.id)}
+                          onReplaceExercise={() => openReplaceModal(log.id)}
+                          onAddSet={() => {
+                            const updated = exercises.map((ex) => {
+                              if (ex.id !== log.id) return ex;
+                              const nextOrder = ex.sets.length + 1;
+                              const newSet = {
+                                id: `set-new-${Date.now()}`,
+                                order: nextOrder,
+                                setType: SetType.WORKING,
+                                reps: 10,
+                                weight: 20,
+                                rir: 2,
+                                restAfterSet: 90,
+                              };
+                              return { ...ex, sets: [...ex.sets, newSet] };
+                            });
+                            setExercises(updated);
+                          }}
+                          onRemoveSet={(exId, setNumber) => {
+                            const updated = exercises.map((ex) => {
+                              if (ex.id !== exId) return ex;
+                              const filtered = ex.sets.filter((s) => s.order !== setNumber);
+                              const reordered = filtered.map((s, i) => ({ ...s, order: i + 1 }));
+                              return { ...ex, sets: reordered };
+                            });
+                            setExercises(updated);
+                          }}
+                          onUpdateSet={(exId, setId, data) => {
+                            const updated = exercises.map((ex) => {
+                              if (ex.id !== exId) return ex;
+                              const updatedSets = ex.sets.map((s) => {
+                                if (s.id === setId) {
+                                  return { ...s, ...data };
+                                }
+                                return s;
+                              });
+                              return { ...ex, sets: updatedSets };
+                            });
+                            setExercises(updated);
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
+
+                {/* Small centered + icon to add more exercises (same as wizard step 3) */}
+                <div className="flex justify-center py-2">
+                  <Button
+                    variant="outline"
+                    onClick={openAddModal}
+                    className="h-14 w-14 rounded-lg p-0"
+                    aria-label="Übung hinzufügen"
+                  >
+                    <IconPlus className="size-7" />
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {/* Save as Template Button (exact look as in wizard step 3) */}
+            {exercises.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => setShowSaveTemplateModal(true)}
+                disabled={saving}
+                className="w-full mt-2"
+              >
+                Als Vorlage speichern
+              </Button>
             )}
 
             {/* Action Buttons */}
             <div className="mt-6 flex gap-3">
-              <button
+              <Button
+                variant="outline"
                 onClick={handleCancel}
                 disabled={saving}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+                className="flex-1"
               >
                 Abbrechen
-              </button>
-              <button
+              </Button>
+              <Button
                 onClick={handleSave}
                 disabled={saving || exercises.length === 0}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="flex-1"
               >
                 {saving ? 'Speichert...' : 'Speichern'}
-              </button>
+              </Button>
             </div>
           </div>
         </main>
       </div>
 
-      {/* Exercise Selection Modal */}
-      {showExerciseModal && (
-        <ExerciseSelectionModal
-          onSelect={
-            replacingExerciseId ? handleReplaceExercise : handleAddExercise
-          }
-          onClose={() => {
-            setShowExerciseModal(false);
+      {/* Exercise Selection Modal (shadcn Dialog, controlled) */}
+      <ExerciseSelectionModal
+        open={showExerciseModal}
+        onOpenChange={(isOpen) => {
+          setShowExerciseModal(isOpen);
+          if (!isOpen) {
             setReplacingExerciseId(null);
-          }}
-        />
-      )}
+          }
+        }}
+        onSelect={
+          replacingExerciseId ? handleReplaceExercise : handleAddExercise
+        }
+      />
 
-      {/* Save Template Modal */}
-      {showSaveTemplateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Blueprint als Vorlage speichern
-            </h3>
-            <p className="text-sm text-gray-600 mb-4">
+      {/* Save Template Modal (shadcn) */}
+      <Dialog open={showSaveTemplateModal} onOpenChange={(open) => {
+        setShowSaveTemplateModal(open);
+        if (!open) setTemplateName('');
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Blueprint als Vorlage speichern</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
               Gib einen Namen für deine Workout-Vorlage ein. Diese Vorlage kannst du
               später wiederverwenden oder direkt als Workout starten.
             </p>
-            <input
-              type="text"
+            <Input
               value={templateName}
               onChange={(e) => setTemplateName(e.target.value)}
               placeholder="z.B. Mein Push Workout"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
-              onKeyPress={(e) => {
+              onKeyDown={(e) => {
                 if (e.key === 'Enter' && !savingTemplate) {
                   handleSaveAsTemplate();
                 }
               }}
               autoFocus
             />
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setShowSaveTemplateModal(false);
-                  setTemplateName('');
-                }}
-                disabled={savingTemplate}
-                className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 font-medium transition-colors disabled:opacity-50"
-              >
-                Abbrechen
-              </button>
-              <button
-                onClick={handleSaveAsTemplate}
-                disabled={savingTemplate || !templateName.trim()}
-                className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium transition-colors disabled:opacity-50"
-              >
-                {savingTemplate ? 'Speichert...' : 'Speichern'}
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+          <DialogFooter className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowSaveTemplateModal(false);
+                setTemplateName('');
+              }}
+              disabled={savingTemplate}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              onClick={handleSaveAsTemplate}
+              disabled={savingTemplate || !templateName.trim()}
+            >
+              {savingTemplate ? 'Speichert...' : 'Speichern'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ProtectedRoute>
   );
 }

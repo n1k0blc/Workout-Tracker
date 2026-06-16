@@ -1,6 +1,8 @@
 'use client';
 
 import React from 'react';
+import { Badge } from '@/components/ui/badge';
+import { IconTrendingUp, IconTrendingDown } from '@tabler/icons-react';
 
 interface TrendIndicatorProps {
   change: number;
@@ -14,26 +16,22 @@ export default function TrendIndicator({ change, className = '' }: TrendIndicato
 
   if (isNeutral) {
     return (
-      <div className={`flex items-center gap-1 text-sm text-gray-500 ${className}`}>
-        <span>→</span>
-        <span>0%</span>
-      </div>
+      <Badge variant="outline" className={className}>
+        0%
+      </Badge>
     );
   }
 
+  const Icon = isPositive ? IconTrendingUp : IconTrendingDown;
+
   return (
-    <div
-      className={`flex items-center gap-1 text-sm font-medium ${className} ${
-        isPositive ? 'text-green-600' : 'text-red-600'
-      }`}
+    <Badge
+      variant={isPositive ? 'default' : 'destructive'}
+      className={className}
     >
-      <span className="text-lg leading-none">
-        {isPositive ? '↗' : '↘'}
-      </span>
-      <span>
-        {isPositive ? '+' : '-'}
-        {formattedChange}%
-      </span>
-    </div>
+      <Icon className="mr-1 size-3.5" />
+      {isPositive ? '+' : '-'}
+      {formattedChange}%
+    </Badge>
   );
 }
