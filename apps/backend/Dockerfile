@@ -23,6 +23,9 @@ RUN npm run build
 # Production Stage
 FROM node:20-alpine
 
+# Needed for the healthcheck in docker-compose.prod.yml (wget http://localhost:3001/api/health)
+RUN apk add --no-cache wget
+
 WORKDIR /app
 
 # Copy package files

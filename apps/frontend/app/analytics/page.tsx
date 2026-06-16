@@ -72,7 +72,6 @@ export default function AnalyticsPage() {
   type ChartLineConfig = {
     dataKey: string;
     name: string;
-    color: string;
     yAxisId: string;
     unit: string;
   };
