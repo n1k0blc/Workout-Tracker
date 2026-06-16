@@ -2,9 +2,17 @@
 
 import { ProtectedRoute } from '@/components/protected-route';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/lib/api';
 import { WorkoutListItem } from '@/types';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Badge } from '@/components/ui/badge';
+import { GymTag } from '@/components/GymTag';
+import {
+  IconCalendar,
+  IconClock,
+  IconList,
+} from '@tabler/icons-react';
 
 type FilterType = '7days' | '30days' | '90days' | 'currentMonth' | 'currentYear' | 'custom';
 
@@ -14,10 +22,6 @@ export default function HistoryPage() {
   const [filterType, setFilterType] = useState<FilterType>('30days');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
-
-  useEffect(() => {
-    loadWorkouts();
-  }, [filterType, customStartDate, customEndDate]);
 
   const getDateRange = (): { startDate: string; endDate: string } => {
     const now = new Date();
@@ -62,7 +66,7 @@ export default function HistoryPage() {
     };
   };
 
-  const loadWorkouts = async () => {
+  const loadWorkouts = useCallback(async () => {
     if (filterType === 'custom' && (!customStartDate || !customEndDate)) {
       return;
     }
@@ -81,7 +85,12 @@ export default function HistoryPage() {
     } finally {
       setLoading(false);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterType, customStartDate, customEndDate]);
+
+  useEffect(() => {
+    loadWorkouts();
+  }, [loadWorkouts]);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -102,113 +111,78 @@ export default function HistoryPage() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-background">
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
             <div className="space-y-6">
               {/* Header */}
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">
+                <h2 className="text-2xl font-bold text-foreground">
                   Trainingsverlauf
                 </h2>
-                <p className="mt-1 text-sm text-gray-600">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Übersicht deiner abgeschlossenen Workouts
                 </p>
               </div>
 
               {/* Filters */}
-              <div className="bg-white rounded-lg shadow p-6 space-y-4">
+              <div className="bg-card rounded-lg border p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                  <div className="text-sm font-medium text-muted-foreground mb-3">
                     Zeitraum
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => setFilterType('7days')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        filterType === '7days'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      Letzte 7 Tage
-                    </button>
-                    <button
-                      onClick={() => setFilterType('30days')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        filterType === '30days'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      Letzte 30 Tage
-                    </button>
-                    <button
-                      onClick={() => setFilterType('90days')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        filterType === '90days'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      Letzte 90 Tage
-                    </button>
-                    <button
-                      onClick={() => setFilterType('currentMonth')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        filterType === 'currentMonth'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      Aktueller Monat
-                    </button>
-                    <button
-                      onClick={() => setFilterType('currentYear')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        filterType === 'currentYear'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      Aktuelles Jahr
-                    </button>
-                    <button
-                      onClick={() => setFilterType('custom')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        filterType === 'custom'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      Benutzerdefiniert
-                    </button>
                   </div>
+                  <ToggleGroup
+                    type="single"
+                    value={filterType}
+                    onValueChange={(value) => {
+                      if (value) setFilterType(value as FilterType);
+                    }}
+                    className="flex flex-wrap gap-2"
+                  >
+                    <ToggleGroupItem value="7days" aria-label="Letzte 7 Tage">
+                      Letzte 7 Tage
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="30days" aria-label="Letzte 30 Tage">
+                      Letzte 30 Tage
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="90days" aria-label="Letzte 90 Tage">
+                      Letzte 90 Tage
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="currentMonth" aria-label="Aktueller Monat">
+                      Aktueller Monat
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="currentYear" aria-label="Aktuelles Jahr">
+                      Aktuelles Jahr
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="custom" aria-label="Benutzerdefiniert">
+                      Benutzerdefiniert
+                    </ToggleGroupItem>
+                  </ToggleGroup>
                 </div>
 
                 {/* Custom Date Range */}
                 {filterType === 'custom' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <div className="text-sm font-medium text-muted-foreground mb-2">
                         Von
-                      </label>
+                      </div>
                       <input
                         type="date"
                         value={customStartDate}
                         onChange={(e) => setCustomStartDate(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <div className="text-sm font-medium text-muted-foreground mb-2">
                         Bis
-                      </label>
+                      </div>
                       <input
                         type="date"
                         value={customEndDate}
                         onChange={(e) => setCustomEndDate(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full"
                       />
                     </div>
                   </div>
@@ -218,95 +192,60 @@ export default function HistoryPage() {
               {/* Workouts List */}
               {loading ? (
                 <div className="flex items-center justify-center py-12">
-                  <div className="text-lg text-gray-600">Lädt Workouts...</div>
+                  <div className="text-lg text-muted-foreground">Lädt Workouts...</div>
                 </div>
               ) : workouts.length > 0 ? (
                 <div className="space-y-4">
-                  <div className="text-sm text-gray-600 mb-2">
+                  <div className="text-sm text-muted-foreground mb-2">
                     {workouts.length} Workout{workouts.length !== 1 ? 's' : ''} gefunden
                   </div>
                   {workouts.map((workout) => (
                     <div
                       key={workout.id}
-                      className="block bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-6"
+                      className="block bg-card border rounded-lg p-6 hover:shadow-sm transition-shadow"
                     >
                       <div className="flex items-start justify-between">
-                        <Link
-                          href={`/history/${workout.id}`}
-                          className="flex-1"
-                        >
-                          <div className="flex items-center gap-3 mb-2 flex-wrap">
-                            <h3 className="text-lg font-semibold text-gray-900">
+                        <Link href={`/history/${workout.id}/edit`} className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-3 flex-wrap">
+                            <h3 className="text-lg font-semibold text-foreground">
                               {workout.isFreeWorkout
                                 ? workout.templateName || 'Freies Workout'
                                 : workout.workoutDayName || 'Workout'}
                             </h3>
                             {workout.cycleName && (
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                                {workout.cycleName}
-                              </span>
+                              <Badge variant="secondary">{workout.cycleName}</Badge>
                             )}
-                            {workout.homeGym ? (
-                              <span className="text-xs bg-violet-100 text-violet-800 px-2 py-1 rounded">
-                                {workout.homeGym.name}
-                              </span>
-                            ) : (
-                              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                                Anderes Gym
-                              </span>
-                            )}
+                            <GymTag homeGym={workout.homeGym} />
                           </div>
-                          <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                            <div className="flex items-center gap-1">
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
+
+                          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-1.5">
+                              <IconCalendar className="size-4" />
                               <span>{formatDate(workout.date)}</span>
                             </div>
                             {workout.totalDuration && (
-                              <div className="flex items-center gap-1">
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
+                              <div className="flex items-center gap-1.5">
+                                <IconClock className="size-4" />
                                 <span>{formatDuration(workout.totalDuration)}</span>
                               </div>
                             )}
-                            <div className="flex items-center gap-1">
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
-                              </svg>
-                              <span>{workout.exerciseCount} Übung{workout.exerciseCount !== 1 ? 'en' : ''}</span>
+                            <div className="flex items-center gap-1.5">
+                              <IconList className="size-4" />
+                              <span>
+                                {workout.exerciseCount} Übung{workout.exerciseCount !== 1 ? 'en' : ''}
+                              </span>
                             </div>
                           </div>
                         </Link>
-                        <div className="flex items-center gap-2 ml-4">
-                          <Link
-                            href={`/history/${workout.id}/edit`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="Workout bearbeiten"
-                          >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </Link>
-                          <Link
-                            href={`/history/${workout.id}`}
-                            className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                            title="Details anzeigen"
-                          >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          </Link>
-                        </div>
+
+
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="bg-white rounded-lg shadow p-12 text-center">
-                  <p className="text-gray-600">
+                <div className="bg-card border rounded-lg p-12 text-center">
+                  <p className="text-muted-foreground">
                     Keine Workouts im ausgewählten Zeitraum gefunden
                   </p>
                 </div>

@@ -8,6 +8,8 @@ import BasicInfoStep from './basic-info-step';
 import WorkoutDaysStep from './workout-days-step';
 import BlueprintEditorStep from './blueprint-editor-step';
 import ReviewStep from './review-step';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 
 export interface BlueprintSetData {
   order: number;
@@ -116,42 +118,38 @@ export default function CycleWizard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm sticky top-0 z-10">
+    <div className="min-h-screen bg-background">
+      {/* Header (shadcn/sera consistent with other flows) */}
+      <div className="border-b bg-card sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="text-2xl font-bold text-foreground">
                 Neuer Trainingszyklus
               </h1>
-              <p className="text-sm text-gray-600 mt-1">{getStepTitle()}</p>
+              <p className="text-sm text-muted-foreground mt-1">{getStepTitle()}</p>
             </div>
-            <button
+            <Button
+              variant="ghost"
               onClick={() => router.push('/cycles')}
-              className="text-gray-600 hover:text-gray-900"
             >
               Abbrechen
-            </button>
+            </Button>
           </div>
 
-          {/* Progress Bar */}
+          {/* Progress Indicator (semantic, no hard blue/gray) */}
           <div className="mt-4">
             <div className="flex items-center justify-between mb-2">
               {Array.from({ length: totalSteps }, (_, i) => i + 1).map((step) => (
                 <div
                   key={step}
-                  className={`flex-1 ${step !== totalSteps ? 'mr-2' : ''}`}
-                >
-                  <div
-                    className={`h-2 rounded-full ${
-                      step <= currentStep ? 'bg-blue-600' : 'bg-gray-200'
-                    }`}
-                  />
-                </div>
+                  className={`flex-1 h-1.5 rounded-full mx-0.5 transition-colors ${
+                    step <= currentStep ? 'bg-primary' : 'bg-muted'
+                  }`}
+                />
               ))}
             </div>
-            <div className="flex items-center justify-between text-xs text-gray-600">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>Schritt {currentStep} von {totalSteps}</span>
             </div>
           </div>
@@ -161,47 +159,53 @@ export default function CycleWizard() {
       {/* Content */}
       <div className="max-w-4xl mx-auto px-4 py-6">
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-sm text-red-800">{error}</p>
-          </div>
+          <Card className="mb-6 border-destructive bg-destructive/5">
+            <CardContent className="p-4">
+              <p className="text-sm text-destructive">{error}</p>
+            </CardContent>
+          </Card>
         )}
 
-        {currentStep === 1 && (
-          <BasicInfoStep
-            formData={formData}
-            updateFormData={updateFormData}
-            onNext={handleNext}
-          />
-        )}
+        <Card>
+          <CardContent className="p-6">
+            {currentStep === 1 && (
+              <BasicInfoStep
+                formData={formData}
+                updateFormData={updateFormData}
+                onNext={handleNext}
+              />
+            )}
 
-        {currentStep === 2 && (
-          <WorkoutDaysStep
-            formData={formData}
-            updateFormData={updateFormData}
-            onNext={handleNext}
-            onBack={handleBack}
-          />
-        )}
+            {currentStep === 2 && (
+              <WorkoutDaysStep
+                formData={formData}
+                updateFormData={updateFormData}
+                onNext={handleNext}
+                onBack={handleBack}
+              />
+            )}
 
-        {currentStep === 3 && (
-          <BlueprintEditorStep
-            formData={formData}
-            updateFormData={updateFormData}
-            currentDayIndex={currentDayIndex}
-            setCurrentDayIndex={setCurrentDayIndex}
-            onNext={handleNext}
-            onBack={handleBack}
-          />
-        )}
+            {currentStep === 3 && (
+              <BlueprintEditorStep
+                formData={formData}
+                updateFormData={updateFormData}
+                currentDayIndex={currentDayIndex}
+                setCurrentDayIndex={setCurrentDayIndex}
+                onNext={handleNext}
+                onBack={handleBack}
+              />
+            )}
 
-        {currentStep === 4 && (
-          <ReviewStep
-            formData={formData}
-            onBack={handleBack}
-            onSubmit={handleSubmit}
-            loading={loading}
-          />
-        )}
+            {currentStep === 4 && (
+              <ReviewStep
+                formData={formData}
+                onBack={handleBack}
+                onSubmit={handleSubmit}
+                loading={loading}
+              />
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

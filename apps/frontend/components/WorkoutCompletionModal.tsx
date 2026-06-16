@@ -4,8 +4,19 @@ import { useState, useEffect } from 'react';
 import Confetti from 'react-confetti';
 import { useSwipe } from '@/hooks/useSwipe';
 import { Workout, PersonalRecord } from '@/types';
-import { WorkoutStats, calculateWorkoutStats } from '@/lib/workoutStats';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { calculateWorkoutStats } from '@/lib/workoutStats';
+import {
+  IconX,
+  IconChevronLeft,
+  IconChevronRight,
+} from '@tabler/icons-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import { VolumeSlide } from './slides/VolumeSlide';
 import { DurationSlide } from './slides/DurationSlide';
 import { ExercisesSlide } from './slides/ExercisesSlide';
@@ -14,40 +25,67 @@ import { PRsSlide } from './slides/PRsSlide';
 import { SummarySlide } from './slides/SummarySlide';
 
 interface WorkoutCompletionModalProps {
-  workout: Workout;
+  open: boolean;
+  onOpenChange?: (open: boolean) => void;
+  workout?: Workout;
   personalRecords?: PersonalRecord[];
-  onClose: () => void;
+  onClose?: () => void;
 }
 
 export function WorkoutCompletionModal({
+  open,
+  onOpenChange,
   workout,
   personalRecords = [],
   onClose,
 }: WorkoutCompletionModalProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [showConfetti, setShowConfetti] = useState(true);
+  const [showConfetti, setShowConfetti] = useState(false);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
 
-  const stats = calculateWorkoutStats(workout, personalRecords);
+  const stats = workout
+    ? calculateWorkoutStats(workout, personalRecords)
+    : {
+        totalVolume: 0,
+        duration: 0,
+        exerciseCount: 0,
+        setCount: 0,
+        personalRecords: [] as PersonalRecord[],
+      };
   
   // Determine slides to show (skip PRs if none)
   const hasPRs = stats.personalRecords.length > 0;
   const totalSlides = hasPRs ? 6 : 5;
 
   useEffect(() => {
-    // Set window size for confetti
-    setWindowSize({
-      width: window.innerWidth,
-      height: window.innerHeight,
-    });
+    if (!open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setShowConfetti(false);
+      return;
+    }
+
+    // Trigger confetti only when the modal opens
+    setShowConfetti(true);
+
+    const updateSize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      });
+    };
+    updateSize();
+    window.addEventListener('resize', updateSize);
 
     // Stop confetti after 3 seconds
     const timer = setTimeout(() => {
       setShowConfetti(false);
     }, 3000);
 
-    return () => clearTimeout(timer);
-  }, []);
+    return () => {
+      window.removeEventListener('resize', updateSize);
+      clearTimeout(timer);
+    };
+  }, [open]);
 
   // Swipe handlers
   useSwipe({
@@ -76,6 +114,8 @@ export function WorkoutCompletionModal({
   };
 
   const renderSlide = () => {
+    if (!workout) return null;
+
     // Adjust slide index if PRs are skipped
     let slideIndex = currentSlide;
     if (!hasPRs && currentSlide >= 4) {
@@ -102,48 +142,63 @@ export function WorkoutCompletionModal({
 
   const isLastSlide = currentSlide === totalSlides - 1;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      {/* Confetti */}
-      {showConfetti && (
-        <Confetti
-          width={windowSize.width}
-          height={windowSize.height}
-          recycle={false}
-          numberOfPieces={300}
-        />
-      )}
+  const handleClose = () => {
+    if (onOpenChange) onOpenChange(false);
+    if (onClose) onClose();
+  };
 
-      {/* Modal Container */}
-      <div className="relative w-full max-w-2xl mx-4 bg-white rounded-xl shadow-2xl overflow-hidden">
-        {/* Skip Button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 z-10 p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+  return (
+    <Dialog open={open} onOpenChange={(o) => {
+      if (onOpenChange) onOpenChange(o);
+      if (!o && onClose) onClose();
+    }}>
+      <DialogContent 
+        className="max-w-2xl p-0 overflow-hidden rounded-xl" 
+        showCloseButton={false}
+      >
+        {/* Confetti inside the modal content for proper layering */}
+        {showConfetti && (
+          <Confetti
+            width={windowSize.width}
+            height={windowSize.height}
+            recycle={false}
+            numberOfPieces={300}
+            style={{ position: 'absolute', top: 0, left: 0, zIndex: 10, pointerEvents: 'none' }}
+          />
+        )}
+        <VisuallyHidden.Root>
+          <DialogTitle>Workout-Statistiken</DialogTitle>
+        </VisuallyHidden.Root>
+        {/* Close / Skip Button (top right, no default X) */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleClose}
+          className="absolute top-4 right-4 z-10 h-9 w-9 rounded-lg bg-muted/80 hover:bg-muted"
           aria-label="Überspringen"
         >
-          <X className="h-5 w-5 text-gray-600" />
-        </button>
+          <IconX className="h-4 w-4" />
+        </Button>
 
         {/* Slide Content */}
-        <div className="min-h-[500px] flex items-center justify-center p-8">
+        <div className="min-h-[500px] flex items-center justify-center p-8 bg-card">
           <div className="w-full">
-            {renderSlide()}
+            {workout ? renderSlide() : null}
           </div>
         </div>
 
         {/* Navigation */}
-        <div className="px-8 pb-8">
+        <div className="px-8 pb-8 bg-card border-t">
           {/* Progress Dots */}
-          <div className="flex justify-center gap-2 mb-6">
+          <div className="flex justify-center gap-2 mb-6 pt-6">
             {Array.from({ length: totalSlides }).map((_, index) => (
               <button
                 key={index}
                 onClick={() => setCurrentSlide(index)}
                 className={`h-2 rounded-full transition-all ${
                   index === currentSlide
-                    ? 'w-8 bg-blue-600'
-                    : 'w-2 bg-gray-300 hover:bg-gray-400'
+                    ? 'w-8 bg-primary'
+                    : 'w-2 bg-muted hover:bg-muted-foreground/30'
                 }`}
                 aria-label={`Zu Slide ${index + 1} gehen`}
               />
@@ -153,52 +208,49 @@ export function WorkoutCompletionModal({
           {/* Desktop Navigation Arrows + Finish Button */}
           <div className="flex items-center justify-between">
             {/* Previous Button */}
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={goToPrevSlide}
               disabled={currentSlide === 0}
-              className={`hidden md:flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                currentSlide === 0
-                  ? 'opacity-0 cursor-default'
-                  : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-              }`}
+              className={`hidden md:flex items-center gap-2 ${currentSlide === 0 ? 'opacity-0 pointer-events-none' : ''}`}
             >
-              <ChevronLeft className="h-5 w-5" />
+              <IconChevronLeft className="h-4 w-4" />
               Zurück
-            </button>
+            </Button>
 
             {/* Finish or Skip Button */}
             {isLastSlide ? (
-              <button
-                onClick={onClose}
-                className="mx-auto px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+              <Button
+                onClick={handleClose}
+                className="mx-auto px-8 py-3"
               >
                 Fertig
-              </button>
+              </Button>
             ) : (
-              <button
-                onClick={onClose}
-                className="mx-auto px-6 py-2 text-gray-600 hover:text-gray-900 font-medium transition-colors"
+              <Button
+                variant="ghost"
+                onClick={handleClose}
+                className="mx-auto"
               >
                 Überspringen
-              </button>
+              </Button>
             )}
 
             {/* Next Button */}
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={goToNextSlide}
               disabled={isLastSlide}
-              className={`hidden md:flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                isLastSlide
-                  ? 'opacity-0 cursor-default'
-                  : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-              }`}
+              className={`hidden md:flex items-center gap-2 ${isLastSlide ? 'opacity-0 pointer-events-none' : ''}`}
             >
               Weiter
-              <ChevronRight className="h-5 w-5" />
-            </button>
+              <IconChevronRight className="h-4 w-4" />
+            </Button>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
