@@ -54,7 +54,7 @@ export default function WorkoutStartScreen() {
   const [pendingWorkoutData, setPendingWorkoutData] = useState<{
     cycleId?: string;
     workoutDayId?: string;
-    isFreeWorkout: boolean;
+    isFreeWorkout?: boolean;
     isPastWorkout?: boolean;
     pastWorkoutDate?: string;
     pastWorkoutDuration?: number;
@@ -142,6 +142,7 @@ export default function WorkoutStartScreen() {
       await startWorkout({
         ...pendingWorkoutData,
         homeGymId,
+        isFreeWorkout: pendingWorkoutData.isFreeWorkout ?? false,
       });
       setPendingWorkoutData(null);
     } catch (err) {
