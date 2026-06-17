@@ -7,7 +7,8 @@ COPY package*.json ./
 COPY apps/backend/package*.json ./apps/backend/
 
 # Install all dependencies (including devDependencies for build)
-RUN npm ci --workspace=backend
+# Flags help on slow/ARM networks during Pi deploys
+RUN npm ci --workspace=backend --no-audit --no-fund --progress=false
 
 # Copy prisma schema and generate client
 COPY apps/backend/prisma ./apps/backend/prisma
@@ -20,6 +21,11 @@ COPY apps/backend ./apps/backend
 WORKDIR /app/apps/backend
 RUN npm run build
 
+# Remove devDependencies so the production image only contains runtime deps.
+# This makes the final image smaller while still avoiding a network npm ci
+# in the production stage (we just copy the pruned result).
+RUN npm prune --omit=dev --workspace=backend
+
 # Production Stage
 FROM node:20-alpine
 
@@ -28,17 +34,19 @@ RUN apk add --no-cache wget
 
 WORKDIR /app
 
-# Copy package files
+# We copy the (pruned) node_modules from the builder stage instead of
+# running another npm ci. This avoids slow network installs on the Pi
+# and makes builds more reliable.
+# The builder already performed the full install + prisma generate + build.
+
+# Copy built application and prisma + node_modules from builder
+COPY --from=builder /app/apps/backend/dist ./apps/backend/dist
+COPY --from=builder /app/apps/backend/node_modules ./apps/backend/node_modules
+COPY --from=builder /app/apps/backend/prisma ./apps/backend/prisma
+
+# We still copy the package manifests (some tools / health scripts may read them)
 COPY package*.json ./
 COPY apps/backend/package*.json ./apps/backend/
-
-# Install only production dependencies
-RUN npm ci --workspace=backend --omit=dev
-
-# Copy built application and prisma from builder
-COPY --from=builder /app/apps/backend/dist ./apps/backend/dist
-COPY --from=builder /app/apps/backend/node_modules/.prisma ./apps/backend/node_modules/.prisma
-COPY --from=builder /app/apps/backend/prisma ./apps/backend/prisma
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
