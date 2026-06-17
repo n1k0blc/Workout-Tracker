@@ -751,9 +751,13 @@ export class WorkoutsService {
       });
     }
 
-    // Update sets
+    // Update sets + support deletion by omission:
+    // For history edit we send the *final* list of sets per exercise. Any SetLog that belonged
+    // to the exercise but is no longer present in the payload should be removed (user deleted it).
+    const sentSetIds = new Set<string>();
     for (const exerciseUpdate of updateDto.exercises) {
       for (const setUpdate of exerciseUpdate.sets) {
+        sentSetIds.add(setUpdate.id);
         await this.prisma.setLog.update({
           where: { id: setUpdate.id },
           data: {
@@ -761,6 +765,21 @@ export class WorkoutsService {
             weight: setUpdate.weight,
             rir: setUpdate.rir,
           },
+        });
+      }
+    }
+
+    // Prune sets that were omitted from the payload for each touched exercise.
+    // We only prune for the exercises explicitly listed in the update (to be conservative).
+    for (const exerciseUpdate of updateDto.exercises) {
+      const existingSets = await this.prisma.setLog.findMany({
+        where: { exerciseLogId: exerciseUpdate.id },
+        select: { id: true },
+      });
+      const toDelete = existingSets.filter(s => !sentSetIds.has(s.id));
+      if (toDelete.length > 0) {
+        await this.prisma.setLog.deleteMany({
+          where: { id: { in: toDelete.map(s => s.id) } },
         });
       }
     }

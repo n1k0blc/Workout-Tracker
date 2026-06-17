@@ -32,6 +32,12 @@ import {
 // TODO: This component mixes live execution logging/editing with presentation.
 // Before extracting a shared WorkoutExercise component (with mode="execution"|"editor"|"review"),
 // further separation of concerns may be useful. Unplanned live tracking removed (Phase 4).
+//
+// Key invariant after bugfix (reappear + timer + phantom history sets):
+// - plannedSets are treated as immutable *initial defaults/suggestions* for execution flows.
+// - "Delete" of an unlogged planned set during active/past tracking = session skip (via skippedPlannedSetNumbers).
+// - Only controlled callers (templates/cycles via onRemoveSet) mutate plannedSets (they edit blueprints).
+// - setActiveWorkoutDirectly no longer restarts live timers on patches.
 
 interface ExerciseCardProps {
   exercise: ExerciseLog;
@@ -85,6 +91,7 @@ export default function ExerciseCard({
     replaceExercise: contextReplaceExercise, 
     logSet, 
     updateSet: contextUpdateSet, 
+    deleteSet: contextDeleteSet,
     loading,
     activeWorkout,
     setActiveWorkoutDirectly,
@@ -168,6 +175,12 @@ export default function ExerciseCard({
   };
 
   const handleLogSet = async (setNumber: number) => {
+    // Defensive: if this planned slot was explicitly skipped (via RTL), do not log it
+    // even if a deferred handle (e.g. from edit-mode auto on past tracking) is still firing.
+    if (skippedPlannedSetNumbers.has(setNumber)) {
+      return;
+    }
+
     // Double-click protection
     const existingSet = getLoggedSet(setNumber);
     if (existingSet) {
@@ -221,11 +234,16 @@ export default function ExerciseCard({
       // Remove from additional drafts (if it was one)
       setAdditionalSetNumbers((prev) => prev.filter((n) => n !== setNumber));
 
-      // Clear edit state for this setNumber
+      // Clear edit state + any skip marker for this setNumber (now logged)
       setEditValues((prev) => {
         const newVals = { ...prev };
         delete newVals[setNumber];
         return newVals;
+      });
+      setSkippedPlannedSetNumbers((prev) => {
+        const next = new Set(prev);
+        next.delete(setNumber);
+        return next;
       });
     } catch (error) {
       console.error('Failed to log set:', error);
@@ -290,11 +308,17 @@ export default function ExerciseCard({
 
   // In edit mode, on mount, commit any pre-filled planned sets with values (even if not edited),
   // so that on "beenden" the current field values (planned or edited) are saved.
+  // Skip:
+  // - any setNumbers that have been explicitly discarded/skipped for this session
+  // - COMPLETED workouts (history edit): we only edit existing performed sets; do not auto-materialize
+  //   never-performed planned sets into the saved data.
+  const isCompletedHijack = activeWorkout?.status === 'COMPLETED' || activeWorkout?.status === 'DISCARDED';
   useEffect(() => {
-    if (mode === 'edit' && hasPlannedSets && !initialEditCommitDone.current) {
+    if (mode === 'edit' && hasPlannedSets && !initialEditCommitDone.current && !isCompletedHijack) {
       initialEditCommitDone.current = true;
       exercise.plannedSets!.forEach((ps) => {
         const sn = ps.order;
+        if (skippedPlannedSetNumbers.has(sn)) return;
         if (!getLoggedSet(sn)) {
           const w = parseFloat(getEditValue(sn, 'weight') || ps.weight?.toString() || '0');
           const r = parseInt(getEditValue(sn, 'reps') || ps.reps?.toString() || '0');
@@ -306,7 +330,7 @@ export default function ExerciseCard({
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, hasPlannedSets]);
+  }, [mode, hasPlannedSets, skippedPlannedSetNumbers, isCompletedHijack]);
 
   const getSetIndicatorSlots = (): number[] => {
     const slots = new Set<number>();
@@ -368,30 +392,73 @@ export default function ExerciseCard({
 
     if (effectiveAllowSetManagement) {
       if (onRemoveSet) {
-        // Use injected handler (for no-hijack template usage) - pass setNumber (reliable for blueprint plan sets)
+        // Controlled usage (template editor, cycle blueprint, etc.): mutate the plan directly.
         onRemoveSet(exercise.id, setNumber);
-      } else if (activeWorkout && setActiveWorkoutDirectly) {
-        // fallback for cases still using hijack (e.g. history edit)
-        // IMPORTANT: for past tracking we MUST pass the current isPast/pastDuration
-        // so that setActiveWorkoutDirectly does not flip isPastWorkout=false
-        // (which would cause the parent to re-render the screen with live timers visible).
-        const updatedExercises = activeWorkout.exercises.map((ex: any) => {
+        setAdditionalSetNumbers(prev => prev.filter(n => n !== setNumber));
+        setSkippedPlannedSetNumbers(prev => {
+          const next = new Set(prev);
+          next.delete(setNumber);
+          return next;
+        });
+        return;
+      }
+
+      // Hijack / shared execution flows (active workout, past tracking, history edit of completed):
+      // - plannedSets are *initial suggestions only*. Never mutate them here (server re-derives
+      //   them from blueprint on every response, which used to cause deleted planned sets to reappear).
+      // - For an unlogged planned set: just mark it skipped for this session (render filter hides the row).
+      // - For already-logged sets or additional drafts: remove locally from sets (and call real delete
+      //   for IN_PROGRESS when we have a server id).
+      const isLiveInProgress = activeWorkout && activeWorkout.status === 'IN_PROGRESS' && !(activeWorkout as any).blueprintEdit; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+      if (isPlannedSlot && !getLoggedSet(setNumber)) {
+        // Session-level skip of a planned suggestion. Survives server re-sync because we filter on render.
+        setSkippedPlannedSetNumbers(prev => {
+          const next = new Set(prev);
+          next.add(setNumber);
+          return next;
+        });
+        setAdditionalSetNumbers(prev => prev.filter(n => n !== setNumber));
+        return;
+      }
+
+      // Remove from local sets (covers: removing an already-logged set in supported modes,
+      // or cleaning an additional draft). For live IN_PROGRESS + real server id, actually delete via API.
+      if (activeWorkout && setActiveWorkoutDirectly) {
+        const targetSet = exercise.sets.find((s: any) => (s.setNumber ?? s.order) === setNumber); // eslint-disable-line @typescript-eslint/no-explicit-any
+        const isLocalId = targetSet && typeof targetSet.id === 'string' && targetSet.id.startsWith('local-');
+
+        if (isLiveInProgress && targetSet && !isLocalId) {
+          // Real logged set during active session: delete via context (will hit API for IN_PROGRESS)
+          // We still do local optimistic filter below.
+          // Note: deleteSet in context already handles IN_PROGRESS vs hijack.
+          // We can't await here easily without making discard async everywhere; fire and let context update.
+          // For safety, the context deleteSet will set the server state.
+          // We perform the local filter immediately for snappy UI.
+          // Call without blocking:
+          (async () => {
+            try { await contextDeleteSet?.(targetSet.id); } catch {}
+          })();
+        }
+
+        const updatedExercises = activeWorkout.exercises.map((ex: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
           if (ex.id !== exercise.id) return ex;
           return {
             ...ex,
-            plannedSets: (ex.plannedSets || []).filter((ps: any) => ps.order !== setNumber),
-            sets: (ex.sets || []).filter((s: any) => (s.setNumber ?? s.order) !== setNumber),
+            // Do not touch plannedSets for execution flows (see above)
+            sets: (ex.sets || []).filter((s: any) => (s.setNumber ?? s.order) !== setNumber), // eslint-disable-line @typescript-eslint/no-explicit-any
           };
         });
         setActiveWorkoutDirectly(
           {
             ...activeWorkout,
             exercises: updatedExercises,
-          } as any,
+          } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
           isPastWorkout,
           pastWorkoutDuration
         );
       }
+
       setAdditionalSetNumbers(prev => prev.filter(n => n !== setNumber));
       setSkippedPlannedSetNumbers(prev => {
         const next = new Set(prev);
@@ -402,7 +469,7 @@ export default function ExerciseCard({
     }
 
     if (isPlannedSlot) {
-      // For unlogged planned: "delete" means hide the row for this execution (user doesn't want to do this planned set)
+      // For unlogged planned (pure active without setManagement flag): hide via skip.
       setSkippedPlannedSetNumbers(prev => {
         const next = new Set(prev);
         next.add(setNumber);
@@ -457,7 +524,7 @@ export default function ExerciseCard({
     const swipeClass = swipeOffset > 0 ? 'bg-primary/5' : swipeOffset < 0 ? 'bg-destructive/5' : '';
 
     const commitIfNeeded = () => {
-      if (mode === 'edit' && !getLoggedSet(setNumber)) {
+      if (mode === 'edit' && !getLoggedSet(setNumber) && !isCompletedHijack) {
         const w = parseFloat(getEditValue(setNumber, 'weight') || '0');
         const r = parseInt(getEditValue(setNumber, 'reps') || '0');
         if (w > 0 && r > 0) {
@@ -708,7 +775,7 @@ export default function ExerciseCard({
               const swipeClass = swipeOffset > 0 ? 'bg-primary/5' : swipeOffset < 0 ? 'bg-destructive/5' : '';
 
               const commitIfNeeded = () => {
-                if (!isReadonly && mode === 'edit' && !loggedSet) {
+                if (!isReadonly && mode === 'edit' && !loggedSet && !isCompletedHijack) {
                   const w = parseFloat(getEditValue(setNumber, 'weight') || plannedSet.weight?.toString() || '0');
                   const r = parseInt(getEditValue(setNumber, 'reps') || plannedSet.reps?.toString() || '0');
                   if (w > 0 && r > 0) {

@@ -81,6 +81,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   
   // Timestamp-based timers (stored in localStorage for persistence)
   const [workoutStartTime, setWorkoutStartTime] = useState<number | null>(null);
+  const workoutStartTimeRef = useRef<number | null>(null);
   const [restStartTime, setRestStartTime] = useState<number | null>(null);
 
   // Pause state - stores elapsed time when paused
@@ -90,6 +91,11 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
   const workoutTimerRef = useRef<NodeJS.Timeout | null>(null);
   const restTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Keep a ref in sync for stable callbacks that need current value without causing re-creation
+  useEffect(() => {
+    workoutStartTimeRef.current = workoutStartTime;
+  }, [workoutStartTime]);
 
   const togglePause = () => {
     setIsPaused(prev => {
@@ -309,12 +315,19 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setIsPaused(false);
     setIsRestTimerPaused(false);
     
-    // Initialize workout timer only for non-past workouts
-    if (!isPast) {
-      const now = Date.now();
-      setWorkoutStartTime(now);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('workoutStartTime', now.toString());
+    // Initialize workout timer only for real live IN_PROGRESS sessions.
+    // - Never for completed hijacks (history edit)
+    // - Never reset on patches (the inner if (ref === null) )
+    // This keeps the timer stable during delete/reorder in active sessions and prevents
+    // loops or unwanted resets when hijacking completed workouts for editing.
+    const isLiveSession = workout.status === 'IN_PROGRESS' && !isPast;
+    if (isLiveSession) {
+      if (workoutStartTimeRef.current === null) {
+        const now = Date.now();
+        setWorkoutStartTime(now);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('workoutStartTime', now.toString());
+        }
       }
     }
 
@@ -331,7 +344,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem('restTimerTarget');
       }
     }
-  }, []);
+  }, []); // Stable reference: use ref inside for freshness on the one value we need to peek at.
 
   const startWorkout = async (data: {
     cycleId?: string;
@@ -463,7 +476,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const addExercise = async (exerciseId: string) => {
     if (!activeWorkout) return;
 
-    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
+    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') { // eslint-disable-line @typescript-eslint/no-explicit-any
       // local add for history edit / completed via shared edit component
       try {
         const exDetails = await apiClient.getExercise(exerciseId);
@@ -516,7 +529,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const removeExercise = async (exerciseLogId: string) => {
     if (!activeWorkout) return;
 
-    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
+    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') { // eslint-disable-line @typescript-eslint/no-explicit-any
       const updated = {
         ...activeWorkout,
         exercises: activeWorkout.exercises.filter((ex: { id: string }) => ex.id !== exerciseLogId),
@@ -543,7 +556,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const replaceExercise = async (exerciseLogId: string, newExerciseId: string) => {
     if (!activeWorkout) return;
 
-    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
+    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') { // eslint-disable-line @typescript-eslint/no-explicit-any
       try {
         const exDetails = await apiClient.getExercise(newExerciseId);
         const updated = {
@@ -603,7 +616,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       exercises: reorderedExercises,
     });
 
-    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
+    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') { // eslint-disable-line @typescript-eslint/no-explicit-any
       return; // no API for completed
     }
 
@@ -637,7 +650,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     // For completed workouts (e.g. history edit using the shared component in 'edit' mode),
     // perform local update only. Do not hit the active workout mutation APIs.
     // Persistence happens on the parent's explicit save via updateCompletedWorkout.
-    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
+    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') { // eslint-disable-line @typescript-eslint/no-explicit-any
       const updatedExercises = activeWorkout.exercises.map((ex) => {
         if (ex.id !== exerciseLogId) return ex;
 
@@ -720,7 +733,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const deleteSet = async (setLogId: string) => {
     if (!activeWorkout) return;
 
-    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
+    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') { // eslint-disable-line @typescript-eslint/no-explicit-any
       const updatedExercises = activeWorkout.exercises.map((ex) => ({
         ...ex,
         sets: ex.sets.filter((s) => s.id !== setLogId),
@@ -755,7 +768,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   ) => {
     if (!activeWorkout) return;
 
-    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') {
+    if ((activeWorkout as any).blueprintEdit || activeWorkout.status === 'COMPLETED' || activeWorkout.status === 'DISCARDED') { // eslint-disable-line @typescript-eslint/no-explicit-any
       // local update for completed (history edit via shared component)
       const updatedExercises = activeWorkout.exercises.map((ex) => ({
         ...ex,

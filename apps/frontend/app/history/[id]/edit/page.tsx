@@ -44,9 +44,26 @@ export default function EditWorkoutPage() {
 
   useEffect(() => {
     if (workout) {
-      setActiveWorkoutDirectly(workout);
+      // Technical debt workaround (see UI-REFRACTORING-PLAN.md): the API always returns the full
+      // plannedSets snapshot from the (current) blueprint for the workout. In history edit of a
+      // *performed* record we only want to show rows for the sets that were actually executed
+      // (i.e. exist in .sets). Un-performed / previously removed planned sets should not appear
+      // as if they are part of the historical performed data.
+      // We trim here for the hijacked context (cards see only matching planned). This is pure
+      // frontend view adjustment; the real persisted data (sets) is untouched. No backend change.
+      const trimmedForEdit = {
+        ...workout,
+        exercises: workout.exercises.map((ex) => {
+          const performed = new Set(ex.sets.map((s) => s.setNumber));
+          return {
+            ...ex,
+            plannedSets: (ex.plannedSets || []).filter((ps) => performed.has(ps.order)),
+          };
+        }),
+      };
+      setActiveWorkoutDirectly(trimmedForEdit);
     }
-  }, [workout, setActiveWorkoutDirectly]);
+  }, [workout]); // eslint-disable-line react-hooks/exhaustive-deps -- setActiveWorkoutDirectly is stable (useCallback([]))
 
   // Clear the hijacked completed workout from global context when leaving this edit view
   // (browser back, or unmount). This prevents the main site header/nav from staying hidden
@@ -55,7 +72,7 @@ export default function EditWorkoutPage() {
     return () => {
       setActiveWorkoutDirectly(null);
     };
-  }, [setActiveWorkoutDirectly]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- rely on stable ref from context; including it caused update loops on clear
 
   const loadWorkout = useCallback(async () => {
     setLoading(true);
