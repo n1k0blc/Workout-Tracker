@@ -104,11 +104,11 @@ export default function AnalyticsPage() {
     loadInitialData();
   }, []);
 
-  // Reload analytics when filters change
+  // Reload analytics when filters change.
+  // Also runs on initial mount (with default filter values) so the chart renders immediately
+  // instead of only after a manual change (e.g. days/weeks toggle).
   useEffect(() => {
-    if (!loading) {
-      loadAnalyticsData();
-    }
+    loadAnalyticsData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycleMode, timeFilter, gymFilter, selectedMuscles, selectedEquipment, selectedCycleIndex, selectedViews, aggregationMode, selectedExercise]);
 
@@ -1247,7 +1247,8 @@ export default function AnalyticsPage() {
                     dataKey="volume"
                     name="Volumen"
                     stroke={CHART_ACCENT}
-                    yAxisTickFormatter={(value) => `${formatNumber(value)}kg`}
+                    yAxisTickFormatter={(value) => `${formatNumber(value)}`}
+                    yAxisLabel="kg"
                     footer={
                       <div className="mt-4 text-center">
                         <div className="text-sm text-muted-foreground">
@@ -1282,7 +1283,8 @@ export default function AnalyticsPage() {
                         dataKey="percentORM"
                         name="%ORM"
                         stroke={CHART_ACCENT}
-                        yAxisTickFormatter={(value) => `${value}%`}
+                        yAxisTickFormatter={(value) => `${value}`}
+                        yAxisLabel="%"
                         footer={
                           <div className="mt-4 text-center">
                             <div className="text-sm text-muted-foreground">
@@ -1313,6 +1315,7 @@ export default function AnalyticsPage() {
                         title="RIR-Verteilung"
                         height={300}
                         chartType="bar"
+                        yAxisLabel="Anzahl"
                         children={
                           <>
                             <Bar dataKey="rir0Count" fill={getRIRBarFill(0)} name="RIR 0" />
@@ -1350,6 +1353,7 @@ export default function AnalyticsPage() {
                         title="RIR-Verteilung"
                         height={300}
                         chartType="bar"
+                        yAxisLabel="Anzahl"
                         children={
                           <>
                             <Bar dataKey="rir0Count" fill={getRIRBarFill(0)} name="RIR 0" />
@@ -1399,7 +1403,7 @@ export default function AnalyticsPage() {
                         dataKey="duration"
                         name="Dauer"
                         stroke={CHART_ACCENT}
-                        yAxisTickFormatter={(value) => `${value} min`}
+                        yAxisTickFormatter={(value) => `${value}`}
                         yAxisLabel="Minuten"
                         footer={
                           <div className="mt-4 text-center">
@@ -1446,7 +1450,7 @@ export default function AnalyticsPage() {
                         dataKey="duration"
                         name="Dauer"
                         stroke={CHART_ACCENT}
-                        yAxisTickFormatter={(value) => `${value} min`}
+                        yAxisTickFormatter={(value) => `${value}`}
                         yAxisLabel="Minuten"
                         footer={
                           <div className="mt-4 text-center">
@@ -1484,7 +1488,7 @@ export default function AnalyticsPage() {
                         dataKey="averageRestTime"
                         name="Satzpause"
                         stroke={CHART_ACCENT}
-                        yAxisTickFormatter={(value) => `${value}s`}
+                        yAxisTickFormatter={(value) => `${value}`}
                         yAxisLabel="Sekunden"
                         footer={
                           <div className="mt-4 text-center">
@@ -1519,7 +1523,7 @@ export default function AnalyticsPage() {
                         dataKey="averageRestTime"
                         name="Satzpause"
                         stroke={CHART_ACCENT}
-                        yAxisTickFormatter={(value) => `${value}s`}
+                        yAxisTickFormatter={(value) => `${value}`}
                         yAxisLabel="Sekunden"
                         footer={
                           <div className="mt-4 text-center">

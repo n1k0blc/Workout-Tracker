@@ -205,7 +205,7 @@ export default function HistoryPage() {
                       className="block bg-card border rounded-lg p-6 hover:shadow-sm transition-shadow"
                     >
                       <div className="flex items-start justify-between">
-                        <Link href={`/history/${workout.id}/edit`} className="flex-1 min-w-0">
+                        <Link href={`/history/${workout.id}`} className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-3 flex-wrap">
                             <h3 className="text-lg font-semibold text-foreground">
                               {workout.isFreeWorkout

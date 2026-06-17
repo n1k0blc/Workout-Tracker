@@ -9,10 +9,9 @@ import { Workout, SetType } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import ExerciseCard from '@/components/workout/exercise-card';
 import {
-  IconBarbell,
   IconChevronLeft,
-  IconFlame,
   IconCheck,
 } from '@tabler/icons-react';
 
@@ -40,7 +39,23 @@ export default function WorkoutDetailPage() {
     setLoading(true);
     try {
       const data = await apiClient.getWorkout(workoutId);
-      setWorkout(data);
+
+      // Trim plannedSets to only those that were actually performed.
+      // This prevents "unlogged/removed planned sets" (skipped during execution)
+      // from appearing in the history view. Only the real executed sets (and their
+      // matching planned rows) should be shown. Matches the behavior in history edit.
+      const trimmedData = {
+        ...data,
+        exercises: data.exercises.map((ex) => {
+          const performedNumbers = new Set(ex.sets.map((s) => s.setNumber));
+          return {
+            ...ex,
+            plannedSets: (ex.plannedSets || []).filter((ps) => performedNumbers.has(ps.order)),
+          };
+        }),
+      };
+
+      setWorkout(trimmedData);
     } catch (error) {
       console.error('Failed to load workout:', error);
     } finally {
@@ -135,10 +150,24 @@ export default function WorkoutDetailPage() {
                           </p>
                         )}
                       </div>
-                      <Badge variant="secondary" className="flex items-center gap-1">
-                        <IconCheck className="size-3.5" />
-                        Abgeschlossen
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="flex items-center gap-1">
+                          <IconCheck className="size-3.5" />
+                          Abgeschlossen
+                        </Badge>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const editUrl = fromCycle && cycleId
+                              ? `/history/${workoutId}/edit?from=cycle&cycleId=${cycleId}`
+                              : `/history/${workoutId}/edit`;
+                            router.push(editUrl);
+                          }}
+                        >
+                          Bearbeiten
+                        </Button>
+                      </div>
                     </div>
                     <p className="text-muted-foreground">{formatDate(workout.date)}</p>
                   </CardContent>
@@ -181,68 +210,21 @@ export default function WorkoutDetailPage() {
                   </Card>
                 </div>
 
-                {/* Exercises */}
+                {/* Exercises - now using the shared modern ExerciseCard for consistent look */}
                 <div className="space-y-4">
                   <h3 className="text-xl font-bold text-foreground">Übungen</h3>
                   {workout.exercises.map((exercise, idx) => (
-                    <Card key={exercise.id}>
-                      <CardContent className="p-6">
-                        <div className="mb-4">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-muted-foreground">
-                              #{idx + 1}
-                            </span>
-                            <h4 className="text-lg font-semibold text-foreground">
-                              {exercise.exerciseName}
-                            </h4>
-                          </div>
-                        </div>
-
-                        {/* Sets */}
-                        <div className="space-y-2">
-                          <div className="text-sm font-medium text-muted-foreground mb-2">
-                            Sätze ({exercise.sets.length})
-                          </div>
-                          {exercise.sets
-                            .sort((a, b) => a.setNumber - b.setNumber)
-                            .map((set) => (
-                              <div
-                                key={set.id}
-                                className="flex items-center justify-between p-3 rounded-md border bg-muted/30"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <Badge
-                                    variant={set.setType === SetType.WARMUP ? 'outline' : 'default'}
-                                    className="p-1"
-                                    title={set.setType === SetType.WARMUP ? 'Aufwärmen' : 'Arbeit'}
-                                  >
-                                    {set.setType === SetType.WARMUP ? (
-                                      <IconFlame className="size-7" />
-                                    ) : (
-                                      <IconBarbell className="size-7" />
-                                    )}
-                                  </Badge>
-                                </div>
-                                <div className="flex items-center gap-4 text-sm">
-                                  <span className="font-semibold text-foreground">
-                                    {set.weight} kg × {set.reps} Wdh
-                                  </span>
-                                  {set.rir !== undefined && set.rir !== null && (
-                                    <span className="text-muted-foreground">
-                                      RIR {set.rir}
-                                    </span>
-                                  )}
-                                  {set.actualRestDuration && (
-                                    <span className="text-muted-foreground text-xs">
-                                      Pause: {set.actualRestDuration}s
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <ExerciseCard
+                      key={exercise.id}
+                      exercise={exercise}
+                      exerciseNumber={idx + 1}
+                      mode="edit"
+                      readonly={true}
+                      allowReorder={false}
+                      allowExerciseActions={false}
+                      allowSetManagement={false}
+                      allowLogging={false}
+                    />
                   ))}
                 </div>
               </div>

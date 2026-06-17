@@ -556,9 +556,11 @@ export default function WorkoutStartScreen() {
               <Label>Workout-Dauer (Minuten)</Label>
               <Input
                 type="number"
+                inputMode="numeric"
                 min="1"
                 value={pastDetailsDuration}
                 onChange={(e) => setPastDetailsDuration(parseInt(e.target.value) || 0)}
+                className="text-base"
               />
             </div>
           </div>
@@ -603,9 +605,11 @@ export default function WorkoutStartScreen() {
               <Label>Workout-Dauer (Minuten)</Label>
               <Input
                 type="number"
+                inputMode="numeric"
                 min="1"
                 value={pastDetailsDuration}
                 onChange={(e) => setPastDetailsDuration(parseInt(e.target.value) || 0)}
+                className="text-base"
               />
             </div>
           </div>
