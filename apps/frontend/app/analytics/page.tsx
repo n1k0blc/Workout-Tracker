@@ -104,11 +104,11 @@ export default function AnalyticsPage() {
     loadInitialData();
   }, []);
 
-  // Reload analytics when filters change
+  // Reload analytics when filters change.
+  // Also runs on initial mount (with default filter values) so the chart renders immediately
+  // instead of only after a manual change (e.g. days/weeks toggle).
   useEffect(() => {
-    if (!loading) {
-      loadAnalyticsData();
-    }
+    loadAnalyticsData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycleMode, timeFilter, gymFilter, selectedMuscles, selectedEquipment, selectedCycleIndex, selectedViews, aggregationMode, selectedExercise]);
 

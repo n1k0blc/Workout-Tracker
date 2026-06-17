@@ -132,6 +132,7 @@ export default function ExerciseCard({
   // drag listeners are conditionally spread in the name area below when effectiveAllowReorder is true.
 
   const hasPlannedSets = exercise.plannedSets && exercise.plannedSets.length > 0;
+  const hasLoggedSets = (exercise.sets || []).length > 0;
 
   const showCheckColumn = effectiveAllowLogging;
   const colTemplate = showCheckColumn
@@ -263,6 +264,11 @@ export default function ExerciseCard({
   };
 
   const handleReplaceExercise = async (newExerciseId: string) => {
+    if (hasLoggedSets && !onReplaceExercise) {
+      console.warn('Cannot replace exercise after sets have been logged');
+      setShowReplaceModal(false);
+      return;
+    }
     try {
       await replaceExercise(exercise.id, newExerciseId);
       setShowReplaceModal(false);
@@ -717,7 +723,10 @@ export default function ExerciseCard({
             )}
           </div>
           <div className="flex items-center gap-1 mt-0.5">
-            {/* Replace Exercise Button - only if allowed and not readonly */}
+            {/* Replace Exercise Button - only if allowed and not readonly.
+                Disabled (and blocked) once sets have been logged for this exercise,
+                because the backend (and performed data model) forbids replacing after logging.
+                In controlled blueprint editors (onReplaceExercise provided) we still allow it. */}
             {!isReadonly && effectiveAllowExerciseActions && (
               <Button
                 variant="ghost"
@@ -725,7 +734,8 @@ export default function ExerciseCard({
                 onClick={() => setShowReplaceModal(true)}
                 onPointerDown={(e) => e.stopPropagation()}
                 className="size-8"
-                title="Übung austauschen"
+                disabled={hasLoggedSets && !onReplaceExercise}
+                title={hasLoggedSets && !onReplaceExercise ? 'Übung kann nicht ausgetauscht werden, wenn bereits Sätze geloggt wurden' : 'Übung austauschen'}
               >
                 <IconRefresh className="size-4" />
               </Button>
