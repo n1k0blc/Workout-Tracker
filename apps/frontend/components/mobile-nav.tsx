@@ -15,7 +15,6 @@ import {
   IconHistory,
   IconChartBar,
   IconLogout,
-  IconUserCircle,
 } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -27,6 +26,7 @@ import {
   DrawerTrigger,
 } from '@/components/ui/drawer';
 import { Separator } from '@/components/ui/separator';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 
 export function MobileNav() {
@@ -34,6 +34,12 @@ export function MobileNav() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const { activeWorkout } = useWorkout();
+
+  const getUserInitial = () => {
+    if (user?.firstName) return user.firstName[0].toUpperCase();
+    if (user?.email) return user.email[0].toUpperCase();
+    return 'U';
+  };
 
   // Close menu when route changes (async to avoid sync setState-in-effect cascade warnings)
   useEffect(() => {
@@ -78,10 +84,10 @@ export function MobileNav() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="md:hidden"
+                className="md:hidden h-12 w-12"
                 aria-label="Menü öffnen"
               >
-                <IconMenu2 />
+                <IconMenu2 className="size-8" />
               </Button>
             </DrawerTrigger>
 
@@ -140,15 +146,19 @@ export function MobileNav() {
           </h1>
 
           <Link href="/profile" aria-label="Profil">
-            <Button variant="ghost" size="icon" aria-label="Profil">
-              <IconUserCircle />
+            <Button variant="ghost" size="icon" className="rounded-full h-12 w-12" aria-label="Profil">
+              <Avatar className="h-10 w-10">
+                <AvatarFallback className="text-sm">
+                  {getUserInitial()}
+                </AvatarFallback>
+              </Avatar>
             </Button>
           </Link>
         </div>
       </div>
 
       {/* Desktop Navigation */}
-      <nav className="hidden md:block border-b bg-background">
+      <nav className="hidden md:block border-b bg-background sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center gap-8">
@@ -176,8 +186,12 @@ export function MobileNav() {
             </div>
 
             <Link href="/profile" aria-label="Profil">
-              <Button variant="ghost" size="icon">
-                <IconUserCircle className="size-5" />
+              <Button variant="ghost" size="icon" className="rounded-full">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="text-xs">
+                    {getUserInitial()}
+                  </AvatarFallback>
+                </Avatar>
               </Button>
             </Link>
           </div>

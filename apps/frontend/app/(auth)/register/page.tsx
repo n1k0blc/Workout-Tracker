@@ -33,7 +33,7 @@ export default function RegisterPage() {
   const [weight, setWeight] = useState('');
 
   // Step 2: Home Gyms
-  const [homeGyms, setHomeGyms] = useState<HomeGymInput[]>([{ name: '' }]);
+  const [homeGyms, setHomeGyms] = useState<HomeGymInput[]>([]);
 
   const handleStep1Next = () => {
     setError('');
@@ -93,9 +93,7 @@ export default function RegisterPage() {
   };
 
   const handleRemoveGym = (index: number) => {
-    if (homeGyms.length > 1) {
-      setHomeGyms(homeGyms.filter((_, i) => i !== index));
-    }
+    setHomeGyms(homeGyms.filter((_, i) => i !== index));
   };
 
   const handleGymNameChange = (index: number, name: string) => {
@@ -282,34 +280,22 @@ export default function RegisterPage() {
           <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
             <FieldGroup>
               <Field>
-                <div className="flex items-center justify-between">
-                  <FieldLabel>Deine Home Gyms</FieldLabel>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleAddGym}
-                    className="text-primary hover:text-primary/80"
-                  >
-                    <IconPlus className="mr-1 size-4" />
-                    Hinzufügen
-                  </Button>
-                </div>
+                <FieldLabel>Deine Home Gyms</FieldLabel>
                 <p className="text-sm text-muted-foreground mt-1 mb-4">
                   Füge die Studios hinzu, in denen du trainierst. Du kannst später weitere hinzufügen.
                 </p>
               </Field>
 
-              <FieldGroup className="gap-3">
-                {homeGyms.map((gym, index) => (
-                  <Field key={index} className="flex-row items-center gap-2">
-                    <Input
-                      value={gym.name}
-                      onChange={(e) => handleGymNameChange(index, e.target.value)}
-                      placeholder={index === 0 ? "z.B. Mein Home Gym" : "Studio Name"}
-                      className="flex-1"
-                    />
-                    {homeGyms.length > 1 && (
+              {homeGyms.length > 0 && (
+                <FieldGroup className="gap-3">
+                  {homeGyms.map((gym, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <Input
+                        value={gym.name}
+                        onChange={(e) => handleGymNameChange(index, e.target.value)}
+                        placeholder="Gym name"
+                        className="flex-1"
+                      />
                       <Button
                         type="button"
                         variant="ghost"
@@ -319,10 +305,25 @@ export default function RegisterPage() {
                       >
                         <IconX />
                       </Button>
-                    )}
-                  </Field>
-                ))}
-              </FieldGroup>
+                    </div>
+                  ))}
+                </FieldGroup>
+              )}
+
+              {/* Add Home Gym button - centered, same style as add exercise in workouts */}
+              <div className="flex justify-center py-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleAddGym}
+                  className={homeGyms.length === 0 
+                    ? "h-16 w-16 rounded-lg p-0 flex items-center justify-center" 
+                    : "h-14 w-14 rounded-lg p-0 flex items-center justify-center"}
+                  aria-label={homeGyms.length === 0 ? "Home Gym hinzufügen" : "Weiteres Home Gym hinzufügen"}
+                >
+                  <IconPlus className={homeGyms.length === 0 ? "size-8" : "size-7"} />
+                </Button>
+              </div>
             </FieldGroup>
 
             {error && (

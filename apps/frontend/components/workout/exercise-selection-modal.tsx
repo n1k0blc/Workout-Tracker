@@ -7,6 +7,7 @@ import { MUSCLE_GROUP_LABELS } from '@/lib/exercise-utils';
 import { ExerciseEditorDialog } from '@/components/exercises/exercise-editor-dialog';
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -14,7 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { IconPlus } from '@tabler/icons-react';
+import { IconPlus, IconX } from '@tabler/icons-react';
 
 interface ExerciseSelectionModalProps {
   open: boolean;
@@ -112,8 +113,18 @@ export default function ExerciseSelectionModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
         {/* Header */}
-        <DialogHeader className="px-6 py-4 border-b shrink-0">
+        <DialogHeader className="px-6 py-4 border-b shrink-0 relative">
           <DialogTitle>Übung hinzufügen</DialogTitle>
+          <DialogClose asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-4 top-1/2 -translate-y-1/2"
+              aria-label="Schließen"
+            >
+              <IconX className="size-4" />
+            </Button>
+          </DialogClose>
         </DialogHeader>
 
         {/* Search */}
@@ -128,17 +139,18 @@ export default function ExerciseSelectionModal({
         </div>
 
         {/* Filters */}
-        <div className="px-6 py-3 border-b space-y-3 shrink-0">
-          {/* Muscle Group Filter */}
-          <div>
+        <div className="px-6 py-3 border-b shrink-0">
+          {/* Muscle Group Filter - horizontal scrollable */}
+          <div className="mb-3">
             <label className="block text-sm font-medium text-muted-foreground mb-1.5">
               Muskelgruppe
             </label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex gap-1.5 overflow-x-auto pb-2 -mx-1 px-1">
               <Button
                 variant={!muscleGroupFilter ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setMuscleGroupFilter(undefined)}
+                className="flex-shrink-0 whitespace-nowrap"
               >
                 Alle
               </Button>
@@ -148,6 +160,7 @@ export default function ExerciseSelectionModal({
                   variant={muscleGroupFilter === mg ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setMuscleGroupFilter(mg)}
+                  className="flex-shrink-0 whitespace-nowrap"
                 >
                   {translateMuscleGroup(mg)}
                 </Button>
@@ -155,16 +168,17 @@ export default function ExerciseSelectionModal({
             </div>
           </div>
 
-          {/* Equipment Filter */}
+          {/* Equipment Filter - horizontal scrollable */}
           <div>
             <label className="block text-sm font-medium text-muted-foreground mb-1.5">
               Equipment
             </label>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex gap-1.5 overflow-x-auto pb-2 -mx-1 px-1">
               <Button
                 variant={!equipmentFilter ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setEquipmentFilter(undefined)}
+                className="flex-shrink-0 whitespace-nowrap"
               >
                 Alle
               </Button>
@@ -174,6 +188,7 @@ export default function ExerciseSelectionModal({
                   variant={equipmentFilter === eq ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setEquipmentFilter(eq)}
+                  className="flex-shrink-0 whitespace-nowrap"
                 >
                   {translateEquipment(eq)}
                 </Button>

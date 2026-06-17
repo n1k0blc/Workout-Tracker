@@ -77,7 +77,7 @@ export default function AnalyticsChart({
   footer,
 }: AnalyticsChartProps) {
   const ChartComponent = chartType === 'bar' ? BarChart : LineChart;
-  const SeriesComponent = chartType === 'bar' ? Bar : Line;
+  // Note: SeriesComponent is currently unused (renderSeries handles series directly)
 
   const defaultXTickFormatter = (value: any, index: number) => {
     if (xTickFormatter) return xTickFormatter(value, index);
@@ -89,6 +89,22 @@ export default function AnalyticsChart({
     if (tooltipFormatter) return tooltipFormatter(value, name);
     return [`${formatNumber(value as number)}`, String(name || '')];
   };
+
+  // Compute effective axis labels for both single and comparison modes
+  let leftAxisLabel = yAxisLabel;
+  let rightAxisLabel: string | undefined;
+  if (isComparison && lineConfigs && lineConfigs.length > 0) {
+    const leftConf = lineConfigs.find((c) => (c.yAxisId || 'left') === 'left');
+    const rightConf = lineConfigs.find((c) => c.yAxisId === 'right');
+    if (leftConf && !leftAxisLabel) {
+      leftAxisLabel = leftConf.unit || leftConf.name;
+    }
+    if (rightConf) {
+      rightAxisLabel = rightConf.unit || rightConf.name;
+    }
+  } else if (!isComparison && !yAxisLabel && name) {
+    leftAxisLabel = name;
+  }
 
   const renderSeries = () => {
     if (children) {
@@ -119,6 +135,7 @@ export default function AnalyticsChart({
         name: name || dataKey,
         stroke: stroke || 'var(--foreground)',
         strokeWidth: 2,
+        yAxisId: 'left',  // explicitly associate to left axis like in multiline comparison
         dot: { r: chartType === 'bar' ? undefined : 4 },
       };
 
@@ -148,21 +165,35 @@ export default function AnalyticsChart({
             <YAxis
               yAxisId="left"
               style={{ fontSize: '12px' }}
+              domain={['dataMin', 'dataMax']}
+              tickCount={8}
+              interval={0}
+              minTickGap={5}
               tickFormatter={yAxisTickFormatter || ((value) => `${formatNumber(value)}`)}
               label={
-                yAxisLabel
-                  ? { value: yAxisLabel, angle: -90, position: 'insideLeft' }
+                leftAxisLabel
+                  ? { value: leftAxisLabel, angle: -90, position: 'insideLeft' }
                   : undefined
               }
             />
 
-            {isComparison && lineConfigs && lineConfigs.some((c) => c.yAxisId === 'right') && (
+            {(isComparison && lineConfigs && lineConfigs.some((c) => c.yAxisId === 'right')) || rightAxisLabel ? (
               <YAxis
                 yAxisId="right"
                 orientation="right"
                 style={{ fontSize: '12px' }}
+                domain={['dataMin', 'dataMax']}
+                tickCount={8}
+                interval={0}
+                minTickGap={5}
+                tickFormatter={yAxisTickFormatter || ((value) => `${formatNumber(value)}`)}
+                label={
+                  rightAxisLabel
+                    ? { value: rightAxisLabel, angle: -90, position: 'insideRight' }
+                    : undefined
+                }
               />
-            )}
+            ) : null}
 
             <Tooltip
               contentStyle={tooltipContentStyle}

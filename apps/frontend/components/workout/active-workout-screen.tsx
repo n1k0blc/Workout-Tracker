@@ -265,13 +265,14 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
                       <Label className="text-sm">Dauer (Min):</Label>
                       <Input
                         type="number"
+                        inputMode="numeric"
                         min="0"
                         value={Math.floor(pastWorkoutDuration / 60)}
                         onChange={(e) => {
                           const minutes = parseInt(e.target.value) || 0;
                           setPastWorkoutDuration(minutes * 60);
                         }}
-                        className="w-20"
+                        className="w-20 text-base"
                       />
                     </div>
                   ) : null}
@@ -443,14 +444,14 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
                 setUpdateBlueprint(false);
                 setSaveAsTemplate(false);
               }}
-              className="flex-1"
+              className="flex-1 h-14 text-base py-2"
             >
               Abbrechen
             </Button>
             <Button
               onClick={handleComplete}
               disabled={loading}
-              className="flex-1"
+              className="flex-1 h-14 text-base py-2"
             >
               {loading ? 'Wird gespeichert...' : 'Beenden'}
             </Button>
@@ -473,7 +474,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
             <Button
               variant="outline"
               onClick={() => setShowDiscardConfirm(false)}
-              className="flex-1"
+              className="flex-1 h-14 text-base py-2"
             >
               Abbrechen
             </Button>
@@ -481,7 +482,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
               variant="outline"
               onClick={handleDiscard}
               disabled={loading}
-              className="flex-1 border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
+              className="flex-1 h-14 text-base py-2 border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
             >
               {loading ? 'Wird verworfen...' : 'Verwerfen'}
             </Button>

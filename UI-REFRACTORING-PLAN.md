@@ -1328,3 +1328,152 @@ Der Zyklus-Wizard sieht aus und fühlt sich an wie der Rest der App (Workout-Sta
 ---
 
 **Hinweis:** Dieses Dokument ersetzt frühere informelle Phasen-Planungen aus dem Chat und dient als zentrale Referenz für den UI-Refactoring-Fortschritt. Der Cycle Wizard ist der logische nächste Kandidat nach der zentralen ExerciseCard und den Template-Integrationen.
+
+---
+
+## Technical Debt: Exercise Selection Modal – Name Search verursacht vollständiges Neuladen der Liste bei jedem Tastendruck (Juni 2026)
+
+**Symptom (User-Report):**  
+Beim Eintippen eines einzelnen Buchstabens im Suchfeld der `ExerciseSelectionModal` wird die gesamte Übungsliste nach jedem Buchstaben neu geladen / aktualisiert. Die Liste "springt" und das Modal fühlt sich instabil an, besonders auf Mobile beim Tippen.
+
+**Status:** Nur analysiert. **Keine Implementierung vorgenommen.** Reine Dokumentation für zukünftige Behebung.
+
+### Exakter Root Cause
+
+Die Ursache liegt in einer direkten Kopplung von React-State-Änderungen an Netzwerk-Requests + aggressivem Loading-UI:
+
+**apps/frontend/components/workout/exercise-selection-modal.tsx**
+
+```tsx
+const [search, setSearch] = useState('');
+// ...
+const [exercises, setExercises] = useState<Exercise[]>([]);
+const [loading, setLoading] = useState(true);
+
+const loadExercises = useCallback(async () => {
+  setLoading(true);
+  try {
+    const data = await apiClient.getExercises({
+      search: search || undefined,
+      muscleGroup: muscleGroupFilter,
+      equipment: equipmentFilter,
+      includeCustom: true,
+    });
+    setExercises(data);   // kompletter Listen-Ersatz
+  } finally {
+    setLoading(false);
+  }
+}, [search, muscleGroupFilter, equipmentFilter]);  // ← neue Fn-Identity bei jedem change
+
+useEffect(() => {
+  loadExercises();
+}, [loadExercises]);   // ← triggert bei jeder neuen loadExercises-Referenz
+```
+
+Such-Input (Zeile ~135):
+```tsx
+<Input
+  value={search}
+  onChange={(e) => setSearch(e.target.value)}   // direkt, ohne Debounce
+  placeholder="Übung suchen..."
+/>
+```
+
+**Ablauf bei jedem Buchstaben:**
+1. `setSearch("b")` → Re-Render
+2. `loadExercises` wird neu erzeugt (search ist Dep)
+3. `useEffect([loadExercises])` feuert
+4. `setLoading(true)` + `apiClient.getExercises({ search: "b", ... })`
+5. Response → `setExercises(newArray)` + Liste wird komplett ersetzt
+6. Wiederholen für "be", "ben", "bench"...
+
+Dasselbe (leicht variiert) Muster existiert auch in:
+- `apps/frontend/components/templates/exercises-tab.tsx:34-53` (useEffect direkt auf [search, filters])
+
+### Backend
+
+**apps/backend/src/exercises/exercises.service.ts:120-125**
+```ts
+if (search) {
+  where.name = {
+    contains: search,
+    mode: 'insensitive',
+  };
+}
+```
+
+- Controller: `GET /exercises?search=...&muscleGroup=...&includeCustom=true`
+- Kein Pagination, kein Caching, kein Debounce auf Server.
+- Query trifft auf `Exercise` Tabelle (soft-delete via `deletedAt` + OR global + user-customs).
+
+**Datenmenge:** Ca. 115 Basis-Übungen (aus `Exercises_premium.csv`) + beliebig viele Custom-Übungen des Users. Sehr klein → Client-seitiges Filtern wäre trivial performant.
+
+### Warum besonders störend?
+
+- Name-Suche ist **kontinuierliche Freitext-Eingabe** (hohe Frequenz).
+- Muscle/Equipment-Filter sind diskrete Buttons (niedrige Frequenz) → dort ist Refetch weniger spürbar.
+- `loading`-State ersetzt den gesamten Listenbereich (`{loading ? <div>Lädt Übungen...</div> : <Liste>}`).
+- Keine Unterscheidung "Typing vs. Filter anwenden".
+- `open`-Prop wird nur an `<Dialog>` weitergegeben – kein `if (open)` für initiales Laden oder Reset.
+- Es gibt keinen globalen Exercise-Cache. Jede Modal-Instanz lädt selbst (auch wenn Elternteile schonmal alles geladen haben, z. B. in blueprint-editor-step oder template-editor).
+- Kein AbortController, keine Beibehaltung der vorherigen Ergebnisse während des Tippens.
+
+### Weitere Kontext-Beobachtungen
+
+- Andere Stellen laden bereits einmalig das volle Set ohne `search` und nutzen die Liste nur zum Mappen (z. B. `blueprint-editor-step.tsx:68`, `template-editor-screen.tsx:102`, `review-step.tsx`).
+- Beim Erstellen einer Custom-Exercise macht das Modal bereits ein optimistisches lokales Prepend (`setExercises((prev) => [exercise, ...prev])`) – gutes Vorbild.
+- Es gibt aktuell **keine** Debounce/Throttle-Logik oder useDebounce im gesamten Frontend.
+- Die Modal wird an vielen Orten genutzt: Active Workout, Replace in ExerciseCard, Templates, Cycles (Wizard + Detail), Analytics Exercise-Picker.
+
+### Mögliche Stabilisierungs-Ansätze (für spätere Diskussion / Umsetzung)
+
+1. **Debounce nur für die Namenssuche** (Server-Fetch bleibt)
+   - Eigenen `debouncedSearch` State mit useEffect + Timeout (oder lib).
+   - Nur den debounced Wert in die Deps von `loadExercises` packen.
+   - Während des Tippens vorherige Liste sichtbar lassen + nur subtilen "sucht..." Hinweis (kein hartes Loading + Listen-Reset).
+
+2. **Einmal laden + reines Client-Side Filtering** (empfohlen wegen kleiner N)
+   - Beim Öffnen (oder einmal pro Session) volle Liste ohne `search` laden (`includeCustom: true`).
+   - Vollständige Liste in State halten.
+   - Sichtbare Liste via `useMemo` ableiten aus `(search, muscleGroupFilter, equipmentFilter)`.
+   - Tippen wird instant, null Netzwerk während der Eingabe.
+   - Nur bei Custom-Erstellung oder explizitem Refresh neu laden.
+
+3. **Hybrid / geteilter Cache**
+   - Exercise-Liste in einen wiederverwendbaren Hook / leichten Context / Ref-Cache auslagern.
+   - Modal + andere Consumer lesen daraus und filtern client-seitig.
+   - Invalidation nur bei neu erstelltem Custom oder nach Timeout.
+
+4. **Vertragsänderung für Suche**
+   - Suche nur bei Blur / Enter / dediziertem Button auslösen.
+   - Oder festen kleinen Debounce (300 ms) + In-Flight-Request abbrechen.
+   - Loading-State niemals bei reiner Namenseingabe aktivieren.
+
+5. **UI-Stabilisierungen (kombinierbar)**
+   - Liste während Name-Suche **nicht** unmounten.
+   - Vorherige Ergebnisse sichtbar halten.
+   - Scroll-Position erhalten.
+   - Unterschiedliche Behandlung von Name-Suche vs. Filter-Buttons.
+
+**Hinweis:** Muscle/Equipment-Filter können weiterhin unmittelbar fetchen. Nur die Freitext-Namenssuche sollte "stabil" sein.
+
+### Betroffene Dateien (Stand Analyse)
+
+- `apps/frontend/components/workout/exercise-selection-modal.tsx` (Hauptproblem)
+- `apps/frontend/components/templates/exercises-tab.tsx` (identisches Muster)
+- `apps/frontend/lib/api/client.ts` (getExercises)
+- `apps/backend/src/exercises/exercises.service.ts` + `dto/filter-exercise.dto.ts`
+- Aufrufer: active-workout-screen, exercise-card (Replace), template-editor, cycles/*, analytics
+
+Diese Analyse basiert auf Code-Inspection (Juni 2026) und der User-Beobachtung. Kann als Basis für eine spätere Implementierung (idealerweise mit Debounce +/oder Client-Filter + Loading-Verbesserung) verwendet werden.
+
+**Nächste Schritte bei Umsetzung (später):**
+- Analyse mit User bestätigen.
+- Kleine N → starke Präferenz für Client-Filter-Ansatz prüfen.
+- Ähnliches Verhalten im Exercises-Tab gleich mit beheben.
+- Nach Fix: Manuelle Tests auf Mobile (iOS/Android Tastatur + Typing-Feel).
+- Dokumentation hier aktualisieren + ggf. in AGENTS.md oder Frontend-README referenzieren.
+
+---
+
+**Gesamt-Status (Juni 2026):** ExerciseSelectionModal ist funktional und wurde kürzlich um scrollbare separate Filter-Zeilen + X-Close-Button erweitert. Die Namenssuch-Instabilität bleibt als dokumentierter offener Punkt bestehen.

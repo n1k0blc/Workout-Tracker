@@ -896,7 +896,8 @@ export default function CycleDetailPage() {
                       dataKey="volume"
                       name="Volumen"
                       stroke={CHART_ACCENT}
-                      yAxisTickFormatter={(value) => `${formatNumber(value)}kg`}
+                      yAxisTickFormatter={(value) => `${formatNumber(value)}`}
+                      yAxisLabel="kg"
                       footer={
                         <div className="mt-4 text-center">
                           <div className="text-sm text-muted-foreground">
@@ -931,7 +932,8 @@ export default function CycleDetailPage() {
                           dataKey="percentORM"
                           name="%ORM"
                           stroke={CHART_ACCENT}
-                          yAxisTickFormatter={(value) => `${value}%`}
+                          yAxisTickFormatter={(value) => `${value}`}
+                          yAxisLabel="%"
                           footer={
                             <div className="mt-4 text-center">
                               <div className="text-sm text-muted-foreground">
@@ -962,6 +964,7 @@ export default function CycleDetailPage() {
                           title="RIR-Verteilung"
                           height={300}
                           chartType="bar"
+                          yAxisLabel="Anzahl"
                         >
                           <Bar dataKey="rir0Count" fill={getRIRBarFill(0)} name="RIR 0" />
                           <Bar dataKey="rir1Count" fill={getRIRBarFill(1)} name="RIR 1" />
@@ -987,7 +990,8 @@ export default function CycleDetailPage() {
                       dataKey="duration"
                       name="Dauer"
                       stroke={CHART_ACCENT}
-                      yAxisTickFormatter={(value) => `${value}min`}
+                      yAxisTickFormatter={(value) => `${value}`}
+                      yAxisLabel="Minuten"
                       footer={
                         <div className="mt-4 text-center">
                           <div className="text-sm text-muted-foreground">
@@ -1011,7 +1015,8 @@ export default function CycleDetailPage() {
                       dataKey="averageRestTime"
                       name="Satzpause"
                       stroke={CHART_ACCENT}
-                      yAxisTickFormatter={(value) => `${value}s`}
+                      yAxisTickFormatter={(value) => `${value}`}
+                      yAxisLabel="Sekunden"
                       footer={
                         <div className="mt-4 text-center">
                           <div className="text-sm text-muted-foreground">
@@ -1036,6 +1041,7 @@ export default function CycleDetailPage() {
                       name="Wiederholungen"
                       stroke={CHART_ACCENT}
                       yAxisTickFormatter={(value) => `${value}`}
+                      yAxisLabel="Wiederholungen"
                       footer={
                         <div className="mt-4 text-center">
                           <div className="text-sm text-muted-foreground">
@@ -1060,6 +1066,7 @@ export default function CycleDetailPage() {
                       name="Sätze"
                       stroke={CHART_ACCENT}
                       yAxisTickFormatter={(value) => `${value}`}
+                      yAxisLabel="Sätze"
                       footer={
                         <div className="mt-4 text-center">
                           <div className="text-sm text-muted-foreground">

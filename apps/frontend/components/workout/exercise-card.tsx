@@ -569,9 +569,9 @@ export default function ExerciseCard({
             </Badge>
           </button>
 
-          <Input type="number" step="0.5" value={getEditValue(setNumber, 'weight')} onChange={(e) => handleRowValueChange(setNumber, null, 'weight', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} />
-          <Input type="number" value={getEditValue(setNumber, 'reps')} onChange={(e) => handleRowValueChange(setNumber, null, 'reps', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} />
-          <Input type="number" value={getEditValue(setNumber, 'rir')} onChange={(e) => handleRowValueChange(setNumber, null, 'rir', e.target.value)} onBlur={commitIfNeeded} placeholder="" className="h-7 text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} />
+          <Input type="number" step="0.5" inputMode="decimal" value={getEditValue(setNumber, 'weight')} onChange={(e) => handleRowValueChange(setNumber, null, 'weight', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-base md:text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} />
+          <Input type="number" inputMode="numeric" value={getEditValue(setNumber, 'reps')} onChange={(e) => handleRowValueChange(setNumber, null, 'reps', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-base md:text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} />
+          <Input type="number" inputMode="numeric" value={getEditValue(setNumber, 'rir')} onChange={(e) => handleRowValueChange(setNumber, null, 'rir', e.target.value)} onBlur={commitIfNeeded} placeholder="" className="h-7 text-base md:text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} />
 
           {showCheckColumn && (
             <div className="flex justify-end">
@@ -640,28 +640,31 @@ export default function ExerciseCard({
           <Input
             type="number"
             step="0.5"
+            inputMode="decimal"
             value={isEditingThis ? editingValues.weight : set.weight.toString()}
             onChange={(e) => handleRowValueChange(set.setNumber, set, 'weight', e.target.value)}
             placeholder="0"
-            className="h-7 text-sm tabular-nums"
+            className="h-7 text-base md:text-sm tabular-nums"
             disabled={loading}
             
           />
           <Input
             type="number"
+            inputMode="numeric"
             value={isEditingThis ? editingValues.reps : set.reps.toString()}
             onChange={(e) => handleRowValueChange(set.setNumber, set, 'reps', e.target.value)}
             placeholder="0"
-            className="h-7 text-sm tabular-nums"
+            className="h-7 text-base md:text-sm tabular-nums"
             disabled={loading}
             
           />
           <Input
             type="number"
+            inputMode="numeric"
             value={isEditingThis ? editingValues.rir : (set.rir != null ? set.rir.toString() : '')}
             onChange={(e) => handleRowValueChange(set.setNumber, set, 'rir', e.target.value)}
             placeholder=""
-            className="h-7 text-sm tabular-nums"
+            className="h-7 text-base md:text-sm tabular-nums"
             disabled={loading}
             
           />
@@ -844,11 +847,12 @@ export default function ExerciseCard({
                     <Input
                       type="number"
                       step="0.5"
+                      inputMode="decimal"
                       value={isEditingThis ? editingValues.weight : (loggedSet ? loggedSet.weight.toString() : getEditValue(setNumber, 'weight'))}
                       onChange={(e) => handleRowValueChange(setNumber, loggedSet ?? null, 'weight', e.target.value)}
                       onBlur={commitIfNeeded}
                       placeholder="0"
-                      className="h-7 text-sm tabular-nums"
+                      className="h-7 text-base md:text-sm tabular-nums"
                       disabled={loading || isReadonly}
                       readOnly={isReadonly}
                     />
@@ -856,11 +860,12 @@ export default function ExerciseCard({
                     {/* Reps cell - always input style; for logged: live editable via updateSet */}
                     <Input
                       type="number"
+                      inputMode="numeric"
                       value={isEditingThis ? editingValues.reps : (loggedSet ? loggedSet.reps.toString() : getEditValue(setNumber, 'reps'))}
                       onChange={(e) => handleRowValueChange(setNumber, loggedSet ?? null, 'reps', e.target.value)}
                       onBlur={commitIfNeeded}
                       placeholder="0"
-                      className="h-7 text-sm tabular-nums"
+                      className="h-7 text-base md:text-sm tabular-nums"
                       disabled={loading || isReadonly}
                       readOnly={isReadonly}
                     />
@@ -868,11 +873,12 @@ export default function ExerciseCard({
                     {/* RIR cell - always input style; for logged: live editable via updateSet */}
                     <Input
                       type="number"
+                      inputMode="numeric"
                       value={isEditingThis ? editingValues.rir : (loggedSet ? (loggedSet.rir != null ? loggedSet.rir.toString() : '') : getEditValue(setNumber, 'rir'))}
                       onChange={(e) => handleRowValueChange(setNumber, loggedSet ?? null, 'rir', e.target.value)}
                       onBlur={commitIfNeeded}
                       placeholder=""
-                      className="h-7 text-sm tabular-nums"
+                      className="h-7 text-base md:text-sm tabular-nums"
                       disabled={loading || isReadonly}
                       readOnly={isReadonly}
                     />

@@ -6,13 +6,13 @@ import { useAuth } from '@/lib/auth-context';
 import { apiClient } from '@/lib/api/client';
 import { HomeGym } from '@/types';
 import {
-  IconUserCircle,
   IconPlus,
   IconX,
   IconEdit,
   IconCheck,
   IconTrash,
 } from '@tabler/icons-react';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -197,11 +197,15 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-            <IconUserCircle className="size-8" />
+            <Avatar className="h-8 w-8">
+              <AvatarFallback>
+                {user?.firstName?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
+              </AvatarFallback>
+            </Avatar>
             Mein Profil
           </h1>
         </div>
