@@ -15,13 +15,14 @@ RUN npm ci --workspace=backend --no-audit --no-fund --progress=false
 # to guarantee /app/node_modules/prisma (with build/) exists for the backup.
 RUN npm ls prisma --workspace=backend || npm install --workspace=backend prisma --no-audit --no-fund --progress=false
 
-# Backup the prisma package early, right after install, before any other steps that might affect node_modules.
-RUN mkdir -p /prisma-backup && \
-    cp -r /app/node_modules/prisma /prisma-backup/prisma
-
 # Copy prisma schema and generate client
 COPY apps/backend/prisma ./apps/backend/prisma
 RUN cd apps/backend && npx prisma generate
+
+# Backup the prisma package right after generate (which uses the CLI via npx), 
+# so we are 100% sure /app/node_modules/prisma (with build/) exists.
+RUN mkdir -p /prisma-backup && \
+    cp -r /app/node_modules/prisma /prisma-backup/prisma
 
 # Copy source code
 COPY apps/backend ./apps/backend
