@@ -15,6 +15,10 @@ RUN npm ci --workspace=backend --no-audit --no-fund --progress=false
 # to guarantee /app/node_modules/prisma (with build/) exists for the backup.
 RUN npm ls prisma --workspace=backend || npm install --workspace=backend prisma --no-audit --no-fund --progress=false
 
+# Backup the prisma package early, right after install, before any other steps that might affect node_modules.
+RUN mkdir -p /prisma-backup && \
+    cp -r /app/node_modules/prisma /prisma-backup/prisma
+
 # Copy prisma schema and generate client
 COPY apps/backend/prisma ./apps/backend/prisma
 RUN cd apps/backend && npx prisma generate
@@ -29,16 +33,8 @@ RUN npm run build
 # Go back to root for pruning
 WORKDIR /app
 
-# Backup the complete 'prisma' package (including build/ for the CLI) to a safe location
-# before pruning. Prune + workspace hoisting often leaves the CLI incomplete.
-RUN mkdir -p /prisma-backup && \
-    cp -r /app/node_modules/prisma /prisma-backup/prisma
-
 # Prune dev dependencies (keeps most of the app slim)
 RUN npm prune --omit=dev --workspace=backend
-
-# The pruned node_modules will be copied below.
-# We will overlay the full prisma package in the prod stage.
 
 # Production Stage
 FROM node:20-alpine
