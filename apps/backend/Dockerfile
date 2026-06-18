@@ -24,9 +24,17 @@ RUN npm run build
 # Go back to root for pruning
 WORKDIR /app
 
-# Prune dev dependencies. "prisma" is now in regular dependencies (see package.json)
-# so it (and its runtime deps like 'effect') will be kept for the migrate step.
+# Backup the complete 'prisma' package (including build/ CLI files) before pruning.
+# Even though we moved it to dependencies, prune + workspace hoisting can leave
+# the CLI incomplete. We restore the full version so the runtime wrapper works.
+RUN cp -r /app/node_modules/prisma /tmp/prisma-full 2>/dev/null || true
+
+# Prune dev dependencies.
 RUN npm prune --omit=dev --workspace=backend
+
+# Restore the full prisma package so /app/node_modules/prisma/build/index.js exists.
+RUN rm -rf /app/node_modules/prisma 2>/dev/null || true && \
+    cp -r /tmp/prisma-full /app/node_modules/prisma 2>/dev/null || true
 
 # Production Stage
 FROM node:20-alpine
