@@ -10,6 +10,11 @@ COPY apps/backend/package*.json ./apps/backend/
 # Flags help on slow/ARM networks during Pi deploys
 RUN npm ci --workspace=backend --no-audit --no-fund --progress=false
 
+# Ensure 'prisma' (the CLI package) is present in node_modules.
+# It is listed in dependencies so it survives prune, but we force it here
+# to guarantee /app/node_modules/prisma (with build/) exists for the backup.
+RUN npm ls prisma --workspace=backend || npm install --workspace=backend prisma --no-audit --no-fund --progress=false
+
 # Copy prisma schema and generate client
 COPY apps/backend/prisma ./apps/backend/prisma
 RUN cd apps/backend && npx prisma generate
@@ -27,7 +32,7 @@ WORKDIR /app
 # Backup the complete 'prisma' package (including build/ for the CLI) to a safe location
 # before pruning. Prune + workspace hoisting often leaves the CLI incomplete.
 RUN mkdir -p /prisma-backup && \
-    cp -r /app/node_modules/prisma /prisma-backup/ 2>/dev/null || true
+    cp -r /app/node_modules/prisma /prisma-backup/prisma
 
 # Prune dev dependencies (keeps most of the app slim)
 RUN npm prune --omit=dev --workspace=backend
