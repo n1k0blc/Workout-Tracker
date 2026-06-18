@@ -52,8 +52,10 @@ COPY --from=builder /app/apps/backend/prisma ./apps/backend/prisma
 COPY package*.json ./
 COPY apps/backend/package*.json ./apps/backend/
 
-# Safety: ensure prisma binary is executable
-RUN chmod +x /app/node_modules/.bin/prisma || true
+# Create a reliable wrapper for prisma CLI (bypasses .bin symlink issues after prune + COPY in workspaces)
+RUN mkdir -p /app/node_modules/.bin && \
+    printf '#!/bin/sh\nnode /app/node_modules/prisma/build/index.js "$@"\n' > /app/node_modules/.bin/prisma && \
+    chmod +x /app/node_modules/.bin/prisma
 
 # Create non-root user and fix ownership (important for copied files)
 RUN addgroup -g 1001 -S nodejs && \
