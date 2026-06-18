@@ -21,10 +21,18 @@ COPY apps/backend ./apps/backend
 WORKDIR /app/apps/backend
 RUN npm run build
 
-# Remove devDependencies so the production image only contains runtime deps.
-# This makes the final image smaller while still avoiding a network npm ci
-# in the production stage (we just copy the pruned result).
+# Remove devDependencies for smaller image.
+# But preserve the prisma CLI because we use it for "prisma migrate deploy" at container startup.
+RUN mkdir -p /tmp/prisma-cli && \
+    cp -a /app/node_modules/prisma /tmp/prisma-cli/ 2>/dev/null || true && \
+    cp -a /app/node_modules/.bin/prisma /tmp/prisma-cli/ 2>/dev/null || true
+
 RUN npm prune --omit=dev --workspace=backend
+
+# Restore prisma CLI (devDep) into the pruned node_modules so migrate deploy works without network fetch
+RUN mkdir -p /app/node_modules/prisma /app/node_modules/.bin && \
+    cp -a /tmp/prisma-cli/prisma /app/node_modules/ 2>/dev/null || true && \
+    cp -a /tmp/prisma-cli/prisma /app/node_modules/.bin/ 2>/dev/null || true
 
 # Production Stage
 FROM node:20-alpine
@@ -34,23 +42,26 @@ RUN apk add --no-cache wget
 
 WORKDIR /app
 
-# We copy the (pruned) node_modules from the builder stage instead of
-# running another npm ci. This avoids slow network installs on the Pi
-# and makes builds more reliable.
-# The builder already performed the full install + prisma generate + build.
+# Ensure tools like prisma (from root node_modules) are in PATH
+ENV PATH="/app/node_modules/.bin:${PATH}"
 
-# Copy built application and prisma + node_modules from builder
+# We copy the (pruned) node_modules from the builder stage (hoisted at root).
+# Prisma CLI was explicitly preserved for the migrate step at startup.
+# This avoids slow network installs on the Pi.
+COPY --from=builder /app/node_modules ./node_modules
+
+# Copy built application, prisma schema
 COPY --from=builder /app/apps/backend/dist ./apps/backend/dist
-COPY --from=builder /app/apps/backend/node_modules ./apps/backend/node_modules
 COPY --from=builder /app/apps/backend/prisma ./apps/backend/prisma
 
-# We still copy the package manifests (some tools / health scripts may read them)
+# Package manifests for reference
 COPY package*.json ./
 COPY apps/backend/package*.json ./apps/backend/
 
-# Create non-root user
+# Create non-root user and fix ownership (important for copied files)
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+    adduser -S nodejs -u 1001 && \
+    chown -R nodejs:nodejs /app
 USER nodejs
 
 EXPOSE 3001

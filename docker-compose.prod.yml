@@ -51,7 +51,7 @@ services:
     networks:
       - workout-network
     command: >
-      sh -c "npx prisma migrate deploy && node dist/main.js"
+      sh -c "/app/node_modules/.bin/prisma migrate deploy --schema=/app/apps/backend/prisma/schema.prisma && node dist/main.js"
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/api/health"]
       interval: 30s
