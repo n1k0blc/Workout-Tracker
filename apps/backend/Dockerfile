@@ -24,17 +24,16 @@ RUN npm run build
 # Go back to root for pruning
 WORKDIR /app
 
-# Backup the complete 'prisma' package (including build/ CLI files) before pruning.
-# Even though we moved it to dependencies, prune + workspace hoisting can leave
-# the CLI incomplete. We restore the full version so the runtime wrapper works.
-RUN cp -r /app/node_modules/prisma /tmp/prisma-full 2>/dev/null || true
+# Backup the complete 'prisma' package (including build/ for the CLI) to a safe location
+# before pruning. Prune + workspace hoisting often leaves the CLI incomplete.
+RUN mkdir -p /prisma-backup && \
+    cp -r /app/node_modules/prisma /prisma-backup/ 2>/dev/null || true
 
-# Prune dev dependencies.
+# Prune dev dependencies (keeps most of the app slim)
 RUN npm prune --omit=dev --workspace=backend
 
-# Restore the full prisma package so /app/node_modules/prisma/build/index.js exists.
-RUN rm -rf /app/node_modules/prisma 2>/dev/null || true && \
-    cp -r /tmp/prisma-full /app/node_modules/prisma 2>/dev/null || true
+# The pruned node_modules will be copied below.
+# We will overlay the full prisma package in the prod stage.
 
 # Production Stage
 FROM node:20-alpine
@@ -48,9 +47,11 @@ WORKDIR /app
 ENV PATH="/app/node_modules/.bin:${PATH}"
 
 # We copy the (pruned) node_modules from the builder stage (hoisted at root).
-# Prisma CLI was explicitly preserved for the migrate step at startup.
-# This avoids slow network installs on the Pi.
 COPY --from=builder /app/node_modules ./node_modules
+
+# Overlay the complete prisma package (with build/ CLI) from the pre-prune backup.
+# This ensures /app/node_modules/prisma/build/index.js exists for the wrapper.
+COPY --from=builder /prisma-backup/prisma /app/node_modules/prisma
 
 # Copy built application, prisma schema
 COPY --from=builder /app/apps/backend/dist ./apps/backend/dist
