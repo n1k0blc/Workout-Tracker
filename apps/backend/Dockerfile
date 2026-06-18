@@ -21,18 +21,12 @@ COPY apps/backend ./apps/backend
 WORKDIR /app/apps/backend
 RUN npm run build
 
-# Remove devDependencies for smaller image.
-# But preserve the prisma CLI because we use it for "prisma migrate deploy" at container startup.
-RUN mkdir -p /tmp/prisma-cli && \
-    cp -a /app/node_modules/prisma /tmp/prisma-cli/ 2>/dev/null || true && \
-    cp -a /app/node_modules/.bin/prisma /tmp/prisma-cli/ 2>/dev/null || true
+# Go back to root for pruning
+WORKDIR /app
 
+# Prune dev dependencies. "prisma" is now in regular dependencies (see package.json)
+# so it (and its runtime deps like 'effect') will be kept for the migrate step.
 RUN npm prune --omit=dev --workspace=backend
-
-# Restore prisma CLI (devDep) into the pruned node_modules so migrate deploy works without network fetch
-RUN mkdir -p /app/node_modules/prisma /app/node_modules/.bin && \
-    cp -a /tmp/prisma-cli/prisma /app/node_modules/ 2>/dev/null || true && \
-    cp -a /tmp/prisma-cli/prisma /app/node_modules/.bin/ 2>/dev/null || true
 
 # Production Stage
 FROM node:20-alpine
@@ -57,6 +51,9 @@ COPY --from=builder /app/apps/backend/prisma ./apps/backend/prisma
 # Package manifests for reference
 COPY package*.json ./
 COPY apps/backend/package*.json ./apps/backend/
+
+# Safety: ensure prisma binary is executable
+RUN chmod +x /app/node_modules/.bin/prisma || true
 
 # Create non-root user and fix ownership (important for copied files)
 RUN addgroup -g 1001 -S nodejs && \
