@@ -1,86 +1,65 @@
-# AGENTS.md – Workout Tracker
+# CLAUDE.md
 
-## Projekt-Philosophie
-Dies ist eine **persönliche, mobile-first PWA** für echtes, flexibles Krafttraining.  
-**Kernprinzip**: Flexibilität über Rigidität.  
-Geplante Workouts sind **Vorschläge**, keine Zwänge. Der User kann skippen, umsortieren, Exercises austauschen oder komplett freie Sessions machen – das System muss trotzdem exakte Progress-Tracking (Volume, 1RM, PRs, Muscle Distribution, Rest Times) ermöglichen.
+Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
 
-Historische Daten sind **immutable**. Änderungen am Blueprint wirken **nur forward** auf zukünftige Workouts.
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
 
-## Tech Stack & Versions (aktuell)
-- **Frontend**: Next.js 16 (App Router), TypeScript (strict), Tailwind CSS, PWA
-- **Backend**: NestJS (TypeScript), REST API
-- **Database**: PostgreSQL 16 + Prisma ORM
-- **Monorepo**: Yarn/PNPM Workspaces mit `apps/backend/` und `apps/frontend/`
-- **Deployment**: Docker (ARM64 auf Raspberry Pi), Cloudflare Tunnel
-- **Auth**: JWT (email/password)
-- **Testing**: Vitest + React Testing Library (Frontend), Jest/NestJS Testing (Backend)
+## 1. Think Before Coding
 
-## Monorepo-Struktur (wichtig!)
-- `apps/backend/` → NestJS mit Domain-Modulen (auth, users, workout-cycles, workouts, exercises, workout-templates, analytics, orm, health…)
-- `apps/frontend/` → Next.js mit Route-Groups (auth, cycles, workout, history, analytics, templates, profile)
-- Shared Configs und Scripts im Root
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
 
-## Architecture & Design-Prinzipien
-- **Clean Architecture / Feature-Sliced Design** im Backend
-- **Domain-Driven Design**: WorkoutEngineService, AnalyticsService, ORMService als zentrale Services
-- Blueprint = Source of Truth für geplante Workouts
-- Workout = tatsächliche ausgeführte Session (kann von Blueprint abweichen)
-- Alle historischen Logs (ExerciseLog, SetLog) sind unveränderlich
-- Muscle-Group-Distribution: Jede Exercise hat %-Aufteilung (sum = 100 %)
-- Epley-Formel für 1RM-Schätzung und Benchmarking
+Before implementing:
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
 
-## Coding Standards
-- **TypeScript strict mode** überall
-- ESLint + Prettier (keine Warnings erlaubt)
-- Keine `any`, keine `// @ts-ignore`
-- Descriptive Naming (z. B. `workoutBlueprintExercise` statt `exercise`)
-- Feature-Sliced Ordnerstruktur bevorzugt
-- Fehlerbehandlung mit NestJS Exceptions + Zod Validation
-- Prisma: Keine Raw-SQL außer bei sehr komplexen Analytics-Queries
-- Kommentare nur wo wirklich nötig (Code soll selbsterklärend sein)
+## 2. Simplicity First
 
-## Agent-Rollen & Verhalten
+**Minimum code that solves the problem. Nothing speculative.**
 
-### 1. Feature-Implementer (Default-Rolle)
-- Immer **Plan-First**: Erstelle detaillierten Plan bevor Code geschrieben wird
-- Implementiere Backend **+** Frontend **+** Tests in einem Zug
-- Berücksichtige PWA-Offline-Fähigkeit und mobile UX
-- Achte auf flexible Workout-Execution (Add/Remove/Reorder/Replace mid-workout)
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
 
-### 2. Code Reviewer
-- Prüft auf: Domain-Konsistenz, Immutable-History, Flexibilitäts-Regeln, Performance
-- Schlägt Verbesserungen vor (kein Auto-Apply)
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
 
-### 3. Tester
-- Schreibt immer **unit + integration tests** (Vitest)
-- Testet Edge-Cases: Free Workout, Blueprint-Änderungen, Partial Logs, Offline-Modus
+## 3. Surgical Changes
 
-### 4. Refactoring / Analytics Expert
-- Besonders vorsichtig bei AnalyticsService, ORMService und Benchmark-Berechnungen
+**Touch only what you must. Clean up only your own mess.**
 
-## Wichtige Workflows
+When editing existing code:
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
 
-**Neues Feature / Bugfix:**
-1. Plan (mit User bestätigen)
-2. Backend-Änderung (Module + Service + DTO + Prisma wenn nötig)
-3. Frontend-Änderung
-4. Tests (mind. 1 Test pro neuen Flow)
-5. Update von DEPLOYMENT-PLAN.md oder IMPLEMENTATION-PLAN.md falls relevant
+When your changes create orphans:
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
 
-**Database-Änderung:**
-- Immer Prisma Migration + Seed-Update bei neuen Default-Exercises
-- Keine Breaking Changes bei existierenden Tabellen ohne Migration-Plan
+The test: Every changed line should trace directly to the user's request.
 
-**Deployment:**
-- Immer ARM64 Docker berücksichtigen
-- Secrets nur über .env + Docker Secrets
-- Cloudflare Tunnel + Raspberry Pi spezifische Hinweise
+## 4. Goal-Driven Execution
 
-## Sonstiges
-- Dokumentation: Alle neuen Features in den bestehenden .md-Dateien (Business Requirements, Architecture Overview etc.) mitpflegen
-- Performance: Analytics-Queries dürfen nicht bei jedem Workout-Log langsam werden
-- Accessibility & Mobile-First immer priorisieren
+**Define success criteria. Loop until verified.**
 
-**Du bist jetzt der ultimative Workout-Tracker-Experte.**  
-Nutze diese Regeln bei jedem Prompt.
+Transform tasks into verifiable goals:
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+```
+
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+---
+
+**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
