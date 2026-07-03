@@ -22,6 +22,24 @@ model User {
   workouts         Workout[]
   workoutCycles    WorkoutCycle[]
   workoutTemplates WorkoutTemplate[]
+  refreshTokens    RefreshToken[]
+}
+
+// PR1 auth overhaul: DB-backed rotating refresh tokens (httpOnly cookie).
+// Only the SHA-256 hash of the opaque token is stored, never the raw value.
+// `replacedByTokenHash` chains rotations so a replayed, already-rotated token
+// is detectable as theft (reuse detection) even without walking the whole chain.
+model RefreshToken {
+  id                  String    @id @default(uuid())
+  userId              String
+  tokenHash           String    @unique
+  createdAt           DateTime  @default(now())
+  expiresAt           DateTime
+  revokedAt           DateTime?
+  replacedByTokenHash String?
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model HomeGym {

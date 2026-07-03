@@ -6,20 +6,44 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
-import { RegisterDto, LoginDto, AuthResponseDto } from './dto';
-import * as bcrypt from 'bcrypt';
+import { RegisterDto, LoginDto, ChangePasswordDto } from './dto';
+import { UserDto } from '../users/dto';
+import { PasswordService } from './password.service';
+import { RefreshTokenService, IssuedRefreshToken } from './refresh-token.service';
+
+const USER_SELECT = {
+  id: true,
+  email: true,
+  firstName: true,
+  lastName: true,
+  dateOfBirth: true,
+  height: true,
+  weight: true,
+  createdAt: true,
+  homeGyms: {
+    select: { id: true, name: true, createdAt: true },
+    orderBy: { name: 'asc' as const },
+  },
+};
+
+export interface AuthSession {
+  user: UserDto;
+  accessToken: string;
+  refreshToken: IssuedRefreshToken;
+}
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private passwordService: PasswordService,
+    private refreshTokenService: RefreshTokenService,
   ) {}
 
-  async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
+  async register(registerDto: RegisterDto): Promise<AuthSession> {
     const { email, password, firstName, lastName, dateOfBirth, height, weight, homeGyms } = registerDto;
 
-    // Check if user already exists
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
     });
@@ -28,12 +52,11 @@ export class AuthService {
       throw new ConflictException('User with this email already exists');
     }
 
-    // Hash password
-    const passwordHash = await this.hashPassword(password);
+    const passwordHash = await this.passwordService.hash(password);
 
-    // Create user with profile data and home gyms in a transaction
+    let user: UserDto;
     try {
-      const user = await this.prisma.user.create({
+      user = await this.prisma.user.create({
         data: {
           email,
           passwordHash,
@@ -48,44 +71,18 @@ export class AuthService {
             })),
           },
         },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          dateOfBirth: true,
-          height: true,
-          weight: true,
-          createdAt: true,
-          homeGyms: {
-            select: {
-              id: true,
-              name: true,
-              createdAt: true,
-            },
-            orderBy: {
-              name: 'asc',
-            },
-          },
-        },
+        select: USER_SELECT,
       });
-
-      // Generate JWT token
-      const access_token = await this.generateToken(user.id, user.email);
-
-      return {
-        access_token,
-        user,
-      };
     } catch (error) {
       throw new InternalServerErrorException('Failed to create user');
     }
+
+    return this.issueSession(user);
   }
 
-  async login(loginDto: LoginDto): Promise<AuthResponseDto> {
+  async login(loginDto: LoginDto): Promise<AuthSession> {
     const { email, password } = loginDto;
 
-    // Find user by email with password hash for verification
     const userWithPassword = await this.prisma.user.findUnique({
       where: { email },
       select: {
@@ -99,45 +96,62 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Verify password
-    const isPasswordValid = await this.verifyPassword(password, userWithPassword.passwordHash);
+    const isPasswordValid = await this.passwordService.verify(password, userWithPassword.passwordHash);
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Fetch full user data with profile and homeGyms
-    const user = await this.prisma.user.findUnique({
+    // Transparent upgrade: a successful legacy-bcrypt verify gets rehashed to argon2id.
+    if (this.passwordService.needsRehash(userWithPassword.passwordHash)) {
+      const upgradedHash = await this.passwordService.hash(password);
+      await this.prisma.user.update({
+        where: { id: userWithPassword.id },
+        data: { passwordHash: upgradedHash },
+      });
+    }
+
+    const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userWithPassword.id },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        dateOfBirth: true,
-        height: true,
-        weight: true,
-        createdAt: true,
-        homeGyms: {
-          select: {
-            id: true,
-            name: true,
-            createdAt: true,
-          },
-          orderBy: {
-            name: 'asc',
-          },
-        },
-      },
+      select: USER_SELECT,
     });
 
-    // Generate JWT token
-    const access_token = await this.generateToken(user.id, user.email);
+    return this.issueSession(user);
+  }
 
-    return {
-      access_token,
-      user,
-    };
+  async refresh(rawRefreshToken: string): Promise<{ accessToken: string; refreshToken: IssuedRefreshToken }> {
+    const { userId, ...refreshToken } = await this.refreshTokenService.rotate(rawRefreshToken);
+    const accessToken = await this.generateAccessToken(userId);
+    return { accessToken, refreshToken };
+  }
+
+  async logout(rawRefreshToken: string): Promise<void> {
+    await this.refreshTokenService.revoke(rawRefreshToken);
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto): Promise<void> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, passwordHash: true },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+
+    const isCurrentPasswordValid = await this.passwordService.verify(dto.currentPassword, user.passwordHash);
+    if (!isCurrentPasswordValid) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    const newHash = await this.passwordService.hash(dto.newPassword);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: newHash },
+    });
+
+    // Credential change: rotate every session out, including the current one.
+    await this.refreshTokenService.revokeAllForUser(userId);
   }
 
   async validateUser(userId: string) {
@@ -157,17 +171,14 @@ export class AuthService {
     return user;
   }
 
-  private async hashPassword(password: string): Promise<string> {
-    const saltRounds = 10;
-    return bcrypt.hash(password, saltRounds);
+  private async issueSession(user: UserDto): Promise<AuthSession> {
+    const accessToken = await this.generateAccessToken(user.id);
+    const refreshToken = await this.refreshTokenService.issue(user.id);
+    return { user, accessToken, refreshToken };
   }
 
-  private async verifyPassword(password: string, passwordHash: string): Promise<boolean> {
-    return bcrypt.compare(password, passwordHash);
-  }
-
-  private async generateToken(userId: string, email: string): Promise<string> {
-    const payload = { sub: userId, email };
+  private async generateAccessToken(userId: string): Promise<string> {
+    const payload = { sub: userId };
     return this.jwtService.signAsync(payload);
   }
 }

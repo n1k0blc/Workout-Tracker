@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto, UserDto, CreateHomeGymDto, UpdateHomeGymDto, HomeGymDto } from './dto';
 
@@ -40,7 +40,17 @@ export class UsersService {
 
   async updateUser(userId: string, updateUserDto: UpdateUserDto): Promise<UserDto> {
     const data: any = { ...updateUserDto };
-    
+
+    if (updateUserDto.email) {
+      const existing = await this.prisma.user.findUnique({
+        where: { email: updateUserDto.email },
+        select: { id: true },
+      });
+      if (existing && existing.id !== userId) {
+        throw new ConflictException('Email is already in use');
+      }
+    }
+
     // Convert dateOfBirth string to Date if provided
     if (updateUserDto.dateOfBirth) {
       data.dateOfBirth = new Date(updateUserDto.dateOfBirth);

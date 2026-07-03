@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { Workout, SetType } from '@/types';
 import { apiClient } from '@/lib/api';
+import { useAuth } from '@/lib/auth-context';
 
 interface WorkoutContextType {
   activeWorkout: Workout | null;
@@ -67,6 +68,7 @@ interface WorkoutContextType {
 const WorkoutContext = createContext<WorkoutContextType | undefined>(undefined);
 
 export function WorkoutProvider({ children }: { children: React.ReactNode }) {
+  const { user, loading: authLoading } = useAuth();
   const [activeWorkout, setActiveWorkout] = useState<Workout | null>(null);
   const [loading, setLoading] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -258,12 +260,12 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   }, [restTimerStartedAt, restTimerTarget, isPaused, isRestTimerPaused, isPastWorkout, restStartTime, pausedRestTimer, pausedRestTimerValue]);
 
   const refreshActiveWorkout = async () => {
-    // Only try to load active workout if user is logged in (has token)
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-    if (!token) {
+    // Only try to load active workout once auth has resolved to a logged-in user.
+    // (Auth now lives in an httpOnly cookie - there's no client-readable token to check.)
+    if (authLoading || !user) {
       return;
     }
-    
+
     try {
       const workout = await apiClient.getActiveWorkout();
       setActiveWorkout(workout);
@@ -828,9 +830,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Load active workout on mount
+    // Load active workout once auth has resolved to a logged-in user.
     refreshActiveWorkout();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authLoading]);
 
   return (
     <WorkoutContext.Provider

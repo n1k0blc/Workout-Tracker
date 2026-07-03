@@ -19,7 +19,6 @@ export interface HomeGym {
 
 // Auth Types
 export interface AuthResponse {
-  access_token: string;
   user: User;
 }
 

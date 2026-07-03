@@ -46,26 +46,32 @@ class ApiClient {
     this.baseUrl = baseUrl;
   }
 
-  private getToken(): string | null {
-    if (typeof window === 'undefined') return null;
-    return localStorage.getItem('access_token');
+  private getCsrfToken(): string | null {
+    if (typeof document === 'undefined') return null;
+    const match = document.cookie.match(/(?:^|; )csrf_token=([^;]*)/);
+    return match ? decodeURIComponent(match[1]) : null;
   }
 
-  private setToken(token: string): void {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem('access_token', token);
-  }
-
-  private removeToken(): void {
-    if (typeof window === 'undefined') return;
-    localStorage.removeItem('access_token');
+  // Cookie-based auth session refresh. Raw fetch (not this.request) so it can't
+  // recursively trigger its own refresh/redirect handling.
+  private async tryRefresh(): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
   }
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    opts: { isRetry?: boolean; suppressRedirect?: boolean } = {}
   ): Promise<T> {
-    const token = this.getToken();
+    const method = (options.method || 'GET').toUpperCase();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -74,18 +80,34 @@ class ApiClient {
       Object.assign(headers, options.headers);
     }
 
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+    // Double-submit CSRF cookie: echo it back as a header on every mutating request.
+    if (method !== 'GET' && method !== 'HEAD') {
+      const csrfToken = this.getCsrfToken();
+      if (csrfToken) {
+        headers['X-CSRF-Token'] = csrfToken;
+      }
     }
 
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       ...options,
       headers,
+      credentials: 'include',
     });
 
     if (response.status === 401) {
-      this.removeToken();
-      if (typeof window !== 'undefined') {
+      // /auth/* 401s are real auth failures (bad credentials, expired session on
+      // refresh itself) - never retry-refresh or redirect for those, let the
+      // caller (login form, change-password form, ...) handle the error.
+      const isAuthEndpoint = endpoint.startsWith('/auth/');
+
+      if (!opts.isRetry && !isAuthEndpoint) {
+        const refreshed = await this.tryRefresh();
+        if (refreshed) {
+          return this.request<T>(endpoint, options, { ...opts, isRetry: true });
+        }
+      }
+
+      if (!opts.suppressRedirect && !isAuthEndpoint && typeof window !== 'undefined') {
         window.location.href = '/login';
       }
       throw new Error('Unauthorized');
@@ -123,32 +145,50 @@ class ApiClient {
 
   // Auth Methods
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    const response = await this.request<AuthResponse>('/auth/login', {
+    return this.request<AuthResponse>('/auth/login', {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
-    this.setToken(response.access_token);
-    return response;
   }
 
   async register(credentials: RegisterCredentials): Promise<AuthResponse> {
-    const response = await this.request<AuthResponse>('/auth/register', {
+    return this.request<AuthResponse>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(credentials),
     });
-    this.setToken(response.access_token);
-    return response;
   }
 
-  logout(): void {
-    this.removeToken();
+  async logout(): Promise<void> {
+    try {
+      await this.request<void>('/auth/logout', { method: 'POST' });
+    } catch {
+      // Logout is best-effort client-side too - cookies may already be gone/expired.
+    }
+  }
+
+  async changePassword(data: { currentPassword: string; newPassword: string }): Promise<void> {
+    await this.request<void>('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 
   async getProfile(): Promise<User> {
     return this.request<User>('/users/me');
   }
 
+  // Silent session check for app bootstrap: never redirects to /login on a
+  // fresh/anonymous visit, just resolves to null.
+  async checkAuth(): Promise<User | null> {
+    try {
+      return await this.request<User>('/users/me', {}, { suppressRedirect: true });
+    } catch {
+      return null;
+    }
+  }
+
   async updateProfile(data: {
+    email?: string;
     firstName?: string;
     lastName?: string;
     dateOfBirth?: string;

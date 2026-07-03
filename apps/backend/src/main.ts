@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -8,10 +9,12 @@ async function bootstrap() {
 
   // Trust the first hop (Cloudflare Tunnel connects to the container over localhost;
   // the real client IP arrives via X-Forwarded-For set by the Cloudflare edge).
-  // Needed so req.ip / throttler / future Secure-cookie logic see the real client, not the tunnel.
+  // Needed so req.ip / throttler / Secure-cookie logic see the real client, not the tunnel.
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
 
   app.use(helmet());
+  // Must run before the CSRF middleware and JwtStrategy's cookie extractor.
+  app.use(cookieParser());
 
   // Global prefix for all routes
   app.setGlobalPrefix('api');
@@ -31,7 +34,7 @@ async function bootstrap() {
       origin: explicitOrigins,
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-CSRF-Token'],
       exposedHeaders: ['Content-Range', 'X-Content-Range'],
       maxAge: 3600,
     });
@@ -74,7 +77,7 @@ async function bootstrap() {
       },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-CSRF-Token'],
       exposedHeaders: ['Content-Range', 'X-Content-Range'],
       maxAge: 3600,
     });
