@@ -17,6 +17,7 @@
 6. [Testing strategy](#6-testing-strategy)
 7. [Pi deployment & rollback strategy](#7-pi-deployment--rollback-strategy)
 8. [Open flags / deferred](#8-open-flags--deferred)
+9. [Progress log](#9-progress-log)
 
 ---
 
@@ -340,3 +341,25 @@ Every site calls `setWorkingVolume`; analytics additionally distributes. Fixes t
 - **Timezone:** pick a single basis for date bucketing (recommend one configured app timezone) — addressed in PR 3.
 - **`HomeGym → Gym` rename:** optional clarity, low priority.
 - **Deferred work:** Prisma 7, TS 6, pnpm (separate PRs); Pi resilience/backups/SSD (future session).
+
+---
+
+## 9. Progress log
+
+> Updated as each PR lands. Not committed automatically — status reflects the working tree at time of writing.
+
+### PR 0 — Foundations & low-risk hardening — ✅ done (2026-07-03)
+
+- **Jest + ts-jest harness fixed.** Root cause: no `jest` config existed, so Jest fell back to defaults, picked up stale compiled specs under `dist/` and couldn't parse `.ts` at all. Added the standard Nest jest block (`rootDir: src`, ts-jest transform) to `apps/backend/package.json`. Fixed two pre-existing bad expected-values in `orm.service.spec.ts` (hand-rounded comment math didn't match the actual Epley-formula result — test bug, not a code bug). Removed the dead `test:e2e` script (pointed at a `test/` dir that doesn't exist; out of scope per §6 anyway). **15/15 tests pass.**
+- **Env-validation schema.** New `apps/backend/src/config/env.validation.ts` (class-validator, no new dependency), wired via `ConfigModule.forRoot({ validate })`. Fails fast on missing/malformed `DATABASE_URL`, `JWT_SECRET` < 32 chars, or a JWT_SECRET matching a known placeholder (e.g. the literal value shipped in `.env.example`). Verified against the real `.env.local` and against synthetic bad configs.
+- **helmet + throttler + CORS + trust proxy.** `helmet()` on all responses. `@nestjs/throttler`: global default 100 req/min, `/auth/login` + `/auth/register` overridden to 5 req/min (verified live: 6th rapid login attempt → 429). CORS now branches on `NODE_ENV`: production uses a strict `CORS_ORIGIN` allowlist only (throws at boot if unset), dev keeps the existing LAN-friendly behavior unchanged. `trust proxy` set to `1` (Cloudflare Tunnel connects to the container over localhost; the real client IP arrives via the edge's `X-Forwarded-For`).
+- **npm audit fix + patch bumps.** `@nestjs/core`/`common`/`platform-express` 11.1.17→11.1.27, `@nestjs/cli` 11.0.16→11.0.23, Prisma 6.19.2→6.19.3. Vulnerabilities 26→2 (workspace-wide `npm audit`); the remaining 2 are Next.js/postcss on the frontend needing a major Next bump (`--force`), correctly deferred (§3.12, §5 "Later/separate"). Had to add a root-level `overrides.multer: 2.2.0` (nested exact-pinned by `@nestjs/platform-express@11.1.27` at `2.1.1`) and fully regenerate `package-lock.json` — npm doesn't retroactively apply new `overrides` entries to an existing lockfile via a plain `npm install`. Confirmed the app has no multipart/file-upload endpoints, so the multer CVEs were unreachable anyway; fixed for hygiene. Both backend and frontend build clean afterward.
+- **DB-ping health + connection_limit.** `/api/health` now runs `SELECT 1` and returns 503 (`ServiceUnavailableException`) when the DB is unreachable, instead of always returning 200. Verified live by stopping/restarting the dev DB container. Added explicit `connection_limit=10` to `DATABASE_URL` in both prod compose files (`docker-compose.prod.yml`, `docker-compose.prod.alternative-ports.yml`) and documented it in `apps/backend/.env.example`.
+- **Post-PR0 smoke test:** both dev servers started clean, backend/frontend CORS preflight succeeds, `/api/health` reports `database: connected`.
+- **Not part of PR 0, noted in passing:** `.claude/skills/refactoring/SKILL.md` shows as deleted in the working tree; not caused by this work — flagged to the user, left untouched.
+
+### PR 1 — Auth overhaul — not started
+
+### PR 2 — Unified data-model core + BOLA — not started
+
+### PR 3 — Analytics + dashboard consolidation — not started

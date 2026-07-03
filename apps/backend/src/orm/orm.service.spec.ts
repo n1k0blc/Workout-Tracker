@@ -116,10 +116,10 @@ describe('ORMService', () => {
         exercise,
       );
 
-      // Set 1: 70 / 99.65 = 0.702 = 70.2%
-      // Set 2: 80 / 99.65 = 0.802 = 80.2%
-      // Average: 75.2%
-      expect(percentORM).toBeCloseTo(75.2, 1);
+      // Set 1: 70 / 99.65 = 0.7024 = 70.24%
+      // Set 2: 80 / 99.65 = 0.8028 = 80.28%
+      // Average: 75.26%
+      expect(percentORM).toBeCloseTo(75.26, 1);
     });
 
     it('should handle double weight in %ORM calculation', () => {
@@ -134,8 +134,8 @@ describe('ORMService', () => {
         exercise,
       );
 
-      // (30 × 2) / 82 = 60 / 82 = 0.731 = 73.1%
-      expect(percentORM).toBeCloseTo(73.1, 1);
+      // (30 × 2) / 82 = 60 / 82 = 0.7317 = 73.17%
+      expect(percentORM).toBeCloseTo(73.17, 1);
     });
   });
 });
