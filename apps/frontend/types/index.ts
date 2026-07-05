@@ -307,12 +307,30 @@ export interface CycleDetails {
   percentage?: number;
 }
 
-// Analytics Types
+// Analytics Types (PR3 §3.9: `cycleId` presence alone switches a metric into cycle-anchored
+// mode -- there's no separate "-by-cycle" type/endpoint anymore, just optional cycle/week fields)
+export interface AnalyticsFilterParams {
+  period?: 'week' | 'month' | 'all';
+  startDate?: string;
+  endDate?: string;
+  gymId?: string;
+  muscleGroup?: string | string[];
+  equipment?: string | string[];
+  cycleId?: string;
+  aggregation?: 'day' | 'week';
+  exerciseId?: string;
+}
+
 export interface VolumeDataPoint {
   date: string;
   volume: number;
   workoutId?: string;
   trainingDay?: number;
+  weekNumber?: number;
+  weekLabel?: string;
+  weekStartDate?: string;
+  weekEndDate?: string;
+  workoutCount?: number;
 }
 
 export interface VolumeByMuscleGroup {
@@ -322,8 +340,10 @@ export interface VolumeByMuscleGroup {
 }
 
 export interface VolumeAnalytics {
+  cycleId?: string;
+  cycleName?: string;
   totalVolume: number;
-  period: string;
+  period?: string;
   dataPoints: VolumeDataPoint[];
   byMuscleGroup?: VolumeByMuscleGroup[];
 }
@@ -368,33 +388,25 @@ export interface CycleList {
 
 export interface RIRDataPoint {
   date: string;
-  trainingDay: number;
+  trainingDay?: number;
   rir0Count: number;
   rir1Count: number;
   rir2Count: number;
   workoutId: string;
-}
-
-export interface RIRByCycleAnalytics {
-  cycleId: string;
-  cycleName: string;
-  dataPoints: RIRDataPoint[];
-  totalSets: number;
-  totalWorkouts: number;
-}
-
-export interface RIRAnalyticsDataPoint {
-  date: string;
-  rir0Count: number;
-  rir1Count: number;
-  rir2Count: number;
-  workoutId: string;
+  weekNumber?: number;
+  weekLabel?: string;
+  weekStartDate?: string;
+  weekEndDate?: string;
+  workoutCount?: number;
 }
 
 export interface RIRAnalytics {
+  cycleId?: string;
+  cycleName?: string;
   totalSets: number;
-  period: string;
-  dataPoints: RIRAnalyticsDataPoint[];
+  period?: string;
+  totalWorkouts: number;
+  dataPoints: RIRDataPoint[];
 }
 
 export interface DurationDataPoint {
@@ -402,20 +414,20 @@ export interface DurationDataPoint {
   duration: number;
   workoutId: string;
   trainingDay?: number;
+  weekNumber?: number;
+  weekLabel?: string;
+  weekStartDate?: string;
+  weekEndDate?: string;
+  workoutCount?: number;
 }
 
 export interface DurationAnalytics {
+  cycleId?: string;
+  cycleName?: string;
   averageDuration: number;
-  period: string;
-  dataPoints: DurationDataPoint[];
-}
-
-export interface DurationByCycleAnalytics {
-  cycleId: string;
-  cycleName: string;
-  dataPoints: DurationDataPoint[];
-  averageDuration: number;
+  period?: string;
   totalWorkouts: number;
+  dataPoints: DurationDataPoint[];
 }
 
 export interface RestTimeDataPoint {
@@ -423,20 +435,20 @@ export interface RestTimeDataPoint {
   averageRestTime: number;
   workoutId: string;
   trainingDay?: number;
+  weekNumber?: number;
+  weekLabel?: string;
+  weekStartDate?: string;
+  weekEndDate?: string;
+  workoutCount?: number;
 }
 
 export interface RestTimeAnalytics {
+  cycleId?: string;
+  cycleName?: string;
   overallAverage: number;
-  period: string;
-  dataPoints: RestTimeDataPoint[];
-}
-
-export interface RestTimeByCycleAnalytics {
-  cycleId: string;
-  cycleName: string;
-  dataPoints: RestTimeDataPoint[];
-  overallAverage: number;
+  period?: string;
   totalWorkouts: number;
+  dataPoints: RestTimeDataPoint[];
 }
 
 export interface RepsDataPoint {
@@ -444,22 +456,21 @@ export interface RepsDataPoint {
   reps: number;
   workoutId: string;
   trainingDay?: number;
+  weekNumber?: number;
+  weekLabel?: string;
+  weekStartDate?: string;
+  weekEndDate?: string;
+  workoutCount?: number;
 }
 
 export interface RepsAnalytics {
+  cycleId?: string;
+  cycleName?: string;
   totalReps: number;
   averageReps: number;
-  period: string;
-  dataPoints: RepsDataPoint[];
-}
-
-export interface RepsByCycleAnalytics {
-  cycleId: string;
-  cycleName: string;
-  dataPoints: RepsDataPoint[];
-  totalReps: number;
-  averageReps: number;
+  period?: string;
   totalWorkouts: number;
+  dataPoints: RepsDataPoint[];
 }
 
 export interface SetsDataPoint {
@@ -467,22 +478,44 @@ export interface SetsDataPoint {
   sets: number;
   workoutId: string;
   trainingDay?: number;
+  weekNumber?: number;
+  weekLabel?: string;
+  weekStartDate?: string;
+  weekEndDate?: string;
+  workoutCount?: number;
 }
 
 export interface SetsAnalytics {
+  cycleId?: string;
+  cycleName?: string;
   totalSets: number;
   averageSets: number;
-  period: string;
+  period?: string;
+  totalWorkouts: number;
   dataPoints: SetsDataPoint[];
 }
 
-export interface SetsByCycleAnalytics {
-  cycleId: string;
-  cycleName: string;
-  dataPoints: SetsDataPoint[];
-  totalSets: number;
-  averageSets: number;
+// PR3 §3.10: ORM% reborn weight-independent (`3000 / (30 + reps + rir)` per working set,
+// averaged) -- applies to every gym/workout, unlike the retired benchmark-based %ORM.
+export interface IntensityDataPoint {
+  date: string;
+  intensity: number;
+  workoutId: string;
+  trainingDay?: number;
+  weekNumber?: number;
+  weekLabel?: string;
+  weekStartDate?: string;
+  weekEndDate?: string;
+  workoutCount?: number;
+}
+
+export interface IntensityAnalytics {
+  cycleId?: string;
+  cycleName?: string;
+  averageIntensity: number;
+  period?: string;
   totalWorkouts: number;
+  dataPoints: IntensityDataPoint[];
 }
 
 // Workout Template Types (same tree shape as blueprints/workouts, §3.2)

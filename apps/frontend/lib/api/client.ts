@@ -12,16 +12,13 @@ import {
   VolumeAnalytics,
   PersonalRecordsResponse,
   CycleList,
-  RIRByCycleAnalytics,
   RIRAnalytics,
   DurationAnalytics,
-  DurationByCycleAnalytics,
   RestTimeAnalytics,
-  RestTimeByCycleAnalytics,
   RepsAnalytics,
-  RepsByCycleAnalytics,
   SetsAnalytics,
-  SetsByCycleAnalytics,
+  IntensityAnalytics,
+  AnalyticsFilterParams,
   MuscleGroup,
   Equipment,
   HomeGym,
@@ -412,18 +409,11 @@ class ApiClient {
     );
   }
 
-  // Analytics Methods
-  async getVolumeAnalytics(params?: {
-    startDate?: string;
-    endDate?: string;
-    gymId?: string;
-    muscleGroup?: string | string[];
-    equipment?: string | string[];
-    cycleId?: string;
-    aggregation?: 'day' | 'week';
-    exerciseId?: string;
-  }): Promise<VolumeAnalytics> {
+  // Analytics Methods (PR3 §3.9: one endpoint per metric; `cycleId` presence alone switches
+  // a metric into cycle-anchored mode -- there are no more "-by-cycle" twins.)
+  private buildAnalyticsQuery(params?: AnalyticsFilterParams): string {
     const query = new URLSearchParams();
+    if (params?.period) query.append('period', params.period);
     if (params?.startDate) query.append('startDate', params.startDate);
     if (params?.endDate) query.append('endDate', params.endDate);
     if (params?.gymId) query.append('gymId', params.gymId);
@@ -433,8 +423,11 @@ class ApiClient {
     if (params?.aggregation) query.append('aggregation', params.aggregation);
     if (params?.exerciseId) query.append('exerciseId', params.exerciseId);
 
-    const queryString = query.toString() ? `?${query.toString()}` : '';
-    return this.request<VolumeAnalytics>(`/analytics/volume${queryString}`);
+    return query.toString() ? `?${query.toString()}` : '';
+  }
+
+  async getVolumeAnalytics(params?: AnalyticsFilterParams): Promise<VolumeAnalytics> {
+    return this.request<VolumeAnalytics>(`/analytics/volume${this.buildAnalyticsQuery(params)}`);
   }
 
   async getPersonalRecords(params?: {
@@ -457,223 +450,28 @@ class ApiClient {
     return this.request<CycleList>('/analytics/cycles');
   }
 
-  async getRIRByCycle(
-    cycleId: string,
-    gymId?: string,
-    muscleGroup?: string | string[],
-    equipment?: string | string[],
-    timeOfDay?: string,
-    aggregation?: 'day' | 'week',
-    exerciseId?: string,
-  ): Promise<RIRByCycleAnalytics> {
-    const query = new URLSearchParams();
-    if (gymId) query.append('gymId', gymId);
-    this.addQueryParam(query, 'muscleGroup', muscleGroup);
-    this.addQueryParam(query, 'equipment', equipment);
-    if (timeOfDay) query.append('timeOfDay', timeOfDay);
-    if (aggregation) query.append('aggregation', aggregation);
-    if (exerciseId) query.append('exerciseId', exerciseId);
-
-    const queryString = query.toString() ? `?${query.toString()}` : '';
-    return this.request<RIRByCycleAnalytics>(
-      `/analytics/rir-by-cycle/${cycleId}${queryString}`
-    );
+  async getRIRAnalytics(params?: AnalyticsFilterParams): Promise<RIRAnalytics> {
+    return this.request<RIRAnalytics>(`/analytics/rir${this.buildAnalyticsQuery(params)}`);
   }
 
-  async getRIRAnalytics(params: {
-    period?: 'week' | 'month' | 'all';
-    startDate?: string;
-    endDate?: string;
-    gymId?: string;
-    muscleGroup?: string | string[];
-    equipment?: string | string[];
-    aggregation?: 'day' | 'week';
-    exerciseId?: string;
-  }): Promise<RIRAnalytics> {
-    const query = new URLSearchParams();
-    if (params.period) query.append('period', params.period);
-    if (params.startDate) query.append('startDate', params.startDate);
-    if (params.endDate) query.append('endDate', params.endDate);
-    if (params.gymId) query.append('gymId', params.gymId);
-    this.addQueryParam(query, 'muscleGroup', params.muscleGroup);
-    this.addQueryParam(query, 'equipment', params.equipment);
-    if (params.aggregation) query.append('aggregation', params.aggregation);
-    if (params.exerciseId) query.append('exerciseId', params.exerciseId);
-
-    const queryString = query.toString() ? `?${query.toString()}` : '';
-    return this.request<RIRAnalytics>(`/analytics/rir${queryString}`);
+  async getDurationAnalytics(params?: AnalyticsFilterParams): Promise<DurationAnalytics> {
+    return this.request<DurationAnalytics>(`/analytics/duration${this.buildAnalyticsQuery(params)}`);
   }
 
-  async getDurationAnalytics(params: {
-    period?: 'week' | 'month' | 'all';
-    startDate?: string;
-    endDate?: string;
-    gymId?: string;
-    muscleGroup?: string | string[];
-    equipment?: string | string[];
-    aggregation?: 'day' | 'week';
-  }): Promise<DurationAnalytics> {
-    const query = new URLSearchParams();
-    if (params.period) query.append('period', params.period);
-    if (params.startDate) query.append('startDate', params.startDate);
-    if (params.endDate) query.append('endDate', params.endDate);
-    if (params.gymId) query.append('gymId', params.gymId);
-    this.addQueryParam(query, 'muscleGroup', params.muscleGroup);
-    this.addQueryParam(query, 'equipment', params.equipment);
-    if (params.aggregation) query.append('aggregation', params.aggregation);
-
-    const queryString = query.toString() ? `?${query.toString()}` : '';
-    return this.request<DurationAnalytics>(`/analytics/duration${queryString}`);
+  async getRestTimeAnalytics(params?: AnalyticsFilterParams): Promise<RestTimeAnalytics> {
+    return this.request<RestTimeAnalytics>(`/analytics/rest-time${this.buildAnalyticsQuery(params)}`);
   }
 
-  async getDurationByCycle(
-    cycleId: string,
-    gymId?: string,
-    muscleGroup?: string | string[],
-    equipment?: string | string[],
-    aggregation?: 'day' | 'week',
-  ): Promise<DurationByCycleAnalytics> {
-    const query = new URLSearchParams();
-    if (gymId) query.append('gymId', gymId);
-    this.addQueryParam(query, 'muscleGroup', muscleGroup);
-    this.addQueryParam(query, 'equipment', equipment);
-    if (aggregation) query.append('aggregation', aggregation);
-
-    const queryString = query.toString() ? `?${query.toString()}` : '';
-    return this.request<DurationByCycleAnalytics>(
-      `/analytics/duration-by-cycle/${cycleId}${queryString}`
-    );
+  async getRepsAnalytics(params?: AnalyticsFilterParams): Promise<RepsAnalytics> {
+    return this.request<RepsAnalytics>(`/analytics/reps${this.buildAnalyticsQuery(params)}`);
   }
 
-  async getRestTimeAnalytics(params: {
-    period?: 'week' | 'month' | 'all';
-    startDate?: string;
-    endDate?: string;
-    gymId?: string;
-    muscleGroup?: string | string[];
-    equipment?: string | string[];
-    aggregation?: 'day' | 'week';
-    exerciseId?: string;
-  }): Promise<RestTimeAnalytics> {
-    const query = new URLSearchParams();
-    if (params.period) query.append('period', params.period);
-    if (params.startDate) query.append('startDate', params.startDate);
-    if (params.endDate) query.append('endDate', params.endDate);
-    if (params.gymId) query.append('gymId', params.gymId);
-    this.addQueryParam(query, 'muscleGroup', params.muscleGroup);
-    this.addQueryParam(query, 'equipment', params.equipment);
-    if (params.aggregation) query.append('aggregation', params.aggregation);
-    if (params.exerciseId) query.append('exerciseId', params.exerciseId);
-
-    const queryString = query.toString() ? `?${query.toString()}` : '';
-    return this.request<RestTimeAnalytics>(`/analytics/rest-time${queryString}`);
+  async getSetsAnalytics(params?: AnalyticsFilterParams): Promise<SetsAnalytics> {
+    return this.request<SetsAnalytics>(`/analytics/sets${this.buildAnalyticsQuery(params)}`);
   }
 
-  async getRestTimeByCycle(
-    cycleId: string,
-    gymId?: string,
-    muscleGroup?: string | string[],
-    equipment?: string | string[],
-    aggregation?: 'day' | 'week',
-    exerciseId?: string,
-  ): Promise<RestTimeByCycleAnalytics> {
-    const query = new URLSearchParams();
-    if (gymId) query.append('gymId', gymId);
-    this.addQueryParam(query, 'muscleGroup', muscleGroup);
-    this.addQueryParam(query, 'equipment', equipment);
-    if (aggregation) query.append('aggregation', aggregation);
-    if (exerciseId) query.append('exerciseId', exerciseId);
-
-    const queryString = query.toString() ? `?${query.toString()}` : '';
-    return this.request<RestTimeByCycleAnalytics>(
-      `/analytics/rest-time-by-cycle/${cycleId}${queryString}`
-    );
-  }
-
-  async getRepsAnalytics(params: {
-    period?: 'week' | 'month' | 'all';
-    startDate?: string;
-    endDate?: string;
-    gymId?: string;
-    muscleGroup?: string | string[];
-    equipment?: string | string[];
-    aggregation?: 'day' | 'week';
-    exerciseId?: string;
-  }): Promise<RepsAnalytics> {
-    const query = new URLSearchParams();
-    if (params.period) query.append('period', params.period);
-    if (params.startDate) query.append('startDate', params.startDate);
-    if (params.endDate) query.append('endDate', params.endDate);
-    if (params.gymId) query.append('gymId', params.gymId);
-    this.addQueryParam(query, 'muscleGroup', params.muscleGroup);
-    this.addQueryParam(query, 'equipment', params.equipment);
-    if (params.aggregation) query.append('aggregation', params.aggregation);
-    if (params.exerciseId) query.append('exerciseId', params.exerciseId);
-
-    const queryString = query.toString() ? `?${query.toString()}` : '';
-    return this.request<RepsAnalytics>(`/analytics/reps${queryString}`);
-  }
-
-  async getRepsByCycle(
-    cycleId: string,
-    muscleGroup?: string | string[],
-    equipment?: string | string[],
-    aggregation?: 'day' | 'week',
-    exerciseId?: string,
-  ): Promise<RepsByCycleAnalytics> {
-    const query = new URLSearchParams();
-    this.addQueryParam(query, 'muscleGroup', muscleGroup);
-    this.addQueryParam(query, 'equipment', equipment);
-    if (aggregation) query.append('aggregation', aggregation);
-    if (exerciseId) query.append('exerciseId', exerciseId);
-
-    const queryString = query.toString() ? `?${query.toString()}` : '';
-    return this.request<RepsByCycleAnalytics>(
-      `/analytics/reps-by-cycle/${cycleId}${queryString}`
-    );
-  }
-
-  async getSetsAnalytics(params: {
-    period?: 'week' | 'month' | 'all';
-    startDate?: string;
-    endDate?: string;
-    gymId?: string;
-    muscleGroup?: string | string[];
-    equipment?: string | string[];
-    aggregation?: 'day' | 'week';
-    exerciseId?: string;
-  }): Promise<SetsAnalytics> {
-    const query = new URLSearchParams();
-    if (params.period) query.append('period', params.period);
-    if (params.startDate) query.append('startDate', params.startDate);
-    if (params.endDate) query.append('endDate', params.endDate);
-    if (params.gymId) query.append('gymId', params.gymId);
-    this.addQueryParam(query, 'muscleGroup', params.muscleGroup);
-    this.addQueryParam(query, 'equipment', params.equipment);
-    if (params.aggregation) query.append('aggregation', params.aggregation);
-    if (params.exerciseId) query.append('exerciseId', params.exerciseId);
-
-    const queryString = query.toString() ? `?${query.toString()}` : '';
-    return this.request<SetsAnalytics>(`/analytics/sets${queryString}`);
-  }
-
-  async getSetsByCycle(
-    cycleId: string,
-    muscleGroup?: string | string[],
-    equipment?: string | string[],
-    aggregation?: 'day' | 'week',
-    exerciseId?: string,
-  ): Promise<SetsByCycleAnalytics> {
-    const query = new URLSearchParams();
-    this.addQueryParam(query, 'muscleGroup', muscleGroup);
-    this.addQueryParam(query, 'equipment', equipment);
-    if (aggregation) query.append('aggregation', aggregation);
-    if (exerciseId) query.append('exerciseId', exerciseId);
-
-    const queryString = query.toString() ? `?${query.toString()}` : '';
-    return this.request<SetsByCycleAnalytics>(
-      `/analytics/sets-by-cycle/${cycleId}${queryString}`
-    );
+  async getIntensityAnalytics(params?: AnalyticsFilterParams): Promise<IntensityAnalytics> {
+    return this.request<IntensityAnalytics>(`/analytics/intensity${this.buildAnalyticsQuery(params)}`);
   }
 
   // Dashboard Methods
