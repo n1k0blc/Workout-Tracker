@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { mapExercisesToResponse, WORKOUT_EXERCISE_TREE_INCLUDE } from '../workout-tree/workout-tree.service';
+import { WorkoutExerciseResponseDto } from '../common/dto/workout-tree.dto';
+import { getCurrentDate } from '../common/utils/date.util';
 
 export interface SuggestedWorkout {
   cycleId: string;
@@ -7,26 +10,16 @@ export interface SuggestedWorkout {
   workoutDayId: string;
   workoutDayName: string;
   weekday: number;
+  order: number;
   plannedHomeGymId?: string | null;
-  exercises: {
-    exerciseId: string;
-    exerciseName: string;
-    order: number;
-    sets: {
-      order: number;
-      setType: string;
-      reps: number;
-      weight: number;
-      rir: number;
-      restAfterSet: number;
-    }[];
-  }[];
+  exercises: WorkoutExerciseResponseDto[];
 }
 
 export interface CycleWorkoutDay {
   workoutDayId: string;
   workoutDayName: string;
   weekday: number;
+  order: number;
   isSuggested: boolean;
   exerciseCount: number;
 }
@@ -37,234 +30,112 @@ export interface CurrentCycleWorkouts {
   workoutDays: CycleWorkoutDay[];
 }
 
+type DayWithBlueprint = {
+  id: string;
+  name: string;
+  weekday: number;
+  order: number;
+  plannedHomeGymId: string | null;
+  workouts: any[]; // filtered to kind=BLUEPRINT, 0 or 1 element
+};
+
+/**
+ * The one "next workout" service (§3.6), shared by the workouts controller (suggested
+ * workout / cycle overview) and the dashboard -- replaces the old weekday-gated engine
+ * and the dashboard's independent sequence-based algorithm. Rotation is driven by
+ * `WorkoutDay.order`; weekday is now just a date hint, not a gate. Blueprint is the
+ * single source of truth for the suggestion (structure, values, and rest, verbatim --
+ * no more merging in numbers from the last completed session).
+ */
 @Injectable()
 export class WorkoutEngineService {
   constructor(private prisma: PrismaService) {}
 
-  async getSuggestedWorkout(userId: string): Promise<SuggestedWorkout | null> {
-    // Get current active cycle (most recent)
-    const activeCycle = await this.prisma.workoutCycle.findFirst({
-      where: { 
-        userId,
-        status: 'ACTIVE',
-      },
+  private async getActiveCycleWithDays(userId: string) {
+    return this.prisma.workoutCycle.findFirst({
+      where: { userId, status: 'ACTIVE' },
       orderBy: { startDate: 'desc' },
       include: {
         workoutDays: {
-          include: {
-            blueprint: {
-              include: {
-                exercises: {
-                  include: {
-                    exercise: {
-                      select: { name: true },
-                    },
-                    sets: {
-                      orderBy: { order: 'asc' },
-                    },
-                  },
-                  orderBy: { order: 'asc' },
-                },
-              },
-            },
-          },
+          include: { workouts: { where: { kind: 'BLUEPRINT' }, include: WORKOUT_EXERCISE_TREE_INCLUDE } },
+          orderBy: { order: 'asc' },
         },
       },
     });
+  }
 
-    if (!activeCycle) {
-      return null; // No active cycle
+  private isCycleExpired(cycle: { startDate: Date; duration: number }): boolean {
+    const endDate = new Date(cycle.startDate);
+    endDate.setDate(endDate.getDate() + cycle.duration * 7);
+    return getCurrentDate() > endDate;
+  }
+
+  /** The next day in rotation order, based on the workoutDay of the last performed workout. */
+  private async findNextWorkoutDay(
+    userId: string,
+    cycle: { id: string; workoutDays: DayWithBlueprint[] },
+  ): Promise<DayWithBlueprint | null> {
+    if (cycle.workoutDays.length === 0) {
+      return null;
     }
 
-    // Check if cycle has ended
-    const cycleEndDate = new Date(activeCycle.startDate);
-    cycleEndDate.setDate(cycleEndDate.getDate() + activeCycle.duration * 7);
-
-    const now = new Date();
-    if (now > cycleEndDate) {
-      return null; // Cycle has ended
-    }
-
-    // Get current weekday (0 = Sunday, 6 = Saturday)
-    const currentWeekday = now.getDay();
-
-    // Find workout day for today
-    const todaysWorkoutDay = activeCycle.workoutDays.find(
-      (day) => day.weekday === currentWeekday,
-    );
-
-    if (!todaysWorkoutDay || !todaysWorkoutDay.blueprint) {
-      return null; // No workout scheduled for today
-    }
-
-    // Check if user already completed workout today
-    const startOfToday = new Date(now);
-    startOfToday.setHours(0, 0, 0, 0);
-
-    const completedToday = await this.prisma.workout.findFirst({
-      where: {
-        userId,
-        workoutDayId: todaysWorkoutDay.id,
-        status: 'COMPLETED' as any,
-        date: {
-          gte: startOfToday,
-        },
-      },
-    });
-
-    if (completedToday) {
-      return null; // Already completed today's workout
-    }
-
-    // Get last workout for this workout day to use as baseline for weight/reps
     const lastWorkout = await this.prisma.workout.findFirst({
-      where: {
-        userId,
-        workoutDayId: todaysWorkoutDay.id,
-        status: 'COMPLETED' as any,
-      },
-      include: {
-        exercises: {
-          include: {
-            sets: {
-              orderBy: { setNumber: 'desc' },
-              take: 1, // Get last set for each exercise
-            },
-          },
-        },
-      },
+      where: { userId, cycleId: cycle.id, kind: 'WORKOUT' },
       orderBy: { date: 'desc' },
+      select: { workoutDayId: true },
     });
 
-    // Build suggested workout
-    const exercises = todaysWorkoutDay.blueprint.exercises.map((blueprintEx) => {
-      // Try to find data from last workout
-      const lastExerciseLog = lastWorkout?.exercises.find(
-        (ex) => ex.exerciseId === blueprintEx.exerciseId,
-      );
+    const lastIndex = lastWorkout?.workoutDayId
+      ? cycle.workoutDays.findIndex((day) => day.id === lastWorkout.workoutDayId)
+      : -1;
 
-      // Map each individual set from blueprint
-      const sets = blueprintEx.sets.map((bpSet) => {
-        // Try to find corresponding set from last workout (by order/setNumber)
-        const lastSetLog = lastExerciseLog?.sets.find(
-          (s) => s.setNumber === bpSet.order,
-        );
+    if (lastIndex === -1) {
+      return cycle.workoutDays[0];
+    }
 
-        return {
-          order: bpSet.order,
-          setType: bpSet.setType,
-          reps: lastSetLog?.reps || bpSet.reps,
-          weight: lastSetLog?.weight || bpSet.weight,
-          rir: lastSetLog?.rir ?? bpSet.rir,
-          restAfterSet: bpSet.restAfterSet,
-        };
-      });
+    return cycle.workoutDays[(lastIndex + 1) % cycle.workoutDays.length];
+  }
 
-      return {
-        exerciseId: blueprintEx.exerciseId,
-        exerciseName: blueprintEx.exercise.name,
-        order: blueprintEx.order,
-        sets,
-      };
-    });
+  async getSuggestedWorkout(userId: string): Promise<SuggestedWorkout | null> {
+    const activeCycle = await this.getActiveCycleWithDays(userId);
+    if (!activeCycle || this.isCycleExpired(activeCycle)) {
+      return null;
+    }
+
+    const nextDay = await this.findNextWorkoutDay(userId, activeCycle);
+    const blueprint = nextDay?.workouts[0];
+    if (!nextDay || !blueprint) {
+      return null; // no day in rotation, or that day has no blueprint yet
+    }
 
     return {
       cycleId: activeCycle.id,
       cycleName: activeCycle.name,
-      workoutDayId: todaysWorkoutDay.id,
-      workoutDayName: todaysWorkoutDay.name,
-      weekday: todaysWorkoutDay.weekday,
-      plannedHomeGymId: todaysWorkoutDay.plannedHomeGymId,
-      exercises,
+      workoutDayId: nextDay.id,
+      workoutDayName: nextDay.name,
+      weekday: nextDay.weekday,
+      order: nextDay.order,
+      plannedHomeGymId: nextDay.plannedHomeGymId,
+      exercises: mapExercisesToResponse(blueprint.exercises),
     };
   }
 
-  async getCurrentCycleWeek(userId: string): Promise<number | null> {
-    const activeCycle = await this.prisma.workoutCycle.findFirst({
-      where: { 
-        userId,
-        status: 'ACTIVE',
-      },
-      orderBy: { startDate: 'desc' },
-    });
-
-    if (!activeCycle) {
-      return null;
-    }
-
-    const now = new Date();
-    const startDate = new Date(activeCycle.startDate);
-    const diffTime = Math.abs(now.getTime() - startDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    const currentWeek = Math.ceil(diffDays / 7);
-
-    return currentWeek <= activeCycle.duration ? currentWeek : null;
-  }
-
   async getCurrentCycleWorkouts(userId: string): Promise<CurrentCycleWorkouts | null> {
-    // Get current active cycle
-    const activeCycle = await this.prisma.workoutCycle.findFirst({
-      where: { 
-        userId,
-        status: 'ACTIVE',
-      },
-      orderBy: { startDate: 'desc' },
-      include: {
-        workoutDays: {
-          include: {
-            blueprint: {
-              include: {
-                exercises: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!activeCycle) {
+    const activeCycle = await this.getActiveCycleWithDays(userId);
+    if (!activeCycle || this.isCycleExpired(activeCycle)) {
       return null;
     }
 
-    // Check if cycle has ended
-    const cycleEndDate = new Date(activeCycle.startDate);
-    cycleEndDate.setDate(cycleEndDate.getDate() + activeCycle.duration * 7);
+    const nextDay = await this.findNextWorkoutDay(userId, activeCycle);
 
-    const now = new Date();
-    if (now > cycleEndDate) {
-      return null;
-    }
-
-    // Get current weekday and check for completed workout today
-    const currentWeekday = now.getDay();
-    const startOfToday = new Date(now);
-    startOfToday.setHours(0, 0, 0, 0);
-
-    const completedToday = await this.prisma.workout.findFirst({
-      where: {
-        userId,
-        status: 'COMPLETED' as any,
-        date: {
-          gte: startOfToday,
-        },
-      },
-    });
-
-    // Map workout days with suggestion info
-    const workoutDays: CycleWorkoutDay[] = activeCycle.workoutDays.map((day) => {
-      const isSuggested = 
-        !completedToday && 
-        day.weekday === currentWeekday &&
-        day.blueprint !== null;
-
-      return {
-        workoutDayId: day.id,
-        workoutDayName: day.name,
-        weekday: day.weekday,
-        isSuggested,
-        exerciseCount: day.blueprint?.exercises.length || 0,
-      };
-    });
+    const workoutDays: CycleWorkoutDay[] = activeCycle.workoutDays.map((day) => ({
+      workoutDayId: day.id,
+      workoutDayName: day.name,
+      weekday: day.weekday,
+      order: day.order,
+      isSuggested: nextDay?.id === day.id && day.workouts.length > 0,
+      exerciseCount: day.workouts[0]?.exercises.length ?? 0,
+    }));
 
     return {
       cycleId: activeCycle.id,

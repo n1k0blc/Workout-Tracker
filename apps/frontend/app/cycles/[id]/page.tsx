@@ -5,20 +5,20 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
 import { MUSCLE_GROUP_LABELS } from '@/lib/exercise-utils';
-import { 
-  CycleDetails, 
-  PersonalRecord, 
+import {
+  CycleDetails,
+  PersonalRecord,
   WorkoutListItem,
   MuscleGroup,
   Equipment,
   HomeGym,
   VolumeAnalytics,
-  ORMByCycleAnalytics,
-  RIRByCycleAnalytics,
-  DurationByCycleAnalytics,
-  RestTimeByCycleAnalytics,
-  RepsByCycleAnalytics,
-  SetsByCycleAnalytics,
+  RIRAnalytics,
+  DurationAnalytics,
+  RestTimeAnalytics,
+  RepsAnalytics,
+  SetsAnalytics,
+  IntensityAnalytics,
   Exercise,
 } from '@/types';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
@@ -65,12 +65,12 @@ export default function CycleDetailPage() {
   // Analytics state
   const [homeGyms, setHomeGyms] = useState<HomeGym[]>([]);
   const [volumeData, setVolumeData] = useState<VolumeAnalytics | null>(null);
-  const [ormData, setOrmData] = useState<ORMByCycleAnalytics | null>(null);
-  const [rirData, setRirData] = useState<RIRByCycleAnalytics | null>(null);
-  const [durationData, setDurationData] = useState<DurationByCycleAnalytics | null>(null);
-  const [restTimeData, setRestTimeData] = useState<RestTimeByCycleAnalytics | null>(null);
-  const [repsData, setRepsData] = useState<RepsByCycleAnalytics | null>(null);
-  const [setsData, setSetsData] = useState<SetsByCycleAnalytics | null>(null);
+  const [rirData, setRirData] = useState<RIRAnalytics | null>(null);
+  const [durationData, setDurationData] = useState<DurationAnalytics | null>(null);
+  const [restTimeData, setRestTimeData] = useState<RestTimeAnalytics | null>(null);
+  const [repsData, setRepsData] = useState<RepsAnalytics | null>(null);
+  const [setsData, setSetsData] = useState<SetsAnalytics | null>(null);
+  const [intensityData, setIntensityData] = useState<IntensityAnalytics | null>(null);
 
   // Multi-line chart data
   type ChartLineConfig = {
@@ -84,7 +84,7 @@ export default function CycleDetailPage() {
   const [chartLineConfigs, setChartLineConfigs] = useState<ChartLineConfig[]>([]);
 
   // Multi-select filter states
-  const [selectedViews, setSelectedViews] = useState<Array<'volume' | 'orm' | 'rir' | 'duration' | 'restTime' | 'reps' | 'sets'>>(['volume']);
+  const [selectedViews, setSelectedViews] = useState<Array<'volume' | 'rir' | 'duration' | 'restTime' | 'reps' | 'sets' | 'intensity'>>(['volume']);
   const [selectedMuscles, setSelectedMuscles] = useState<(MuscleGroup | 'ALL')[]>(['ALL']);
   const [selectedEquipment, setSelectedEquipment] = useState<(Equipment | 'ALL')[]>(['ALL']);
   const [gymFilter, setGymFilter] = useState('alle');
@@ -128,7 +128,7 @@ export default function CycleDetailPage() {
     try {
       const [details, cycleWorkouts, prs, gyms] = await Promise.all([
         apiClient.getCycleDetails(cycleId),
-        apiClient.getWorkoutHistory({ cycleId: cycleId, status: 'COMPLETED' }),
+        apiClient.getWorkoutHistory({ cycleId: cycleId }),
         apiClient.getPersonalRecords({}),
         apiClient.getHomeGyms(),
       ]);
@@ -161,7 +161,7 @@ export default function CycleDetailPage() {
   };
 
   // Toggle handlers for multi-select filters
-  const toggleView = (view: 'volume' | 'orm' | 'rir' | 'duration' | 'restTime' | 'reps' | 'sets') => {
+  const toggleView = (view: 'volume' | 'rir' | 'duration' | 'restTime' | 'reps' | 'sets' | 'intensity') => {
     const maxAllowed = calculateMaxAllowed('view');
     
     if (view === 'rir') {
@@ -247,10 +247,10 @@ export default function CycleDetailPage() {
     equipment?: Equipment
   ): string => {
     const viewNames: Record<string, string> = {
-      volume: 'Volumen', orm: 'ORM%', rir: 'RIR', duration: 'Dauer',
-      restTime: 'Pause', reps: 'Wdh', sets: 'Sätze',
+      volume: 'Volumen', rir: 'RIR', duration: 'Dauer',
+      restTime: 'Pause', reps: 'Wdh', sets: 'Sätze', intensity: 'Intensität',
     };
-    
+
     const parts = [viewNames[view] || view];
     if (muscle) parts.push(translateMuscleGroup(muscle));
     if (equipment) parts.push(translateEquipment(equipment));
@@ -262,12 +262,12 @@ export default function CycleDetailPage() {
   const getViewConfig = (view: string): { unit: string; yAxisId: string } => {
     const configs: Record<string, { unit: string; yAxisId: string }> = {
       volume: { unit: 'kg', yAxisId: 'left' },
-      orm: { unit: '%', yAxisId: 'left' },
       rir: { unit: 'RIR', yAxisId: 'left' },
       duration: { unit: 'min', yAxisId: 'left' },
       restTime: { unit: 's', yAxisId: 'left' },
       reps: { unit: 'Wdh', yAxisId: 'left' },
       sets: { unit: 'Sätze', yAxisId: 'left' },
+      intensity: { unit: '%', yAxisId: 'left' },
     };
     return configs[view] || { unit: '', yAxisId: 'left' };
   };
@@ -329,12 +329,12 @@ export default function CycleDetailPage() {
         if (dateEntry) {
           let value = 0;
           if (combo.view === 'volume') value = point.volume;
-          else if (combo.view === 'orm') value = point.percentORM || point.averageOrmPercentage;
           else if (combo.view === 'rir') value = point.rir0Count || 0;
           else if (combo.view === 'duration') value = point.duration;
           else if (combo.view === 'restTime') value = point.averageRestTime;
           else if (combo.view === 'reps') value = point.reps;
           else if (combo.view === 'sets') value = point.sets;
+          else if (combo.view === 'intensity') value = point.intensity;
 
           dateEntry[lineName] = value;
         }
@@ -369,50 +369,34 @@ export default function CycleDetailPage() {
         equipment?: Equipment;
       }> = [];
 
+      // cycleId alone puts every metric into cycle-anchored mode (§3.9) -- no more separate
+      // "-by-cycle" methods, just the base method with `cycleId` set.
       for (const view of selectedViews) {
         if (selectedExercise) {
-          // Exercise filter mode: single iteration without muscle/equipment filters (except duration)
-          if (view === 'duration') {
-            // Duration analytics: keep existing logic unchanged
-            for (const muscle of muscles) {
-              for (const equip of equipment) {
-                filterCombinations.push({ view, muscle: muscle as MuscleGroup | undefined, equipment: equip as Equipment | undefined });
-                allPromises.push(
-                  apiClient.getDurationByCycle(cycleId, gymFilter, muscle, equip, aggregationMode)
-                );
-              }
-            }
-          } else {
-            // All other views: use exerciseId filter
-            filterCombinations.push({ view, muscle: undefined, equipment: undefined });
+          // Exercise filter mode: single iteration without muscle/equipment filters
+          filterCombinations.push({ view, muscle: undefined, equipment: undefined });
 
-            if (view === 'volume') {
-              const cycleStart = new Date(cycleDetails.startDate).toISOString();
-              const cycleEnd = cycleDetails.completedAt
-                ? new Date(cycleDetails.completedAt).toISOString()
-                : undefined;
-
-              allPromises.push(
-                apiClient.getVolumeAnalytics({
-                  startDate: cycleStart,
-                  endDate: cycleEnd,
-                  gymId: gymFilter,
-                  exerciseId: selectedExercise.id,
-                  cycleId: cycleId,
-                  aggregation: aggregationMode,
-                })
-              );
-            } else if (view === 'orm') {
-              allPromises.push(apiClient.getORMByCycle(cycleId, undefined, undefined, aggregationMode, selectedExercise.id));
-            } else if (view === 'rir') {
-              allPromises.push(apiClient.getRIRByCycle(cycleId, gymFilter, undefined, undefined, selectedExercise.id, aggregationMode));
-            } else if (view === 'restTime') {
-              allPromises.push(apiClient.getRestTimeByCycle(cycleId, gymFilter, undefined, undefined, aggregationMode, selectedExercise.id));
-            } else if (view === 'reps') {
-              allPromises.push(apiClient.getRepsByCycle(cycleId, undefined, undefined, aggregationMode, selectedExercise.id));
-            } else if (view === 'sets') {
-              allPromises.push(apiClient.getSetsByCycle(cycleId, undefined, undefined, aggregationMode, selectedExercise.id));
-            }
+          if (view === 'volume') {
+            allPromises.push(
+              apiClient.getVolumeAnalytics({
+                gymId: gymFilter,
+                exerciseId: selectedExercise.id,
+                cycleId: cycleId,
+                aggregation: aggregationMode,
+              })
+            );
+          } else if (view === 'rir') {
+            allPromises.push(apiClient.getRIRAnalytics({ gymId: gymFilter, exerciseId: selectedExercise.id, cycleId, aggregation: aggregationMode }));
+          } else if (view === 'duration') {
+            allPromises.push(apiClient.getDurationAnalytics({ gymId: gymFilter, cycleId, aggregation: aggregationMode }));
+          } else if (view === 'restTime') {
+            allPromises.push(apiClient.getRestTimeAnalytics({ gymId: gymFilter, exerciseId: selectedExercise.id, cycleId, aggregation: aggregationMode }));
+          } else if (view === 'reps') {
+            allPromises.push(apiClient.getRepsAnalytics({ exerciseId: selectedExercise.id, cycleId, aggregation: aggregationMode }));
+          } else if (view === 'sets') {
+            allPromises.push(apiClient.getSetsAnalytics({ exerciseId: selectedExercise.id, cycleId, aggregation: aggregationMode }));
+          } else if (view === 'intensity') {
+            allPromises.push(apiClient.getIntensityAnalytics({ gymId: gymFilter, exerciseId: selectedExercise.id, cycleId, aggregation: aggregationMode }));
           }
         } else {
           // No exercise filter: use existing muscle/equipment logic
@@ -421,15 +405,8 @@ export default function CycleDetailPage() {
               filterCombinations.push({ view, muscle: muscle as MuscleGroup | undefined, equipment: equip as Equipment | undefined });
 
               if (view === 'volume') {
-                const cycleStart = new Date(cycleDetails.startDate).toISOString();
-                const cycleEnd = cycleDetails.completedAt
-                  ? new Date(cycleDetails.completedAt).toISOString()
-                  : undefined;
-
                 allPromises.push(
                   apiClient.getVolumeAnalytics({
-                    startDate: cycleStart,
-                    endDate: cycleEnd,
                     gymId: gymFilter,
                     muscleGroup: muscle,
                     equipment: equip,
@@ -437,18 +414,18 @@ export default function CycleDetailPage() {
                     aggregation: aggregationMode,
                   })
                 );
-              } else if (view === 'orm') {
-                allPromises.push(apiClient.getORMByCycle(cycleId, muscle, equip, aggregationMode));
               } else if (view === 'rir') {
-                allPromises.push(apiClient.getRIRByCycle(cycleId, gymFilter, muscle, equip, undefined, aggregationMode));
+                allPromises.push(apiClient.getRIRAnalytics({ gymId: gymFilter, muscleGroup: muscle, equipment: equip, cycleId, aggregation: aggregationMode }));
               } else if (view === 'duration') {
-                allPromises.push(apiClient.getDurationByCycle(cycleId, gymFilter, muscle, equip, aggregationMode));
+                allPromises.push(apiClient.getDurationAnalytics({ gymId: gymFilter, cycleId, aggregation: aggregationMode }));
               } else if (view === 'restTime') {
-                allPromises.push(apiClient.getRestTimeByCycle(cycleId, gymFilter, muscle, equip, aggregationMode));
+                allPromises.push(apiClient.getRestTimeAnalytics({ gymId: gymFilter, muscleGroup: muscle, equipment: equip, cycleId, aggregation: aggregationMode }));
               } else if (view === 'reps') {
-                allPromises.push(apiClient.getRepsByCycle(cycleId, muscle, equip, aggregationMode));
+                allPromises.push(apiClient.getRepsAnalytics({ muscleGroup: muscle, equipment: equip, cycleId, aggregation: aggregationMode }));
               } else if (view === 'sets') {
-                allPromises.push(apiClient.getSetsByCycle(cycleId, muscle, equip, aggregationMode));
+                allPromises.push(apiClient.getSetsAnalytics({ muscleGroup: muscle, equipment: equip, cycleId, aggregation: aggregationMode }));
+              } else if (view === 'intensity') {
+                allPromises.push(apiClient.getIntensityAnalytics({ gymId: gymFilter, muscleGroup: muscle, equipment: equip, cycleId, aggregation: aggregationMode }));
               }
             }
           }
@@ -466,10 +443,6 @@ export default function CycleDetailPage() {
             dataPoints: volumeResult.dataPoints.filter((point: any) => point.volume > 0),
           });
         }
-      }
-      if (selectedViews.includes('orm')) {
-        const ormResult = results.find((r, i) => filterCombinations[i].view === 'orm');
-        if (ormResult) setOrmData(ormResult);
       }
       if (selectedViews.includes('rir')) {
         const rirResult = results.find((r, i) => filterCombinations[i].view === 'rir');
@@ -490,6 +463,10 @@ export default function CycleDetailPage() {
       if (selectedViews.includes('sets')) {
         const setsResult = results.find((r, i) => filterCombinations[i].view === 'sets');
         if (setsResult) setSetsData(setsResult);
+      }
+      if (selectedViews.includes('intensity')) {
+        const intensityResult = results.find((r, i) => filterCombinations[i].view === 'intensity');
+        if (intensityResult) setIntensityData(intensityResult);
       }
     } catch (error) {
       console.error('Failed to load analytics data:', error);
@@ -732,15 +709,6 @@ export default function CycleDetailPage() {
                       Volumen
                     </Button>
                     <Button
-                      variant={selectedViews.includes('orm') ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => toggleView('orm')}
-                      disabled={gymFilter === 'andere'}
-                      title={gymFilter === 'andere' ? 'ORM nur für Home Gyms verfügbar' : ''}
-                    >
-                      ORM%
-                    </Button>
-                    <Button
                       variant={selectedViews.includes('rir') ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => toggleView('rir')}
@@ -776,6 +744,13 @@ export default function CycleDetailPage() {
                       onClick={() => toggleView('sets')}
                     >
                       Sätze
+                    </Button>
+                    <Button
+                      variant={selectedViews.includes('intensity') ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => toggleView('intensity')}
+                    >
+                      Intensität
                     </Button>
                   </div>
                 </div>
@@ -911,50 +886,6 @@ export default function CycleDetailPage() {
                     />
                   )}
 
-                  {/* ORM Chart */}
-                  {selectedViews.length === 1 && selectedViews.includes('orm') && (
-                    <div className="bg-card border rounded-lg p-6">
-                      {gymFilter === 'andere' ? (
-                        <div className="text-center py-12">
-                          <p className="text-muted-foreground">
-                            %ORM Tracking ist nur für Home Gym Workouts verfügbar.
-                          </p>
-                          <p className="text-sm text-muted-foreground mt-2">
-                            Bitte wähle ein Home Gym oder &quot;Alle&quot; aus.
-                          </p>
-                        </div>
-                      ) : ormData && ormData.dataPoints.length > 0 ? (
-                        <AnalyticsChart
-                          data={ormData.dataPoints}
-                          title="%ORM-Entwicklung"
-                          height={300}
-                          chartType="line"
-                          dataKey="percentORM"
-                          name="%ORM"
-                          stroke={CHART_ACCENT}
-                          yAxisTickFormatter={(value) => `${value}`}
-                          yAxisLabel="%"
-                          footer={
-                            <div className="mt-4 text-center">
-                              <div className="text-sm text-muted-foreground">
-                                Durchschnitt %ORM
-                              </div>
-                              <div className="text-2xl font-bold text-foreground">
-                                {ormData.averagePercentORM}%
-                              </div>
-                            </div>
-                          }
-                        />
-                      ) : (
-                        <div className="text-center py-12">
-                          <p className="text-muted-foreground">
-                            Keine ORM Daten verfügbar für die ausgewählten Filter.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
                   {/* RIR Chart */}
                   {selectedViews.length === 1 && selectedViews.includes('rir') && (
                     <div className="bg-card border rounded-lg p-6">
@@ -1079,6 +1010,31 @@ export default function CycleDetailPage() {
                       }
                     />
                   )}
+
+                  {/* Intensity Chart */}
+                  {selectedViews.length === 1 && selectedViews.includes('intensity') && intensityData && intensityData.dataPoints.length > 0 && (
+                    <AnalyticsChart
+                      data={intensityData.dataPoints}
+                      title="Intensität-Entwicklung"
+                      height={300}
+                      chartType="line"
+                      dataKey="intensity"
+                      name="Intensität"
+                      stroke={CHART_ACCENT}
+                      yAxisTickFormatter={(value) => `${value}`}
+                      yAxisLabel="%"
+                      footer={
+                        <div className="mt-4 text-center">
+                          <div className="text-sm text-muted-foreground">
+                            Durchschnittliche Intensität
+                          </div>
+                          <div className="text-2xl font-bold text-foreground">
+                            {formatNumber(intensityData.averageIntensity)}%
+                          </div>
+                        </div>
+                      }
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -1122,7 +1078,7 @@ export default function CycleDetailPage() {
                           <div className="flex items-center gap-3 mb-2 flex-wrap">
                             <h3 className="text-lg font-semibold text-foreground">
                               {workout.isFreeWorkout
-                                ? workout.templateName || 'Freies Workout'
+                                ? workout.originTemplateName || 'Freies Workout'
                                 : workout.workoutDayName || 'Workout'}
                             </h3>
                             {workout.homeGym ? (

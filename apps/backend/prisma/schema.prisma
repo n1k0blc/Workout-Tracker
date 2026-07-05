@@ -8,20 +8,37 @@ datasource db {
 }
 
 model User {
-  id               String            @id @default(uuid())
-  email            String            @unique
-  passwordHash     String
-  createdAt        DateTime          @default(now())
-  dateOfBirth      DateTime?
-  firstName        String?
-  height           Int?
-  lastName         String?
-  weight           Float?
-  exercises        Exercise[]
-  homeGyms         HomeGym[]
-  workouts         Workout[]
-  workoutCycles    WorkoutCycle[]
-  workoutTemplates WorkoutTemplate[]
+  id            String         @id @default(uuid())
+  email         String         @unique
+  passwordHash  String
+  createdAt     DateTime       @default(now())
+  dateOfBirth   DateTime?
+  firstName     String?
+  height        Int?
+  lastName      String?
+  weight        Float?
+  exercises     Exercise[]
+  homeGyms      HomeGym[]
+  workouts      Workout[]
+  workoutCycles WorkoutCycle[]
+  refreshTokens RefreshToken[]
+}
+
+// PR1 auth overhaul: DB-backed rotating refresh tokens (httpOnly cookie).
+// Only the SHA-256 hash of the opaque token is stored, never the raw value.
+// `replacedByTokenHash` chains rotations so a replayed, already-rotated token
+// is detectable as theft (reuse detection) even without walking the whole chain.
+model RefreshToken {
+  id                  String    @id @default(uuid())
+  userId              String
+  tokenHash           String    @unique
+  createdAt           DateTime  @default(now())
+  expiresAt           DateTime
+  revokedAt           DateTime?
+  replacedByTokenHash String?
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model HomeGym {
@@ -29,217 +46,137 @@ model HomeGym {
   name               String
   userId             String
   createdAt          DateTime     @default(now())
+  deletedAt          DateTime?
   user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   workouts           Workout[]
   plannedWorkoutDays WorkoutDay[] @relation("PlannedHomeGym")
 }
 
 model WorkoutCycle {
-  id                 String              @id @default(uuid())
-  name               String
-  duration           Int
-  startDate          DateTime
-  status             CycleStatus         @default(ACTIVE)
-  completedAt        DateTime?
-  createdAt          DateTime            @default(now())
-  userId             String
-  workouts           Workout[]
-  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workoutDays        WorkoutDay[]
-  exerciseBenchmarks ExerciseBenchmark[]
+  id          String       @id @default(uuid())
+  name        String
+  duration    Int
+  startDate   DateTime
+  status      CycleStatus  @default(ACTIVE)
+  completedAt DateTime?
+  createdAt   DateTime     @default(now())
+  userId      String
+  workouts    Workout[]
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutDays WorkoutDay[]
 }
 
 model WorkoutDay {
-  id                 String              @id @default(uuid())
-  weekday            Int
-  name               String
-  cycleId            String
-  plannedHomeGymId   String?
-  workouts           Workout[]
-  blueprint          WorkoutBlueprint?
-  cycle              WorkoutCycle        @relation(fields: [cycleId], references: [id], onDelete: Cascade)
-  plannedHomeGym     HomeGym?            @relation("PlannedHomeGym", fields: [plannedHomeGymId], references: [id])
-  exerciseBenchmarks ExerciseBenchmark[]
+  id               String       @id @default(uuid())
+  weekday          Int
+  order            Int
+  name             String
+  cycleId          String
+  plannedHomeGymId String?
+  workouts         Workout[]
+  cycle            WorkoutCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  plannedHomeGym   HomeGym?     @relation("PlannedHomeGym", fields: [plannedHomeGymId], references: [id])
+
+  @@unique([cycleId, order])
 }
 
-model WorkoutBlueprint {
-  id           String              @id @default(uuid())
-  workoutDayId String              @unique
-  updatedAt    DateTime            @updatedAt
-  exercises    BlueprintExercise[]
-  workoutDay   WorkoutDay          @relation(fields: [workoutDayId], references: [id], onDelete: Cascade)
-}
-
-model BlueprintExercise {
-  id          String           @id @default(uuid())
-  order       Int
-  blueprintId String
-  exerciseId  String
-  blueprint   WorkoutBlueprint @relation(fields: [blueprintId], references: [id], onDelete: Cascade)
-  exercise    Exercise         @relation(fields: [exerciseId], references: [id])
-  sets        BlueprintSet[]
-}
-
-model BlueprintSet {
-  id                  String            @id @default(uuid())
-  order               Int
-  setType             SetType           @default(WORKING)
-  reps                Int
-  weight              Float
-  rir                 Int
-  restAfterSet        Int               @default(90)
-  blueprintExerciseId String
-  blueprintExercise   BlueprintExercise @relation(fields: [blueprintExerciseId], references: [id], onDelete: Cascade)
-}
-
+// Unified data model (PR2): one Workout entity discriminated by `kind`,
+// replacing the three former parallel hierarchies (WorkoutBlueprint/BlueprintExercise/BlueprintSet,
+// WorkoutTemplate/WorkoutTemplateExercise/WorkoutTemplateSet, Workout/ExerciseLog/SetLog).
+// Kind-specific fields are nullable; a row's mere existence implies "saved/complete" —
+// there is no server-side draft/in-progress state (logging happens fully client-side).
 model Workout {
-  id            String              @id @default(uuid())
-  date          DateTime            @default(now())
-  status        WorkoutStatus
-  isFreeWorkout Boolean             @default(false)
+  id     String      @id @default(uuid())
+  kind   WorkoutKind
+  userId String? // nullable: system templates (kind=TEMPLATE, isCustom=false) have no owner
+  user   User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // kind=WORKOUT (performed)
+  date          DateTime?
   totalDuration Int?
-  userId        String
+  isFreeWorkout Boolean?
   cycleId       String?
-  workoutDayId  String?
-  templateId    String?
-  templateName  String?
-  createdAt     DateTime            @default(now())
-  homeGymId     String?
-  exercises     ExerciseLog[]
-  cycle         WorkoutCycle?       @relation(fields: [cycleId], references: [id])
-  homeGym       HomeGym?            @relation(fields: [homeGymId], references: [id])
-  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workoutDay    WorkoutDay?         @relation(fields: [workoutDayId], references: [id])
-  benchmarksSet ExerciseBenchmark[] @relation("BenchmarkWorkout")
+  cycle         WorkoutCycle? @relation(fields: [cycleId], references: [id])
+
+  // kind=WORKOUT (cycle day this instance belongs to) or kind=BLUEPRINT (the day this is the plan for; 1:1, enforced via partial unique index in migration SQL)
+  workoutDayId String?
+  workoutDay   WorkoutDay? @relation(fields: [workoutDayId], references: [id])
+
+  // kind=WORKOUT: which template (if any) this was started from — drives the "overwrite template" auto-detect UX
+  originTemplateId String?
+  originTemplate   Workout?  @relation("WorkoutOrigin", fields: [originTemplateId], references: [id], onDelete: SetNull)
+  startedFrom      Workout[] @relation("WorkoutOrigin")
+
+  // kind=WORKOUT or kind=TEMPLATE: which gym this was performed at / is recommended for
+  homeGymId String?
+  homeGym   HomeGym? @relation(fields: [homeGymId], references: [id])
+
+  // kind=TEMPLATE (name unique per userId, partial unique index in migration SQL --
+  // NULL userId rows, i.e. system templates, are exempt from that uniqueness)
+  name     String?
+  isCustom Boolean?
+
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  exercises WorkoutExercise[]
+
+  @@index([userId, kind])
+}
+
+model WorkoutExercise {
+  id         String       @id @default(uuid())
+  order      Int
+  workoutId  String
+  exerciseId String
+  workout    Workout      @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exercise   Exercise     @relation(fields: [exerciseId], references: [id])
+  sets       WorkoutSet[]
+
+  @@index([workoutId])
+}
+
+model WorkoutSet {
+  id                String    @id @default(uuid())
+  order             Int
+  workoutExerciseId String
+  setType           SetType   @default(WORKING)
+  reps              Int
+  weight            Float
+  rir               Int?
+  rest              Int? // seconds rested after completing this set; app defaults to 90 when absent
+  completedAt       DateTime? // meaningful only for kind=WORKOUT sets
+
+  workoutExercise WorkoutExercise @relation(fields: [workoutExerciseId], references: [id], onDelete: Cascade)
+
+  @@unique([workoutExerciseId, order])
 }
 
 model Exercise {
-  id                      String                    @id @default(uuid())
-  csvId                   Int?                      @unique
-  name                    String
-  muscleGroup             MuscleGroup
-  equipment               Equipment
-  isCustom                Boolean                   @default(false)
-  userId                  String?
-  isDoubleWeight          Boolean                   @default(false)
-  isUnilateral            Boolean                   @default(false)
-  deletedAt               DateTime?
-  // Muscle group distribution in percentages (must sum to 100)
-  abdomenPercent          Int                       @default(0)
-  latissimusPercent       Int                       @default(0)
-  trapeziusPercent        Int                       @default(0)
-  lowerBackPercent        Int                       @default(0)
-  hamstringsPercent       Int                       @default(0)
-  glutesPercent           Int                       @default(0)
-  shouldersPercent        Int                       @default(0)
-  bicepsPercent           Int                       @default(0)
-  chestPercent            Int                       @default(0)
-  quadricepsPercent       Int                       @default(0)
-  calvesPercent           Int                       @default(0)
-  tricepsPercent          Int                       @default(0)
-  blueprintExercises      BlueprintExercise[]
-  user                    User?                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  exerciseLogs            ExerciseLog[]
-  workoutTemplateExercise WorkoutTemplateExercise[]
-  benchmarks              ExerciseBenchmark[]
-}
-
-model ExerciseBenchmark {
-  id             String       @id @default(uuid())
-  cycleId        String
-  workoutDayId   String
-  exerciseId     String
-  ormBenchmark   Float
-  setAtWorkoutId String
-  createdAt      DateTime     @default(now())
-  cycle          WorkoutCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
-  workoutDay     WorkoutDay   @relation(fields: [workoutDayId], references: [id], onDelete: Cascade)
-  exercise       Exercise     @relation(fields: [exerciseId], references: [id])
-  setAtWorkout   Workout      @relation("BenchmarkWorkout", fields: [setAtWorkoutId], references: [id])
-
-  @@unique([cycleId, workoutDayId, exerciseId])
-  @@index([cycleId, workoutDayId])
-}
-
-model ExerciseLog {
-  id                String   @id @default(uuid())
-  order             Int
-  workoutId         String
-  exerciseId        String
-  customPlannedSets Json?
-  exercise          Exercise @relation(fields: [exerciseId], references: [id])
-  workout           Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
-  sets              SetLog[]
-}
-
-model SetLog {
-  id                 String      @id @default(uuid())
-  exerciseLogId      String
-  setNumber          Int
-  setType            SetType     @default(WORKING)
-  targetReps         Int?
-  targetWeight       Float?
-  targetRir          Int?
-  reps               Int
-  weight             Float
-  rir                Int?
-  actualRestDuration Int?
-  completedAt        DateTime    @default(now())
-  exerciseLog        ExerciseLog @relation(fields: [exerciseLogId], references: [id], onDelete: Cascade)
-
-  @@unique([exerciseLogId, setNumber])
-}
-
-model WorkoutTemplate {
-  id               String                    @id @default(uuid())
-  name             String
-  isCustom         Boolean                   @default(false)
-  userId           String?
-  recommendedGymId String?
-  createdAt        DateTime                  @default(now())
-  user             User?                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  exercises        WorkoutTemplateExercise[]
-
-  @@unique([userId, name])
-}
-
-model WorkoutTemplateExercise {
-  id         String               @id @default(uuid())
-  templateId String
-  exerciseId String
-  order      Int
-  template   WorkoutTemplate      @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  exercise   Exercise             @relation(fields: [exerciseId], references: [id])
-  sets       WorkoutTemplateSet[]
-}
-
-model WorkoutTemplateSet {
-  id                 String                  @id @default(uuid())
-  templateExerciseId String
-  order              Int
-  isWarmup           Boolean                 @default(false)
-  targetReps         Int
-  targetWeight       Float
-  targetRir          Int
-  templateExercise   WorkoutTemplateExercise @relation(fields: [templateExerciseId], references: [id], onDelete: Cascade)
-}
-
-enum MuscleGroup {
-  CHEST
-  BACK
-  BICEPS
-  TRICEPS
-  ABS
-  SHOULDERS
-  LEGS
-  ABDOMEN
-  LATISSIMUS
-  TRAPEZIUS
-  LOWER_BACK
-  HAMSTRINGS
-  GLUTES
-  QUADRICEPS
-  CALVES
+  id                String            @id @default(uuid())
+  csvId             Int?              @unique
+  name              String
+  equipment         Equipment
+  isCustom          Boolean           @default(false)
+  userId            String?
+  isDoubleWeight    Boolean           @default(false)
+  isUnilateral      Boolean           @default(false)
+  deletedAt         DateTime?
+  // Muscle group distribution in percentages (must sum to 100) — single source of truth;
+  // "primary muscle" is derived (max-percent column), not stored.
+  abdomenPercent    Int               @default(0)
+  latissimusPercent Int               @default(0)
+  trapeziusPercent  Int               @default(0)
+  lowerBackPercent  Int               @default(0)
+  hamstringsPercent Int               @default(0)
+  glutesPercent     Int               @default(0)
+  shouldersPercent  Int               @default(0)
+  bicepsPercent     Int               @default(0)
+  chestPercent      Int               @default(0)
+  quadricepsPercent Int               @default(0)
+  calvesPercent     Int               @default(0)
+  tricepsPercent    Int               @default(0)
+  user              User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutExercises  WorkoutExercise[]
 }
 
 enum Equipment {
@@ -252,10 +189,10 @@ enum Equipment {
   EZ_BAR
 }
 
-enum WorkoutStatus {
-  IN_PROGRESS
-  COMPLETED
-  DISCARDED
+enum WorkoutKind {
+  BLUEPRINT
+  TEMPLATE
+  WORKOUT
 }
 
 enum SetType {
@@ -266,9 +203,4 @@ enum SetType {
 enum CycleStatus {
   ACTIVE
   COMPLETED
-}
-
-enum GymLocation {
-  HOME
-  OTHER
 }

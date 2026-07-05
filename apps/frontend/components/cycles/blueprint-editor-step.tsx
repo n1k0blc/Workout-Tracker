@@ -116,7 +116,7 @@ export default function BlueprintEditorStep({
           reps: s.reps ?? 0,
           weight: s.weight ?? 0,
           rir: s.rir ?? 0,
-          restAfterSet: s.restAfterSet ?? 90,
+          rest: s.rest ?? 90,
         };
       });
       return {
@@ -142,7 +142,7 @@ export default function BlueprintEditorStep({
           reps: s.reps ?? 0,
           weight: s.weight ?? 0,
           rir: s.rir ?? 0,
-          restAfterSet: p.restAfterSet ?? 90,
+          rest: p.rest ?? 90,
         };
       }),
     }));
@@ -222,10 +222,11 @@ export default function BlueprintEditorStep({
           order: ex.order - 1, // Convert 1-based to 0-based
           sets: ex.sets.map((set) => ({
             order: set.order,
-            isWarmup: set.setType === SetType.WARMUP,
-            targetReps: set.reps,
-            targetWeight: set.weight,
-            targetRir: set.rir,
+            setType: set.setType,
+            reps: set.reps,
+            weight: set.weight,
+            rir: set.rir,
+            rest: set.rest,
           })),
         })),
       };
@@ -266,11 +267,11 @@ export default function BlueprintEditorStep({
         order: ex.order + 1, // Convert 0-based to 1-based
         sets: ex.sets.map((set) => ({
           order: set.order + 1, // Convert 0-based to 1-based
-          setType: set.isWarmup ? SetType.WARMUP : SetType.WORKING,
-          reps: set.targetReps,
-          weight: set.targetWeight,
-          rir: set.targetRir,
-          restAfterSet: 90, // Default rest time
+          setType: set.setType,
+          reps: set.reps,
+          weight: set.weight,
+          rir: set.rir ?? 0,
+          rest: set.rest ?? 90,
         })),
       }));
 
@@ -308,7 +309,7 @@ export default function BlueprintEditorStep({
       setExercises(prev => [exercise, ...prev]);
     }
 
-    // Create mapped ExerciseLog entry with default set (including restAfterSet in planned)
+    // Create mapped ExerciseLog entry with default set (including rest in planned)
     const exDetails = exercises.find((e) => e.id === exerciseId) || exercise;
     const sharedSetId = `set-${Date.now()}`;
     const defaultSet = {
@@ -327,7 +328,7 @@ export default function BlueprintEditorStep({
       reps: 10,
       weight: 0,
       rir: 2,
-      restAfterSet: 90,
+      rest: 90,
     };
 
     const newExLog: ExerciseLog = {
@@ -451,7 +452,7 @@ export default function BlueprintEditorStep({
                               reps: 10,
                               weight: 0,
                               rir: 2,
-                              restAfterSet: 90,
+                              rest: 90,
                             };
                             return {
                               ...e,

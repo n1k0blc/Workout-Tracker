@@ -1,55 +1,13 @@
-import { SetType } from '../../common/types';
-
-export enum WorkoutStatus {
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED',
-  DISCARDED = 'DISCARDED',
-}
+import { WorkoutExerciseResponseDto } from '../../common/dto/workout-tree.dto';
 
 export class HomeGymDto {
   id: string;
   name: string;
 }
 
-export class PlannedSetDto {
-  id: string;
-  order: number;
-  setType: SetType;
-  reps: number;
-  weight: number;
-  rir: number;
-  restAfterSet: number;
-}
-
-export class SetLogDto {
-  id: string;
-  setNumber: number;
-  setType?: SetType;
-  reps: number;
-  weight: number;
-  rir?: number;
-  targetReps?: number;
-  targetWeight?: number;
-  targetRir?: number;
-  actualRestDuration?: number;
-  completedAt: Date;
-}
-
-export class ExerciseLogDto {
-  id: string;
-  exerciseId: string;
-  exerciseName: string;
-  isUnilateral?: boolean;
-  isDoubleWeight?: boolean;
-  order: number;
-  sets: SetLogDto[];
-  plannedSets?: PlannedSetDto[];
-}
-
 export class WorkoutResponseDto {
   id: string;
   date: Date;
-  status: WorkoutStatus;
   isFreeWorkout: boolean;
   totalDuration?: number;
   homeGymId?: string;
@@ -58,16 +16,15 @@ export class WorkoutResponseDto {
   cycleName?: string;
   workoutDayId?: string;
   workoutDayName?: string;
-  templateId?: string;
-  templateName?: string;
-  exercises: ExerciseLogDto[];
+  originTemplateId?: string;
+  originTemplateName?: string;
+  exercises: WorkoutExerciseResponseDto[];
   createdAt: Date;
 }
 
 export class WorkoutListItemDto {
   id: string;
   date: Date;
-  status: WorkoutStatus;
   isFreeWorkout: boolean;
   totalDuration?: number;
   totalVolume: number;
@@ -79,8 +36,8 @@ export class WorkoutListItemDto {
   cycleName?: string;
   workoutDayName?: string;
   workoutDayWeekday?: number;
-  templateId?: string;
-  templateName?: string;
+  originTemplateId?: string;
+  originTemplateName?: string;
   exerciseCount: number;
   createdAt: Date;
 }

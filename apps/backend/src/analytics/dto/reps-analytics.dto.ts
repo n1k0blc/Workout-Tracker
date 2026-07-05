@@ -2,7 +2,7 @@ export class RepsDataPoint {
   date: string;
   reps: number; // Total reps for workout
   workoutId: string;
-  trainingDay?: number; // For cycle mode
+  trainingDay?: number; // cycle-anchored mode only
   weekNumber?: number;
   weekLabel?: string;
   weekStartDate?: string;
@@ -11,17 +11,11 @@ export class RepsDataPoint {
 }
 
 export class RepsAnalyticsDto {
+  cycleId?: string;
+  cycleName?: string;
   totalReps: number;
   averageReps: number;
-  period: string;
-  dataPoints: RepsDataPoint[];
-}
-
-export class RepsByCycleDto {
-  cycleId: string;
-  cycleName: string;
-  dataPoints: RepsDataPoint[];
-  totalReps: number;
-  averageReps: number;
+  period?: string;
   totalWorkouts: number;
+  dataPoints: RepsDataPoint[];
 }

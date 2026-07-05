@@ -109,7 +109,7 @@ export function ExerciseEditorDialog({
       if (exercise) {
         // Edit mode - prefill
         setName(exercise.name);
-        setMuscleGroup(exercise.muscleGroup);
+        setMuscleGroup(exercise.primaryMuscle);
         setEquipment(exercise.equipment);
         setIsUnilateral(exercise.isUnilateral);
         setIsDoubleWeight(exercise.isDoubleWeight);
@@ -171,7 +171,7 @@ export function ExerciseEditorDialog({
     try {
       const payload = {
         name: name.trim(),
-        muscleGroup,
+        primaryMuscle: muscleGroup,
         equipment,
         isUnilateral,
         isDoubleWeight,
@@ -349,7 +349,6 @@ export function ExerciseEditorDialog({
             {/* Sliders */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4 max-h-[320px] overflow-y-auto pr-1">
               {(Object.entries(MUSCLE_GROUP_LABELS) as [MuscleGroup, string][])
-                .filter(([key]) => ![MuscleGroup.ABS, MuscleGroup.BACK, MuscleGroup.LEGS].includes(key))
                 .map(([key, label]) => {
                   const fieldMap: Record<MuscleGroup, keyof PercentageState> = {
                     [MuscleGroup.ABDOMEN]: 'abdomenPercent',
@@ -364,9 +363,6 @@ export function ExerciseEditorDialog({
                     [MuscleGroup.QUADRICEPS]: 'quadricepsPercent',
                     [MuscleGroup.CALVES]: 'calvesPercent',
                     [MuscleGroup.TRICEPS]: 'tricepsPercent',
-                    [MuscleGroup.ABS]: 'abdomenPercent',
-                    [MuscleGroup.BACK]: 'latissimusPercent',
-                    [MuscleGroup.LEGS]: 'quadricepsPercent',
                   };
 
                   const field = fieldMap[key];

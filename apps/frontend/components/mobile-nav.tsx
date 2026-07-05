@@ -33,7 +33,7 @@ export function MobileNav() {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const { activeWorkout } = useWorkout();
+  const { activeWorkout, isHistoryEdit } = useWorkout();
 
   const getUserInitial = () => {
     if (user?.firstName) return user.firstName[0].toUpperCase();
@@ -56,7 +56,7 @@ export function MobileNav() {
     pathname === '/login' ||
     pathname === '/register' ||
     pathname?.startsWith('/workout') ||
-    (activeWorkout && activeWorkout.status === 'IN_PROGRESS')
+    (activeWorkout && !isHistoryEdit)
   ) {
     return null;
   }

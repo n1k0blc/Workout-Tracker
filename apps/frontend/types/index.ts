@@ -19,7 +19,6 @@ export interface HomeGym {
 
 // Auth Types
 export interface AuthResponse {
-  access_token: string;
   user: User;
 }
 
@@ -40,22 +39,21 @@ export interface RegisterCredentials {
 }
 
 // Exercise Types
+// PR2 (§3.7): the 12-column percent distribution is the source of truth. `primaryMuscle` is
+// derived server-side (max-percent column), not a stored field -- no more coarse BACK/ABS/LEGS.
 export enum MuscleGroup {
-  CHEST = 'CHEST',
-  BACK = 'BACK',
-  BICEPS = 'BICEPS',
-  TRICEPS = 'TRICEPS',
-  ABS = 'ABS',
-  SHOULDERS = 'SHOULDERS',
-  LEGS = 'LEGS',
   ABDOMEN = 'ABDOMEN',
   LATISSIMUS = 'LATISSIMUS',
   TRAPEZIUS = 'TRAPEZIUS',
   LOWER_BACK = 'LOWER_BACK',
   HAMSTRINGS = 'HAMSTRINGS',
   GLUTES = 'GLUTES',
+  SHOULDERS = 'SHOULDERS',
+  BICEPS = 'BICEPS',
+  CHEST = 'CHEST',
   QUADRICEPS = 'QUADRICEPS',
   CALVES = 'CALVES',
+  TRICEPS = 'TRICEPS',
 }
 
 export enum Equipment {
@@ -71,7 +69,7 @@ export enum Equipment {
 export interface Exercise {
   id: string;
   name: string;
-  muscleGroup: MuscleGroup;
+  primaryMuscle: MuscleGroup;
   equipment: Equipment;
   isUnilateral: boolean;
   isDoubleWeight: boolean;
@@ -94,7 +92,7 @@ export interface Exercise {
 
 export interface UpdateExerciseDto {
   name: string;
-  muscleGroup: MuscleGroup;
+  primaryMuscle?: MuscleGroup;
   equipment: Equipment;
   isUnilateral?: boolean;
   isDoubleWeight?: boolean;
@@ -113,40 +111,40 @@ export interface UpdateExerciseDto {
   tricepsPercent?: number;
 }
 
-export interface ExerciseBenchmark {
-  id: string;
-  cycleId: string;
-  workoutDayId: string;
-  exerciseId: string;
-  ormBenchmark: number;
-  setAtWorkoutId: string;
-  createdAt: string;
-}
-
-export interface ORMAnalytics {
-  workouts: {
-    workoutId: string;
-    date: string;
-    exercises: {
-      exerciseId: string;
-      exerciseName: string;
-      benchmark: number;
-      percentORM: number | null;
-      wasBenchmarkSet: boolean;
-    }[];
-  }[];
-}
-
-// Workout Types
-export enum WorkoutStatus {
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED',
-  DISCARDED = 'DISCARDED',
-}
-
+// Workout tree types.
+// `WorkoutExercise`/`WorkoutSet` mirror the backend wire shape exactly (§3.2/§4.1) and are used
+// for the blueprint/template tree (read-only from the client's perspective) and as the payload
+// shape for the final save.
+// `ExerciseLog`/`SetLog`/`PlannedSet` are the CLIENT-side working model for an in-progress/edited
+// workout draft: `plannedSets` is a local-only "suggested, not yet confirmed" list (sourced from
+// the blueprint/template at draft-build time, never sent to the backend), while `sets` holds the
+// sets the user has actually confirmed/logged. This mirrors the pre-PR2 shape deliberately (field
+// renames only: `restAfterSet`/`actualRestDuration` -> `rest`, dropped `target*`) so the existing
+// exercise-card UI (swipe-to-log, planned-vs-logged rendering) needed no structural rewrite.
 export enum SetType {
   WARMUP = 'WARMUP',
   WORKING = 'WORKING',
+}
+
+export interface WorkoutSet {
+  id: string;
+  order: number;
+  setType: SetType;
+  reps: number;
+  weight: number;
+  rir?: number;
+  rest?: number; // seconds rested after completing this set
+  completedAt?: string; // meaningful only for performed workouts
+}
+
+export interface WorkoutExercise {
+  id: string;
+  exerciseId: string;
+  exerciseName: string;
+  isUnilateral?: boolean;
+  isDoubleWeight?: boolean;
+  order: number;
+  sets: WorkoutSet[];
 }
 
 export interface PlannedSet {
@@ -156,7 +154,7 @@ export interface PlannedSet {
   reps: number;
   weight: number;
   rir: number;
-  restAfterSet: number;
+  rest: number;
 }
 
 export interface SetLog {
@@ -166,11 +164,10 @@ export interface SetLog {
   reps: number;
   weight: number;
   rir?: number;
-  targetReps?: number;
-  targetWeight?: number;
-  targetRir?: number;
   completedAt: string;
-  actualRestDuration?: number;
+  /** Seconds rested after completing this set -- assigned when the NEXT set (anywhere in the
+   *  workout) completes, or defaulted to the planned/90 value at save time for the last set. */
+  rest?: number;
 }
 
 export interface ExerciseLog {
@@ -187,7 +184,6 @@ export interface ExerciseLog {
 export interface Workout {
   id: string;
   date: string;
-  status: WorkoutStatus;
   isFreeWorkout: boolean;
   totalDuration?: number;
   homeGymId?: string | null;
@@ -197,8 +193,9 @@ export interface Workout {
   cycleName?: string;
   workoutDayId?: string;
   workoutDayName?: string;
-  templateId?: string;
-  templateName?: string;
+  originTemplateId?: string;
+  originTemplateName?: string;
+  originTemplateIsCustom?: boolean;
   exercises: ExerciseLog[];
   createdAt: string;
 }
@@ -206,7 +203,6 @@ export interface Workout {
 export interface WorkoutListItem {
   id: string;
   date: string;
-  status: WorkoutStatus;
   isFreeWorkout: boolean;
   totalDuration?: number;
   totalVolume: number;
@@ -215,45 +211,62 @@ export interface WorkoutListItem {
   cycleName?: string;
   workoutDayName?: string;
   workoutDayWeekday?: number;
-  templateId?: string;
-  templateName?: string;
+  originTemplateId?: string;
+  originTemplateName?: string;
   exerciseCount: number;
   createdAt: string;
 }
 
-// Cycle Types
-export interface BlueprintSet {
-  id: string;
+// Save-workout DTOs (§3.4): the single transactional save, with side-effect flags.
+export enum SaveAsTemplateMode {
+  NONE = 'none',
+  NEW = 'new',
+  OVERWRITE = 'overwrite',
+}
+
+export interface WorkoutSetInput {
   order: number;
   setType: SetType;
   reps: number;
   weight: number;
-  rir: number;
-  restAfterSet: number;
+  rir?: number;
+  rest?: number;
+  completedAt?: string;
 }
 
-export interface BlueprintExercise {
-  id: string;
+export interface WorkoutExerciseInput {
   exerciseId: string;
-  exerciseName: string;
-  isUnilateral?: boolean;
-  isDoubleWeight?: boolean;
   order: number;
-  sets: BlueprintSet[];
+  sets: WorkoutSetInput[];
 }
 
-export interface WorkoutBlueprint {
-  id: string;
-  exercises: BlueprintExercise[];
-  updatedAt: string;
+export interface SaveWorkoutDto {
+  date: string;
+  totalDuration?: number;
+  isFreeWorkout?: boolean;
+  homeGymId?: string;
+  cycleId?: string;
+  workoutDayId?: string;
+  originTemplateId?: string;
+  exercises: WorkoutExerciseInput[];
+  overwriteBlueprint?: boolean;
+  saveAsTemplateMode?: SaveAsTemplateMode;
+  saveAsTemplateName?: string;
+  overwriteTemplateId?: string;
 }
 
+// Cycle Types
 export interface WorkoutDay {
   id: string;
   weekday: number;
+  order: number;
   name: string;
   plannedHomeGymId?: string;
-  blueprint?: WorkoutBlueprint;
+  blueprint?: {
+    id: string;
+    updatedAt: string;
+    exercises: WorkoutExercise[];
+  };
 }
 
 export interface WorkoutCycle {
@@ -294,12 +307,30 @@ export interface CycleDetails {
   percentage?: number;
 }
 
-// Analytics Types
+// Analytics Types (PR3 §3.9: `cycleId` presence alone switches a metric into cycle-anchored
+// mode -- there's no separate "-by-cycle" type/endpoint anymore, just optional cycle/week fields)
+export interface AnalyticsFilterParams {
+  period?: 'week' | 'month' | 'all';
+  startDate?: string;
+  endDate?: string;
+  gymId?: string;
+  muscleGroup?: string | string[];
+  equipment?: string | string[];
+  cycleId?: string;
+  aggregation?: 'day' | 'week';
+  exerciseId?: string;
+}
+
 export interface VolumeDataPoint {
   date: string;
   volume: number;
   workoutId?: string;
   trainingDay?: number;
+  weekNumber?: number;
+  weekLabel?: string;
+  weekStartDate?: string;
+  weekEndDate?: string;
+  workoutCount?: number;
 }
 
 export interface VolumeByMuscleGroup {
@@ -309,8 +340,10 @@ export interface VolumeByMuscleGroup {
 }
 
 export interface VolumeAnalytics {
+  cycleId?: string;
+  cycleName?: string;
   totalVolume: number;
-  period: string;
+  period?: string;
   dataPoints: VolumeDataPoint[];
   byMuscleGroup?: VolumeByMuscleGroup[];
 }
@@ -353,50 +386,27 @@ export interface CycleList {
   completedCycles: CycleListItem[];
 }
 
-export interface ORMDataPoint {
-  date: string;
-  trainingDay: number;
-  percentORM: number;
-  workoutId: string;
-}
-
-export interface ORMByCycleAnalytics {
-  cycleId: string;
-  cycleName: string;
-  dataPoints: ORMDataPoint[];
-  averagePercentORM: number;
-  totalWorkouts: number;
-}
-
 export interface RIRDataPoint {
   date: string;
-  trainingDay: number;
+  trainingDay?: number;
   rir0Count: number;
   rir1Count: number;
   rir2Count: number;
   workoutId: string;
-}
-
-export interface RIRByCycleAnalytics {
-  cycleId: string;
-  cycleName: string;
-  dataPoints: RIRDataPoint[];
-  totalSets: number;
-  totalWorkouts: number;
-}
-
-export interface RIRAnalyticsDataPoint {
-  date: string;
-  rir0Count: number;
-  rir1Count: number;
-  rir2Count: number;
-  workoutId: string;
+  weekNumber?: number;
+  weekLabel?: string;
+  weekStartDate?: string;
+  weekEndDate?: string;
+  workoutCount?: number;
 }
 
 export interface RIRAnalytics {
+  cycleId?: string;
+  cycleName?: string;
   totalSets: number;
-  period: string;
-  dataPoints: RIRAnalyticsDataPoint[];
+  period?: string;
+  totalWorkouts: number;
+  dataPoints: RIRDataPoint[];
 }
 
 export interface DurationDataPoint {
@@ -404,20 +414,20 @@ export interface DurationDataPoint {
   duration: number;
   workoutId: string;
   trainingDay?: number;
+  weekNumber?: number;
+  weekLabel?: string;
+  weekStartDate?: string;
+  weekEndDate?: string;
+  workoutCount?: number;
 }
 
 export interface DurationAnalytics {
+  cycleId?: string;
+  cycleName?: string;
   averageDuration: number;
-  period: string;
-  dataPoints: DurationDataPoint[];
-}
-
-export interface DurationByCycleAnalytics {
-  cycleId: string;
-  cycleName: string;
-  dataPoints: DurationDataPoint[];
-  averageDuration: number;
+  period?: string;
   totalWorkouts: number;
+  dataPoints: DurationDataPoint[];
 }
 
 export interface RestTimeDataPoint {
@@ -425,20 +435,20 @@ export interface RestTimeDataPoint {
   averageRestTime: number;
   workoutId: string;
   trainingDay?: number;
+  weekNumber?: number;
+  weekLabel?: string;
+  weekStartDate?: string;
+  weekEndDate?: string;
+  workoutCount?: number;
 }
 
 export interface RestTimeAnalytics {
+  cycleId?: string;
+  cycleName?: string;
   overallAverage: number;
-  period: string;
-  dataPoints: RestTimeDataPoint[];
-}
-
-export interface RestTimeByCycleAnalytics {
-  cycleId: string;
-  cycleName: string;
-  dataPoints: RestTimeDataPoint[];
-  overallAverage: number;
+  period?: string;
   totalWorkouts: number;
+  dataPoints: RestTimeDataPoint[];
 }
 
 export interface RepsDataPoint {
@@ -446,22 +456,21 @@ export interface RepsDataPoint {
   reps: number;
   workoutId: string;
   trainingDay?: number;
+  weekNumber?: number;
+  weekLabel?: string;
+  weekStartDate?: string;
+  weekEndDate?: string;
+  workoutCount?: number;
 }
 
 export interface RepsAnalytics {
+  cycleId?: string;
+  cycleName?: string;
   totalReps: number;
   averageReps: number;
-  period: string;
-  dataPoints: RepsDataPoint[];
-}
-
-export interface RepsByCycleAnalytics {
-  cycleId: string;
-  cycleName: string;
-  dataPoints: RepsDataPoint[];
-  totalReps: number;
-  averageReps: number;
+  period?: string;
   totalWorkouts: number;
+  dataPoints: RepsDataPoint[];
 }
 
 export interface SetsDataPoint {
@@ -469,42 +478,47 @@ export interface SetsDataPoint {
   sets: number;
   workoutId: string;
   trainingDay?: number;
+  weekNumber?: number;
+  weekLabel?: string;
+  weekStartDate?: string;
+  weekEndDate?: string;
+  workoutCount?: number;
 }
 
 export interface SetsAnalytics {
+  cycleId?: string;
+  cycleName?: string;
   totalSets: number;
   averageSets: number;
-  period: string;
-  dataPoints: SetsDataPoint[];
-}
-
-export interface SetsByCycleAnalytics {
-  cycleId: string;
-  cycleName: string;
-  dataPoints: SetsDataPoint[];
-  totalSets: number;
-  averageSets: number;
+  period?: string;
   totalWorkouts: number;
+  dataPoints: SetsDataPoint[];
 }
 
-// Workout Template Types
-export interface WorkoutTemplateSet {
-  id: string;
-  order: number;
-  isWarmup: boolean;
-  targetReps: number;
-  targetWeight: number;
-  targetRir: number;
+// PR3 §3.10: ORM% reborn weight-independent (`3000 / (30 + reps + rir)` per working set,
+// averaged) -- applies to every gym/workout, unlike the retired benchmark-based %ORM.
+export interface IntensityDataPoint {
+  date: string;
+  intensity: number;
+  workoutId: string;
+  trainingDay?: number;
+  weekNumber?: number;
+  weekLabel?: string;
+  weekStartDate?: string;
+  weekEndDate?: string;
+  workoutCount?: number;
 }
 
-export interface WorkoutTemplateExercise {
-  id: string;
-  order: number;
-  exerciseId: string;
-  exerciseName?: string;
-  sets: WorkoutTemplateSet[];
+export interface IntensityAnalytics {
+  cycleId?: string;
+  cycleName?: string;
+  averageIntensity: number;
+  period?: string;
+  totalWorkouts: number;
+  dataPoints: IntensityDataPoint[];
 }
 
+// Workout Template Types (same tree shape as blueprints/workouts, §3.2)
 export interface WorkoutTemplate {
   id: string;
   name: string;
@@ -513,35 +527,21 @@ export interface WorkoutTemplate {
   recommendedGymId?: string;
   recommendedGymName?: string;
   createdAt: string;
-  exercises?: WorkoutTemplateExercise[];
+  exercises?: WorkoutExercise[];
   totalExercises?: number;
   totalSets?: number;
-}
-
-export interface CreateWorkoutTemplateSet {
-  order: number;
-  isWarmup: boolean;
-  targetReps: number;
-  targetWeight: number;
-  targetRir: number;
-}
-
-export interface CreateWorkoutTemplateExercise {
-  exerciseId: string;
-  order: number;
-  sets: CreateWorkoutTemplateSet[];
 }
 
 export interface CreateWorkoutTemplate {
   name: string;
   recommendedGymId?: string;
-  exercises: CreateWorkoutTemplateExercise[];
+  exercises: WorkoutExerciseInput[];
 }
 
 export interface UpdateWorkoutTemplate {
   name?: string;
   recommendedGymId?: string;
-  exercises?: CreateWorkoutTemplateExercise[];
+  exercises?: WorkoutExerciseInput[];
 }
 
 // Dashboard Types
@@ -575,4 +575,31 @@ export interface CycleProgress {
   totalWeeks: number;
   percentage: number;
   cycleName: string;
+}
+
+// Suggested workout / current-cycle-workouts (workout-engine)
+export interface SuggestedWorkout {
+  cycleId: string;
+  cycleName: string;
+  workoutDayId: string;
+  workoutDayName: string;
+  weekday: number;
+  order: number;
+  plannedHomeGymId?: string | null;
+  exercises: WorkoutExercise[];
+}
+
+export interface CycleWorkoutDay {
+  workoutDayId: string;
+  workoutDayName: string;
+  weekday: number;
+  order: number;
+  isSuggested: boolean;
+  exerciseCount: number;
+}
+
+export interface CurrentCycleWorkouts {
+  cycleId: string;
+  cycleName: string;
+  workoutDays: CycleWorkoutDay[];
 }

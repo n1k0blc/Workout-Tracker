@@ -16,14 +16,10 @@ export const MUSCLE_GROUP_LABELS: Record<MuscleGroup, string> = {
   [MuscleGroup.QUADRICEPS]: 'Quadrizeps',
   [MuscleGroup.CALVES]: 'Waden',
   [MuscleGroup.TRICEPS]: 'Trizeps',
-  // Legacy values
-  [MuscleGroup.ABS]: 'Bauch',
-  [MuscleGroup.BACK]: 'Rücken',
-  [MuscleGroup.LEGS]: 'Beine',
 };
 
 /**
- * Gets the secondary muscle groups (>0% and not the main muscle group)
+ * Gets the secondary muscle groups (>0% and not the primary muscle)
  * Returns array of { muscleGroup, percent }
  */
 export function getSecondaryMuscleGroups(exercise: Exercise): Array<{ muscleGroup: MuscleGroup; percent: number; label: string }> {
@@ -43,7 +39,7 @@ export function getSecondaryMuscleGroups(exercise: Exercise): Array<{ muscleGrou
   ];
 
   return percentages
-    .filter(({ percent, muscleGroup }) => percent > 0 && muscleGroup !== exercise.muscleGroup)
+    .filter(({ percent, muscleGroup }) => percent > 0 && muscleGroup !== exercise.primaryMuscle)
     .sort((a, b) => b.percent - a.percent)
     .map(({ muscleGroup, percent }) => ({
       muscleGroup,
@@ -59,14 +55,14 @@ export function getSecondaryMuscleGroups(exercise: Exercise): Array<{ muscleGrou
 export function formatSecondaryMuscleGroups(exercise: Exercise): string {
   const secondary = getSecondaryMuscleGroups(exercise);
   if (secondary.length === 0) return '';
-  
+
   return secondary
     .map(({ label, percent }) => `${label} ${percent}%`)
     .join(', ');
 }
 
 /**
- * Gets all muscle groups that this exercise targets (including main)
+ * Gets all muscle groups that this exercise targets (including the primary one)
  * Returns array of { muscleGroup, percent, label, isMain }
  */
 export function getAllMuscleGroups(exercise: Exercise): Array<{
@@ -97,7 +93,7 @@ export function getAllMuscleGroups(exercise: Exercise): Array<{
       muscleGroup,
       percent,
       label: MUSCLE_GROUP_LABELS[muscleGroup],
-      isMain: muscleGroup === exercise.muscleGroup,
+      isMain: muscleGroup === exercise.primaryMuscle,
     }));
 }
 
@@ -141,10 +137,6 @@ export function createIsolationPreset(muscleGroup: MuscleGroup): Record<string, 
     [MuscleGroup.QUADRICEPS]: 'quadricepsPercent',
     [MuscleGroup.CALVES]: 'calvesPercent',
     [MuscleGroup.TRICEPS]: 'tricepsPercent',
-    // Legacy mappings
-    [MuscleGroup.ABS]: 'abdomenPercent',
-    [MuscleGroup.BACK]: 'latissimusPercent',
-    [MuscleGroup.LEGS]: 'quadricepsPercent',
   };
 
   const field = muscleGroupToField[muscleGroup];

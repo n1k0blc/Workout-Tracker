@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 
 interface ScrollableChartProps {
   children: ReactNode;
@@ -9,43 +9,39 @@ interface ScrollableChartProps {
 }
 
 /**
- * Wrapper-Komponente für Charts, die auf Mobile horizontal scrollbar macht
- * wenn zu viele Datenpunkte vorhanden sind.
- * 
+ * Wrapper-Komponente für Charts, die horizontal scrollbar macht, wenn zu viele
+ * Datenpunkte vorhanden sind (Desktop und Mobile gleichermaßen).
+ *
  * @param dataPointCount - Anzahl der Datenpunkte im Chart
  * @param minDataPointsForScroll - Ab wie vielen Datenpunkten scrollen aktiviert wird (default: 5)
  */
-export default function ScrollableChart({ 
-  children, 
+export default function ScrollableChart({
+  children,
   dataPointCount,
-  minDataPointsForScroll = 5 
+  minDataPointsForScroll = 5
 }: ScrollableChartProps) {
-  const [isMobile, setIsMobile] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
 
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    const el = containerRef.current;
+    if (!el) return;
+
+    const observer = new ResizeObserver((entries) => {
+      setContainerWidth(entries[0].contentRect.width);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
   }, []);
 
-  const shouldScroll = isMobile && dataPointCount > minDataPointsForScroll;
-  
-  // Berechne Breite basierend auf Anzahl der Datenpunkte
-  // ~60px pro Datenpunkt für gute Lesbarkeit auf Mobile
-  const chartWidth = shouldScroll ? dataPointCount * 60 : undefined;
+  const shouldScroll = dataPointCount > minDataPointsForScroll;
 
-  console.log('ScrollableChart Debug:', { 
-    isMobile, 
-    dataPointCount, 
-    minDataPointsForScroll,
-    shouldScroll, 
-    chartWidth,
-    windowWidth: typeof window !== 'undefined' ? window.innerWidth : 'SSR'
-  });
+  // ~60px pro Datenpunkt für gute Lesbarkeit; nie schmaler als die verfügbare Breite,
+  // damit der Chart auf großen Bildschirmen nicht unnötig schrumpft.
+  const chartWidth = shouldScroll ? Math.max(dataPointCount * 60, containerWidth) : undefined;
 
   return (
-    <div className={shouldScroll ? 'overflow-x-auto pb-2' : ''}>
+    <div ref={containerRef} className={shouldScroll ? 'overflow-x-auto pb-2' : ''}>
       <div style={{ width: chartWidth }}>
         {children}
       </div>

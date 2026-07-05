@@ -2,12 +2,12 @@ export class VolumeDataPoint {
   date: string;
   volume: number;
   workoutId?: string;
-  trainingDay?: number; // Added for cycle mode
-  weekNumber?: number; // Week number for cycle mode
+  trainingDay?: number; // cycle-anchored mode only
+  weekNumber?: number;
   weekLabel?: string; // "KW 18" or "Woche 3"
-  weekStartDate?: string; // Start of week for tooltip
-  weekEndDate?: string; // End of week for tooltip
-  workoutCount?: number; // Number of workouts in this week
+  weekStartDate?: string;
+  weekEndDate?: string;
+  workoutCount?: number;
 }
 
 export class VolumeByMuscleGroup {
@@ -17,8 +17,10 @@ export class VolumeByMuscleGroup {
 }
 
 export class VolumeAnalyticsDto {
+  cycleId?: string;
+  cycleName?: string;
   totalVolume: number;
-  period: string;
+  period?: string;
   dataPoints: VolumeDataPoint[];
   byMuscleGroup?: VolumeByMuscleGroup[];
 }

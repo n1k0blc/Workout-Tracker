@@ -17,7 +17,7 @@ export interface BlueprintSetData {
   reps: number;
   weight: number;
   rir: number;
-  restAfterSet: number;
+  rest: number;
 }
 
 export interface WorkoutDayData {

@@ -1,38 +1,21 @@
-import { SetType } from '../../common/types';
 import { CycleStatus } from '@prisma/client';
+import { WorkoutExerciseResponseDto } from '../../common/dto/workout-tree.dto';
 
 export class HomeGymDto {
   id: string;
   name: string;
 }
 
-export class BlueprintSetResponseDto {
-  id: string;
-  order: number;
-  setType: SetType;
-  reps: number;
-  weight: number;
-  rir: number;
-  restAfterSet: number;
-}
-
-export class BlueprintExerciseResponseDto {
-  id: string;
-  exerciseId: string;
-  exerciseName: string;
-  order: number;
-  sets: BlueprintSetResponseDto[];
-}
-
 export class WorkoutBlueprintResponseDto {
   id: string;
-  exercises: BlueprintExerciseResponseDto[];
   updatedAt: Date;
+  exercises: WorkoutExerciseResponseDto[];
 }
 
 export class WorkoutDayResponseDto {
   id: string;
   weekday: number;
+  order: number;
   name: string;
   plannedHomeGymId?: string;
   plannedHomeGym?: HomeGymDto;

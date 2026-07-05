@@ -34,7 +34,10 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3001
-      DATABASE_URL: postgresql://${DB_USER:-workoutuser}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-workout_tracker}?schema=public
+      # connection_limit explicit: Prisma's default (num_cpus*2+1 = 9 on the Pi's 4 cores) is fine
+      # for a single backend instance against Postgres' max_connections=100, but pin it explicitly
+      # so pool sizing is documented rather than implicit.
+      DATABASE_URL: postgresql://${DB_USER:-workoutuser}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-workout_tracker}?schema=public&connection_limit=10
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-7d}
       CORS_ORIGIN: ${CORS_ORIGIN:-https://workout.nikobjelic.com}

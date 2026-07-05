@@ -2,7 +2,7 @@ export class DurationDataPoint {
   date: string;
   duration: number; // in minutes
   workoutId: string;
-  trainingDay?: number; // For cycle mode
+  trainingDay?: number; // cycle-anchored mode only
   weekNumber?: number;
   weekLabel?: string;
   weekStartDate?: string;
@@ -11,15 +11,10 @@ export class DurationDataPoint {
 }
 
 export class DurationAnalyticsDto {
+  cycleId?: string;
+  cycleName?: string;
   averageDuration: number; // in minutes
-  period: string;
-  dataPoints: DurationDataPoint[];
-}
-
-export class DurationByCycleDto {
-  cycleId: string;
-  cycleName: string;
-  dataPoints: DurationDataPoint[];
-  averageDuration: number; // in minutes
+  period?: string;
   totalWorkouts: number;
+  dataPoints: DurationDataPoint[];
 }

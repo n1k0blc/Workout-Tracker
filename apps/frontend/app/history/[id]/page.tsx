@@ -5,14 +5,25 @@ import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
-import { Workout, SetType } from '@/types';
+import { Workout, WorkoutExercise, ExerciseLog, SetType } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import ExerciseCard from '@/components/workout/exercise-card';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   IconChevronLeft,
   IconCheck,
+  IconTrash,
 } from '@tabler/icons-react';
 
 export default function WorkoutDetailPage() {
@@ -26,7 +37,10 @@ export default function WorkoutDetailPage() {
   const cycleId = searchParams.get('cycleId');
   
   const [workout, setWorkout] = useState<Workout | null>(null);
+  const [exerciseLogs, setExerciseLogs] = useState<ExerciseLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (workoutId) {
@@ -39,27 +53,43 @@ export default function WorkoutDetailPage() {
     setLoading(true);
     try {
       const data = await apiClient.getWorkout(workoutId);
-
-      // Trim plannedSets to only those that were actually performed.
-      // This prevents "unlogged/removed planned sets" (skipped during execution)
-      // from appearing in the history view. Only the real executed sets (and their
-      // matching planned rows) should be shown. Matches the behavior in history edit.
-      const trimmedData = {
-        ...data,
-        exercises: data.exercises.map((ex) => {
-          const performedNumbers = new Set(ex.sets.map((s) => s.setNumber));
-          return {
-            ...ex,
-            plannedSets: (ex.plannedSets || []).filter((ps) => performedNumbers.has(ps.order)),
-          };
-        }),
-      };
-
-      setWorkout(trimmedData);
+      setWorkout(data);
+      // Server tree uses `order`/no plannedSets -- map into the client ExerciseLog/SetLog
+      // shape the shared ExerciseCard expects (values-only, read-only view here).
+      setExerciseLogs(
+        (data.exercises as unknown as WorkoutExercise[]).map((ex) => ({
+          ...ex,
+          sets: ex.sets.map((s) => ({
+            id: s.id,
+            setNumber: s.order,
+            setType: s.setType,
+            reps: s.reps,
+            weight: s.weight,
+            rir: s.rir,
+            rest: s.rest,
+            completedAt: s.completedAt ?? new Date().toISOString(),
+          })),
+        }))
+      );
     } catch (error) {
       console.error('Failed to load workout:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await apiClient.deleteWorkout(workoutId);
+      if (fromCycle && cycleId) {
+        router.push(`/cycles/${cycleId}`);
+      } else {
+        router.push('/history');
+      }
+    } catch (error) {
+      console.error('Failed to delete workout:', error);
+      setDeleting(false);
     }
   };
 
@@ -141,7 +171,7 @@ export default function WorkoutDetailPage() {
                       <div>
                         <h2 className="text-2xl font-bold text-foreground">
                           {workout.isFreeWorkout
-                            ? workout.templateName || 'Freies Workout'
+                            ? workout.originTemplateName || 'Freies Workout'
                             : workout.workoutDayName || 'Workout'}
                         </h2>
                         {workout.cycleName && (
@@ -166,6 +196,14 @@ export default function WorkoutDetailPage() {
                           }}
                         >
                           Bearbeiten
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => setShowDeleteConfirm(true)}
+                        >
+                          <IconTrash className="size-4" />
                         </Button>
                       </div>
                     </div>
@@ -213,7 +251,7 @@ export default function WorkoutDetailPage() {
                 {/* Exercises - now using the shared modern ExerciseCard for consistent look */}
                 <div className="space-y-4">
                   <h3 className="text-xl font-bold text-foreground">Übungen</h3>
-                  {workout.exercises.map((exercise, idx) => (
+                  {exerciseLogs.map((exercise, idx) => (
                     <ExerciseCard
                       key={exercise.id}
                       exercise={exercise}
@@ -250,6 +288,29 @@ export default function WorkoutDetailPage() {
           </div>
         </main>
       </div>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={(open) => !open && setShowDeleteConfirm(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Workout löschen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Dieses Workout und alle geloggten Sätze werden dauerhaft gelöscht. Dies kann nicht
+              rückgängig gemacht werden.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Abbrechen</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? 'Wird gelöscht...' : 'Löschen'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </ProtectedRoute>
   );
 }

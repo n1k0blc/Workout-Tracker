@@ -44,7 +44,7 @@ export default function ExerciseSelectionModal({
     try {
       const data = await apiClient.getExercises({
         search: search || undefined,
-        muscleGroup: muscleGroupFilter,
+        primaryMuscle: muscleGroupFilter,
         equipment: equipmentFilter,
         includeCustom: true,
       });
@@ -227,7 +227,7 @@ export default function ExerciseSelectionModal({
                     {exercise.name}
                   </div>
                   <div className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
-                    {translateMuscleGroup(exercise.muscleGroup)} • {translateEquipment(exercise.equipment)}
+                    {translateMuscleGroup(exercise.primaryMuscle)} • {translateEquipment(exercise.equipment)}
                     {exercise.isCustom && (
                       <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
                         Custom

@@ -19,6 +19,9 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
+// createFromBlueprint/createFromWorkout are gone (§3.4): "save as template" and
+// "overwrite template" are now side-effect flags on the workouts save endpoint,
+// applied via the shared workout-tree copy primitive in the same transaction.
 @Controller('workout-templates')
 @UseGuards(JwtAuthGuard)
 export class WorkoutTemplatesController {
@@ -61,23 +64,5 @@ export class WorkoutTemplatesController {
     @CurrentUser() user: { id: string },
   ): Promise<void> {
     return this.workoutTemplatesService.delete(id, user.id);
-  }
-
-  @Post('from-blueprint/:blueprintId')
-  async createFromBlueprint(
-    @Param('blueprintId') blueprintId: string,
-    @CurrentUser() user: { id: string },
-    @Body('name') name: string,
-  ): Promise<WorkoutTemplateDto> {
-    return this.workoutTemplatesService.createFromBlueprint(blueprintId, user.id, name);
-  }
-
-  @Post('from-workout/:workoutId')
-  async createFromWorkout(
-    @Param('workoutId') workoutId: string,
-    @CurrentUser() user: { id: string },
-    @Body('name') name: string,
-  ): Promise<WorkoutTemplateDto> {
-    return this.workoutTemplatesService.createFromWorkout(workoutId, user.id, name);
   }
 }
