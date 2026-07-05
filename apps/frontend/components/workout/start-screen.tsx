@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWorkout } from '@/lib/workout-context';
 import { apiClient } from '@/lib/api';
-import { Workout } from '@/types';
+import { SuggestedWorkout } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,8 +33,8 @@ import TemplateSelectionModal from './template-selection-modal';
 
 export default function WorkoutStartScreen() {
   const router = useRouter();
-  const { startWorkout, loading, setActiveWorkoutDirectly } = useWorkout();
-  const [suggestedWorkout, setSuggestedWorkout] = useState<Workout | null>(
+  const { startWorkout, startWorkoutFromTemplate, loading } = useWorkout();
+  const [suggestedWorkout, setSuggestedWorkout] = useState<SuggestedWorkout | null>(
     null
   );
   const [loadingSuggestion, setLoadingSuggestion] = useState(true);
@@ -230,26 +230,16 @@ export default function WorkoutStartScreen() {
     setShowGymLocationModal(false);
 
     try {
-      // Start workout from template - this returns the created workout
-      const workout = await apiClient.startWorkoutFromTemplate(
+      await startWorkoutFromTemplate(
         selectedTemplateId,
-        homeGymId || undefined,
+        homeGymId,
         pendingWorkoutData?.isPastWorkout,
         pendingWorkoutData?.pastWorkoutDate,
         pendingWorkoutData?.pastWorkoutDuration,
       );
-      
+
       setSelectedTemplateId(null);
       setTemplateRecommendedGymId(undefined);
-      
-      // Navigate to workout screen for all template workouts
-      // Pass isPastWorkout and pastWorkoutDuration to context
-      setActiveWorkoutDirectly(
-        workout,
-        pendingWorkoutData?.isPastWorkout,
-        pendingWorkoutData?.pastWorkoutDuration
-      );
-      
       setPendingWorkoutData(null);
     } catch (err) {
       setError('Fehler beim Starten des Vorlagen-Workouts');
@@ -329,12 +319,12 @@ export default function WorkoutStartScreen() {
                                     {exercise.exerciseName}
                                   </h3>
                                 </div>
-                                {exercise.plannedSets && exercise.plannedSets.length > 0 && (
+                                {exercise.sets && exercise.sets.length > 0 && (
                                   <div className="mt-2 space-y-1">
                                     <div className="text-sm font-medium text-foreground">
-                                      {exercise.plannedSets.length} geplante Sätze:
+                                      {exercise.sets.length} geplante Sätze:
                                     </div>
-                                    {exercise.plannedSets.map((set, setIdx) => (
+                                    {exercise.sets.map((set, setIdx) => (
                                       <div key={setIdx} className="text-sm text-muted-foreground">
                                         {set.setType === 'WARMUP' ? 'Aufwärmen' : 'Arbeit'} — {set.reps} Wdh × {set.weight} kg @ RIR {set.rir}
                                       </div>
@@ -532,55 +522,6 @@ export default function WorkoutStartScreen() {
       />
 
       {/* Common Workout Details step for past workouts (Date + Duration) */}
-      <Dialog open={showPastWorkoutDetails} onOpenChange={(open) => !open && handlePastWorkoutDetailsBack()}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Workout-Details</DialogTitle>
-            <DialogDescription>
-              Gib Datum und ungefähre Dauer des vergangenen Workouts ein.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div>
-              <Label>Workout-Datum</Label>
-              <Input
-                type="date"
-                value={pastDetailsDate}
-                max={new Date().toISOString().split('T')[0]}
-                onChange={(e) => setPastDetailsDate(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <Label>Workout-Dauer (Minuten)</Label>
-              <Input
-                type="number"
-                inputMode="numeric"
-                min="1"
-                value={pastDetailsDuration}
-                onChange={(e) => setPastDetailsDuration(parseInt(e.target.value) || 0)}
-                className="text-base"
-              />
-            </div>
-          </div>
-
-          <DialogFooter className="flex gap-3">
-            <Button variant="outline" onClick={handlePastWorkoutDetailsBack} className="flex-1">
-              Zurück
-            </Button>
-            <Button
-              onClick={handlePastWorkoutDetailsConfirm}
-              disabled={!pastDetailsDate || pastDetailsDuration < 1}
-              className="flex-1"
-            >
-              Weiter zur Gym Auswahl
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Common Workout Details step for past workouts */}
       <Dialog open={showPastWorkoutDetails} onOpenChange={(open) => !open && handlePastWorkoutDetailsBack()}>
         <DialogContent className="max-w-md">
           <DialogHeader>

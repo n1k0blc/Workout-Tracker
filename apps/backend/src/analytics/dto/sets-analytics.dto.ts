@@ -2,7 +2,7 @@ export class SetsDataPoint {
   date: string;
   sets: number; // Total working sets for workout
   workoutId: string;
-  trainingDay?: number; // For cycle mode
+  trainingDay?: number; // cycle-anchored mode only
   weekNumber?: number;
   weekLabel?: string;
   weekStartDate?: string;
@@ -11,17 +11,11 @@ export class SetsDataPoint {
 }
 
 export class SetsAnalyticsDto {
+  cycleId?: string;
+  cycleName?: string;
   totalSets: number;
   averageSets: number;
-  period: string;
-  dataPoints: SetsDataPoint[];
-}
-
-export class SetsByCycleDto {
-  cycleId: string;
-  cycleName: string;
-  dataPoints: SetsDataPoint[];
-  totalSets: number;
-  averageSets: number;
+  period?: string;
   totalWorkouts: number;
+  dataPoints: SetsDataPoint[];
 }

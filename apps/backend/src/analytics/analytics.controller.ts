@@ -1,71 +1,37 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
-import { ORMService } from '../orm/orm.service';
 import {
   VolumeAnalyticsDto,
-  OneRMAnalyticsDto,
   PersonalRecordsDto,
   MuscleDistributionDto,
-  TimeTrackingDto,
   CycleListDto,
-  ORMByCycleDto,
-  RIRByCycleDto,
   RIRAnalyticsDto,
   DurationAnalyticsDto,
-  DurationByCycleDto,
   RestTimeAnalyticsDto,
-  RestTimeByCycleDto,
   RepsAnalyticsDto,
-  RepsByCycleDto,
   SetsAnalyticsDto,
-  SetsByCycleDto,
+  IntensityAnalyticsDto,
 } from './dto';
+import { AnalyticsFilterDto } from '../common/dto/analytics-filter.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
+/**
+ * PR3 (§3.9): consolidated down from 18 routes (9 metrics x base+"-by-cycle" twin, minus the
+ * 3 dropped ORM routes) to one route per metric. `filter.cycleId` presence alone switches a
+ * metric into cycle-anchored mode -- see `AnalyticsService.loadWorkoutsForAnalytics`.
+ */
 @Controller('analytics')
 @UseGuards(JwtAuthGuard)
 export class AnalyticsController {
-  constructor(
-    private readonly analyticsService: AnalyticsService,
-    private readonly ormService: ORMService,
-  ) {}
+  constructor(private readonly analyticsService: AnalyticsService) {}
 
   @Get('volume')
   async getVolumeAnalytics(
     @CurrentUser() user: { id: string },
-    @Query('period') period: 'week' | 'month' | 'all' = 'month',
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-    @Query('gymId') gymId?: string,
-    @Query('muscleGroup') muscleGroup?: string | string[],
-    @Query('equipment') equipment?: string | string[],
-    @Query('cycleId') cycleId?: string,
-    @Query('aggregation') aggregation?: 'day' | 'week',
-    @Query('exerciseId') exerciseId?: string,
+    @Query() filter: AnalyticsFilterDto,
   ): Promise<VolumeAnalyticsDto> {
-    const start = startDate ? new Date(startDate) : undefined;
-    const end = endDate ? new Date(endDate) : undefined;
-    return this.analyticsService.getVolumeAnalytics(
-      user.id,
-      period,
-      start,
-      end,
-      gymId,
-      muscleGroup,
-      equipment,
-      cycleId,
-      aggregation,
-      exerciseId,
-    );
-  }
-
-  @Get('1rm/:exerciseId')
-  async getOneRMAnalytics(
-    @Param('exerciseId') exerciseId: string,
-    @CurrentUser() user: { id: string },
-  ): Promise<OneRMAnalyticsDto> {
-    return this.analyticsService.getOneRMAnalytics(user.id, exerciseId);
+    return this.analyticsService.getVolumeAnalytics(user.id, filter);
   }
 
   @Get('prs')
@@ -81,237 +47,61 @@ export class AnalyticsController {
   @Get('muscle-distribution')
   async getMuscleDistribution(
     @CurrentUser() user: { id: string },
-    @Query('period') period: 'week' | 'month' | 'all' = 'month',
-    @Query('gymId') gymId?: string,
+    @Query() filter: AnalyticsFilterDto,
   ): Promise<MuscleDistributionDto> {
-    return this.analyticsService.getMuscleDistribution(user.id, period, gymId);
-  }
-
-  @Get('time-tracking')
-  async getTimeTracking(
-    @Query('period') period: 'week' | 'month' | 'all' = 'month',
-    @CurrentUser() user: { id: string },
-  ): Promise<TimeTrackingDto> {
-    return this.analyticsService.getTimeTracking(user.id, period);
-  }
-
-  @Get('orm/:cycleId/:workoutDayId')
-  async getORMAnalytics(
-    @Param('cycleId') cycleId: string,
-    @Param('workoutDayId') workoutDayId: string,
-    @CurrentUser() user: { id: string },
-  ) {
-    return this.analyticsService.getORMAnalytics(cycleId, workoutDayId, user.id);
+    return this.analyticsService.getMuscleDistribution(user.id, filter);
   }
 
   @Get('cycles')
-  async getCycles(
-    @CurrentUser() user: { id: string },
-  ): Promise<CycleListDto> {
+  async getCycles(@CurrentUser() user: { id: string }): Promise<CycleListDto> {
     return this.analyticsService.getCycles(user.id);
-  }
-
-  @Get('orm-by-cycle/:cycleId')
-  async getORMByCycle(
-    @Param('cycleId') cycleId: string,
-    @CurrentUser() user: { id: string },
-    @Query('muscleGroup') muscleGroup?: string | string[],
-    @Query('equipment') equipment?: string | string[],
-    @Query('aggregation') aggregation?: 'day' | 'week',
-    @Query('exerciseId') exerciseId?: string,
-  ): Promise<ORMByCycleDto> {
-    return this.analyticsService.getORMByCycle(user.id, cycleId, muscleGroup, equipment, aggregation, exerciseId);
-  }
-
-  @Get('rir-by-cycle/:cycleId')
-  async getRIRByCycle(
-    @Param('cycleId') cycleId: string,
-    @CurrentUser() user: { id: string },
-    @Query('gymId') gymId?: string,
-    @Query('muscleGroup') muscleGroup?: string | string[],
-    @Query('equipment') equipment?: string | string[],
-    @Query('timeOfDay') timeOfDay?: string,
-    @Query('aggregation') aggregation?: 'day' | 'week',
-    @Query('exerciseId') exerciseId?: string,
-  ): Promise<RIRByCycleDto> {
-    return this.analyticsService.getRIRByCycle(user.id, cycleId, gymId, muscleGroup, equipment, timeOfDay, aggregation, exerciseId);
   }
 
   @Get('rir')
   async getRIRAnalytics(
     @CurrentUser() user: { id: string },
-    @Query('period') period: 'week' | 'month' | 'all' = 'month',
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-    @Query('gymId') gymId?: string,
-    @Query('muscleGroup') muscleGroup?: string | string[],
-    @Query('equipment') equipment?: string | string[],
-    @Query('aggregation') aggregation?: 'day' | 'week',
-    @Query('exerciseId') exerciseId?: string,
+    @Query() filter: AnalyticsFilterDto,
   ): Promise<RIRAnalyticsDto> {
-    const start = startDate ? new Date(startDate) : undefined;
-    const end = endDate ? new Date(endDate) : undefined;
-    return this.analyticsService.getRIRAnalytics(
-      user.id,
-      period,
-      start,
-      end,
-      gymId,
-      muscleGroup,
-      equipment,
-      aggregation,
-      exerciseId,
-    );
+    return this.analyticsService.getRIRAnalytics(user.id, filter);
   }
 
   @Get('duration')
   async getDurationAnalytics(
     @CurrentUser() user: { id: string },
-    @Query('period') period: 'week' | 'month' | 'all' = 'month',
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-    @Query('gymId') gymId?: string,
-    @Query('muscleGroup') muscleGroup?: string | string[],
-    @Query('equipment') equipment?: string | string[],
-    @Query('aggregation') aggregation?: 'day' | 'week',
+    @Query() filter: AnalyticsFilterDto,
   ): Promise<DurationAnalyticsDto> {
-    const start = startDate ? new Date(startDate) : undefined;
-    const end = endDate ? new Date(endDate) : undefined;
-    return this.analyticsService.getDurationAnalytics(
-      user.id,
-      period,
-      start,
-      end,
-      gymId,
-      muscleGroup,
-      equipment,
-      aggregation,
-    );
-  }
-
-  @Get('duration-by-cycle/:cycleId')
-  async getDurationByCycle(
-    @Param('cycleId') cycleId: string,
-    @CurrentUser() user: { id: string },
-    @Query('gymId') gymId?: string,
-    @Query('muscleGroup') muscleGroup?: string | string[],
-    @Query('equipment') equipment?: string | string[],
-    @Query('aggregation') aggregation?: 'day' | 'week',
-  ): Promise<DurationByCycleDto> {
-    return this.analyticsService.getDurationByCycle(user.id, cycleId, gymId, muscleGroup, equipment, aggregation);
+    return this.analyticsService.getDurationAnalytics(user.id, filter);
   }
 
   @Get('rest-time')
   async getRestTimeAnalytics(
     @CurrentUser() user: { id: string },
-    @Query('period') period: 'week' | 'month' | 'all' = 'month',
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-    @Query('gymId') gymId?: string,
-    @Query('muscleGroup') muscleGroup?: string | string[],
-    @Query('equipment') equipment?: string | string[],
-    @Query('aggregation') aggregation?: 'day' | 'week',
-    @Query('exerciseId') exerciseId?: string,
+    @Query() filter: AnalyticsFilterDto,
   ): Promise<RestTimeAnalyticsDto> {
-    const start = startDate ? new Date(startDate) : undefined;
-    const end = endDate ? new Date(endDate) : undefined;
-    return this.analyticsService.getRestTimeAnalytics(
-      user.id,
-      period,
-      start,
-      end,
-      gymId,
-      muscleGroup,
-      equipment,
-      aggregation,
-      exerciseId,
-    );
-  }
-
-  @Get('rest-time-by-cycle/:cycleId')
-  async getRestTimeByCycle(
-    @Param('cycleId') cycleId: string,
-    @CurrentUser() user: { id: string },
-    @Query('gymId') gymId?: string,
-    @Query('muscleGroup') muscleGroup?: string | string[],
-    @Query('equipment') equipment?: string | string[],
-    @Query('aggregation') aggregation?: 'day' | 'week',
-    @Query('exerciseId') exerciseId?: string,
-  ): Promise<RestTimeByCycleDto> {
-    return this.analyticsService.getRestTimeByCycle(user.id, cycleId, gymId, muscleGroup, equipment, aggregation, exerciseId);
+    return this.analyticsService.getRestTimeAnalytics(user.id, filter);
   }
 
   @Get('reps')
   async getRepsAnalytics(
     @CurrentUser() user: { id: string },
-    @Query('period') period?: 'week' | 'month' | 'all',
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-    @Query('gymId') gymId?: string,
-    @Query('muscleGroup') muscleGroup?: string | string[],
-    @Query('equipment') equipment?: string | string[],
-    @Query('aggregation') aggregation?: 'day' | 'week',
-    @Query('exerciseId') exerciseId?: string,
+    @Query() filter: AnalyticsFilterDto,
   ): Promise<RepsAnalyticsDto> {
-    return this.analyticsService.getRepsAnalytics(
-      user.id,
-      period,
-      startDate ? new Date(startDate) : undefined,
-      endDate ? new Date(endDate) : undefined,
-      gymId,
-      muscleGroup,
-      equipment,
-      aggregation,
-      exerciseId,
-    );
-  }
-
-  @Get('reps-by-cycle/:cycleId')
-  async getRepsByCycle(
-    @Param('cycleId') cycleId: string,
-    @CurrentUser() user: { id: string },
-    @Query('muscleGroup') muscleGroup?: string | string[],
-    @Query('equipment') equipment?: string | string[],
-    @Query('aggregation') aggregation?: 'day' | 'week',
-    @Query('exerciseId') exerciseId?: string,
-  ): Promise<RepsByCycleDto> {
-    return this.analyticsService.getRepsByCycle(user.id, cycleId, muscleGroup, equipment, aggregation, exerciseId);
+    return this.analyticsService.getRepsAnalytics(user.id, filter);
   }
 
   @Get('sets')
   async getSetsAnalytics(
     @CurrentUser() user: { id: string },
-    @Query('period') period?: 'week' | 'month' | 'all',
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-    @Query('gymId') gymId?: string,
-    @Query('muscleGroup') muscleGroup?: string | string[],
-    @Query('equipment') equipment?: string | string[],
-    @Query('aggregation') aggregation?: 'day' | 'week',
-    @Query('exerciseId') exerciseId?: string,
+    @Query() filter: AnalyticsFilterDto,
   ): Promise<SetsAnalyticsDto> {
-    return this.analyticsService.getSetsAnalytics(
-      user.id,
-      period,
-      startDate ? new Date(startDate) : undefined,
-      endDate ? new Date(endDate) : undefined,
-      gymId,
-      muscleGroup,
-      equipment,
-      aggregation,
-      exerciseId,
-    );
+    return this.analyticsService.getSetsAnalytics(user.id, filter);
   }
 
-  @Get('sets-by-cycle/:cycleId')
-  async getSetsByCycle(
-    @Param('cycleId') cycleId: string,
+  @Get('intensity')
+  async getIntensityAnalytics(
     @CurrentUser() user: { id: string },
-    @Query('muscleGroup') muscleGroup?: string | string[],
-    @Query('equipment') equipment?: string | string[],
-    @Query('aggregation') aggregation?: 'day' | 'week',
-    @Query('exerciseId') exerciseId?: string,
-  ): Promise<SetsByCycleDto> {
-    return this.analyticsService.getSetsByCycle(user.id, cycleId, muscleGroup, equipment, aggregation, exerciseId);
+    @Query() filter: AnalyticsFilterDto,
+  ): Promise<IntensityAnalyticsDto> {
+    return this.analyticsService.getIntensityAnalytics(user.id, filter);
   }
 }

@@ -6,6 +6,8 @@ export class MuscleDistributionItem {
 }
 
 export class MuscleDistributionDto {
-  period: string;
+  cycleId?: string;
+  cycleName?: string;
+  period?: string;
   distribution: MuscleDistributionItem[];
 }

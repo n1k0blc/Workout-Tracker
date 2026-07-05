@@ -315,7 +315,7 @@ export default function DashboardPage() {
                             >
                               <div>
                                 <div className="font-medium">
-                                  {workout.workoutDayName || workout.templateName || 'Freies Workout'}
+                                  {workout.workoutDayName || workout.originTemplateName || 'Freies Workout'}
                                 </div>
                                 <div className="text-sm text-muted-foreground mt-1">
                                   {formatDate(workout.date)}

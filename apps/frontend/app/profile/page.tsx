@@ -11,6 +11,7 @@ import {
   IconEdit,
   IconCheck,
   IconTrash,
+  IconLock,
 } from '@tabler/icons-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -36,12 +37,21 @@ export default function ProfilePage() {
   const [success, setSuccess] = useState('');
 
   // Profile Data
+  const [email, setEmail] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState<Date | null>(null);
   const [height, setHeight] = useState('');
   const [weight, setWeight] = useState('');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+
+  // Change Password
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
 
   // HomeGyms
   const [homeGyms, setHomeGyms] = useState<HomeGym[]>([]);
@@ -51,6 +61,7 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (user) {
+      setEmail(user.email || '');
       setFirstName(user.firstName || '');
       setLastName(user.lastName || '');
       setDateOfBirth(user.dateOfBirth ? new Date(user.dateOfBirth) : null);
@@ -92,8 +103,13 @@ export default function ProfilePage() {
 
     try {
       // Validate
-      if (!firstName || !lastName || !dateOfBirth || !height || !weight) {
+      if (!email || !firstName || !lastName || !dateOfBirth || !height || !weight) {
         throw new Error('Bitte alle Felder ausfüllen');
+      }
+
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailPattern.test(email)) {
+        throw new Error('Bitte eine gültige Email-Adresse angeben');
       }
 
       const heightNum = parseInt(height);
@@ -113,6 +129,7 @@ export default function ProfilePage() {
       }
 
       await apiClient.updateProfile({
+        email,
         firstName,
         lastName,
         dateOfBirth: dateOfBirth.toISOString().split('T')[0],
@@ -194,6 +211,43 @@ export default function ProfilePage() {
   const handleLogout = async () => {
     await logout();
     router.push('/login');
+  };
+
+  const handleChangePassword = async () => {
+    setPasswordError('');
+
+    if (!currentPassword || !newPassword || !confirmNewPassword) {
+      setPasswordError('Bitte alle Felder ausfüllen');
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setPasswordError('Neues Passwort muss mindestens 8 Zeichen lang sein');
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setPasswordError('Die Passwörter stimmen nicht überein');
+      return;
+    }
+
+    setPasswordLoading(true);
+
+    try {
+      await apiClient.changePassword({ currentPassword, newPassword });
+      // Changing the password revokes every session server-side (including this
+      // one) - log out locally and send the user back to /login to re-authenticate.
+      setIsPasswordDialogOpen(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+      await logout();
+      router.push('/login');
+    } catch (err: any) {
+      setPasswordError(err.message || 'Fehler beim Ändern des Passworts');
+    } finally {
+      setPasswordLoading(false);
+    }
   };
 
   return (
@@ -283,7 +337,15 @@ export default function ProfilePage() {
 
               <Field>
                 <FieldLabel>Email</FieldLabel>
-                <p className="text-foreground py-2">{user?.email}</p>
+                {isEditingProfile ? (
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                ) : (
+                  <p className="text-foreground py-2">{user?.email}</p>
+                )}
               </Field>
 
               <Field>
@@ -455,6 +517,96 @@ export default function ProfilePage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Security Section */}
+        <Card className="mb-6">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Sicherheit</CardTitle>
+              <Dialog
+                open={isPasswordDialogOpen}
+                onOpenChange={(open) => {
+                  setIsPasswordDialogOpen(open);
+                  if (!open) {
+                    setPasswordError('');
+                    setCurrentPassword('');
+                    setNewPassword('');
+                    setConfirmNewPassword('');
+                  }
+                }}
+              >
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <IconLock className="mr-2 size-4" />
+                    Passwort ändern
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Passwort ändern</DialogTitle>
+                  </DialogHeader>
+
+                  {passwordError && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{passwordError}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="space-y-4 py-4">
+                    <Field>
+                      <FieldLabel>Aktuelles Passwort</FieldLabel>
+                      <Input
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        autoComplete="current-password"
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel>Neues Passwort</FieldLabel>
+                      <Input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        autoComplete="new-password"
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel>Neues Passwort bestätigen</FieldLabel>
+                      <Input
+                        type="password"
+                        value={confirmNewPassword}
+                        onChange={(e) => setConfirmNewPassword(e.target.value)}
+                        autoComplete="new-password"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleChangePassword();
+                        }}
+                      />
+                    </Field>
+                  </div>
+
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsPasswordDialogOpen(false)}
+                      disabled={passwordLoading}
+                    >
+                      Abbrechen
+                    </Button>
+                    <Button onClick={handleChangePassword} disabled={passwordLoading}>
+                      Passwort ändern
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Nach dem Ändern deines Passworts wirst du überall abgemeldet und musst dich erneut anmelden.
+            </p>
+          </CardContent>
+        </Card>
 
         {/* Logout Section */}
         <Card>

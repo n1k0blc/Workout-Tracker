@@ -58,7 +58,7 @@ export default function ReviewStep({
         reps: s.reps ?? 0,
         weight: s.weight ?? 0,
         rir: s.rir ?? 0,
-        restAfterSet: s.restAfterSet ?? 90,
+        rest: s.rest ?? 90,
       }));
       return {
         id: ex.id || `ex-${ex.exerciseId}-${idx}`,

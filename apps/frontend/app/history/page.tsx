@@ -74,10 +74,9 @@ export default function HistoryPage() {
     setLoading(true);
     try {
       const { startDate, endDate } = getDateRange();
-      const data = await apiClient.getWorkoutHistory({ 
-        startDate, 
+      const data = await apiClient.getWorkoutHistory({
+        startDate,
         endDate,
-        status: 'COMPLETED'
       });
       setWorkouts(data);
     } catch (error) {
@@ -209,7 +208,7 @@ export default function HistoryPage() {
                           <div className="flex items-center gap-3 mb-3 flex-wrap">
                             <h3 className="text-lg font-semibold text-foreground">
                               {workout.isFreeWorkout
-                                ? workout.templateName || 'Freies Workout'
+                                ? workout.originTemplateName || 'Freies Workout'
                                 : workout.workoutDayName || 'Workout'}
                             </h3>
                             {workout.cycleName && (

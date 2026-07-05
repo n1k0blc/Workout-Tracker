@@ -9,7 +9,7 @@ interface AuthContextType {
   loading: boolean;
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (credentials: RegisterCredentials) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,22 +19,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Auth now lives in an httpOnly cookie, invisible to JS - the only way to know
+    // whether a session exists is to ask the server. checkAuth() never redirects.
     const initAuth = async () => {
-      const token =
-        typeof window !== 'undefined'
-          ? localStorage.getItem('access_token')
-          : null;
-
-      if (token) {
-        try {
-          const profile = await apiClient.getProfile();
-          setUser(profile);
-        } catch (error) {
-          console.error('Failed to load user profile:', error);
-          localStorage.removeItem('access_token');
-        }
-      }
-
+      const profile = await apiClient.checkAuth();
+      setUser(profile);
       setLoading(false);
     };
 
@@ -51,8 +40,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(response.user);
   };
 
-  const logout = () => {
-    apiClient.logout();
+  const logout = async () => {
+    await apiClient.logout();
     setUser(null);
   };
 

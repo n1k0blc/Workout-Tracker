@@ -20,5 +20,8 @@
     "tracking"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "overrides": {
+    "multer": "2.2.0"
+  }
 }

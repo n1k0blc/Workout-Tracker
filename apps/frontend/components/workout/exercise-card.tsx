@@ -86,17 +86,17 @@ export default function ExerciseCard({
   const effectiveAllowLogging = allowLogging ?? (mode === 'active');
   const isReadonly = readonly ?? false;
 
-  const { 
-    removeExercise: contextRemoveExercise, 
-    replaceExercise: contextReplaceExercise, 
-    logSet, 
-    updateSet: contextUpdateSet, 
-    deleteSet: contextDeleteSet,
+  const {
+    removeExercise: contextRemoveExercise,
+    replaceExercise: contextReplaceExercise,
+    logSet,
+    updateSet: contextUpdateSet,
     loading,
     activeWorkout,
     setActiveWorkoutDirectly,
     isPastWorkout,
     pastWorkoutDuration,
+    isHistoryEdit,
   } = useWorkout();
 
   // Prefer injected handlers (for decoupled template usage, no context hijack) over context
@@ -206,7 +206,7 @@ export default function ExerciseCard({
         rir: editValues[setNumber]?.rir ?? plannedSet.rir.toString(),
       };
       setType = editValues[setNumber]?.setType ?? plannedSet.setType;
-      plannedRestAfterSet = plannedSet.restAfterSet;
+      plannedRestAfterSet = plannedSet.rest;
     } else {
       // Additional / free set: must come from seeded editValues (from addAdditionalSet)
       const ev = editValues[setNumber];
@@ -318,7 +318,7 @@ export default function ExerciseCard({
   // - any setNumbers that have been explicitly discarded/skipped for this session
   // - COMPLETED workouts (history edit): we only edit existing performed sets; do not auto-materialize
   //   never-performed planned sets into the saved data.
-  const isCompletedHijack = activeWorkout?.status === 'COMPLETED' || activeWorkout?.status === 'DISCARDED';
+  const isCompletedHijack = isHistoryEdit;
   useEffect(() => {
     if (mode === 'edit' && hasPlannedSets && !initialEditCommitDone.current && !isCompletedHijack) {
       initialEditCommitDone.current = true;
@@ -410,13 +410,10 @@ export default function ExerciseCard({
       }
 
       // Hijack / shared execution flows (active workout, past tracking, history edit of completed):
-      // - plannedSets are *initial suggestions only*. Never mutate them here (server re-derives
-      //   them from blueprint on every response, which used to cause deleted planned sets to reappear).
+      // - plannedSets are *initial suggestions only*. Never mutate them here.
       // - For an unlogged planned set: just mark it skipped for this session (render filter hides the row).
-      // - For already-logged sets or additional drafts: remove locally from sets (and call real delete
-      //   for IN_PROGRESS when we have a server id).
-      const isLiveInProgress = activeWorkout && activeWorkout.status === 'IN_PROGRESS' && !(activeWorkout as any).blueprintEdit; // eslint-disable-line @typescript-eslint/no-explicit-any
-
+      // - For already-logged sets or additional drafts: remove locally from sets (fully local now --
+      //   there's no server round-trip until the final save, so this is always a plain local delete).
       if (isPlannedSlot && !getLoggedSet(setNumber)) {
         // Session-level skip of a planned suggestion. Survives server re-sync because we filter on render.
         setSkippedPlannedSetNumbers(prev => {
@@ -429,24 +426,8 @@ export default function ExerciseCard({
       }
 
       // Remove from local sets (covers: removing an already-logged set in supported modes,
-      // or cleaning an additional draft). For live IN_PROGRESS + real server id, actually delete via API.
+      // or cleaning an additional draft). Fully local -- no server round-trip until save.
       if (activeWorkout && setActiveWorkoutDirectly) {
-        const targetSet = exercise.sets.find((s: any) => (s.setNumber ?? s.order) === setNumber); // eslint-disable-line @typescript-eslint/no-explicit-any
-        const isLocalId = targetSet && typeof targetSet.id === 'string' && targetSet.id.startsWith('local-');
-
-        if (isLiveInProgress && targetSet && !isLocalId) {
-          // Real logged set during active session: delete via context (will hit API for IN_PROGRESS)
-          // We still do local optimistic filter below.
-          // Note: deleteSet in context already handles IN_PROGRESS vs hijack.
-          // We can't await here easily without making discard async everywhere; fire and let context update.
-          // For safety, the context deleteSet will set the server state.
-          // We perform the local filter immediately for snappy UI.
-          // Call without blocking:
-          (async () => {
-            try { await contextDeleteSet?.(targetSet.id); } catch {}
-          })();
-        }
-
         const updatedExercises = activeWorkout.exercises.map((ex: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
           if (ex.id !== exercise.id) return ex;
           return {
@@ -645,8 +626,8 @@ export default function ExerciseCard({
             onChange={(e) => handleRowValueChange(set.setNumber, set, 'weight', e.target.value)}
             placeholder="0"
             className="h-7 text-base md:text-sm tabular-nums"
-            disabled={loading}
-            
+            disabled={loading || isReadonly}
+            readOnly={isReadonly}
           />
           <Input
             type="number"
@@ -655,8 +636,8 @@ export default function ExerciseCard({
             onChange={(e) => handleRowValueChange(set.setNumber, set, 'reps', e.target.value)}
             placeholder="0"
             className="h-7 text-base md:text-sm tabular-nums"
-            disabled={loading}
-            
+            disabled={loading || isReadonly}
+            readOnly={isReadonly}
           />
           <Input
             type="number"
@@ -665,8 +646,8 @@ export default function ExerciseCard({
             onChange={(e) => handleRowValueChange(set.setNumber, set, 'rir', e.target.value)}
             placeholder=""
             className="h-7 text-base md:text-sm tabular-nums"
-            disabled={loading}
-            
+            disabled={loading || isReadonly}
+            readOnly={isReadonly}
           />
 
           {/* Check cell - fat only, no buttons (delete via swipe) */}

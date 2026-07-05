@@ -1,5 +1,6 @@
-export class RIRAnalyticsDataPoint {
+export class RIRDataPoint {
   date: string;
+  trainingDay?: number; // cycle-anchored mode only
   rir0Count: number;
   rir1Count: number;
   rir2Count: number;
@@ -12,7 +13,10 @@ export class RIRAnalyticsDataPoint {
 }
 
 export class RIRAnalyticsDto {
+  cycleId?: string;
+  cycleName?: string;
   totalSets: number;
-  period: string;
-  dataPoints: RIRAnalyticsDataPoint[];
+  period?: string;
+  totalWorkouts: number;
+  dataPoints: RIRDataPoint[];
 }

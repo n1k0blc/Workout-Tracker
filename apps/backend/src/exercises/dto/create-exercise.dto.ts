@@ -1,22 +1,7 @@
 import { IsString, IsEnum, IsOptional, MaxLength, IsBoolean, IsInt, Min, Max } from 'class-validator';
+import { MuscleGroup } from '../../common/muscle.util';
 
-export enum MuscleGroup {
-  CHEST = 'CHEST',
-  BACK = 'BACK',
-  BICEPS = 'BICEPS',
-  TRICEPS = 'TRICEPS',
-  ABS = 'ABS',
-  SHOULDERS = 'SHOULDERS',
-  LEGS = 'LEGS',
-  ABDOMEN = 'ABDOMEN',
-  LATISSIMUS = 'LATISSIMUS',
-  TRAPEZIUS = 'TRAPEZIUS',
-  LOWER_BACK = 'LOWER_BACK',
-  HAMSTRINGS = 'HAMSTRINGS',
-  GLUTES = 'GLUTES',
-  QUADRICEPS = 'QUADRICEPS',
-  CALVES = 'CALVES',
-}
+export { MuscleGroup };
 
 export enum Equipment {
   CABLE = 'CABLE',
@@ -33,8 +18,11 @@ export class CreateExerciseDto {
   @MaxLength(100, { message: 'Exercise name must not exceed 100 characters' })
   name: string;
 
+  // Used only as a convenience: if no percentages are provided, this muscle is set to 100%.
+  // Not stored directly -- the percent distribution is the single source of truth (§3.7).
+  @IsOptional()
   @IsEnum(MuscleGroup, { message: 'Invalid muscle group' })
-  muscleGroup: MuscleGroup;
+  primaryMuscle?: MuscleGroup;
 
   @IsEnum(Equipment, { message: 'Invalid equipment type' })
   equipment: Equipment;

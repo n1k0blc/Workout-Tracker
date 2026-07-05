@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWorkout } from '@/lib/workout-context';
 import { apiClient } from '@/lib/api';
-import { Workout, PersonalRecord } from '@/types';
+import { Workout, PersonalRecord, SaveAsTemplateMode } from '@/types';
 import ExerciseCard from '@/components/workout/exercise-card';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import WorkoutTimer from '@/components/workout/workout-timer';
@@ -43,11 +43,13 @@ import {
 } from '@tabler/icons-react';
 
 interface ActiveWorkoutScreenProps {
-  onWorkoutComplete?: (workout: Workout, prs: PersonalRecord[], saveAsTemplate: boolean) => void;
+  onWorkoutComplete?: (workout: Workout, prs: PersonalRecord[]) => void;
   mode?: 'active' | 'edit';
   showBottomBar?: boolean;
   showHeader?: boolean;
 }
+
+type TemplateAction = 'none' | 'overwrite' | 'new';
 
 export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active', showBottomBar = true, showHeader = true }: ActiveWorkoutScreenProps) {
   const router = useRouter();
@@ -70,7 +72,8 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [updateBlueprint, setUpdateBlueprint] = useState(false);
-  const [saveAsTemplate, setSaveAsTemplate] = useState(false);
+  const [templateAction, setTemplateAction] = useState<TemplateAction>('none');
+  const [newTemplateName, setNewTemplateName] = useState('');
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -90,6 +93,9 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
   }
 
   const hasBlueprint = !activeWorkout.isFreeWorkout && activeWorkout.workoutDayId && activeWorkout.homeGymId !== null;
+  // §3.4 availability matrix: overwrite-template only for a custom origin template (system
+  // templates are locked); auto-detected from where this workout was started, no selector.
+  const canOverwriteTemplate = !!activeWorkout.originTemplateId && activeWorkout.originTemplateIsCustom === true;
 
   // Simplified: An exercise is considered "handled" if it has at least one logged set.
   // We no longer distinguish between planned/unplanned sets during execution.
@@ -164,8 +170,15 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
   const handleComplete = async () => {
     try {
       const workout = await completeWorkout({
-        totalDuration: isPastWorkout ? pastWorkoutDuration : workoutDuration,
-        updateBlueprint: updateBlueprint,
+        overwriteBlueprint: updateBlueprint,
+        saveAsTemplateMode:
+          templateAction === 'new'
+            ? SaveAsTemplateMode.NEW
+            : templateAction === 'overwrite'
+            ? SaveAsTemplateMode.OVERWRITE
+            : SaveAsTemplateMode.NONE,
+        saveAsTemplateName: templateAction === 'new' ? newTemplateName.trim() : undefined,
+        overwriteTemplateId: templateAction === 'overwrite' ? activeWorkout.originTemplateId : undefined,
       });
 
       if (!workout) {
@@ -186,20 +199,17 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
       }
 
       // Call parent handler to show completion modal (only when provided, e.g. not in pure edit mode for history/templates)
-      onWorkoutComplete?.(workout, prs, saveAsTemplate);
-      
+      onWorkoutComplete?.(workout, prs);
+
     } catch (error) {
       console.error('Failed to complete workout:', error);
+      toast.error('Fehler beim Speichern des Workouts');
     }
   };
 
-  const handleDiscard = async () => {
-    try {
-      await discardWorkout();
-      router.push('/dashboard');
-    } catch (error) {
-      console.error('Failed to discard workout:', error);
-    }
+  const handleDiscard = () => {
+    discardWorkout();
+    router.push('/dashboard');
   };
 
   const formatTime = (seconds: number): string => {
@@ -228,7 +238,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
                 <div>
                   <h1 className="text-2xl font-bold text-foreground">
                     {activeWorkout.isFreeWorkout
-                      ? activeWorkout.templateName || 'Freies Workout'
+                      ? activeWorkout.originTemplateName || 'Freies Workout'
                       : activeWorkout.workoutDayName || 'Workout'}
                   </h1>
                   {activeWorkout.cycleName && (
@@ -378,7 +388,8 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
         if (!open) {
           setShowCompleteConfirm(false);
           setUpdateBlueprint(false);
-          setSaveAsTemplate(false);
+          setTemplateAction('none');
+          setNewTemplateName('');
         }
       }}>
         <DialogContent className="max-w-md">
@@ -414,23 +425,58 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
             </Card>
           )}
 
-          {/* Save as Template Option */}
+          {/* Template Option (§3.4: auto-detected overwrite target, no selector) */}
           <Card className="bg-muted/50 border">
-            <CardContent className="p-4">
+            <CardContent className="p-4 space-y-3">
+              <div className="font-medium text-foreground">Vorlage</div>
+
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
                   type="checkbox"
-                  checked={saveAsTemplate}
-                  onChange={(e) => setSaveAsTemplate(e.target.checked)}
+                  checked={templateAction === 'none'}
+                  onChange={() => setTemplateAction('none')}
                   className="mt-1 size-4 accent-primary"
                 />
-                <div>
-                  <div className="font-medium text-foreground">
-                    Als Vorlage speichern
+                <div className="text-sm text-muted-foreground">Nicht als Vorlage speichern</div>
+              </label>
+
+              {canOverwriteTemplate && (
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={templateAction === 'overwrite'}
+                    onChange={() => setTemplateAction('overwrite')}
+                    className="mt-1 size-4 accent-primary"
+                  />
+                  <div>
+                    <div className="text-sm text-foreground font-medium">
+                      &quot;{activeWorkout.originTemplateName}&quot; überschreiben
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Ersetzt die Vorlage dauerhaft mit den heutigen Werten.
+                    </div>
                   </div>
-                  <div className="text-sm text-muted-foreground mt-1">
-                    Speichere dieses Workout als wiederverwendbare Vorlage mit deinen heutigen Werten.
-                  </div>
+                </label>
+              )}
+
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={templateAction === 'new'}
+                  onChange={() => setTemplateAction('new')}
+                  className="mt-1 size-4 accent-primary"
+                />
+                <div className="flex-1">
+                  <div className="text-sm text-foreground font-medium">Als neue Vorlage speichern</div>
+                  {templateAction === 'new' && (
+                    <Input
+                      value={newTemplateName}
+                      onChange={(e) => setNewTemplateName(e.target.value)}
+                      placeholder="z.B. Mein starkes Push Workout"
+                      className="mt-2"
+                      autoFocus
+                    />
+                  )}
                 </div>
               </label>
             </CardContent>
@@ -442,7 +488,8 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
               onClick={() => {
                 setShowCompleteConfirm(false);
                 setUpdateBlueprint(false);
-                setSaveAsTemplate(false);
+                setTemplateAction('none');
+                setNewTemplateName('');
               }}
               className="flex-1 h-14 text-base py-2"
             >
@@ -450,7 +497,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
             </Button>
             <Button
               onClick={handleComplete}
-              disabled={loading}
+              disabled={loading || (templateAction === 'new' && !newTemplateName.trim())}
               className="flex-1 h-14 text-base py-2"
             >
               {loading ? 'Wird gespeichert...' : 'Beenden'}

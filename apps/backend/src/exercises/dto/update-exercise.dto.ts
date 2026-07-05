@@ -1,12 +1,14 @@
-import { MuscleGroup, Equipment } from '@prisma/client';
 import { IsString, IsEnum, IsBoolean, IsOptional, IsInt, Min, Max } from 'class-validator';
+import { MuscleGroup } from '../../common/muscle.util';
+import { Equipment } from './create-exercise.dto';
 
 export class UpdateExerciseDto {
   @IsString()
   name: string;
 
+  @IsOptional()
   @IsEnum(MuscleGroup)
-  muscleGroup: MuscleGroup;
+  primaryMuscle?: MuscleGroup;
 
   @IsEnum(Equipment)
   equipment: Equipment;
