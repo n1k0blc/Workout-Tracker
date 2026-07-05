@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
-import { WorkoutCycle, Exercise, BlueprintExercise, SetType } from '@/types';
+import { WorkoutCycle, Exercise, WorkoutExercise, SetType } from '@/types';
 import {
   DndContext,
   closestCenter,
@@ -48,7 +48,7 @@ export default function EditBlueprintPage() {
   const [workoutDayName, setWorkoutDayName] = useState<string>('');
   const [plannedWeekday, setPlannedWeekday] = useState<number>(1);
   const [plannedHomeGymId, setPlannedHomeGymId] = useState<string>('');
-  const [exercises, setExercises] = useState<BlueprintExercise[]>([]);
+  const [exercises, setExercises] = useState<WorkoutExercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showExerciseModal, setShowExerciseModal] = useState(false);
@@ -107,7 +107,7 @@ export default function EditBlueprintPage() {
   const handleAddExercise = (exerciseId: string, exercise?: Exercise) => {
     if (!exercise) return;
 
-    const newExercise: BlueprintExercise = {
+    const newExercise: WorkoutExercise = {
       id: `new-${Date.now()}`, // Temporary ID
       exerciseId: exercise.id,
       exerciseName: exercise.name,
@@ -120,7 +120,7 @@ export default function EditBlueprintPage() {
           reps: 10,
           weight: 20,
           rir: 3,
-          restAfterSet: 90,
+          rest: 90,
         },
         {
           id: `set-new-${Date.now()}-1`,
@@ -129,7 +129,7 @@ export default function EditBlueprintPage() {
           reps: 10,
           weight: 40,
           rir: 2,
-          restAfterSet: 90,
+          rest: 90,
         },
         {
           id: `set-new-${Date.now()}-2`,
@@ -138,7 +138,7 @@ export default function EditBlueprintPage() {
           reps: 10,
           weight: 40,
           rir: 2,
-          restAfterSet: 90,
+          rest: 90,
         },
       ],
     };
@@ -211,7 +211,7 @@ export default function EditBlueprintPage() {
             reps: set.reps,
             weight: set.weight,
             rir: set.rir,
-            restAfterSet: set.restAfterSet,
+            rest: set.rest,
           })),
         })),
       };
@@ -252,10 +252,11 @@ export default function EditBlueprintPage() {
           order: ex.order,
           sets: ex.sets.map((set) => ({
             order: set.order,
-            isWarmup: set.setType === SetType.WARMUP,
-            targetReps: set.reps,
-            targetWeight: set.weight,
-            targetRir: set.rir,
+            setType: set.setType,
+            reps: set.reps,
+            weight: set.weight,
+            rir: set.rir,
+            rest: set.rest,
           })),
         })),
       };
@@ -303,8 +304,8 @@ export default function EditBlueprintPage() {
       setType: s.setType,
       reps: s.reps,
       weight: s.weight,
-      rir: s.rir,
-      restAfterSet: s.restAfterSet,
+      rir: s.rir ?? 0,
+      rest: s.rest ?? 90,
     }));
     return {
       id: ex.id,
@@ -464,7 +465,7 @@ export default function EditBlueprintPage() {
                                 reps: 10,
                                 weight: 20,
                                 rir: 2,
-                                restAfterSet: 90,
+                                rest: 90,
                               };
                               return { ...ex, sets: [...ex.sets, newSet] };
                             });

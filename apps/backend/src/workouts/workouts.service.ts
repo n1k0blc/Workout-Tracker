@@ -1,72 +1,65 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { ORMService } from '../orm/orm.service';
-import { getCurrentDate } from '../common/utils/date.util';
 import {
-  StartWorkoutDto,
-  LogSetDto,
-  UpdateSetDto,
-  AddExerciseToWorkoutDto,
-  CompleteWorkoutDto,
-  UpdateCompletedWorkoutDto,
-  WorkoutResponseDto,
-  WorkoutListItemDto,
-  WorkoutStatus,
-} from './dto';
+  WorkoutTreeService,
+  ExerciseInput,
+  mapExercisesToResponse,
+  toExerciseInputs,
+  WORKOUT_EXERCISE_TREE_INCLUDE,
+} from '../workout-tree/workout-tree.service';
+import { setWorkingVolume } from '../common/utils/volume.util';
+import { ExercisesService } from '../exercises/exercises.service';
+import { CreateWorkoutDto, SaveAsTemplateMode } from './dto/create-workout.dto';
+import { UpdateWorkoutDto } from './dto/update-workout.dto';
+import { WorkoutResponseDto, WorkoutListItemDto } from './dto/workout-response.dto';
+
+const WORKOUT_FULL_INCLUDE = {
+  cycle: { select: { name: true } },
+  workoutDay: { select: { name: true, weekday: true } },
+  homeGym: { select: { id: true, name: true } },
+  originTemplate: { select: { id: true, name: true } },
+  ...WORKOUT_EXERCISE_TREE_INCLUDE,
+};
+
+interface SaveContext {
+  workoutDay: { id: string; cycleId: string; plannedHomeGymId: string | null } | null;
+  overwriteTemplate: { id: string } | null;
+}
 
 @Injectable()
 export class WorkoutsService {
   constructor(
     private prisma: PrismaService,
-    private ormService: ORMService,
+    private workoutTreeService: WorkoutTreeService,
+    private exercisesService: ExercisesService,
   ) {}
 
   async findAll(
     userId: string,
-    status?: WorkoutStatus,
     startDate?: Date,
     endDate?: Date,
     cycleId?: string,
   ): Promise<WorkoutListItemDto[]> {
-    const dateFilter: any = {};
-    if (startDate && endDate) {
-      dateFilter.gte = startDate;
-      dateFilter.lte = endDate;
-    } else if (startDate) {
-      dateFilter.gte = startDate;
-    } else if (endDate) {
-      dateFilter.lte = endDate;
-    }
+    const dateFilter: Prisma.DateTimeFilter = {};
+    if (startDate) dateFilter.gte = startDate;
+    if (endDate) dateFilter.lte = endDate;
 
     const workouts = await this.prisma.workout.findMany({
       where: {
         userId,
-        // If no status specified, exclude DISCARDED workouts by default
-        ...(status ? { status: status as any } : { status: { not: 'DISCARDED' as any } }),
+        kind: 'WORKOUT',
         ...(Object.keys(dateFilter).length > 0 ? { date: dateFilter } : {}),
         ...(cycleId ? { cycleId } : {}),
       },
       include: {
-        cycle: {
-          select: { name: true },
-        },
-        workoutDay: {
-          select: { 
-            name: true,
-            weekday: true,
-          },
-        },
-        homeGym: {
-          select: { id: true, name: true, createdAt: true },
-        },
+        cycle: { select: { name: true } },
+        workoutDay: { select: { name: true, weekday: true } },
+        homeGym: { select: { id: true, name: true, createdAt: true } },
+        originTemplate: { select: { id: true, name: true } },
         exercises: {
           include: {
-            exercise: {
-              select: {
-                isUnilateral: true,
-                isDoubleWeight: true,
-              },
-            },
+            exercise: { select: { isUnilateral: true, isDoubleWeight: true } },
             sets: true,
           },
         },
@@ -75,925 +68,257 @@ export class WorkoutsService {
     });
 
     return workouts.map((workout) => {
-      // Calculate total volume (excluding warmup sets)
       let totalVolume = 0;
       for (const exercise of workout.exercises) {
-        const isUnilateral = exercise.exercise?.isUnilateral || false;
-        const isDoubleWeight = exercise.exercise?.isDoubleWeight || false;
-
         for (const set of exercise.sets) {
-          if (set.setType !== 'WARMUP') {
-            let weight = set.weight;
-            
-            // Apply multipliers
-            if (isUnilateral) {
-              weight *= 2;
-            }
-            if (isDoubleWeight) {
-              weight *= 2;
-            }
-            
-            totalVolume += weight * set.reps;
-          }
+          totalVolume += setWorkingVolume(set, exercise.exercise);
         }
       }
 
       return {
         id: workout.id,
-        date: workout.date,
-        status: workout.status as WorkoutStatus,
-        isFreeWorkout: workout.isFreeWorkout,
-        totalDuration: workout.totalDuration,
+        date: workout.date!,
+        isFreeWorkout: workout.isFreeWorkout!,
+        totalDuration: workout.totalDuration ?? undefined,
         totalVolume,
         homeGymId: workout.homeGymId,
-        homeGym: workout.homeGym ? {
-          id: workout.homeGym.id,
-          name: workout.homeGym.name,
-          createdAt: workout.homeGym.createdAt,
-        } : undefined,
+        homeGym: workout.homeGym
+          ? { id: workout.homeGym.id, name: workout.homeGym.name }
+          : undefined,
         cycleName: workout.cycle?.name,
         workoutDayName: workout.workoutDay?.name,
         workoutDayWeekday: workout.workoutDay?.weekday,
-        templateId: workout.templateId,
-        templateName: workout.templateName,
+        originTemplateId: workout.originTemplateId ?? undefined,
+        originTemplateName: workout.originTemplate?.name ?? undefined,
         exerciseCount: workout.exercises.length,
         createdAt: workout.createdAt,
       };
     });
   }
 
-  async findActive(userId: string): Promise<WorkoutResponseDto | null> {
-    const workout = await this.prisma.workout.findFirst({
-      where: {
-        userId,
-        status: 'IN_PROGRESS' as any,
-      },
-      include: {
-        cycle: {
-          select: { name: true },
-        },
-        workoutDay: {
-          select: { 
-            name: true,
-            blueprint: {
-              include: {
-                exercises: {
-                  include: {
-                    sets: {
-                      orderBy: { order: 'asc' },
-                    },
-                  },
-                  orderBy: { order: 'asc' },
-                },
-              },
-            },
-          },
-        },
-        homeGym: {
-          select: { id: true, name: true },
-        },
-        exercises: {
-          include: {
-            exercise: {
-              select: { name: true, isUnilateral: true, isDoubleWeight: true },
-            },
-            sets: {
-              orderBy: { setNumber: 'asc' },
-            },
-          },
-          orderBy: { order: 'asc' },
-        },
-      },
-      orderBy: { date: 'desc' },
-    });
-
-    if (!workout) {
-      return null;
-    }
-
-    return this.mapWorkoutToResponse(workout);
-  }
-
   async findById(id: string, userId: string): Promise<WorkoutResponseDto> {
     const workout = await this.prisma.workout.findUnique({
       where: { id },
-      include: {
-        cycle: {
-          select: { name: true },
-        },
-        workoutDay: {
-          select: { 
-            name: true,
-            blueprint: {
-              include: {
-                exercises: {
-                  include: {
-                    sets: {
-                      orderBy: { order: 'asc' },
-                    },
-                  },
-                  orderBy: { order: 'asc' },
-                },
-              },
-            },
-          },
-        },
-        homeGym: {
-          select: { id: true, name: true },
-        },
-        exercises: {
-          include: {
-            exercise: {
-              select: { name: true, isUnilateral: true, isDoubleWeight: true },
-            },
-            sets: {
-              orderBy: { setNumber: 'asc' },
-            },
-          },
-          orderBy: { order: 'asc' },
-        },
-      },
+      include: WORKOUT_FULL_INCLUDE,
     });
 
-    if (!workout) {
-      throw new NotFoundException('Workout not found');
-    }
-
-    if (workout.userId !== userId) {
+    if (!workout || workout.kind !== 'WORKOUT' || workout.userId !== userId) {
       throw new NotFoundException('Workout not found');
     }
 
     return this.mapWorkoutToResponse(workout);
   }
 
-  async start(startWorkoutDto: StartWorkoutDto, userId: string): Promise<WorkoutResponseDto> {
-    const { isFreeWorkout, cycleId, workoutDayId, exercises, homeGymId, isPastWorkout, pastWorkoutDate } = startWorkoutDto;
-
-    // Validate: If not free workout, cycleId and workoutDayId must be provided
-    if (!isFreeWorkout && (!cycleId || !workoutDayId)) {
-      throw new BadRequestException(
-        'cycleId and workoutDayId are required for non-free workouts',
-      );
+  async create(dto: CreateWorkoutDto, userId: string): Promise<WorkoutResponseDto> {
+    if (!dto.isFreeWorkout && (!dto.cycleId || !dto.workoutDayId)) {
+      throw new BadRequestException('cycleId and workoutDayId are required for non-free workouts');
     }
 
-    // Load exercises from blueprint if starting a cycle workout without explicit exercises
-    let exercisesToCreate = exercises;
-    let blueprintData = null;
-    if (!isFreeWorkout && cycleId && workoutDayId && (!exercises || exercises.length === 0)) {
-      const workoutDay = await this.prisma.workoutDay.findUnique({
-        where: { id: workoutDayId },
-        include: {
-          blueprint: {
-            include: {
-              exercises: {
-                include: {
-                  sets: {
-                    orderBy: { order: 'asc' },
-                  },
-                },
-                orderBy: { order: 'asc' },
-              },
-            },
-          },
-        },
-      });
+    const ctx = await this.resolveSaveContext(dto, userId);
+    const exerciseInputs = toExerciseInputs(dto.exercises);
 
-      if (workoutDay?.blueprint?.exercises) {
-        blueprintData = workoutDay.blueprint;
-        exercisesToCreate = workoutDay.blueprint.exercises.map((ex) => ({
-          exerciseId: ex.exerciseId,
-          order: ex.order,
-        }));
-      }
-    }
-
-    const workout = await this.prisma.workout.create({
-      data: {
-        userId,
-        date: isPastWorkout && pastWorkoutDate ? new Date(pastWorkoutDate) : getCurrentDate(),
-        status: 'IN_PROGRESS' as any,
-        isFreeWorkout: isFreeWorkout ?? false,
-        homeGymId: homeGymId || null,
-        cycleId: cycleId || null,
-        workoutDayId: workoutDayId || null,
-        ...(exercisesToCreate &&
-          exercisesToCreate.length > 0 && {
-            exercises: {
-              create: exercisesToCreate.map((ex) => ({
-                exerciseId: ex.exerciseId,
-                order: ex.order,
-              })),
-            },
-          }),
-      },
-      include: {
-        cycle: {
-          select: { name: true },
-        },
-        workoutDay: {
-          select: { 
-            name: true,
-            blueprint: {
-              include: {
-                exercises: {
-                  include: {
-                    sets: {
-                      orderBy: { order: 'asc' },
-                    },
-                  },
-                  orderBy: { order: 'asc' },
-                },
-              },
-            },
-          },
-        },
-        homeGym: {
-          select: { id: true, name: true },
-        },
-        exercises: {
-          include: {
-            exercise: {
-              select: { name: true, isUnilateral: true, isDoubleWeight: true },
-            },
-            sets: true,
-          },
-          orderBy: { order: 'asc' },
-        },
-      },
-    });
-
-    return this.mapWorkoutToResponse(workout);
-  }
-
-  async startFromTemplate(
-    templateId: string,
-    userId: string,
-    homeGymId?: string,
-    isPastWorkout?: boolean,
-    pastWorkoutDate?: string,
-    pastWorkoutDuration?: number,
-  ): Promise<WorkoutResponseDto> {
-    // Load template with all exercises and sets
-    const template = await this.prisma.workoutTemplate.findUnique({
-      where: { id: templateId },
-      include: {
-        exercises: {
-          include: {
-            sets: {
-              orderBy: { order: 'asc' },
-            },
-          },
-          orderBy: { order: 'asc' },
-        },
-      },
-    });
-
-    if (!template) {
-      throw new NotFoundException('Workout template not found');
-    }
-
-    // Check access: system templates or user's own templates
-    if (template.isCustom && template.userId !== userId) {
-      throw new NotFoundException('Workout template not found');
-    }
-
-    // Determine workout date (status is always IN_PROGRESS at start, like Free/Cycle workouts)
-    const workoutDate = isPastWorkout && pastWorkoutDate 
-      ? new Date(pastWorkoutDate) 
-      : new Date();
-
-    // Create workout as free workout with template info
-    const workout = await this.prisma.workout.create({
-      data: {
-        userId,
-        date: workoutDate,
-        status: 'IN_PROGRESS' as any,
-        isFreeWorkout: true,
-        templateId: template.id,
-        templateName: template.name,
-        homeGymId: homeGymId || template.recommendedGymId || null,
-        exercises: {
-          create: template.exercises.map((templateEx) => ({
-            exerciseId: templateEx.exerciseId,
-            order: templateEx.order,
-            // Save template sets as customPlannedSets
-            customPlannedSets: templateEx.sets.map((set) => ({
-              order: set.order,
-              setType: set.isWarmup ? 'WARMUP' : 'WORKING',
-              reps: set.targetReps,
-              weight: set.targetWeight,
-              rir: set.targetRir,
-              restAfterSet: 90, // Default rest time
-            })),
-          })),
-        },
-      },
-      include: {
-        homeGym: {
-          select: { id: true, name: true },
-        },
-        exercises: {
-          include: {
-            exercise: {
-              select: { name: true, isUnilateral: true, isDoubleWeight: true },
-            },
-            sets: true,
-          },
-          orderBy: { order: 'asc' },
-        },
-      },
-    });
-
-    return this.mapWorkoutToResponse(workout);
-  }
-
-  async addExercise(
-    workoutId: string,
-    addExerciseDto: AddExerciseToWorkoutDto,
-    userId: string,
-  ): Promise<WorkoutResponseDto> {
-    // Check workout ownership and status
-    const workout = await this.findById(workoutId, userId);
-    if (workout.status !== WorkoutStatus.IN_PROGRESS) {
-      throw new BadRequestException('Cannot modify a completed or discarded workout');
-    }
-
-    // If order not provided, calculate it
-    let order = addExerciseDto.order;
-    if (!order) {
-      const existingExercises = await this.prisma.exerciseLog.findMany({
-        where: { workoutId },
-        orderBy: { order: 'desc' },
-        take: 1,
-      });
-      order = existingExercises.length > 0 ? existingExercises[0].order + 1 : 1;
-    }
-
-    await this.prisma.exerciseLog.create({
-      data: {
-        workoutId,
-        exerciseId: addExerciseDto.exerciseId,
-        order,
-      },
-    });
-
-    return this.findById(workoutId, userId);
-  }
-
-  async removeExercise(
-    workoutId: string,
-    exerciseLogId: string,
-    userId: string,
-  ): Promise<WorkoutResponseDto> {
-    // Check workout ownership and status
-    const workout = await this.findById(workoutId, userId);
-    if (workout.status !== WorkoutStatus.IN_PROGRESS) {
-      throw new BadRequestException('Cannot modify a completed or discarded workout');
-    }
-
-    await this.prisma.exerciseLog.delete({
-      where: { id: exerciseLogId },
-    });
-
-    return this.findById(workoutId, userId);
-  }
-
-  async reorderExercises(
-    workoutId: string,
-    exerciseIds: string[],
-    userId: string,
-  ): Promise<WorkoutResponseDto> {
-    // Check workout ownership and status
-    const workout = await this.findById(workoutId, userId);
-    if (workout.status !== WorkoutStatus.IN_PROGRESS) {
-      throw new BadRequestException('Cannot modify a completed or discarded workout');
-    }
-
-    // Update order for each exercise
-    await Promise.all(
-      exerciseIds.map((exerciseId, index) =>
-        this.prisma.exerciseLog.updateMany({
-          where: {
-            id: exerciseId,
-            workoutId,
-          },
-          data: {
-            order: index + 1,
-          },
-        }),
-      ),
-    );
-
-    return this.findById(workoutId, userId);
-  }
-
-  async logSet(
-    workoutId: string,
-    exerciseLogId: string,
-    logSetDto: LogSetDto,
-    userId: string,
-  ): Promise<WorkoutResponseDto> {
-    // Check workout ownership and status
-    const workout = await this.findById(workoutId, userId);
-    if (workout.status !== WorkoutStatus.IN_PROGRESS) {
-      throw new BadRequestException('Cannot modify a completed or discarded workout');
-    }
-
-    // Check if exercise log belongs to workout
-    const exerciseLog = await this.prisma.exerciseLog.findUnique({
-      where: { id: exerciseLogId },
-    });
-
-    if (!exerciseLog || exerciseLog.workoutId !== workoutId) {
-      throw new NotFoundException('Exercise log not found');
-    }
-
-    // Check if this set number is already logged for this exercise (defensive programming)
-    const existingSet = await this.prisma.setLog.findFirst({
-      where: {
-        exerciseLogId,
-        setNumber: logSetDto.setNumber,
-      },
-    });
-
-    if (existingSet) {
-      throw new BadRequestException(
-        `Set ${logSetDto.setNumber} is already logged for this exercise`
-      );
-    }
-
-    try {
-      await this.prisma.setLog.create({
+    const workoutId = await this.prisma.$transaction(async (tx) => {
+      const workout = await tx.workout.create({
         data: {
-          exerciseLogId,
-          setNumber: logSetDto.setNumber,
-          reps: logSetDto.reps,
-          weight: logSetDto.weight,
-          rir: logSetDto.rir,
-          setType: logSetDto.setType,
-          targetReps: logSetDto.targetReps,
-          targetWeight: logSetDto.targetWeight,
-          targetRir: logSetDto.targetRir,
-          actualRestDuration: logSetDto.actualRestDuration,
+          kind: 'WORKOUT',
+          userId,
+          date: new Date(dto.date),
+          totalDuration: dto.totalDuration,
+          isFreeWorkout: dto.isFreeWorkout ?? false,
+          homeGymId: dto.homeGymId || null,
+          cycleId: dto.cycleId || null,
+          workoutDayId: dto.workoutDayId || null,
+          originTemplateId: dto.originTemplateId || null,
         },
       });
-    } catch (error) {
-      // Handle unique constraint violation
-      if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
-        throw new BadRequestException(
-          `Set ${logSetDto.setNumber} is already logged for this exercise`
-        );
-      }
-      throw error;
-    }
 
-    return this.findById(workoutId, userId);
-  }
+      await this.workoutTreeService.replaceTree(tx, workout.id, exerciseInputs);
+      await this.applySideEffects(tx, exerciseInputs, dto, ctx, userId);
 
-  async deleteSet(
-    workoutId: string,
-    setLogId: string,
-    userId: string,
-  ): Promise<WorkoutResponseDto> {
-    // Check workout ownership and status
-    const workout = await this.findById(workoutId, userId);
-    if (workout.status !== WorkoutStatus.IN_PROGRESS) {
-      throw new BadRequestException('Cannot modify a completed or discarded workout');
-    }
-
-    await this.prisma.setLog.delete({
-      where: { id: setLogId },
+      return workout.id;
     });
 
     return this.findById(workoutId, userId);
   }
 
-  async updateSet(
-    workoutId: string,
-    setLogId: string,
-    updateSetDto: UpdateSetDto,
-    userId: string,
-  ): Promise<WorkoutResponseDto> {
-    // Check workout ownership and status
-    const workout = await this.findById(workoutId, userId);
-    if (workout.status !== WorkoutStatus.IN_PROGRESS) {
-      throw new BadRequestException('Cannot modify a completed or discarded workout');
+  async update(id: string, dto: UpdateWorkoutDto, userId: string): Promise<WorkoutResponseDto> {
+    const existing = await this.prisma.workout.findUnique({ where: { id } });
+    if (!existing || existing.kind !== 'WORKOUT' || existing.userId !== userId) {
+      throw new NotFoundException('Workout not found');
     }
 
-    // Verify setLog belongs to this workout
-    const setLog = await this.prisma.setLog.findUnique({
-      where: { id: setLogId },
-      include: {
-        exerciseLog: true,
-      },
-    });
-
-    if (!setLog || setLog.exerciseLog.workoutId !== workoutId) {
-      throw new NotFoundException('Set log not found');
+    const wantsSideEffect = dto.overwriteBlueprint || (dto.saveAsTemplateMode && dto.saveAsTemplateMode !== SaveAsTemplateMode.NONE);
+    if (wantsSideEffect && !dto.exercises) {
+      throw new BadRequestException('exercises must be provided when requesting a save side-effect');
     }
 
-    await this.prisma.setLog.update({
-      where: { id: setLogId },
-      data: {
-        ...(updateSetDto.reps !== undefined && { reps: updateSetDto.reps }),
-        ...(updateSetDto.weight !== undefined && { weight: updateSetDto.weight }),
-        ...(updateSetDto.rir !== undefined && { rir: updateSetDto.rir }),
-        ...(updateSetDto.setType !== undefined && { setType: updateSetDto.setType }),
-      },
-    });
+    const ctx = await this.resolveSaveContext(dto, userId, existing);
+    const exerciseInputs = dto.exercises ? toExerciseInputs(dto.exercises) : null;
 
-    return this.findById(workoutId, userId);
-  }
-
-  async replaceExercise(
-    workoutId: string,
-    exerciseLogId: string,
-    newExerciseId: string,
-    userId: string,
-  ): Promise<WorkoutResponseDto> {
-    // Check workout ownership and status
-    const workout = await this.findById(workoutId, userId);
-    if (workout.status !== WorkoutStatus.IN_PROGRESS) {
-      throw new BadRequestException('Cannot modify a completed or discarded workout');
-    }
-
-    // Get full workout data with blueprint to access planned sets
-    const fullWorkout = await this.prisma.workout.findUnique({
-      where: { id: workoutId },
-      include: {
-        workoutDay: {
-          include: {
-            blueprint: {
-              include: {
-                exercises: {
-                  include: {
-                    sets: {
-                      orderBy: { order: 'asc' },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-        exercises: {
-          include: {
-            sets: true,
-          },
-        },
-      },
-    });
-
-    // Find the exercise log
-    const exerciseLog = fullWorkout.exercises.find(ex => ex.id === exerciseLogId);
-    if (!exerciseLog) {
-      throw new NotFoundException('Exercise log not found');
-    }
-
-    // Check if any sets have been logged
-    if (exerciseLog.sets.length > 0) {
-      throw new BadRequestException('Cannot replace exercise after sets have been logged');
-    }
-
-    // Get the planned sets from the blueprint for the OLD exercise
-    const blueprint = fullWorkout.workoutDay?.blueprint;
-    let customPlannedSets = null;
-
-    if (blueprint) {
-      const blueprintExercise = blueprint.exercises.find(
-        (bpEx: any) => bpEx.exerciseId === exerciseLog.exerciseId
-      );
-      
-      if (blueprintExercise && blueprintExercise.sets) {
-        // Save the planned sets structure to preserve it for the new exercise
-        customPlannedSets = blueprintExercise.sets.map((bpSet: any) => ({
-          order: bpSet.order,
-          setType: bpSet.setType,
-          reps: bpSet.reps,
-          weight: bpSet.weight,
-          rir: bpSet.rir,
-          restAfterSet: bpSet.restAfterSet,
-        }));
-      }
-    }
-
-    // Update the exercise reference and save custom planned sets
-    await this.prisma.exerciseLog.update({
-      where: { id: exerciseLogId },
-      data: {
-        exerciseId: newExerciseId,
-        customPlannedSets: customPlannedSets ? customPlannedSets : undefined,
-      },
-    });
-
-    return this.findById(workoutId, userId);
-  }
-
-  async complete(
-    workoutId: string,
-    completeWorkoutDto: CompleteWorkoutDto,
-    userId: string,
-  ): Promise<WorkoutResponseDto> {
-    const workout = await this.findById(workoutId, userId);
-
-    if (workout.status !== WorkoutStatus.IN_PROGRESS) {
-      throw new BadRequestException('Workout is not in progress');
-    }
-
-    // Update workout status and get full workout data with exercises and sets
-    const updatedWorkout = await this.prisma.workout.update({
-      where: { id: workoutId },
-      data: {
-        status: 'COMPLETED' as any,
-        totalDuration: completeWorkoutDto.totalDuration,
-      },
-      include: {
-        exercises: {
-          include: {
-            exercise: true,
-            sets: true,
-          },
-        },
-      },
-    });
-
-    // Set ORM benchmarks for cycle workouts
-    if (updatedWorkout.cycleId && updatedWorkout.workoutDayId) {
-      await this.setORMBenchmarks(updatedWorkout);
-    }
-
-    // Update blueprint if requested (only for home gym workouts)
-    if (completeWorkoutDto.updateBlueprint && workout.workoutDayId && workout.homeGymId !== null) {
-      await this.updateBlueprintFromWorkout(workoutId, workout.workoutDayId);
-    }
-
-    return this.findById(workoutId, userId);
-  }
-
-  async updateCompletedWorkout(
-    workoutId: string,
-    updateDto: UpdateCompletedWorkoutDto,
-    userId: string,
-  ): Promise<WorkoutResponseDto> {
-    const workout = await this.findById(workoutId, userId);
-
-    if (workout.status !== WorkoutStatus.COMPLETED) {
-      throw new BadRequestException('Only completed workouts can be edited');
-    }
-
-    // Update workout date if provided
-    if (updateDto.completedAt) {
-      await this.prisma.workout.update({
-        where: { id: workoutId },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.workout.update({
+        where: { id },
         data: {
-          date: new Date(updateDto.completedAt),
+          ...(dto.date !== undefined && { date: new Date(dto.date) }),
+          ...(dto.totalDuration !== undefined && { totalDuration: dto.totalDuration }),
+          ...(dto.isFreeWorkout !== undefined && { isFreeWorkout: dto.isFreeWorkout }),
+          ...(dto.homeGymId !== undefined && { homeGymId: dto.homeGymId || null }),
+          ...(dto.cycleId !== undefined && { cycleId: dto.cycleId || null }),
+          ...(dto.workoutDayId !== undefined && { workoutDayId: dto.workoutDayId || null }),
+          ...(dto.originTemplateId !== undefined && { originTemplateId: dto.originTemplateId || null }),
         },
       });
-    }
 
-    // Update sets + support deletion by omission:
-    // For history edit we send the *final* list of sets per exercise. Any SetLog that belonged
-    // to the exercise but is no longer present in the payload should be removed (user deleted it).
-    const sentSetIds = new Set<string>();
-    for (const exerciseUpdate of updateDto.exercises) {
-      for (const setUpdate of exerciseUpdate.sets) {
-        sentSetIds.add(setUpdate.id);
-        await this.prisma.setLog.update({
-          where: { id: setUpdate.id },
-          data: {
-            reps: setUpdate.reps,
-            weight: setUpdate.weight,
-            rir: setUpdate.rir,
-          },
-        });
+      if (exerciseInputs) {
+        await this.workoutTreeService.replaceTree(tx, id, exerciseInputs);
+        await this.applySideEffects(tx, exerciseInputs, dto, ctx, userId);
       }
+    });
+
+    return this.findById(id, userId);
+  }
+
+  async delete(id: string, userId: string): Promise<void> {
+    const workout = await this.prisma.workout.findUnique({ where: { id } });
+    if (!workout || workout.kind !== 'WORKOUT' || workout.userId !== userId) {
+      throw new NotFoundException('Workout not found');
     }
 
-    // Prune sets that were omitted from the payload for each touched exercise.
-    // We only prune for the exercises explicitly listed in the update (to be conservative).
-    for (const exerciseUpdate of updateDto.exercises) {
-      const existingSets = await this.prisma.setLog.findMany({
-        where: { exerciseLogId: exerciseUpdate.id },
-        select: { id: true },
-      });
-      const toDelete = existingSets.filter(s => !sentSetIds.has(s.id));
-      if (toDelete.length > 0) {
-        await this.prisma.setLog.deleteMany({
-          where: { id: { in: toDelete.map(s => s.id) } },
-        });
-      }
-    }
-
-    return this.findById(workoutId, userId);
+    await this.prisma.workout.delete({ where: { id } });
   }
 
   /**
-   * Set ORM benchmarks for exercises in cycle workout (if not already set)
-   * Only for Home Gym workouts to ensure consistent equipment/weights
+   * Validates the §3.4 availability matrix and resolves the DB rows the side effects need.
+   * BOLA: homeGymId/workoutDayId/originTemplateId/overwriteTemplateId are all re-verified
+   * against `userId` here rather than trusted from the client.
    */
-  private async setORMBenchmarks(workout: any): Promise<void> {
-    const { cycleId, workoutDayId, homeGymId, id: workoutId } = workout;
-
-    // Only track ORM for Home Gym workouts (consistent equipment)
-    if (!homeGymId) {
-      return; // Skip ORM tracking for non-home gym workouts
+  private async resolveSaveContext(
+    dto: CreateWorkoutDto | UpdateWorkoutDto,
+    userId: string,
+    existing?: { originTemplateId: string | null },
+  ): Promise<SaveContext> {
+    if (dto.exercises) {
+      await this.exercisesService.validateAccessible(dto.exercises.map((e) => e.exerciseId), userId);
     }
 
-    for (const exerciseLog of workout.exercises) {
-      const { exerciseId, exercise, sets } = exerciseLog;
-
-      // Check if benchmark already exists
-      const shouldSet = await this.ormService.shouldSetBenchmark(
-        cycleId,
-        workoutDayId,
-        exerciseId,
-      );
-
-      if (!shouldSet) {
-        continue; // Benchmark already set in previous workout
+    if (dto.homeGymId) {
+      const gym = await this.prisma.homeGym.findUnique({ where: { id: dto.homeGymId } });
+      if (!gym || gym.userId !== userId) {
+        throw new NotFoundException('Home gym not found');
       }
-
-      // Calculate benchmark from working sets
-      const workingSets = sets.filter((s: any) => s.setType === 'WORKING');
-      const benchmark = this.ormService.calculateExerciseBenchmark(
-        workingSets,
-        exercise,
-      );
-
-      if (benchmark === null) {
-        console.warn(
-          `⚠️  No working sets for exercise ${exercise.name} in workout ${workoutId}. ` +
-          `Benchmark not set. This may happen if only warmup sets were logged.`
-        );
-        continue; // Skip if no working sets
-      }
-
-      // Create benchmark
-      await this.ormService.createBenchmark(
-        cycleId,
-        workoutDayId,
-        exerciseId,
-        benchmark,
-        workoutId,
-      );
-
-      console.log(
-        `✅ Benchmark set: ${exercise.name} = ${benchmark.toFixed(2)}kg ORM (Workout ${workoutId})`,
-      );
     }
+
+    let workoutDay: SaveContext['workoutDay'] = null;
+    if (dto.workoutDayId) {
+      const day = await this.prisma.workoutDay.findUnique({
+        where: { id: dto.workoutDayId },
+        include: { cycle: { select: { userId: true } } },
+      });
+      if (!day || day.cycle.userId !== userId) {
+        throw new NotFoundException('Workout day not found');
+      }
+      if (dto.cycleId && day.cycleId !== dto.cycleId) {
+        throw new BadRequestException('workoutDayId does not belong to cycleId');
+      }
+      workoutDay = { id: day.id, cycleId: day.cycleId, plannedHomeGymId: day.plannedHomeGymId };
+    }
+
+    if (dto.originTemplateId) {
+      const template = await this.prisma.workout.findUnique({ where: { id: dto.originTemplateId } });
+      if (!template || template.kind !== 'TEMPLATE' || (template.isCustom && template.userId !== userId)) {
+        throw new NotFoundException('Origin template not found');
+      }
+    }
+
+    if (dto.overwriteBlueprint) {
+      if (!workoutDay) {
+        throw new BadRequestException('overwriteBlueprint requires a cycle workoutDayId');
+      }
+      if (!dto.homeGymId) {
+        throw new BadRequestException('overwriteBlueprint requires a home gym');
+      }
+    }
+
+    let overwriteTemplate: SaveContext['overwriteTemplate'] = null;
+    if (dto.saveAsTemplateMode === SaveAsTemplateMode.OVERWRITE) {
+      const originTemplateId = dto.originTemplateId ?? existing?.originTemplateId;
+      if (!dto.overwriteTemplateId) {
+        throw new BadRequestException('overwriteTemplateId is required');
+      }
+      if (dto.overwriteTemplateId !== originTemplateId) {
+        throw new BadRequestException("overwriteTemplateId must match the workout's origin template");
+      }
+      const template = await this.prisma.workout.findUnique({ where: { id: dto.overwriteTemplateId } });
+      if (!template || template.kind !== 'TEMPLATE' || !template.isCustom || template.userId !== userId) {
+        throw new NotFoundException('Template not found');
+      }
+      overwriteTemplate = { id: template.id };
+    }
+
+    if (dto.saveAsTemplateMode === SaveAsTemplateMode.NEW) {
+      if (!dto.saveAsTemplateName) {
+        throw new BadRequestException('saveAsTemplateName is required');
+      }
+      const existingTemplate = await this.prisma.workout.findFirst({
+        where: { kind: 'TEMPLATE', userId, name: dto.saveAsTemplateName },
+      });
+      if (existingTemplate) {
+        throw new ConflictException('A template with this name already exists');
+      }
+    }
+
+    return { workoutDay, overwriteTemplate };
   }
 
-  private async updateBlueprintFromWorkout(
-    workoutId: string,
-    workoutDayId: string,
+  private async applySideEffects(
+    tx: Prisma.TransactionClient,
+    exerciseInputs: ExerciseInput[],
+    dto: CreateWorkoutDto | UpdateWorkoutDto,
+    ctx: SaveContext,
+    userId: string,
   ): Promise<void> {
-    // Get workout with all exercises and sets
-    const workout = await this.prisma.workout.findUnique({
-      where: { id: workoutId },
-      include: {
-        exercises: {
-          include: {
-            sets: {
-              orderBy: { setNumber: 'asc' },
-            },
-          },
-          orderBy: { order: 'asc' },
-        },
-        workoutDay: {
-          include: {
-            blueprint: true,
-          },
-        },
-      },
-    });
-
-    if (!workout || !workout.workoutDay?.blueprint) {
-      return;
+    if (dto.overwriteBlueprint && ctx.workoutDay) {
+      const blueprint = await tx.workout.findFirst({
+        where: { workoutDayId: ctx.workoutDay.id, kind: 'BLUEPRINT' },
+      });
+      if (blueprint) {
+        await this.workoutTreeService.replaceTree(tx, blueprint.id, exerciseInputs);
+        await tx.workout.update({ where: { id: blueprint.id }, data: { updatedAt: new Date() } });
+      }
     }
 
-    const blueprintId = workout.workoutDay.blueprint.id;
-
-    // Delete old blueprint exercises
-    await this.prisma.blueprintExercise.deleteMany({
-      where: { blueprintId },
-    });
-
-    // Create new blueprint exercises from workout
-    for (const exerciseLog of workout.exercises) {
-      if (exerciseLog.sets.length === 0) continue;
-
-      await this.prisma.blueprintExercise.create({
+    if (dto.saveAsTemplateMode === SaveAsTemplateMode.NEW) {
+      const template = await tx.workout.create({
         data: {
-          blueprintId,
-          exerciseId: exerciseLog.exerciseId,
-          order: exerciseLog.order,
-          sets: {
-            create: exerciseLog.sets.map((setLog) => ({
-              order: setLog.setNumber,
-              setType: setLog.setType || 'WORKING',
-              reps: setLog.reps,
-              weight: setLog.weight,
-              rir: setLog.rir || 0,
-              restAfterSet: setLog.actualRestDuration || 90, // Use actual rest or default
-            })),
-          },
+          kind: 'TEMPLATE',
+          userId,
+          name: dto.saveAsTemplateName,
+          isCustom: true,
+          homeGymId: dto.homeGymId || null,
         },
       });
+      await this.workoutTreeService.replaceTree(tx, template.id, exerciseInputs);
+    } else if (dto.saveAsTemplateMode === SaveAsTemplateMode.OVERWRITE && ctx.overwriteTemplate) {
+      await this.workoutTreeService.replaceTree(tx, ctx.overwriteTemplate.id, exerciseInputs);
+      await tx.workout.update({ where: { id: ctx.overwriteTemplate.id }, data: { updatedAt: new Date() } });
     }
-  }
-
-  async discard(workoutId: string, userId: string): Promise<void> {
-    const workout = await this.findById(workoutId, userId);
-
-    if (workout.status !== WorkoutStatus.IN_PROGRESS) {
-      throw new BadRequestException('Can only discard workouts in progress');
-    }
-
-    await this.prisma.workout.update({
-      where: { id: workoutId },
-      data: {
-        status: 'DISCARDED' as any,
-      },
-    });
   }
 
   private mapWorkoutToResponse(workout: any): WorkoutResponseDto {
-    // Get blueprint exercises if available
-    const blueprintExercisesMap = new Map();
-    if (workout.workoutDay?.blueprint?.exercises) {
-      workout.workoutDay.blueprint.exercises.forEach((bpEx: any) => {
-        blueprintExercisesMap.set(bpEx.exerciseId, bpEx);
-      });
-    }
-
     return {
       id: workout.id,
       date: workout.date,
-      status: workout.status as WorkoutStatus,
       isFreeWorkout: workout.isFreeWorkout,
-      totalDuration: workout.totalDuration,
-      homeGymId: workout.homeGymId,
+      totalDuration: workout.totalDuration ?? undefined,
+      homeGymId: workout.homeGymId ?? undefined,
       homeGym: workout.homeGym ? { id: workout.homeGym.id, name: workout.homeGym.name } : undefined,
-      cycleId: workout.cycleId,
+      cycleId: workout.cycleId ?? undefined,
       cycleName: workout.cycle?.name,
-      workoutDayId: workout.workoutDayId,
+      workoutDayId: workout.workoutDayId ?? undefined,
       workoutDayName: workout.workoutDay?.name,
-      templateId: workout.templateId,
-      templateName: workout.templateName,
-      exercises: workout.exercises.map((ex: any) => {
-        const blueprintExercise = blueprintExercisesMap.get(ex.exerciseId);
-        
-        // Use custom planned sets if exercise was replaced, otherwise use blueprint
-        let plannedSets;
-        
-        if (ex.customPlannedSets) {
-          // Exercise was replaced - use saved planned sets structure
-          // Need to add IDs for frontend compatibility
-          plannedSets = (ex.customPlannedSets as any[]).map((set: any, idx: number) => ({
-            id: `custom-${ex.id}-${idx}`,
-            order: set.order,
-            setType: set.setType,
-            reps: set.reps,
-            weight: set.weight,
-            rir: set.rir,
-            restAfterSet: set.restAfterSet,
-          }));
-        } else if (blueprintExercise?.sets) {
-          // Use blueprint planned sets
-          plannedSets = blueprintExercise.sets.map((bpSet: any) => ({
-            id: bpSet.id,
-            order: bpSet.order,
-            setType: bpSet.setType,
-            reps: bpSet.reps,
-            weight: bpSet.weight,
-            rir: bpSet.rir,
-            restAfterSet: bpSet.restAfterSet,
-          }));
-        }
-        
-        return {
-          id: ex.id,
-          exerciseId: ex.exerciseId,
-          exerciseName: ex.exercise.name,
-          isUnilateral: ex.exercise.isUnilateral,
-          isDoubleWeight: ex.exercise.isDoubleWeight,
-          order: ex.order,
-          sets: ex.sets.map((set: any) => ({
-            id: set.id,
-            setNumber: set.setNumber,
-            setType: set.setType,
-            reps: set.reps,
-            weight: set.weight,
-            rir: set.rir,
-            targetReps: set.targetReps,
-            targetWeight: set.targetWeight,
-            targetRir: set.targetRir,
-            completedAt: set.completedAt,
-            actualRestDuration: set.actualRestDuration,
-          })),
-          plannedSets,
-        };
-      }),
+      originTemplateId: workout.originTemplateId ?? undefined,
+      originTemplateName: workout.originTemplate?.name,
+      exercises: mapExercisesToResponse(workout.exercises),
       createdAt: workout.createdAt,
     };
   }

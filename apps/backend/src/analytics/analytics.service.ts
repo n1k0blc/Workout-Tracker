@@ -1,12 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ORMService } from '../orm/orm.service';
+import { derivePrimaryMuscle, MusclePercentages } from '../common/muscle.util';
 import {
   VolumeAnalyticsDto,
   VolumeDataPoint,
   VolumeByMuscleGroup,
-  OneRMAnalyticsDto,
-  OneRMDataPoint,
   PersonalRecordsDto,
   PersonalRecord,
   MuscleDistributionDto,
@@ -15,8 +13,6 @@ import {
   TimeTrackingDataPoint,
   CycleListDto,
   CycleListItem,
-  ORMByCycleDto,
-  ORMDataPoint,
   RIRByCycleDto,
   RIRDataPoint,
   RIRAnalyticsDto,
@@ -35,12 +31,24 @@ import {
   SetsByCycleDto,
 } from './dto';
 
+const MUSCLE_PERCENT_SELECT = {
+  abdomenPercent: true,
+  latissimusPercent: true,
+  trapeziusPercent: true,
+  lowerBackPercent: true,
+  hamstringsPercent: true,
+  glutesPercent: true,
+  shouldersPercent: true,
+  bicepsPercent: true,
+  chestPercent: true,
+  quadricepsPercent: true,
+  calvesPercent: true,
+  tricepsPercent: true,
+} as const;
+
 @Injectable()
 export class AnalyticsService {
-  constructor(
-    private prisma: PrismaService,
-    private ormService: ORMService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   /**
    * Helper: Normalize filter parameters to arrays
@@ -266,7 +274,7 @@ export class AnalyticsService {
     const workouts = await this.prisma.workout.findMany({
       where: {
         userId,
-        status: 'COMPLETED' as any,
+        kind: 'WORKOUT' as any,
         date: dateFilter,
         ...(gymFilter !== undefined && { homeGymId: gymFilter }),
         ...(cycleId && { cycleId }), // NEW: Filter by cycle if provided
@@ -276,10 +284,6 @@ export class AnalyticsService {
           include: {
             exercise: {
               select: {
-                muscleGroup: true,
-                equipment: true,
-                isUnilateral: true,
-                isDoubleWeight: true,
                 abdomenPercent: true,
                 latissimusPercent: true,
                 trapeziusPercent: true,
@@ -292,6 +296,9 @@ export class AnalyticsService {
                 quadricepsPercent: true,
                 calvesPercent: true,
                 tricepsPercent: true,
+                equipment: true,
+                isUnilateral: true,
+                isDoubleWeight: true,
               },
             },
             sets: true,
@@ -407,98 +414,6 @@ export class AnalyticsService {
   }
 
   /**
-   * One Rep Max Analytics (Epley Formula)
-   * 1RM = weight × (1 + reps / 30)
-   */
-  async getOneRMAnalytics(userId: string, exerciseId: string): Promise<OneRMAnalyticsDto> {
-    // Verify exercise exists
-    const exercise = await this.prisma.exercise.findUnique({
-      where: { id: exerciseId },
-      select: { 
-        name: true,
-        isUnilateral: true,
-        isDoubleWeight: true,
-      },
-    });
-
-    if (!exercise) {
-      throw new NotFoundException('Exercise not found');
-    }
-
-    const workouts = await this.prisma.workout.findMany({
-      where: {
-        userId,
-        status: 'COMPLETED' as any,
-        homeGymId: { not: null }, // Only count 1RM from home gym workouts
-        exercises: {
-          some: {
-            exerciseId,
-          },
-        },
-      },
-      include: {
-        exercises: {
-          where: { exerciseId },
-          include: {
-            exercise: {
-              select: {
-                isUnilateral: true,
-                isDoubleWeight: true,
-              },
-            },
-            sets: {
-              orderBy: { completedAt: 'asc' },
-            },
-          },
-        },
-      },
-      orderBy: { date: 'asc' },
-    });
-
-    const history: OneRMDataPoint[] = [];
-    let bestOneRM = 0;
-    let currentOneRM = 0;
-
-    for (const workout of workouts) {
-      for (const exerciseLog of workout.exercises) {
-        for (const set of exerciseLog.sets) {
-          // Skip warmup sets - only count working sets for 1RM
-          if (set.setType === 'WARMUP') continue;
-
-          const adjustedWeight = set.weight * (exerciseLog.exercise.isDoubleWeight ? 2 : 1);
-          const oneRM = this.calculateOneRM(adjustedWeight, set.reps);
-
-          history.push({
-            date: workout.date.toISOString().split('T')[0],
-            oneRepMax: oneRM,
-            weight: adjustedWeight,
-            reps: set.reps,
-            workoutId: workout.id,
-          });
-
-          if (oneRM > bestOneRM) {
-            bestOneRM = oneRM;
-          }
-
-          // Last workout is current
-          currentOneRM = oneRM;
-        }
-      }
-    }
-
-    const improvement = bestOneRM > 0 ? ((currentOneRM - bestOneRM) / bestOneRM) * 100 : 0;
-
-    return {
-      exerciseId,
-      exerciseName: exercise.name,
-      currentOneRM,
-      bestOneRM,
-      improvement,
-      history,
-    };
-  }
-
-  /**
    * Personal Records
    */
   async getPersonalRecords(
@@ -521,7 +436,7 @@ export class AnalyticsService {
     const workouts = await this.prisma.workout.findMany({
       where: {
         userId,
-        status: 'COMPLETED' as any,
+        kind: 'WORKOUT' as any,
         ...(gymFilter !== undefined && { homeGymId: gymFilter }),
       },
       include: {
@@ -533,7 +448,18 @@ export class AnalyticsService {
             exercise: {
               select: {
                 name: true,
-                muscleGroup: true,
+                abdomenPercent: true,
+                latissimusPercent: true,
+                trapeziusPercent: true,
+                lowerBackPercent: true,
+                hamstringsPercent: true,
+                glutesPercent: true,
+                shouldersPercent: true,
+                bicepsPercent: true,
+                chestPercent: true,
+                quadricepsPercent: true,
+                calvesPercent: true,
+                tricepsPercent: true,
                 equipment: true,
                 isUnilateral: true,
                 isDoubleWeight: true,
@@ -554,7 +480,7 @@ export class AnalyticsService {
         const exerciseName = exerciseLog.exercise.name;
 
         // Apply filters
-        if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) {
+        if (!this.matchesMuscleFilter(derivePrimaryMuscle(exerciseLog.exercise), muscleGroups)) {
           continue;
         }
         if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) {
@@ -624,7 +550,7 @@ export class AnalyticsService {
     const workouts = await this.prisma.workout.findMany({
       where: {
         userId,
-        status: 'COMPLETED' as any,
+        kind: 'WORKOUT' as any,
         date: dateFilter,
         ...(gymFilter !== undefined && { homeGymId: gymFilter }),
       },
@@ -633,9 +559,6 @@ export class AnalyticsService {
           include: {
             exercise: {
               select: {
-                muscleGroup: true,
-                isUnilateral: true,
-                isDoubleWeight: true,
                 abdomenPercent: true,
                 latissimusPercent: true,
                 trapeziusPercent: true,
@@ -648,6 +571,8 @@ export class AnalyticsService {
                 quadricepsPercent: true,
                 calvesPercent: true,
                 tricepsPercent: true,
+                isUnilateral: true,
+                isDoubleWeight: true,
               },
             },
             sets: true,
@@ -715,7 +640,7 @@ export class AnalyticsService {
     const workouts = await this.prisma.workout.findMany({
       where: {
         userId,
-        status: 'COMPLETED' as any,
+        kind: 'WORKOUT' as any,
         date: dateFilter,
         totalDuration: { not: null },
       },
@@ -744,17 +669,6 @@ export class AnalyticsService {
       workoutCount,
       dataPoints,
     };
-  }
-
-  /**
-   * Helper: Calculate 1RM using Epley Formula
-   * 1RM = weight × (1 + reps / 30)
-   */
-  private calculateOneRM(weight: number, reps: number): number {
-    if (reps === 1) {
-      return weight;
-    }
-    return Math.round(weight * (1 + reps / 30) * 10) / 10;
   }
 
   /**
@@ -801,89 +715,6 @@ export class AnalyticsService {
   }
 
   /**
-   * ORM Analytics for a specific cycle workout day
-   */
-  async getORMAnalytics(
-    cycleId: string,
-    workoutDayId: string,
-    userId: string,
-  ) {
-    // 1. Verify user owns this cycle
-    const cycle = await this.prisma.workoutCycle.findFirst({
-      where: { id: cycleId, userId },
-    });
-
-    if (!cycle) {
-      throw new NotFoundException('Cycle not found');
-    }
-
-    // 2. Get all completed workouts for this workout day (Home Gym only)
-    const workouts = await this.prisma.workout.findMany({
-      where: {
-        cycleId,
-        workoutDayId,
-        status: 'COMPLETED' as any,
-        homeGymId: { not: null }, // Only Home Gym workouts for consistent equipment
-      },
-      include: {
-        exercises: {
-          include: {
-            exercise: true,
-            sets: true,
-          },
-        },
-      },
-      orderBy: { date: 'asc' },
-    });
-
-    // 3. For each workout, calculate ORM data
-    const workoutsData = await Promise.all(
-      workouts.map(async workout => {
-        const exercisesData = await Promise.all(
-          workout.exercises.map(async exerciseLog => {
-            const { exerciseId, exercise, sets } = exerciseLog;
-
-            // Get benchmark
-            const benchmarkRecord = await this.ormService.getBenchmark(
-              cycleId,
-              workoutDayId,
-              exerciseId,
-            );
-
-            if (!benchmarkRecord) {
-              return null; // No benchmark = skip
-            }
-
-            // Calculate %ORM
-            const workingSets = sets.filter((s: any) => s.setType === 'WORKING');
-            const percentORM = this.ormService.calculateExercisePercentORM(
-              workingSets,
-              benchmarkRecord.ormBenchmark,
-              exercise,
-            );
-
-            return {
-              exerciseId,
-              exerciseName: exercise.name,
-              benchmark: benchmarkRecord.ormBenchmark,
-              percentORM,
-              wasBenchmarkSet: benchmarkRecord.setAtWorkoutId === workout.id,
-            };
-          }),
-        );
-
-        return {
-          workoutId: workout.id,
-          date: workout.date.toISOString(),
-          exercises: exercisesData.filter(e => e !== null),
-        };
-      }),
-    );
-
-    return { workouts: workoutsData };
-  }
-
-  /**
    * Get list of user's cycles (active + completed)
    */
   async getCycles(userId: string): Promise<CycleListDto> {
@@ -910,146 +741,6 @@ export class AnalyticsService {
     return {
       activeCycle,
       completedCycles,
-    };
-  }
-
-  /**
-   * ORM Analytics for entire cycle (all workout days combined)
-   * Aggregates %ORM across all exercises matching filters per training day
-   */
-  async getORMByCycle(
-    userId: string,
-    cycleId: string,
-    muscleGroup?: string | string[],
-    equipment?: string | string[],
-    aggregation?: 'day' | 'week',
-    exerciseId?: string,
-  ): Promise<ORMByCycleDto> {
-    // 1. Verify user owns this cycle
-    const cycle = await this.prisma.workoutCycle.findFirst({
-      where: { id: cycleId, userId },
-      include: {
-        workoutDays: {
-          select: {
-            id: true,
-          },
-        },
-      },
-    });
-
-    if (!cycle) {
-      throw new NotFoundException('Cycle not found');
-    }
-
-    // 2. Get all completed Home Gym workouts for this cycle
-    const workouts = await this.prisma.workout.findMany({
-      where: {
-        cycleId,
-        status: 'COMPLETED' as any,
-        homeGymId: { not: null }, // Only Home Gym for ORM consistency
-      },
-      include: {
-        exercises: {
-          include: {
-            exercise: {
-              select: {
-                id: true,
-                name: true,
-                muscleGroup: true,
-                equipment: true,
-                isUnilateral: true,
-                isDoubleWeight: true,
-              },
-            },
-            sets: {
-              where: { setType: 'WORKING' },
-            },
-          },
-        },
-        workoutDay: {
-          select: {
-            id: true,
-          },
-        },
-      },
-      orderBy: { date: 'asc' },
-    });
-
-    // 3. Calculate ORM data per workout
-    const dataPoints: ORMDataPoint[] = [];
-    let trainingDayCounter = 1;
-    let totalPercentORM = 0;
-    let dataPointCount = 0;
-
-    for (const workout of workouts) {
-      const exerciseORMs: number[] = [];
-
-      for (const exerciseLog of workout.exercises) {
-        const { exercise, sets, exerciseId: logExerciseId } = exerciseLog;
-
-        // If exerciseId is provided, filter by exercise ID only (ignore muscle/equipment filters)
-        if (exerciseId) {
-          if (logExerciseId !== exerciseId) {
-            continue;
-          }
-        } else {
-          // Apply muscle group and equipment filters
-          if (muscleGroup && exercise.muscleGroup !== muscleGroup) continue;
-          if (equipment && exercise.equipment !== equipment) continue;
-        }
-
-        // Get benchmark
-        const benchmark = await this.ormService.getBenchmark(
-          cycleId,
-          workout.workoutDay.id,
-          logExerciseId,
-        );
-
-        if (!benchmark) continue;
-
-        // Calculate %ORM for this exercise
-        const percentORM = this.ormService.calculateExercisePercentORM(
-          sets,
-          benchmark.ormBenchmark,
-          exercise as any, // Cast: we only need isDoubleWeight
-        );
-
-        exerciseORMs.push(percentORM);
-      }
-
-      // Only add data point if we have exercises matching filters
-      if (exerciseORMs.length > 0) {
-        const avgPercentORM = exerciseORMs.reduce((sum, val) => sum + val, 0) / exerciseORMs.length;
-
-        dataPoints.push({
-          date: workout.date.toISOString().split('T')[0],
-          trainingDay: trainingDayCounter,
-          percentORM: Math.round(avgPercentORM * 10) / 10,
-          workoutId: workout.id,
-        });
-
-        totalPercentORM += avgPercentORM;
-        dataPointCount++;
-      }
-
-      trainingDayCounter++;
-    }
-
-    // Apply week aggregation if requested
-    const finalDataPoints = aggregation === 'week'
-      ? this.aggregateByWeek(dataPoints, 'average', 'percentORM', cycle.startDate)
-      : dataPoints;
-
-    const averagePercentORM = dataPointCount > 0
-      ? Math.round((totalPercentORM / dataPointCount) * 10) / 10
-      : 0;
-
-    return {
-      cycleId: cycle.id,
-      cycleName: cycle.name,
-      dataPoints: finalDataPoints,
-      averagePercentORM,
-      totalWorkouts: workouts.length,
     };
   }
 
@@ -1086,7 +777,7 @@ export class AnalyticsService {
     
     const whereClause: any = {
       cycleId,
-      status: 'COMPLETED' as any,
+      kind: 'WORKOUT' as any,
     };
 
     // Apply gym filter only if it's not undefined
@@ -1104,7 +795,18 @@ export class AnalyticsService {
               select: {
                 id: true,
                 name: true,
-                muscleGroup: true,
+                abdomenPercent: true,
+                latissimusPercent: true,
+                trapeziusPercent: true,
+                lowerBackPercent: true,
+                hamstringsPercent: true,
+                glutesPercent: true,
+                shouldersPercent: true,
+                bicepsPercent: true,
+                chestPercent: true,
+                quadricepsPercent: true,
+                calvesPercent: true,
+                tricepsPercent: true,
                 equipment: true,
               },
             },
@@ -1147,7 +849,7 @@ export class AnalyticsService {
           }
         } else {
           // Apply muscle group and equipment filters
-          if (muscleGroup && exercise.muscleGroup !== muscleGroup) continue;
+          if (muscleGroup && derivePrimaryMuscle(exercise) !== muscleGroup) continue;
           if (equipment && exercise.equipment !== equipment) continue;
         }
 
@@ -1264,7 +966,7 @@ export class AnalyticsService {
     const workouts = await this.prisma.workout.findMany({
       where: {
         userId,
-        status: 'COMPLETED' as any,
+        kind: 'WORKOUT' as any,
         date: dateFilter,
         ...(gymFilter !== undefined && { homeGymId: gymFilter }),
       },
@@ -1273,7 +975,18 @@ export class AnalyticsService {
           include: {
             exercise: {
               select: {
-                muscleGroup: true,
+                abdomenPercent: true,
+                latissimusPercent: true,
+                trapeziusPercent: true,
+                lowerBackPercent: true,
+                hamstringsPercent: true,
+                glutesPercent: true,
+                shouldersPercent: true,
+                bicepsPercent: true,
+                chestPercent: true,
+                quadricepsPercent: true,
+                calvesPercent: true,
+                tricepsPercent: true,
                 equipment: true,
               },
             },
@@ -1302,7 +1015,7 @@ export class AnalyticsService {
           }
         } else {
           // Apply muscle group and equipment filters
-          if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) continue;
+          if (!this.matchesMuscleFilter(derivePrimaryMuscle(exerciseLog.exercise), muscleGroups)) continue;
           if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) continue;
         }
 
@@ -1410,7 +1123,7 @@ export class AnalyticsService {
     const workouts = await this.prisma.workout.findMany({
       where: {
         userId,
-        status: 'COMPLETED' as any,
+        kind: 'WORKOUT' as any,
         date: dateFilter,
         ...(gymFilter !== undefined && { homeGymId: gymFilter }),
         totalDuration: { not: null }, // Only workouts with duration
@@ -1420,7 +1133,18 @@ export class AnalyticsService {
           include: {
             exercise: {
               select: {
-                muscleGroup: true,
+                abdomenPercent: true,
+                latissimusPercent: true,
+                trapeziusPercent: true,
+                lowerBackPercent: true,
+                hamstringsPercent: true,
+                glutesPercent: true,
+                shouldersPercent: true,
+                bicepsPercent: true,
+                chestPercent: true,
+                quadricepsPercent: true,
+                calvesPercent: true,
+                tricepsPercent: true,
                 equipment: true,
               },
             },
@@ -1438,7 +1162,7 @@ export class AnalyticsService {
       // Check if workout has exercises matching filters
       if (muscleGroup || equipment) {
         const hasMatchingExercise = workout.exercises.some(exerciseLog => {
-          if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) return false;
+          if (!this.matchesMuscleFilter(derivePrimaryMuscle(exerciseLog.exercise), muscleGroups)) return false;
           if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) return false;
           return true;
         });
@@ -1506,7 +1230,7 @@ export class AnalyticsService {
     
     const whereClause: any = {
       cycleId,
-      status: 'COMPLETED' as any,
+      kind: 'WORKOUT' as any,
       totalDuration: { not: null },
     };
 
@@ -1522,7 +1246,18 @@ export class AnalyticsService {
           include: {
             exercise: {
               select: {
-                muscleGroup: true,
+                abdomenPercent: true,
+                latissimusPercent: true,
+                trapeziusPercent: true,
+                lowerBackPercent: true,
+                hamstringsPercent: true,
+                glutesPercent: true,
+                shouldersPercent: true,
+                bicepsPercent: true,
+                chestPercent: true,
+                quadricepsPercent: true,
+                calvesPercent: true,
+                tricepsPercent: true,
                 equipment: true,
               },
             },
@@ -1542,7 +1277,7 @@ export class AnalyticsService {
       // Check if workout has exercises matching filters
       if (muscleGroup || equipment) {
         const hasMatchingExercise = workout.exercises.some(exerciseLog => {
-          if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) return false;
+          if (!this.matchesMuscleFilter(derivePrimaryMuscle(exerciseLog.exercise), muscleGroups)) return false;
           if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) return false;
           return true;
         });
@@ -1615,7 +1350,7 @@ export class AnalyticsService {
     const workouts = await this.prisma.workout.findMany({
       where: {
         userId,
-        status: 'COMPLETED' as any,
+        kind: 'WORKOUT' as any,
         date: dateFilter,
         ...(gymFilter !== undefined && { homeGymId: gymFilter }),
       },
@@ -1624,13 +1359,24 @@ export class AnalyticsService {
           include: {
             exercise: {
               select: {
-                muscleGroup: true,
+                abdomenPercent: true,
+                latissimusPercent: true,
+                trapeziusPercent: true,
+                lowerBackPercent: true,
+                hamstringsPercent: true,
+                glutesPercent: true,
+                shouldersPercent: true,
+                bicepsPercent: true,
+                chestPercent: true,
+                quadricepsPercent: true,
+                calvesPercent: true,
+                tricepsPercent: true,
                 equipment: true,
               },
             },
             sets: {
               where: {
-                actualRestDuration: { not: null },
+                rest: { not: null },
               },
             },
           },
@@ -1655,14 +1401,14 @@ export class AnalyticsService {
           }
         } else {
           // Apply muscle group and equipment filters
-          if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) continue;
+          if (!this.matchesMuscleFilter(derivePrimaryMuscle(exerciseLog.exercise), muscleGroups)) continue;
           if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) continue;
         }
 
         // Sum up actual rest durations from sets
         for (const set of exerciseLog.sets) {
-          if (set.actualRestDuration !== null) {
-            workoutRestTimeSum += set.actualRestDuration;
+          if (set.rest !== null) {
+            workoutRestTimeSum += set.rest;
             workoutRestTimeCount++;
           }
         }
@@ -1732,7 +1478,7 @@ export class AnalyticsService {
     
     const whereClause: any = {
       cycleId,
-      status: 'COMPLETED' as any,
+      kind: 'WORKOUT' as any,
     };
 
     if (gymFilter !== undefined) {
@@ -1747,13 +1493,24 @@ export class AnalyticsService {
           include: {
             exercise: {
               select: {
-                muscleGroup: true,
+                abdomenPercent: true,
+                latissimusPercent: true,
+                trapeziusPercent: true,
+                lowerBackPercent: true,
+                hamstringsPercent: true,
+                glutesPercent: true,
+                shouldersPercent: true,
+                bicepsPercent: true,
+                chestPercent: true,
+                quadricepsPercent: true,
+                calvesPercent: true,
+                tricepsPercent: true,
                 equipment: true,
               },
             },
             sets: {
               where: {
-                actualRestDuration: { not: null },
+                rest: { not: null },
               },
             },
           },
@@ -1780,14 +1537,14 @@ export class AnalyticsService {
           }
         } else {
           // Apply muscle group and equipment filters
-          if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) continue;
+          if (!this.matchesMuscleFilter(derivePrimaryMuscle(exerciseLog.exercise), muscleGroups)) continue;
           if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) continue;
         }
 
         // Sum up actual rest durations from sets
         for (const set of exerciseLog.sets) {
-          if (set.actualRestDuration !== null) {
-            workoutRestTimeSum += set.actualRestDuration;
+          if (set.rest !== null) {
+            workoutRestTimeSum += set.rest;
             workoutRestTimeCount++;
           }
         }
@@ -1859,7 +1616,7 @@ export class AnalyticsService {
     const workouts = await this.prisma.workout.findMany({
       where: {
         userId,
-        status: 'COMPLETED' as any,
+        kind: 'WORKOUT' as any,
         date: dateFilter,
         ...(gymFilter !== undefined && { homeGymId: gymFilter }),
       },
@@ -1868,7 +1625,18 @@ export class AnalyticsService {
           include: {
             exercise: {
               select: {
-                muscleGroup: true,
+                abdomenPercent: true,
+                latissimusPercent: true,
+                trapeziusPercent: true,
+                lowerBackPercent: true,
+                hamstringsPercent: true,
+                glutesPercent: true,
+                shouldersPercent: true,
+                bicepsPercent: true,
+                chestPercent: true,
+                quadricepsPercent: true,
+                calvesPercent: true,
+                tricepsPercent: true,
                 equipment: true,
               },
             },
@@ -1894,7 +1662,7 @@ export class AnalyticsService {
           }
         } else {
           // Apply muscle group and equipment filters
-          if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) {
+          if (!this.matchesMuscleFilter(derivePrimaryMuscle(exerciseLog.exercise), muscleGroups)) {
             continue;
           }
           if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) {
@@ -1953,20 +1721,31 @@ export class AnalyticsService {
     const muscleGroups = this.normalizeFilterArray(muscleGroup);
     const equipments = this.normalizeFilterArray(equipment);
 
-    const cycle = await this.prisma.workoutCycle.findUnique({
-      where: { id: cycleId },
+    const cycle = await this.prisma.workoutCycle.findFirst({
+      where: { id: cycleId, userId },
       include: {
         workouts: {
           where: {
             userId,
-            status: 'COMPLETED' as any,
+            kind: 'WORKOUT' as any,
           },
           include: {
             exercises: {
               include: {
                 exercise: {
                   select: {
-                    muscleGroup: true,
+                    abdomenPercent: true,
+                    latissimusPercent: true,
+                    trapeziusPercent: true,
+                    lowerBackPercent: true,
+                    hamstringsPercent: true,
+                    glutesPercent: true,
+                    shouldersPercent: true,
+                    bicepsPercent: true,
+                    chestPercent: true,
+                    quadricepsPercent: true,
+                    calvesPercent: true,
+                    tricepsPercent: true,
                     equipment: true,
                   },
                 },
@@ -1999,7 +1778,7 @@ export class AnalyticsService {
           }
         } else {
           // Apply muscle group and equipment filters
-          if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) {
+          if (!this.matchesMuscleFilter(derivePrimaryMuscle(exerciseLog.exercise), muscleGroups)) {
             continue;
           }
           if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) {
@@ -2078,7 +1857,7 @@ export class AnalyticsService {
     const workouts = await this.prisma.workout.findMany({
       where: {
         userId,
-        status: 'COMPLETED' as any,
+        kind: 'WORKOUT' as any,
         date: dateFilter,
         ...(gymFilter !== undefined && { homeGymId: gymFilter }),
       },
@@ -2087,7 +1866,18 @@ export class AnalyticsService {
           include: {
             exercise: {
               select: {
-                muscleGroup: true,
+                abdomenPercent: true,
+                latissimusPercent: true,
+                trapeziusPercent: true,
+                lowerBackPercent: true,
+                hamstringsPercent: true,
+                glutesPercent: true,
+                shouldersPercent: true,
+                bicepsPercent: true,
+                chestPercent: true,
+                quadricepsPercent: true,
+                calvesPercent: true,
+                tricepsPercent: true,
                 equipment: true,
               },
             },
@@ -2113,7 +1903,7 @@ export class AnalyticsService {
           }
         } else {
           // Apply muscle group and equipment filters
-          if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) {
+          if (!this.matchesMuscleFilter(derivePrimaryMuscle(exerciseLog.exercise), muscleGroups)) {
             continue;
           }
           if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) {
@@ -2172,20 +1962,31 @@ export class AnalyticsService {
     const muscleGroups = this.normalizeFilterArray(muscleGroup);
     const equipments = this.normalizeFilterArray(equipment);
 
-    const cycle = await this.prisma.workoutCycle.findUnique({
-      where: { id: cycleId },
+    const cycle = await this.prisma.workoutCycle.findFirst({
+      where: { id: cycleId, userId },
       include: {
         workouts: {
           where: {
             userId,
-            status: 'COMPLETED' as any,
+            kind: 'WORKOUT' as any,
           },
           include: {
             exercises: {
               include: {
                 exercise: {
                   select: {
-                    muscleGroup: true,
+                    abdomenPercent: true,
+                    latissimusPercent: true,
+                    trapeziusPercent: true,
+                    lowerBackPercent: true,
+                    hamstringsPercent: true,
+                    glutesPercent: true,
+                    shouldersPercent: true,
+                    bicepsPercent: true,
+                    chestPercent: true,
+                    quadricepsPercent: true,
+                    calvesPercent: true,
+                    tricepsPercent: true,
                     equipment: true,
                   },
                 },
@@ -2218,7 +2019,7 @@ export class AnalyticsService {
           }
         } else {
           // Apply muscle group and equipment filters
-          if (!this.matchesMuscleFilter(exerciseLog.exercise.muscleGroup, muscleGroups)) {
+          if (!this.matchesMuscleFilter(derivePrimaryMuscle(exerciseLog.exercise), muscleGroups)) {
             continue;
           }
           if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) {

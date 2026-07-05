@@ -13,7 +13,6 @@ import {
   Equipment,
   HomeGym,
   VolumeAnalytics,
-  ORMByCycleAnalytics,
   RIRByCycleAnalytics,
   DurationByCycleAnalytics,
   RestTimeByCycleAnalytics,
@@ -65,7 +64,6 @@ export default function CycleDetailPage() {
   // Analytics state
   const [homeGyms, setHomeGyms] = useState<HomeGym[]>([]);
   const [volumeData, setVolumeData] = useState<VolumeAnalytics | null>(null);
-  const [ormData, setOrmData] = useState<ORMByCycleAnalytics | null>(null);
   const [rirData, setRirData] = useState<RIRByCycleAnalytics | null>(null);
   const [durationData, setDurationData] = useState<DurationByCycleAnalytics | null>(null);
   const [restTimeData, setRestTimeData] = useState<RestTimeByCycleAnalytics | null>(null);
@@ -84,7 +82,7 @@ export default function CycleDetailPage() {
   const [chartLineConfigs, setChartLineConfigs] = useState<ChartLineConfig[]>([]);
 
   // Multi-select filter states
-  const [selectedViews, setSelectedViews] = useState<Array<'volume' | 'orm' | 'rir' | 'duration' | 'restTime' | 'reps' | 'sets'>>(['volume']);
+  const [selectedViews, setSelectedViews] = useState<Array<'volume' | 'rir' | 'duration' | 'restTime' | 'reps' | 'sets'>>(['volume']);
   const [selectedMuscles, setSelectedMuscles] = useState<(MuscleGroup | 'ALL')[]>(['ALL']);
   const [selectedEquipment, setSelectedEquipment] = useState<(Equipment | 'ALL')[]>(['ALL']);
   const [gymFilter, setGymFilter] = useState('alle');
@@ -128,7 +126,7 @@ export default function CycleDetailPage() {
     try {
       const [details, cycleWorkouts, prs, gyms] = await Promise.all([
         apiClient.getCycleDetails(cycleId),
-        apiClient.getWorkoutHistory({ cycleId: cycleId, status: 'COMPLETED' }),
+        apiClient.getWorkoutHistory({ cycleId: cycleId }),
         apiClient.getPersonalRecords({}),
         apiClient.getHomeGyms(),
       ]);
@@ -161,7 +159,7 @@ export default function CycleDetailPage() {
   };
 
   // Toggle handlers for multi-select filters
-  const toggleView = (view: 'volume' | 'orm' | 'rir' | 'duration' | 'restTime' | 'reps' | 'sets') => {
+  const toggleView = (view: 'volume' | 'rir' | 'duration' | 'restTime' | 'reps' | 'sets') => {
     const maxAllowed = calculateMaxAllowed('view');
     
     if (view === 'rir') {
@@ -247,7 +245,7 @@ export default function CycleDetailPage() {
     equipment?: Equipment
   ): string => {
     const viewNames: Record<string, string> = {
-      volume: 'Volumen', orm: 'ORM%', rir: 'RIR', duration: 'Dauer',
+      volume: 'Volumen', rir: 'RIR', duration: 'Dauer',
       restTime: 'Pause', reps: 'Wdh', sets: 'Sätze',
     };
     
@@ -262,7 +260,6 @@ export default function CycleDetailPage() {
   const getViewConfig = (view: string): { unit: string; yAxisId: string } => {
     const configs: Record<string, { unit: string; yAxisId: string }> = {
       volume: { unit: 'kg', yAxisId: 'left' },
-      orm: { unit: '%', yAxisId: 'left' },
       rir: { unit: 'RIR', yAxisId: 'left' },
       duration: { unit: 'min', yAxisId: 'left' },
       restTime: { unit: 's', yAxisId: 'left' },
@@ -329,7 +326,6 @@ export default function CycleDetailPage() {
         if (dateEntry) {
           let value = 0;
           if (combo.view === 'volume') value = point.volume;
-          else if (combo.view === 'orm') value = point.percentORM || point.averageOrmPercentage;
           else if (combo.view === 'rir') value = point.rir0Count || 0;
           else if (combo.view === 'duration') value = point.duration;
           else if (combo.view === 'restTime') value = point.averageRestTime;
@@ -402,8 +398,6 @@ export default function CycleDetailPage() {
                   aggregation: aggregationMode,
                 })
               );
-            } else if (view === 'orm') {
-              allPromises.push(apiClient.getORMByCycle(cycleId, undefined, undefined, aggregationMode, selectedExercise.id));
             } else if (view === 'rir') {
               allPromises.push(apiClient.getRIRByCycle(cycleId, gymFilter, undefined, undefined, selectedExercise.id, aggregationMode));
             } else if (view === 'restTime') {
@@ -437,8 +431,6 @@ export default function CycleDetailPage() {
                     aggregation: aggregationMode,
                   })
                 );
-              } else if (view === 'orm') {
-                allPromises.push(apiClient.getORMByCycle(cycleId, muscle, equip, aggregationMode));
               } else if (view === 'rir') {
                 allPromises.push(apiClient.getRIRByCycle(cycleId, gymFilter, muscle, equip, undefined, aggregationMode));
               } else if (view === 'duration') {
@@ -466,10 +458,6 @@ export default function CycleDetailPage() {
             dataPoints: volumeResult.dataPoints.filter((point: any) => point.volume > 0),
           });
         }
-      }
-      if (selectedViews.includes('orm')) {
-        const ormResult = results.find((r, i) => filterCombinations[i].view === 'orm');
-        if (ormResult) setOrmData(ormResult);
       }
       if (selectedViews.includes('rir')) {
         const rirResult = results.find((r, i) => filterCombinations[i].view === 'rir');
@@ -732,15 +720,6 @@ export default function CycleDetailPage() {
                       Volumen
                     </Button>
                     <Button
-                      variant={selectedViews.includes('orm') ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => toggleView('orm')}
-                      disabled={gymFilter === 'andere'}
-                      title={gymFilter === 'andere' ? 'ORM nur für Home Gyms verfügbar' : ''}
-                    >
-                      ORM%
-                    </Button>
-                    <Button
                       variant={selectedViews.includes('rir') ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => toggleView('rir')}
@@ -911,50 +890,6 @@ export default function CycleDetailPage() {
                     />
                   )}
 
-                  {/* ORM Chart */}
-                  {selectedViews.length === 1 && selectedViews.includes('orm') && (
-                    <div className="bg-card border rounded-lg p-6">
-                      {gymFilter === 'andere' ? (
-                        <div className="text-center py-12">
-                          <p className="text-muted-foreground">
-                            %ORM Tracking ist nur für Home Gym Workouts verfügbar.
-                          </p>
-                          <p className="text-sm text-muted-foreground mt-2">
-                            Bitte wähle ein Home Gym oder &quot;Alle&quot; aus.
-                          </p>
-                        </div>
-                      ) : ormData && ormData.dataPoints.length > 0 ? (
-                        <AnalyticsChart
-                          data={ormData.dataPoints}
-                          title="%ORM-Entwicklung"
-                          height={300}
-                          chartType="line"
-                          dataKey="percentORM"
-                          name="%ORM"
-                          stroke={CHART_ACCENT}
-                          yAxisTickFormatter={(value) => `${value}`}
-                          yAxisLabel="%"
-                          footer={
-                            <div className="mt-4 text-center">
-                              <div className="text-sm text-muted-foreground">
-                                Durchschnitt %ORM
-                              </div>
-                              <div className="text-2xl font-bold text-foreground">
-                                {ormData.averagePercentORM}%
-                              </div>
-                            </div>
-                          }
-                        />
-                      ) : (
-                        <div className="text-center py-12">
-                          <p className="text-muted-foreground">
-                            Keine ORM Daten verfügbar für die ausgewählten Filter.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
                   {/* RIR Chart */}
                   {selectedViews.length === 1 && selectedViews.includes('rir') && (
                     <div className="bg-card border rounded-lg p-6">
@@ -1122,7 +1057,7 @@ export default function CycleDetailPage() {
                           <div className="flex items-center gap-3 mb-2 flex-wrap">
                             <h3 className="text-lg font-semibold text-foreground">
                               {workout.isFreeWorkout
-                                ? workout.templateName || 'Freies Workout'
+                                ? workout.originTemplateName || 'Freies Workout'
                                 : workout.workoutDayName || 'Workout'}
                             </h3>
                             {workout.homeGym ? (

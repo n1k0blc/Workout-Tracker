@@ -8,29 +8,6 @@ config({ path: path.join(__dirname, '../.env') });
 
 const prisma = new PrismaClient();
 
-// Map German muscle group names to Prisma enum values
-const muscleGroupMap: Record<string, string> = {
-  'Bauch': 'ABDOMEN',
-  'Latissimus': 'LATISSIMUS',
-  'Trapez': 'TRAPEZIUS',
-  'Unterer Rücken': 'LOWER_BACK',
-  'Beinbeuger': 'HAMSTRINGS',
-  'Glutes': 'GLUTES',
-  'Schultern': 'SHOULDERS',
-  'Bizeps': 'BICEPS',
-  'Brust': 'CHEST',
-  'Quadrizeps': 'QUADRICEPS',
-  'Waden': 'CALVES',
-  'Trizeps': 'TRICEPS',
-  // Legacy values for backwards compatibility
-  'Abs': 'ABDOMEN',
-  'Back': 'LATISSIMUS',
-  'Triceps': 'TRICEPS',
-  'Chest': 'CHEST',
-  'Shoulders': 'SHOULDERS',
-  'Legs': 'QUADRICEPS',
-};
-
 const equipmentMap: Record<string, string> = {
   'Kabel': 'CABLE',
   'Maschine': 'MACHINE',
@@ -67,7 +44,7 @@ async function main() {
 
   // Read CSV file
   const csvPath = path.join(__dirname, '../../../Exercises_premium.csv');
-  
+
   if (!fs.existsSync(csvPath)) {
     console.log('❌ Exercises_premium.csv not found at:', csvPath);
     console.log('ℹ️  Please ensure Exercises_premium.csv is in the project root');
@@ -82,18 +59,17 @@ async function main() {
     .filter((line) => line.trim())
     .map((line) => {
       const cols = line.split(';').map((s) => s.trim());
-      
+
       // CSV Format:
-      // 0: ID, 1: Übung, 2: Muskelgruppe main, 
-      // 3: Quadrizeps%, 4: Beinbeuger%, 5: Glutes%, 6: Waden%, 
-      // 7: Schultern%, 8: Trizeps%, 9: Trapez%, 10: Latissimus%, 
+      // 0: ID, 1: Übung, 2: Muskelgruppe main (unused -- distribution is the source of truth, §3.7),
+      // 3: Quadrizeps%, 4: Beinbeuger%, 5: Glutes%, 6: Waden%,
+      // 7: Schultern%, 8: Trizeps%, 9: Trapez%, 10: Latissimus%,
       // 11: Bizeps%, 12: Brust%, 13: Bauch%, 14: Unterer Rücken%,
       // 15: Equipment, 16: Unilateral, 17: Bilateral, 18: Gewicht 2x
-      
+
       return {
         csvId: parseInt(cols[0], 10),
         name: cols[1],
-        muscleGroup: muscleGroupMap[cols[2]],
         quadricepsPercent: parsePercent(cols[3]),
         hamstringsPercent: parsePercent(cols[4]),
         glutesPercent: parsePercent(cols[5]),
@@ -111,15 +87,15 @@ async function main() {
         isDoubleWeight: parseBoolean(cols[18]),
       };
     })
-    .filter((ex) => ex.muscleGroup && ex.equipment && ex.csvId); // Filter out invalid entries
+    .filter((ex) => ex.equipment && ex.csvId); // Filter out invalid entries
 
   console.log(`📋 Parsed ${exercises.length} exercises from CSV`);
 
   // Validate percentages sum to 100
   const invalidExercises = exercises.filter((ex) => {
-    const sum = ex.quadricepsPercent + ex.hamstringsPercent + ex.glutesPercent + 
-                ex.calvesPercent + ex.shouldersPercent + ex.tricepsPercent + 
-                ex.trapeziusPercent + ex.latissimusPercent + ex.bicepsPercent + 
+    const sum = ex.quadricepsPercent + ex.hamstringsPercent + ex.glutesPercent +
+                ex.calvesPercent + ex.shouldersPercent + ex.tricepsPercent +
+                ex.trapeziusPercent + ex.latissimusPercent + ex.bicepsPercent +
                 ex.chestPercent + ex.abdomenPercent + ex.lowerBackPercent;
     return sum !== 100;
   });
@@ -127,9 +103,9 @@ async function main() {
   if (invalidExercises.length > 0) {
     console.warn(`⚠️  Warning: ${invalidExercises.length} exercises have percentages that don't sum to 100%:`);
     invalidExercises.slice(0, 5).forEach((ex) => {
-      const sum = ex.quadricepsPercent + ex.hamstringsPercent + ex.glutesPercent + 
-                  ex.calvesPercent + ex.shouldersPercent + ex.tricepsPercent + 
-                  ex.trapeziusPercent + ex.latissimusPercent + ex.bicepsPercent + 
+      const sum = ex.quadricepsPercent + ex.hamstringsPercent + ex.glutesPercent +
+                  ex.calvesPercent + ex.shouldersPercent + ex.tricepsPercent +
+                  ex.trapeziusPercent + ex.latissimusPercent + ex.bicepsPercent +
                   ex.chestPercent + ex.abdomenPercent + ex.lowerBackPercent;
       console.warn(`  - ${ex.name} (ID: ${ex.csvId}): ${sum}%`);
     });
@@ -152,7 +128,6 @@ async function main() {
         },
         update: {
           name: exercise.name,
-          muscleGroup: exercise.muscleGroup as any,
           equipment: exercise.equipment as any,
           quadricepsPercent: exercise.quadricepsPercent,
           hamstringsPercent: exercise.hamstringsPercent,
@@ -172,7 +147,6 @@ async function main() {
         create: {
           csvId: exercise.csvId,
           name: exercise.name,
-          muscleGroup: exercise.muscleGroup as any,
           equipment: exercise.equipment as any,
           quadricepsPercent: exercise.quadricepsPercent,
           hamstringsPercent: exercise.hamstringsPercent,
@@ -192,7 +166,7 @@ async function main() {
           userId: null,
         },
       });
-      
+
       if (result.csvId === exercise.csvId) {
         successCount++;
       } else {
@@ -211,92 +185,6 @@ async function main() {
     console.log(`❌ Failed to process ${errorCount} exercises`);
   }
 
-  // Migrate custom exercises to have 100% on their main muscle group
-  console.log('\n🔄 Migrating custom exercises...');
-  
-  const customExercises = await prisma.exercise.findMany({
-    where: { isCustom: true },
-  });
-
-  let migratedCount = 0;
-  for (const exercise of customExercises) {
-    // Check if already migrated (any percentage > 0)
-    if (
-      exercise.quadricepsPercent > 0 || exercise.hamstringsPercent > 0 ||
-      exercise.glutesPercent > 0 || exercise.calvesPercent > 0 ||
-      exercise.shouldersPercent > 0 || exercise.tricepsPercent > 0 ||
-      exercise.trapeziusPercent > 0 || exercise.latissimusPercent > 0 ||
-      exercise.bicepsPercent > 0 || exercise.chestPercent > 0 ||
-      exercise.abdomenPercent > 0 || exercise.lowerBackPercent > 0
-    ) {
-      continue; // Already migrated
-    }
-
-    // Set 100% on main muscle group
-    const update: any = {};
-    
-    switch (exercise.muscleGroup) {
-      case 'QUADRICEPS':
-        update.quadricepsPercent = 100;
-        break;
-      case 'HAMSTRINGS':
-        update.hamstringsPercent = 100;
-        break;
-      case 'GLUTES':
-        update.glutesPercent = 100;
-        break;
-      case 'CALVES':
-        update.calvesPercent = 100;
-        break;
-      case 'SHOULDERS':
-        update.shouldersPercent = 100;
-        break;
-      case 'TRICEPS':
-        update.tricepsPercent = 100;
-        break;
-      case 'TRAPEZIUS':
-        update.trapeziusPercent = 100;
-        break;
-      case 'LATISSIMUS':
-        update.latissimusPercent = 100;
-        break;
-      case 'BICEPS':
-        update.bicepsPercent = 100;
-        break;
-      case 'CHEST':
-        update.chestPercent = 100;
-        break;
-      case 'ABDOMEN':
-        update.abdomenPercent = 100;
-        break;
-      case 'LOWER_BACK':
-        update.lowerBackPercent = 100;
-        break;
-      // Legacy values
-      case 'ABS':
-        update.abdomenPercent = 100;
-        update.muscleGroup = 'ABDOMEN';
-        break;
-      case 'BACK':
-        update.latissimusPercent = 100;
-        update.muscleGroup = 'LATISSIMUS';
-        break;
-      case 'LEGS':
-        update.quadricepsPercent = 100;
-        update.muscleGroup = 'QUADRICEPS';
-        break;
-    }
-
-    if (Object.keys(update).length > 0) {
-      await prisma.exercise.update({
-        where: { id: exercise.id },
-        data: update,
-      });
-      migratedCount++;
-    }
-  }
-
-  console.log(`✅ Migrated ${migratedCount} custom exercises`);
   console.log('✅ Seeding completed!');
 }
 
@@ -309,4 +197,3 @@ main()
     await prisma.$disconnect();
     process.exit(1);
   });
-

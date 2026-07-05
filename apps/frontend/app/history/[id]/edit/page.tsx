@@ -3,8 +3,6 @@
 import { ProtectedRoute } from '@/components/protected-route';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
-import { apiClient } from '@/lib/api';
-import { Workout } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
@@ -27,9 +25,8 @@ export default function EditWorkoutPage() {
   const fromCycle = searchParams.get('from') === 'cycle';
   const cycleId = searchParams.get('cycleId');
 
-  const { setActiveWorkoutDirectly, activeWorkout } = useWorkout();
+  const { setActiveWorkoutDirectly, activeWorkout, loadWorkoutForEdit, completeWorkout } = useWorkout();
 
-  const [workout, setWorkout] = useState<Workout | null>(null);
   const [workoutDate, setWorkoutDate] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -42,32 +39,8 @@ export default function EditWorkoutPage() {
     }
   };
 
-  useEffect(() => {
-    if (workout) {
-      // Technical debt workaround (see UI-REFRACTORING-PLAN.md): the API always returns the full
-      // plannedSets snapshot from the (current) blueprint for the workout. In history edit of a
-      // *performed* record we only want to show rows for the sets that were actually executed
-      // (i.e. exist in .sets). Un-performed / previously removed planned sets should not appear
-      // as if they are part of the historical performed data.
-      // We trim here for the hijacked context (cards see only matching planned). This is pure
-      // frontend view adjustment; the real persisted data (sets) is untouched. No backend change.
-      const trimmedForEdit = {
-        ...workout,
-        exercises: workout.exercises.map((ex) => {
-          const performed = new Set(ex.sets.map((s) => s.setNumber));
-          return {
-            ...ex,
-            plannedSets: (ex.plannedSets || []).filter((ps) => performed.has(ps.order)),
-          };
-        }),
-      };
-      setActiveWorkoutDirectly(trimmedForEdit);
-    }
-  }, [workout]); // eslint-disable-line react-hooks/exhaustive-deps -- setActiveWorkoutDirectly is stable (useCallback([]))
-
-  // Clear the hijacked completed workout from global context when leaving this edit view
-  // (browser back, or unmount). This prevents the main site header/nav from staying hidden
-  // (MobileNav hides on any activeWorkout, but we only want that for real IN_PROGRESS sessions).
+  // Clear the hijacked workout from global context when leaving this edit view
+  // (browser back, or unmount). This prevents the main site header/nav from staying hidden.
   useEffect(() => {
     return () => {
       setActiveWorkoutDirectly(null);
@@ -77,13 +50,7 @@ export default function EditWorkoutPage() {
   const loadWorkout = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await apiClient.getWorkout(workoutId);
-      setWorkout(data);
-      
-      // Format date for input (YYYY-MM-DD)
-      const date = new Date(data.date);
-      const formattedDate = date.toISOString().split('T')[0];
-      setWorkoutDate(formattedDate);
+      await loadWorkoutForEdit(workoutId);
     } catch (error) {
       console.error('Failed to load workout:', error);
       alert('Fehler beim Laden des Workouts');
@@ -102,26 +69,27 @@ export default function EditWorkoutPage() {
     loadWorkout();
   }, [loadWorkout]);
 
+  // Seed the date field once the workout has loaded into context.
+  useEffect(() => {
+    if (activeWorkout) {
+      const date = new Date(activeWorkout.date);
+      setWorkoutDate(date.toISOString().split('T')[0]);
+    }
+  }, [activeWorkout?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleSaveFromShared = async () => {
     if (!activeWorkout) return;
 
     setSaving(true);
     try {
-      const exercises = activeWorkout.exercises.map((exercise) => ({
-        id: exercise.id,
-        sets: exercise.sets.map((set) => ({
-          id: set.id,
-          reps: set.reps,
-          weight: set.weight,
-          rir: set.rir,
-        })),
-      }));
+      // Sync the (possibly-edited) date into the draft before the single save call.
+      setActiveWorkoutDirectly(
+        { ...activeWorkout, date: new Date(workoutDate + 'T12:00:00').toISOString() },
+        false,
+        0,
+      );
 
-      await apiClient.updateCompletedWorkout(workoutId, {
-        completedAt: new Date(workoutDate + 'T12:00:00').toISOString(),
-        exercises,
-      });
-
+      await completeWorkout();
       navigateBack();
     } catch (error) {
       console.error('Failed to save workout:', error);
@@ -130,8 +98,6 @@ export default function EditWorkoutPage() {
       setSaving(false);
     }
   };
-
-
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -143,7 +109,7 @@ export default function EditWorkoutPage() {
     }).format(date);
   };
 
-  if (loading || !workout) {
+  if (loading || !activeWorkout) {
     return (
       <ProtectedRoute>
         <div className="min-h-screen bg-background flex items-center justify-center">
@@ -177,10 +143,10 @@ export default function EditWorkoutPage() {
                       Workout bearbeiten
                     </h2>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {workout.isFreeWorkout
-                        ? workout.templateName || 'Freies Workout'
-                        : workout.workoutDayName || 'Workout'}
-                      {workout.cycleName && ` - ${workout.cycleName}`}
+                      {activeWorkout.isFreeWorkout
+                        ? activeWorkout.originTemplateName || 'Freies Workout'
+                        : activeWorkout.workoutDayName || 'Workout'}
+                      {activeWorkout.cycleName && ` - ${activeWorkout.cycleName}`}
                     </p>
                   </div>
                   <Badge variant="outline">Bearbeitung</Badge>
@@ -209,7 +175,7 @@ export default function EditWorkoutPage() {
                   />
                 </Field>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Ursprünglich: {formatDate(workout.date)}
+                  Ursprünglich: {formatDate(activeWorkout.date)}
                 </p>
               </CardContent>
             </Card>
@@ -233,8 +199,8 @@ export default function EditWorkoutPage() {
             </div>
 
             <div className="flex justify-end">
-              <Button 
-                onClick={handleSaveFromShared} 
+              <Button
+                onClick={handleSaveFromShared}
                 disabled={saving || !activeWorkout}
                 className="w-full md:w-auto"
               >

@@ -1,11 +1,11 @@
 import { IsArray, ValidateNested, ArrayMinSize } from 'class-validator';
 import { Type } from 'class-transformer';
-import { BlueprintExerciseDto } from './create-cycle.dto';
+import { WorkoutExerciseInputDto } from '../../common/dto/workout-tree.dto';
 
 export class UpdateBlueprintDto {
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => BlueprintExerciseDto)
+  @Type(() => WorkoutExerciseInputDto)
   @ArrayMinSize(1)
-  exercises: BlueprintExerciseDto[];
+  exercises: WorkoutExerciseInputDto[];
 }

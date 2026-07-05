@@ -120,20 +120,20 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
           sets: (ex.sets || []).map((s: any, sIdx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
             id: s.id || `set-${Date.now()}-${sIdx}`,
             setNumber: s.order === 0 ? sIdx + 1 : s.order,
-            setType: s.isWarmup ? SetType.WARMUP : SetType.WORKING,
-            reps: s.targetReps ?? 0,
-            weight: s.targetWeight ?? 0,
-            rir: s.targetRir ?? 0,
+            setType: s.setType ?? SetType.WORKING,
+            reps: s.reps ?? 0,
+            weight: s.weight ?? 0,
+            rir: s.rir ?? 0,
             completedAt: new Date().toISOString(),
           })),
           plannedSets: (ex.sets || []).map((s: any, sIdx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
             id: s.id || `planned-${Date.now()}-${sIdx}`,
             order: s.order === 0 ? sIdx + 1 : s.order,
-            setType: s.isWarmup ? SetType.WARMUP : SetType.WORKING,
-            reps: s.targetReps ?? 0,
-            weight: s.targetWeight ?? 0,
-            rir: s.targetRir ?? 0,
-            restAfterSet: 0,
+            setType: s.setType ?? SetType.WORKING,
+            reps: s.reps ?? 0,
+            weight: s.weight ?? 0,
+            rir: s.rir ?? 0,
+            rest: s.rest ?? 90,
           })),
         }));
         setExercises(fixed as ExerciseLog[]);
@@ -184,10 +184,11 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
         order: ex.order,
         sets: (ex.sets || []).map((s: any, idx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
           order: s.setNumber || s.order || idx + 1,
-          isWarmup: s.setType === SetType.WARMUP || s.isWarmup === true,
-          targetReps: s.reps ?? 0,
-          targetWeight: s.weight ?? 0,
-          targetRir: s.rir ?? 0,
+          setType: s.setType ?? SetType.WORKING,
+          reps: s.reps ?? 0,
+          weight: s.weight ?? 0,
+          rir: s.rir ?? 0,
+          rest: s.rest ?? 90,
         })),
       }));
 
@@ -360,7 +361,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
                                 reps: 10,
                                 weight: 0,
                                 rir: 2,
-                                restAfterSet: 0,
+                                rest: 90,
                               };
                               return {
                                 ...e,

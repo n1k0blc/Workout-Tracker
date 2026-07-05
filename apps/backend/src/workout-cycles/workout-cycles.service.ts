@@ -1,5 +1,10 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
+import { WorkoutTreeService, mapExercisesToResponse, toExerciseInputs, WORKOUT_EXERCISE_TREE_INCLUDE } from '../workout-tree/workout-tree.service';
+import { setWorkingVolume } from '../common/utils/volume.util';
+import { calculateCycleWeek, getCurrentDate } from '../common/utils/date.util';
+import { ExercisesService } from '../exercises/exercises.service';
 import {
   CreateCycleDto,
   UpdateCycleDto,
@@ -10,77 +15,57 @@ import {
   WorkoutsByGymDto,
 } from './dto';
 
+const CYCLE_TREE_INCLUDE = {
+  workoutDays: {
+    include: {
+      plannedHomeGym: {
+        select: { id: true, name: true },
+      },
+      workouts: {
+        where: { kind: 'BLUEPRINT' as const },
+        include: WORKOUT_EXERCISE_TREE_INCLUDE,
+      },
+    },
+    orderBy: { order: 'asc' as const },
+  },
+};
+
 @Injectable()
 export class WorkoutCyclesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private workoutTreeService: WorkoutTreeService,
+    private exercisesService: ExercisesService,
+  ) {}
 
   /**
-   * Prüft und beendet automatisch Zyklen, deren Dauer abgelaufen ist
+   * Explicit, idempotent trigger (§3.6) -- runs hourly across all users, replacing the
+   * old write-on-read side-effect that silently mutated cycle status inside GET handlers.
    */
-  private async autoCompleteExpiredCycles(userId: string): Promise<void> {
-    const now = new Date();
-    
-    // Finde alle aktiven Zyklen des Users
+  @Cron(CronExpression.EVERY_HOUR)
+  async autoCompleteExpiredCyclesSweep(): Promise<void> {
+    const now = getCurrentDate();
     const activeCycles = await this.prisma.workoutCycle.findMany({
-      where: {
-        userId,
-        status: 'ACTIVE',
-      },
+      where: { status: 'ACTIVE' },
     });
 
-    // Prüfe jeden Zyklus auf Ablauf
     for (const cycle of activeCycles) {
       const endDate = new Date(cycle.startDate);
       endDate.setDate(endDate.getDate() + cycle.duration * 7);
 
-      // Wenn Enddatum überschritten, beende Zyklus
       if (now > endDate) {
         await this.prisma.workoutCycle.update({
           where: { id: cycle.id },
-          data: {
-            status: 'COMPLETED',
-            completedAt: endDate, // Verwende Enddatum, nicht aktuelles Datum
-          },
+          data: { status: 'COMPLETED', completedAt: endDate },
         });
       }
     }
   }
 
   async findAll(userId: string): Promise<CycleResponseDto[]> {
-    // Auto-complete abgelaufene Zyklen vor dem Abrufen
-    await this.autoCompleteExpiredCycles(userId);
-
     const cycles = await this.prisma.workoutCycle.findMany({
       where: { userId },
-      include: {
-        workoutDays: {
-          include: {
-            plannedHomeGym: {
-              select: { id: true, name: true },
-            },
-            blueprint: {
-              include: {
-                exercises: {
-                  include: {
-                    exercise: {
-                      select: {
-                        name: true,
-                        isUnilateral: true,
-                        isDoubleWeight: true,
-                      },
-                    },
-                    sets: {
-                      orderBy: { order: 'asc' },
-                    },
-                  },
-                  orderBy: { order: 'asc' },
-                },
-              },
-            },
-          },
-          orderBy: { weekday: 'asc' },
-        },
-      },
+      include: CYCLE_TREE_INCLUDE,
       orderBy: { createdAt: 'desc' },
     });
 
@@ -88,60 +73,21 @@ export class WorkoutCyclesService {
   }
 
   async findById(id: string, userId: string): Promise<CycleResponseDto> {
-    // Auto-complete abgelaufene Zyklen vor dem Abrufen
-    await this.autoCompleteExpiredCycles(userId);
-
     const cycle = await this.prisma.workoutCycle.findUnique({
       where: { id },
-      include: {
-        workoutDays: {
-          include: {
-            plannedHomeGym: {
-              select: { id: true, name: true },
-            },
-            blueprint: {
-              include: {
-                exercises: {
-                  include: {
-                    exercise: {
-                      select: {
-                        name: true,
-                        isUnilateral: true,
-                        isDoubleWeight: true,
-                      },
-                    },
-                    sets: {
-                      orderBy: { order: 'asc' },
-                    },
-                  },
-                  orderBy: { order: 'asc' },
-                },
-              },
-            },
-          },
-          orderBy: { weekday: 'asc' },
-        },
-      },
+      include: CYCLE_TREE_INCLUDE,
     });
 
-    if (!cycle) {
+    if (!cycle || cycle.userId !== userId) {
       throw new NotFoundException('Workout cycle not found');
-    }
-
-    if (cycle.userId !== userId) {
-      throw new ForbiddenException('Access denied');
     }
 
     return this.mapCycleToResponse(cycle);
   }
 
   async create(createCycleDto: CreateCycleDto, userId: string): Promise<CycleResponseDto> {
-    // Check if an active cycle already exists
     const existingActiveCycle = await this.prisma.workoutCycle.findFirst({
-      where: {
-        userId,
-        status: 'ACTIVE',
-      },
+      where: { userId, status: 'ACTIVE' },
     });
 
     if (existingActiveCycle) {
@@ -150,118 +96,52 @@ export class WorkoutCyclesService {
 
     const { name, duration, startDate, workoutDays } = createCycleDto;
 
-    const cycle = await this.prisma.workoutCycle.create({
-      data: {
-        name,
-        duration,
-        startDate: new Date(startDate),
-        userId,
-        workoutDays: {
-          create: workoutDays.map((day) => ({
+    const allExerciseIds = workoutDays.flatMap((day) => day.exercises.map((e) => e.exerciseId));
+    await this.exercisesService.validateAccessible(allExerciseIds, userId);
+
+    const cycleId = await this.prisma.$transaction(async (tx) => {
+      const cycle = await tx.workoutCycle.create({
+        data: { name, duration, startDate: new Date(startDate), userId },
+      });
+
+      for (let i = 0; i < workoutDays.length; i++) {
+        const day = workoutDays[i];
+        const workoutDay = await tx.workoutDay.create({
+          data: {
+            cycleId: cycle.id,
             weekday: day.weekday,
+            order: i,
             name: day.name,
             plannedHomeGymId: day.plannedHomeGymId || null,
-            blueprint: {
-              create: {
-                exercises: {
-                  create: day.exercises.map((ex) => ({
-                    exerciseId: ex.exerciseId,
-                    order: ex.order,
-                    sets: {
-                      create: ex.sets.map((set) => ({
-                        order: set.order,
-                        setType: set.setType,
-                        reps: set.reps,
-                        weight: set.weight,
-                        rir: set.rir,
-                        restAfterSet: set.restAfterSet || 90,
-                      })),
-                    },
-                  })),
-                },
-              },
-            },
-          })),
-        },
-      },
-      include: {
-        workoutDays: {
-          include: {
-            plannedHomeGym: {
-              select: { id: true, name: true },
-            },
-            blueprint: {
-              include: {
-                exercises: {
-                  include: {
-                    exercise: {
-                      select: {
-                        name: true,
-                        isUnilateral: true,
-                        isDoubleWeight: true,
-                      },
-                    },
-                    sets: {
-                      orderBy: { order: 'asc' },
-                    },
-                  },
-                  orderBy: { order: 'asc' },
-                },
-              },
-            },
           },
-          orderBy: { weekday: 'asc' },
-        },
-      },
+        });
+
+        const blueprint = await tx.workout.create({
+          data: { kind: 'BLUEPRINT', userId, workoutDayId: workoutDay.id },
+        });
+
+        await this.workoutTreeService.replaceTree(tx, blueprint.id, toExerciseInputs(day.exercises));
+      }
+
+      return cycle.id;
     });
 
-    return this.mapCycleToResponse(cycle);
+    return this.findById(cycleId, userId);
   }
 
-  async update(
-    id: string,
-    updateCycleDto: UpdateCycleDto,
-    userId: string,
-  ): Promise<CycleResponseDto> {
-    // Check ownership
+  async update(id: string, updateCycleDto: UpdateCycleDto, userId: string): Promise<CycleResponseDto> {
     await this.findById(id, userId);
 
-    const updatedCycle = await this.prisma.workoutCycle.update({
+    await this.prisma.workoutCycle.update({
       where: { id },
       data: {
         ...(updateCycleDto.name && { name: updateCycleDto.name }),
         ...(updateCycleDto.duration && { duration: updateCycleDto.duration }),
         ...(updateCycleDto.startDate && { startDate: new Date(updateCycleDto.startDate) }),
       },
-      include: {
-        workoutDays: {
-          include: {
-            blueprint: {
-              include: {
-                exercises: {
-                  include: {
-                    exercise: {
-                      select: {
-                        name: true,
-                        isUnilateral: true,
-                        isDoubleWeight: true,
-                      },
-                    },
-                    sets: {
-                      orderBy: { order: 'asc' },
-                    },
-                  },
-                  orderBy: { order: 'asc' },
-                },
-              },
-            },
-          },
-          orderBy: { weekday: 'asc' },
-        },
-      },
     });
 
-    return this.mapCycleToResponse(updatedCycle);
+    return this.findById(id, userId);
   }
 
   async updateBlueprint(
@@ -270,50 +150,31 @@ export class WorkoutCyclesService {
     updateBlueprintDto: UpdateBlueprintDto,
     userId: string,
   ): Promise<CycleResponseDto> {
-    // Check ownership
     await this.findById(cycleId, userId);
+    await this.exercisesService.validateAccessible(
+      updateBlueprintDto.exercises.map((e) => e.exerciseId),
+      userId,
+    );
 
-    // Find workout day with blueprint
     const workoutDay = await this.prisma.workoutDay.findUnique({
       where: { id: workoutDayId },
-      include: { blueprint: true },
+      include: { workouts: { where: { kind: 'BLUEPRINT' } } },
     });
 
     if (!workoutDay || workoutDay.cycleId !== cycleId) {
       throw new NotFoundException('Workout day not found');
     }
 
-    if (!workoutDay.blueprint) {
+    const blueprint = workoutDay.workouts[0];
+    if (!blueprint) {
       throw new NotFoundException('Blueprint not found');
     }
 
-    // Delete old blueprint exercises (cascades to sets)
-    await this.prisma.blueprintExercise.deleteMany({
-      where: { blueprintId: workoutDay.blueprint.id },
+    await this.prisma.$transaction(async (tx) => {
+      await this.workoutTreeService.replaceTree(tx, blueprint.id, toExerciseInputs(updateBlueprintDto.exercises));
+      await tx.workout.update({ where: { id: blueprint.id }, data: { updatedAt: new Date() } });
     });
 
-    // Create new blueprint exercises with sets
-    for (const ex of updateBlueprintDto.exercises) {
-      await this.prisma.blueprintExercise.create({
-        data: {
-          blueprintId: workoutDay.blueprint.id,
-          exerciseId: ex.exerciseId,
-          order: ex.order,
-          sets: {
-            create: ex.sets.map((set) => ({
-              order: set.order,
-              setType: set.setType,
-              reps: set.reps,
-              weight: set.weight,
-              rir: set.rir,
-              restAfterSet: set.restAfterSet || 90,
-            })),
-          },
-        },
-      });
-    }
-
-    // Return updated cycle
     return this.findById(cycleId, userId);
   }
 
@@ -323,10 +184,8 @@ export class WorkoutCyclesService {
     updateWorkoutDayDto: UpdateWorkoutDayDto,
     userId: string,
   ): Promise<CycleResponseDto> {
-    // Check ownership
     await this.findById(cycleId, userId);
 
-    // Find workout day
     const workoutDay = await this.prisma.workoutDay.findUnique({
       where: { id: workoutDayId },
     });
@@ -335,7 +194,6 @@ export class WorkoutCyclesService {
       throw new NotFoundException('Workout day not found');
     }
 
-    // Update workout day
     await this.prisma.workoutDay.update({
       where: { id: workoutDayId },
       data: {
@@ -347,57 +205,25 @@ export class WorkoutCyclesService {
       },
     });
 
-    // Return updated cycle
     return this.findById(cycleId, userId);
   }
 
   async completeCycle(id: string, userId: string): Promise<CycleResponseDto> {
-    // Check ownership
     const cycle = await this.findById(id, userId);
 
     if (cycle.status === 'COMPLETED') {
       throw new BadRequestException('Dieser Zyklus wurde bereits beendet.');
     }
 
-    const updatedCycle = await this.prisma.workoutCycle.update({
+    await this.prisma.workoutCycle.update({
       where: { id },
-      data: {
-        status: 'COMPLETED',
-        completedAt: new Date(),
-      },
-      include: {
-        workoutDays: {
-          include: {
-            blueprint: {
-              include: {
-                exercises: {
-                  include: {
-                    exercise: {
-                      select: {
-                        name: true,
-                        isUnilateral: true,
-                        isDoubleWeight: true,
-                      },
-                    },
-                    sets: {
-                      orderBy: { order: 'asc' },
-                    },
-                  },
-                  orderBy: { order: 'asc' },
-                },
-              },
-            },
-          },
-          orderBy: { weekday: 'asc' },
-        },
-      },
+      data: { status: 'COMPLETED', completedAt: getCurrentDate() },
     });
 
-    return this.mapCycleToResponse(updatedCycle);
+    return this.findById(id, userId);
   }
 
   async delete(id: string, userId: string): Promise<void> {
-    // Check ownership
     await this.findById(id, userId);
 
     await this.prisma.workoutCycle.delete({
@@ -409,127 +235,71 @@ export class WorkoutCyclesService {
    * Get detailed statistics and data for a cycle
    */
   async getCycleDetails(id: string, userId: string): Promise<CycleDetailsDto> {
-    // Check ownership and get cycle
     const cycle = await this.prisma.workoutCycle.findUnique({
       where: { id },
-      include: {
-        workoutDays: true,
-      },
+      include: { workoutDays: true },
     });
 
-    if (!cycle) {
+    if (!cycle || cycle.userId !== userId) {
       throw new NotFoundException('Zyklus nicht gefunden');
     }
 
-    if (cycle.userId !== userId) {
-      throw new ForbiddenException('Zugriff verweigert');
-    }
-
-    // Calculate end date
     const endDate = new Date(cycle.startDate);
     endDate.setDate(endDate.getDate() + cycle.duration * 7);
 
-    // Get all workouts that belong to this cycle
     const workouts = await this.prisma.workout.findMany({
-      where: {
-        userId,
-        cycleId: id,
-        status: 'COMPLETED',
-      },
+      where: { userId, cycleId: id, kind: 'WORKOUT' },
       include: {
         exercises: {
           include: {
-            exercise: {
-              select: {
-                isUnilateral: true,
-                isDoubleWeight: true,
-              },
-            },
+            exercise: { select: { isUnilateral: true, isDoubleWeight: true } },
             sets: true,
           },
         },
-        homeGym: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        homeGym: { select: { id: true, name: true } },
       },
-      orderBy: {
-        date: 'asc',
-      },
+      orderBy: { date: 'asc' },
     });
 
-    // Calculate total volume (excluding warmup sets)
     let totalVolume = 0;
     for (const workout of workouts) {
       for (const exercise of workout.exercises) {
-        const isUnilateral = exercise.exercise?.isUnilateral || false;
-        const isDoubleWeight = exercise.exercise?.isDoubleWeight || false;
-
         for (const set of exercise.sets) {
-          if (set.setType !== 'WARMUP') {
-            let weight = set.weight;
-            
-            // Apply multipliers
-            if (isUnilateral) {
-              weight *= 2;
-            }
-            if (isDoubleWeight) {
-              weight *= 2;
-            }
-            
-            totalVolume += weight * set.reps;
-          }
+          totalVolume += setWorkingVolume(set, exercise.exercise);
         }
       }
     }
 
-    // Group workouts by gym
     const gymMap = new Map<string, { gymName: string; count: number; isHome: boolean }>();
-    
+
     for (const workout of workouts) {
       if (workout.homeGym) {
         const key = workout.homeGym.id;
         if (gymMap.has(key)) {
           gymMap.get(key)!.count++;
         } else {
-          gymMap.set(key, {
-            gymName: workout.homeGym.name,
-            count: 1,
-            isHome: true,
-          });
+          gymMap.set(key, { gymName: workout.homeGym.name, count: 1, isHome: true });
         }
       } else {
-        // Other gyms
         const key = 'other';
         if (gymMap.has(key)) {
           gymMap.get(key)!.count++;
         } else {
-          gymMap.set(key, {
-            gymName: 'Andere Gyms',
-            count: 1,
-            isHome: false,
-          });
+          gymMap.set(key, { gymName: 'Andere Gyms', count: 1, isHome: false });
         }
       }
     }
 
     const workoutsByGym: WorkoutsByGymDto[] = Array.from(gymMap.values());
 
-    // Calculate current week for active cycles
     let currentWeek: number | undefined;
     let totalWeeks: number | undefined;
     let percentage: number | undefined;
 
     if (cycle.status === 'ACTIVE') {
-      const now = new Date();
-      const diffTime = now.getTime() - cycle.startDate.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      currentWeek = Math.min(Math.floor(diffDays / 7) + 1, cycle.duration);
+      currentWeek = calculateCycleWeek(cycle.startDate, cycle.duration);
       totalWeeks = cycle.duration;
-      percentage = Math.min((currentWeek / totalWeeks) * 100, 100);
-      percentage = Math.round(percentage * 100) / 100; // 2 decimals
+      percentage = Math.round(Math.min((currentWeek / totalWeeks) * 100, 100) * 100) / 100;
     }
 
     return {
@@ -539,7 +309,7 @@ export class WorkoutCyclesService {
       startDate: cycle.startDate,
       endDate,
       status: cycle.status,
-      completedAt: cycle.completedAt,
+      completedAt: cycle.completedAt ?? undefined,
       totalVolume: Math.round(totalVolume),
       workoutCount: workouts.length,
       workoutsByGym,
@@ -557,37 +327,27 @@ export class WorkoutCyclesService {
       startDate: cycle.startDate,
       createdAt: cycle.createdAt,
       status: cycle.status,
-      completedAt: cycle.completedAt,
-      workoutDays: cycle.workoutDays.map((day: any) => ({
-        id: day.id,
-        weekday: day.weekday,
-        name: day.name,
-        plannedHomeGymId: day.plannedHomeGymId,
-        plannedHomeGym: day.plannedHomeGym ? { id: day.plannedHomeGym.id, name: day.plannedHomeGym.name } : undefined,
-        blueprint: day.blueprint
-          ? {
-              id: day.blueprint.id,
-              updatedAt: day.blueprint.updatedAt,
-              exercises: day.blueprint.exercises.map((ex: any) => ({
-                id: ex.id,
-                exerciseId: ex.exerciseId,
-                exerciseName: ex.exercise.name,
-                isUnilateral: ex.exercise.isUnilateral,
-                isDoubleWeight: ex.exercise.isDoubleWeight,
-                order: ex.order,
-                sets: ex.sets.map((set: any) => ({
-                  id: set.id,
-                  order: set.order,
-                  setType: set.setType,
-                  reps: set.reps,
-                  weight: set.weight,
-                  rir: set.rir,
-                  restAfterSet: set.restAfterSet,
-                })),
-              })),
-            }
-          : undefined,
-      })),
+      completedAt: cycle.completedAt ?? undefined,
+      workoutDays: cycle.workoutDays.map((day: any) => {
+        const blueprint = day.workouts?.[0];
+        return {
+          id: day.id,
+          weekday: day.weekday,
+          order: day.order,
+          name: day.name,
+          plannedHomeGymId: day.plannedHomeGymId ?? undefined,
+          plannedHomeGym: day.plannedHomeGym
+            ? { id: day.plannedHomeGym.id, name: day.plannedHomeGym.name }
+            : undefined,
+          blueprint: blueprint
+            ? {
+                id: blueprint.id,
+                updatedAt: blueprint.updatedAt,
+                exercises: mapExercisesToResponse(blueprint.exercises),
+              }
+            : undefined,
+        };
+      }),
     };
   }
 }

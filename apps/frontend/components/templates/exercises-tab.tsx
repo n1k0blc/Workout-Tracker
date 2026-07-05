@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
 import { Exercise, MuscleGroup, Equipment } from '@/types';
+import { MUSCLE_GROUP_LABELS } from '@/lib/exercise-utils';
 import { ExerciseEditorDialog } from '@/components/exercises/exercise-editor-dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,7 +41,7 @@ export default function ExercisesTab() {
     try {
       const data = await apiClient.getExercises({
         search: search || undefined,
-        muscleGroup: muscleGroupFilter,
+        primaryMuscle: muscleGroupFilter,
         equipment: equipmentFilter,
         includeCustom: true,
       });
@@ -103,26 +104,7 @@ export default function ExercisesTab() {
   ];
 
   const translateMuscleGroup = (mg: MuscleGroup): string => {
-    const translations: Record<MuscleGroup, string> = {
-      // Legacy groups (kept for backwards compatibility)
-      CHEST: 'Brust',
-      BACK: 'Rücken',
-      BICEPS: 'Bizeps',
-      TRICEPS: 'Trizeps',
-      ABS: 'Bauch',
-      SHOULDERS: 'Schultern',
-      LEGS: 'Beine',
-      // New granular muscle groups
-      ABDOMEN: 'Bauch',
-      LATISSIMUS: 'Latissimus',
-      TRAPEZIUS: 'Trapez',
-      LOWER_BACK: 'Unterer Rücken',
-      HAMSTRINGS: 'Beinbeuger',
-      GLUTES: 'Glutes',
-      QUADRICEPS: 'Quadrizeps',
-      CALVES: 'Waden',
-    };
-    return translations[mg] || mg;
+    return MUSCLE_GROUP_LABELS[mg] || mg;
   };
 
   const translateEquipment = (eq: Equipment): string => {
@@ -248,7 +230,7 @@ export default function ExercisesTab() {
                     <div className="mt-2 space-y-1 text-sm">
                       <div className="text-muted-foreground">
                         <span className="font-medium text-foreground">Muskel:</span>{' '}
-                        {translateMuscleGroup(exercise.muscleGroup)}
+                        {translateMuscleGroup(exercise.primaryMuscle)}
                       </div>
                       <div className="text-muted-foreground">
                         <span className="font-medium text-foreground">Equipment:</span>{' '}

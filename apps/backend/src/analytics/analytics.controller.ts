@@ -1,14 +1,11 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
-import { ORMService } from '../orm/orm.service';
 import {
   VolumeAnalyticsDto,
-  OneRMAnalyticsDto,
   PersonalRecordsDto,
   MuscleDistributionDto,
   TimeTrackingDto,
   CycleListDto,
-  ORMByCycleDto,
   RIRByCycleDto,
   RIRAnalyticsDto,
   DurationAnalyticsDto,
@@ -23,13 +20,12 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
+// getOneRMAnalytics/getORMAnalytics/getORMByCycle are gone (§3.10): ExerciseBenchmark is
+// dropped in PR2; the replacement weight-independent Intensity metric lands in PR3.
 @Controller('analytics')
 @UseGuards(JwtAuthGuard)
 export class AnalyticsController {
-  constructor(
-    private readonly analyticsService: AnalyticsService,
-    private readonly ormService: ORMService,
-  ) {}
+  constructor(private readonly analyticsService: AnalyticsService) {}
 
   @Get('volume')
   async getVolumeAnalytics(
@@ -60,14 +56,6 @@ export class AnalyticsController {
     );
   }
 
-  @Get('1rm/:exerciseId')
-  async getOneRMAnalytics(
-    @Param('exerciseId') exerciseId: string,
-    @CurrentUser() user: { id: string },
-  ): Promise<OneRMAnalyticsDto> {
-    return this.analyticsService.getOneRMAnalytics(user.id, exerciseId);
-  }
-
   @Get('prs')
   async getPersonalRecords(
     @CurrentUser() user: { id: string },
@@ -95,32 +83,11 @@ export class AnalyticsController {
     return this.analyticsService.getTimeTracking(user.id, period);
   }
 
-  @Get('orm/:cycleId/:workoutDayId')
-  async getORMAnalytics(
-    @Param('cycleId') cycleId: string,
-    @Param('workoutDayId') workoutDayId: string,
-    @CurrentUser() user: { id: string },
-  ) {
-    return this.analyticsService.getORMAnalytics(cycleId, workoutDayId, user.id);
-  }
-
   @Get('cycles')
   async getCycles(
     @CurrentUser() user: { id: string },
   ): Promise<CycleListDto> {
     return this.analyticsService.getCycles(user.id);
-  }
-
-  @Get('orm-by-cycle/:cycleId')
-  async getORMByCycle(
-    @Param('cycleId') cycleId: string,
-    @CurrentUser() user: { id: string },
-    @Query('muscleGroup') muscleGroup?: string | string[],
-    @Query('equipment') equipment?: string | string[],
-    @Query('aggregation') aggregation?: 'day' | 'week',
-    @Query('exerciseId') exerciseId?: string,
-  ): Promise<ORMByCycleDto> {
-    return this.analyticsService.getORMByCycle(user.id, cycleId, muscleGroup, equipment, aggregation, exerciseId);
   }
 
   @Get('rir-by-cycle/:cycleId')

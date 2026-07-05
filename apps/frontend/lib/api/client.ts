@@ -10,11 +10,8 @@ import {
   WorkoutCycle,
   CycleDetails,
   VolumeAnalytics,
-  PersonalRecord,
   PersonalRecordsResponse,
-  ORMAnalytics,
   CycleList,
-  ORMByCycleAnalytics,
   RIRByCycleAnalytics,
   RIRAnalytics,
   DurationAnalytics,
@@ -34,7 +31,10 @@ import {
   DashboardStats,
   NextPlannedWorkout,
   CycleProgress,
-  SetType,
+  SaveWorkoutDto,
+  SuggestedWorkout,
+  CurrentCycleWorkouts,
+  WorkoutExerciseInput,
 } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
@@ -135,7 +135,7 @@ class ApiClient {
   // Helper function to add query parameters (supports arrays)
   private addQueryParam(query: URLSearchParams, key: string, value: string | string[] | undefined): void {
     if (!value) return;
-    
+
     if (Array.isArray(value)) {
       value.forEach(v => query.append(key, v));
     } else {
@@ -229,13 +229,13 @@ class ApiClient {
   // Exercise Methods
   async getExercises(params?: {
     search?: string;
-    muscleGroup?: MuscleGroup;
+    primaryMuscle?: MuscleGroup;
     equipment?: Equipment;
     includeCustom?: boolean;
   }): Promise<Exercise[]> {
     const query = new URLSearchParams();
     if (params?.search) query.append('search', params.search);
-    if (params?.muscleGroup) query.append('muscleGroup', params.muscleGroup);
+    if (params?.primaryMuscle) query.append('primaryMuscle', params.primaryMuscle);
     if (params?.equipment) query.append('equipment', params.equipment);
     if (params?.includeCustom !== undefined)
       query.append('includeCustom', String(params.includeCustom));
@@ -250,10 +250,22 @@ class ApiClient {
 
   async createExercise(data: {
     name: string;
-    muscleGroup: MuscleGroup;
+    primaryMuscle?: MuscleGroup;
     equipment: Equipment;
     isUnilateral?: boolean;
     isDoubleWeight?: boolean;
+    abdomenPercent?: number;
+    latissimusPercent?: number;
+    trapeziusPercent?: number;
+    lowerBackPercent?: number;
+    hamstringsPercent?: number;
+    glutesPercent?: number;
+    shouldersPercent?: number;
+    bicepsPercent?: number;
+    chestPercent?: number;
+    quadricepsPercent?: number;
+    calvesPercent?: number;
+    tricepsPercent?: number;
   }): Promise<Exercise> {
     return this.request<Exercise>('/exercises', {
       method: 'POST',
@@ -275,182 +287,40 @@ class ApiClient {
   }
 
   // Workout Methods
-  async getSuggestedWorkout(): Promise<Workout> {
-    return this.request<Workout>('/workouts/suggested');
+  async getSuggestedWorkout(): Promise<SuggestedWorkout | null> {
+    return this.request<SuggestedWorkout | null>('/workouts/suggested');
   }
 
-  async getCurrentCycleWorkouts(): Promise<{
-    cycleId: string;
-    cycleName: string;
-    workoutDays: Array<{
-      workoutDayId: string;
-      workoutDayName: string;
-      weekday: number;
-      isSuggested: boolean;
-      exerciseCount: number;
-    }>;
-  } | null> {
+  async getCurrentCycleWorkouts(): Promise<CurrentCycleWorkouts | null> {
     return this.request('/workouts/cycle/workouts');
   }
 
-  async getActiveWorkout(): Promise<Workout | null> {
-    return this.request<Workout>('/workouts/active');
-  }
-
+  // NOTE: the raw response's `exercises[].sets[]` use the wire shape (`order`, no
+  // `setNumber`/`plannedSets`) -- callers must map into ExerciseLog/SetLog themselves
+  // (see workout-context's loadWorkoutForEdit) before handing this to ExerciseCard.
   async getWorkout(id: string): Promise<Workout> {
     return this.request<Workout>(`/workouts/${id}`);
   }
 
-  async startWorkout(data: {
-    cycleId?: string;
-    workoutDayId?: string;
-    isFreeWorkout: boolean;
-    homeGymId: string | null;
-    isPastWorkout?: boolean;
-    pastWorkoutDate?: string;
-    pastWorkoutDuration?: number;
-  }): Promise<Workout> {
-    return this.request<Workout>('/workouts/start', {
+  // The single transactional save (§3.3/§3.4): the client builds the whole workout locally
+  // and submits it once, complete, with optional side-effect flags.
+  async createWorkout(data: SaveWorkoutDto): Promise<Workout> {
+    return this.request<Workout>('/workouts', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  async startWorkoutFromTemplate(
-    templateId: string,
-    homeGymId?: string,
-    isPastWorkout?: boolean,
-    pastWorkoutDate?: string,
-    pastWorkoutDuration?: number,
-  ): Promise<Workout> {
-    return this.request<Workout>(`/workouts/start-from-template/${templateId}`, {
-      method: 'POST',
-      body: JSON.stringify({ 
-        homeGymId,
-        isPastWorkout,
-        pastWorkoutDate,
-        pastWorkoutDuration,
-      }),
+  async updateWorkout(id: string, data: Partial<SaveWorkoutDto>): Promise<Workout> {
+    return this.request<Workout>(`/workouts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
     });
   }
 
-  async addExerciseToWorkout(
-    workoutId: string,
-    exerciseId: string
-  ): Promise<Workout> {
-    return this.request<Workout>(`/workouts/${workoutId}/exercises`, {
-      method: 'POST',
-      body: JSON.stringify({ exerciseId }),
-    });
-  }
-
-  async removeExerciseFromWorkout(
-    workoutId: string,
-    exerciseLogId: string
-  ): Promise<Workout> {
-    return this.request<Workout>(
-      `/workouts/${workoutId}/exercises/${exerciseLogId}`,
-      {
-        method: 'DELETE',
-      }
-    );
-  }
-
-  async reorderExercises(
-    workoutId: string,
-    exerciseIds: string[]
-  ): Promise<Workout> {
-    return this.request<Workout>(
-      `/workouts/${workoutId}/exercises/reorder`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify({ exerciseIds }),
-      }
-    );
-  }
-
-  async logSet(
-    workoutId: string,
-    exerciseLogId: string,
-    data: {
-      setNumber: number;
-      reps: number;
-      weight: number;
-      rir?: number;
-      setType?: string;
-      actualRestDuration?: number;
-    }
-  ): Promise<Workout> {
-    return this.request<Workout>(
-      `/workouts/${workoutId}/exercises/${exerciseLogId}/sets`,
-      {
-        method: 'POST',
-        body: JSON.stringify(data),
-      }
-    );
-  }
-
-  async deleteSet(
-    workoutId: string,
-    setLogId: string
-  ): Promise<Workout> {
-    return this.request<Workout>(
-      `/workouts/${workoutId}/sets/${setLogId}`,
-      {
-        method: 'DELETE',
-      }
-    );
-  }
-
-  async updateSet(
-    workoutId: string,
-    setLogId: string,
-    data: {
-      reps?: number;
-      weight?: number;
-      rir?: number;
-      setType?: SetType;
-    }
-  ): Promise<Workout> {
-    return this.request<Workout>(
-      `/workouts/${workoutId}/sets/${setLogId}`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify(data),
-      }
-    );
-  }
-
-  async replaceExercise(
-    workoutId: string,
-    exerciseLogId: string,
-    newExerciseId: string
-  ): Promise<Workout> {
-    return this.request<Workout>(
-      `/workouts/${workoutId}/exercises/${exerciseLogId}/replace`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify({ newExerciseId }),
-      }
-    );
-  }
-
-  async completeWorkout(
-    workoutId: string,
-    data?: {
-      totalDuration?: number;
-      updateBlueprint?: boolean;
-    }
-  ): Promise<Workout> {
-    return this.request<Workout>(`/workouts/${workoutId}/complete`, {
-      method: 'POST',
-      body: data ? JSON.stringify(data) : undefined,
-    });
-  }
-
-  async discardWorkout(workoutId: string): Promise<void> {
-    await this.request<void>(`/workouts/${workoutId}/discard`, {
-      method: 'POST',
+  async deleteWorkout(id: string): Promise<void> {
+    await this.request(`/workouts/${id}`, {
+      method: 'DELETE',
     });
   }
 
@@ -458,13 +328,11 @@ class ApiClient {
     startDate?: string;
     endDate?: string;
     cycleId?: string;
-    status?: string;
   }): Promise<WorkoutListItem[]> {
     const query = new URLSearchParams();
     if (params?.startDate) query.append('startDate', params.startDate);
     if (params?.endDate) query.append('endDate', params.endDate);
     if (params?.cycleId) query.append('cycleId', params.cycleId);
-    if (params?.status) query.append('status', params.status);
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return this.request<WorkoutListItem[]>(`/workouts${queryString}`);
@@ -490,18 +358,8 @@ class ApiClient {
     workoutDays: Array<{
       weekday: number;
       name: string;
-      exercises: Array<{
-        exerciseId: string;
-        order: number;
-        sets: Array<{
-          order: number;
-          setType: string;
-          reps: number;
-          weight: number;
-          rir: number;
-          restAfterSet: number;
-        }>;
-      }>;
+      plannedHomeGymId?: string;
+      exercises: WorkoutExerciseInput[];
     }>;
   }): Promise<WorkoutCycle> {
     return this.request<WorkoutCycle>('/cycles', {
@@ -525,20 +383,7 @@ class ApiClient {
   async updateBlueprint(
     cycleId: string,
     workoutDayId: string,
-    data: {
-      exercises: Array<{
-        exerciseId: string;
-        order: number;
-        sets: Array<{
-          order: number;
-          setType: string;
-          reps: number;
-          weight: number;
-          rir: number;
-          restAfterSet: number;
-        }>;
-      }>;
-    }
+    data: { exercises: WorkoutExerciseInput[] }
   ): Promise<WorkoutCycle> {
     return this.request<WorkoutCycle>(
       `/cycles/${cycleId}/workout-days/${workoutDayId}/blueprint`,
@@ -565,27 +410,6 @@ class ApiClient {
         body: JSON.stringify(data),
       }
     );
-  }
-
-  async updateCompletedWorkout(
-    workoutId: string,
-    data: {
-      completedAt?: string;
-      exercises: Array<{
-        id: string;
-        sets: Array<{
-          id: string;
-          reps: number;
-          weight: number;
-          rir?: number;
-        }>;
-      }>;
-    }
-  ): Promise<Workout> {
-    return this.request<Workout>(`/workouts/${workoutId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    });
   }
 
   // Analytics Methods
@@ -629,36 +453,8 @@ class ApiClient {
     return this.request<PersonalRecordsResponse>(`/analytics/prs${queryString}`);
   }
 
-  async getORMAnalytics(
-    cycleId: string,
-    workoutDayId: string,
-  ): Promise<ORMAnalytics> {
-    return this.request<ORMAnalytics>(
-      `/analytics/orm/${cycleId}/${workoutDayId}`
-    );
-  }
-
   async getAnalyticsCycles(): Promise<CycleList> {
     return this.request<CycleList>('/analytics/cycles');
-  }
-
-  async getORMByCycle(
-    cycleId: string,
-    muscleGroup?: string | string[],
-    equipment?: string | string[],
-    aggregation?: 'day' | 'week',
-    exerciseId?: string,
-  ): Promise<ORMByCycleAnalytics> {
-    const query = new URLSearchParams();
-    this.addQueryParam(query, 'muscleGroup', muscleGroup);
-    this.addQueryParam(query, 'equipment', equipment);
-    if (aggregation) query.append('aggregation', aggregation);
-    if (exerciseId) query.append('exerciseId', exerciseId);
-
-    const queryString = query.toString() ? `?${query.toString()}` : '';
-    return this.request<ORMByCycleAnalytics>(
-      `/analytics/orm-by-cycle/${cycleId}${queryString}`
-    );
   }
 
   async getRIRByCycle(
@@ -919,20 +715,6 @@ class ApiClient {
   async deleteWorkoutTemplate(id: string): Promise<void> {
     await this.request(`/workout-templates/${id}`, {
       method: 'DELETE',
-    });
-  }
-
-  async createWorkoutTemplateFromBlueprint(blueprintId: string, name: string): Promise<WorkoutTemplate> {
-    return this.request<WorkoutTemplate>(`/workout-templates/from-blueprint/${blueprintId}`, {
-      method: 'POST',
-      body: JSON.stringify({ name }),
-    });
-  }
-
-  async createWorkoutTemplateFromWorkout(workoutId: string, name: string): Promise<WorkoutTemplate> {
-    return this.request<WorkoutTemplate>(`/workout-templates/from-workout/${workoutId}`, {
-      method: 'POST',
-      body: JSON.stringify({ name }),
     });
   }
 }

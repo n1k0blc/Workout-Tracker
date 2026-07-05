@@ -1,32 +1,94 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateExerciseDto, FilterExerciseDto, ExerciseDto, UpdateExerciseDto } from './dto';
+import {
+  MusclePercentages,
+  derivePrimaryMuscle,
+  sumMusclePercentages,
+  MUSCLE_PERCENT_FIELD,
+} from '../common/muscle.util';
+
+const EXERCISE_SELECT = {
+  id: true,
+  name: true,
+  equipment: true,
+  isUnilateral: true,
+  isDoubleWeight: true,
+  isCustom: true,
+  userId: true,
+  deletedAt: true,
+  abdomenPercent: true,
+  latissimusPercent: true,
+  trapeziusPercent: true,
+  lowerBackPercent: true,
+  hamstringsPercent: true,
+  glutesPercent: true,
+  shouldersPercent: true,
+  bicepsPercent: true,
+  chestPercent: true,
+  quadricepsPercent: true,
+  calvesPercent: true,
+  tricepsPercent: true,
+} as const;
+
+type ExerciseRow = {
+  id: string;
+  name: string;
+  equipment: string;
+  isUnilateral: boolean;
+  isDoubleWeight: boolean;
+  isCustom: boolean;
+  userId: string | null;
+  deletedAt: Date | null;
+} & MusclePercentages;
+
+function toDto(exercise: ExerciseRow): ExerciseDto {
+  const { deletedAt: _deletedAt, ...rest } = exercise;
+  return {
+    ...rest,
+    userId: rest.userId ?? undefined,
+    primaryMuscle: derivePrimaryMuscle(exercise),
+  } as ExerciseDto;
+}
 
 @Injectable()
 export class ExercisesService {
   constructor(private prisma: PrismaService) {}
 
   /**
-   * Validates that muscle group percentages sum to 100
-   * If percentages are not provided, sets 100% on main muscle group
+   * BOLA guard (§2.1/§3.1): confirms every referenced exercise exists, isn't soft-deleted,
+   * and is either a system exercise or owned by `userId` -- callers building a workout/
+   * blueprint/template tree from client-submitted exerciseIds must not trust those ids
+   * blindly (a plain existence-only check would let a user reference another user's
+   * private custom exercise and read its name back out via the tree they just created).
+   */
+  async validateAccessible(exerciseIds: string[], userId: string): Promise<void> {
+    const uniqueIds = Array.from(new Set(exerciseIds));
+    if (uniqueIds.length === 0) return;
+
+    const exercises = await this.prisma.exercise.findMany({
+      where: { id: { in: uniqueIds }, deletedAt: null },
+      select: { id: true, isCustom: true, userId: true },
+    });
+
+    const accessibleIds = new Set(
+      exercises.filter((e) => !e.isCustom || e.userId === userId).map((e) => e.id),
+    );
+
+    if (uniqueIds.some((id) => !accessibleIds.has(id))) {
+      throw new NotFoundException('One or more exercises not found');
+    }
+  }
+
+  /**
+   * Validates that muscle group percentages sum to 100.
+   * If no percentages are provided, sets 100% on `primaryMuscle` as a creation convenience
+   * (the percent distribution itself remains the single source of truth -- §3.7).
    */
   private validateAndNormalizeMusclePercentages(
     dto: CreateExerciseDto | UpdateExerciseDto,
-  ): {
-    abdomenPercent: number;
-    latissimusPercent: number;
-    trapeziusPercent: number;
-    lowerBackPercent: number;
-    hamstringsPercent: number;
-    glutesPercent: number;
-    shouldersPercent: number;
-    bicepsPercent: number;
-    chestPercent: number;
-    quadricepsPercent: number;
-    calvesPercent: number;
-    tricepsPercent: number;
-  } {
-    const percentages = {
+  ): MusclePercentages {
+    const percentages: MusclePercentages = {
       abdomenPercent: dto.abdomenPercent ?? 0,
       latissimusPercent: dto.latissimusPercent ?? 0,
       trapeziusPercent: dto.trapeziusPercent ?? 0,
@@ -41,50 +103,19 @@ export class ExercisesService {
       tricepsPercent: dto.tricepsPercent ?? 0,
     };
 
-    const sum =
-      percentages.abdomenPercent +
-      percentages.latissimusPercent +
-      percentages.trapeziusPercent +
-      percentages.lowerBackPercent +
-      percentages.hamstringsPercent +
-      percentages.glutesPercent +
-      percentages.shouldersPercent +
-      percentages.bicepsPercent +
-      percentages.chestPercent +
-      percentages.quadricepsPercent +
-      percentages.calvesPercent +
-      percentages.tricepsPercent;
+    const sum = sumMusclePercentages(percentages);
 
-    // If no percentages provided, set 100% on main muscle group
     if (sum === 0) {
-      const muscleGroup = dto.muscleGroup;
-      const muscleGroupToField: Record<string, keyof typeof percentages> = {
-        ABDOMEN: 'abdomenPercent',
-        ABS: 'abdomenPercent',
-        LATISSIMUS: 'latissimusPercent',
-        BACK: 'latissimusPercent',
-        TRAPEZIUS: 'trapeziusPercent',
-        LOWER_BACK: 'lowerBackPercent',
-        HAMSTRINGS: 'hamstringsPercent',
-        GLUTES: 'glutesPercent',
-        SHOULDERS: 'shouldersPercent',
-        BICEPS: 'bicepsPercent',
-        CHEST: 'chestPercent',
-        QUADRICEPS: 'quadricepsPercent',
-        LEGS: 'quadricepsPercent',
-        CALVES: 'calvesPercent',
-        TRICEPS: 'tricepsPercent',
-      };
-
-      const field = muscleGroupToField[muscleGroup];
-      if (field) {
-        percentages[field] = 100;
+      if (!dto.primaryMuscle) {
+        throw new BadRequestException(
+          'Provide either muscle percentages summing to 100%, or a primaryMuscle',
+        );
       }
-
+      const field = MUSCLE_PERCENT_FIELD[dto.primaryMuscle] as keyof MusclePercentages;
+      percentages[field] = 100;
       return percentages;
     }
 
-    // If percentages provided, validate sum is 100
     if (sum !== 100) {
       throw new BadRequestException(
         `Muscle group percentages must sum to 100%. Current sum: ${sum}%`,
@@ -95,11 +126,10 @@ export class ExercisesService {
   }
 
   async findAll(filterDto: FilterExerciseDto, userId?: string): Promise<ExerciseDto[]> {
-    const { search, muscleGroup, equipment, includeCustom } = filterDto;
+    const { search, primaryMuscle, equipment, includeCustom } = filterDto;
 
-    // Build where clause
     const where: any = {
-      deletedAt: null, // Filter soft-deleted exercises
+      deletedAt: null,
       OR: [
         { isCustom: false }, // Global exercises
         ...(includeCustom === 'true' && userId
@@ -107,11 +137,6 @@ export class ExercisesService {
           : []),
       ],
     };
-
-    // Add filters
-    if (muscleGroup) {
-      where.muscleGroup = muscleGroup as any;
-    }
 
     if (equipment) {
       where.equipment = equipment as any;
@@ -126,62 +151,21 @@ export class ExercisesService {
 
     const exercises = await this.prisma.exercise.findMany({
       where,
-      select: {
-        id: true,
-        name: true,
-        muscleGroup: true,
-        equipment: true,
-        isUnilateral: true,
-        isDoubleWeight: true,
-        isCustom: true,
-        userId: true,
-        abdomenPercent: true,
-        latissimusPercent: true,
-        trapeziusPercent: true,
-        lowerBackPercent: true,
-        hamstringsPercent: true,
-        glutesPercent: true,
-        shouldersPercent: true,
-        bicepsPercent: true,
-        chestPercent: true,
-        quadricepsPercent: true,
-        calvesPercent: true,
-        tricepsPercent: true,
-      },
+      select: EXERCISE_SELECT,
       orderBy: [{ isCustom: 'asc' }, { name: 'asc' }],
     });
 
-    return exercises as ExerciseDto[];
+    const dtos = exercises.map((e) => toDto(e as ExerciseRow));
+    return primaryMuscle ? dtos.filter((e) => e.primaryMuscle === primaryMuscle) : dtos;
   }
 
   async findById(id: string, userId?: string): Promise<ExerciseDto> {
     const exercise = await this.prisma.exercise.findUnique({
       where: { id },
-      select: {
-        id: true,
-        name: true,
-        muscleGroup: true,
-        equipment: true,
-        isUnilateral: true,
-        isDoubleWeight: true,
-        isCustom: true,
-        userId: true,
-        abdomenPercent: true,
-        latissimusPercent: true,
-        trapeziusPercent: true,
-        lowerBackPercent: true,
-        hamstringsPercent: true,
-        glutesPercent: true,
-        shouldersPercent: true,
-        bicepsPercent: true,
-        chestPercent: true,
-        quadricepsPercent: true,
-        calvesPercent: true,
-        tricepsPercent: true,
-      },
+      select: EXERCISE_SELECT,
     });
 
-    if (!exercise) {
+    if (!exercise || exercise.deletedAt) {
       throw new NotFoundException('Exercise not found');
     }
 
@@ -190,14 +174,14 @@ export class ExercisesService {
       throw new NotFoundException('Exercise not found');
     }
 
-    return exercise as ExerciseDto;
+    return toDto(exercise as ExerciseRow);
   }
 
   async create(
     createExerciseDto: CreateExerciseDto,
     userId: string,
   ): Promise<ExerciseDto> {
-    const { name, muscleGroup, equipment, isUnilateral, isDoubleWeight } = createExerciseDto;
+    const { name, equipment, isUnilateral, isDoubleWeight } = createExerciseDto;
 
     // Check if custom exercise with same name already exists for this user
     const existingExercise = await this.prisma.exercise.findFirst({
@@ -208,6 +192,7 @@ export class ExercisesService {
         },
         userId,
         isCustom: true,
+        deletedAt: null,
       },
     });
 
@@ -215,13 +200,11 @@ export class ExercisesService {
       throw new ConflictException('You already have a custom exercise with this name');
     }
 
-    // Validate and normalize muscle percentages
     const percentages = this.validateAndNormalizeMusclePercentages(createExerciseDto);
 
     const exercise = await this.prisma.exercise.create({
       data: {
         name,
-        muscleGroup: muscleGroup as any,
         equipment: equipment as any,
         isUnilateral: isUnilateral ?? false,
         isDoubleWeight: isDoubleWeight ?? false,
@@ -229,31 +212,10 @@ export class ExercisesService {
         userId,
         ...percentages,
       },
-      select: {
-        id: true,
-        name: true,
-        muscleGroup: true,
-        equipment: true,
-        isUnilateral: true,
-        isDoubleWeight: true,
-        isCustom: true,
-        userId: true,
-        abdomenPercent: true,
-        latissimusPercent: true,
-        trapeziusPercent: true,
-        lowerBackPercent: true,
-        hamstringsPercent: true,
-        glutesPercent: true,
-        shouldersPercent: true,
-        bicepsPercent: true,
-        chestPercent: true,
-        quadricepsPercent: true,
-        calvesPercent: true,
-        tricepsPercent: true,
-      },
+      select: EXERCISE_SELECT,
     });
 
-    return exercise as ExerciseDto;
+    return toDto(exercise as ExerciseRow);
   }
 
   async delete(id: string, userId: string): Promise<void> {
@@ -261,16 +223,20 @@ export class ExercisesService {
       where: { id },
     });
 
-    if (!exercise) {
+    if (!exercise || exercise.deletedAt) {
       throw new NotFoundException('Exercise not found');
     }
 
-    // Only custom exercises can be deleted and only by their owner
-    if (!exercise.isCustom || exercise.userId !== userId) {
-      throw new ConflictException('You can only delete your own custom exercises');
+    // A custom exercise owned by someone else: 404, not 409 -- don't leak that it exists.
+    if (exercise.isCustom && exercise.userId !== userId) {
+      throw new NotFoundException('Exercise not found');
     }
 
-    // Soft-delete instead of hard-delete to prevent FK constraint errors
+    // System exercises are public, read-only data -- this isn't an ownership leak.
+    if (!exercise.isCustom) {
+      throw new ConflictException('System exercises cannot be deleted');
+    }
+
     await this.prisma.exercise.update({
       where: { id },
       data: { deletedAt: new Date() },
@@ -282,52 +248,32 @@ export class ExercisesService {
       where: { id },
     });
 
-    if (!exercise) {
+    if (!exercise || exercise.deletedAt) {
       throw new NotFoundException('Exercise not found');
     }
 
-    // Only custom exercises can be updated and only by their owner
-    if (!exercise.isCustom || exercise.userId !== userId) {
-      throw new ConflictException('You can only update your own custom exercises');
+    if (exercise.isCustom && exercise.userId !== userId) {
+      throw new NotFoundException('Exercise not found');
     }
 
-    // Validate and normalize muscle percentages
+    if (!exercise.isCustom) {
+      throw new ConflictException('System exercises cannot be modified');
+    }
+
     const percentages = this.validateAndNormalizeMusclePercentages(updateDto);
 
     const updated = await this.prisma.exercise.update({
       where: { id },
       data: {
         name: updateDto.name,
-        muscleGroup: updateDto.muscleGroup,
         equipment: updateDto.equipment,
         isUnilateral: updateDto.isUnilateral,
         isDoubleWeight: updateDto.isDoubleWeight,
         ...percentages,
       },
-      select: {
-        id: true,
-        name: true,
-        muscleGroup: true,
-        equipment: true,
-        isUnilateral: true,
-        isDoubleWeight: true,
-        isCustom: true,
-        userId: true,
-        abdomenPercent: true,
-        latissimusPercent: true,
-        trapeziusPercent: true,
-        lowerBackPercent: true,
-        hamstringsPercent: true,
-        glutesPercent: true,
-        shouldersPercent: true,
-        bicepsPercent: true,
-        chestPercent: true,
-        quadricepsPercent: true,
-        calvesPercent: true,
-        tricepsPercent: true,
-      },
+      select: EXERCISE_SELECT,
     });
 
-    return updated as ExerciseDto;
+    return toDto(updated as ExerciseRow);
   }
 }

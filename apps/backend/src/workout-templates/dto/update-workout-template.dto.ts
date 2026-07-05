@@ -1,13 +1,6 @@
-import {
-  IsString,
-  IsOptional,
-  IsArray,
-  ValidateNested,
-  MinLength,
-  MaxLength,
-} from 'class-validator';
+import { IsString, IsOptional, IsArray, ValidateNested, MinLength, MaxLength, ArrayMinSize } from 'class-validator';
 import { Type } from 'class-transformer';
-import { CreateWorkoutTemplateExerciseDto } from './create-workout-template.dto';
+import { WorkoutExerciseInputDto } from '../../common/dto/workout-tree.dto';
 
 export class UpdateWorkoutTemplateDto {
   @IsOptional()
@@ -23,6 +16,7 @@ export class UpdateWorkoutTemplateDto {
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => CreateWorkoutTemplateExerciseDto)
-  exercises?: CreateWorkoutTemplateExerciseDto[];
+  @Type(() => WorkoutExerciseInputDto)
+  @ArrayMinSize(1)
+  exercises?: WorkoutExerciseInputDto[];
 }

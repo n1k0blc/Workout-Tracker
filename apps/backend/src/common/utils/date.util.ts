@@ -81,3 +81,13 @@ export function isMockDateActive(): boolean {
     !isNaN(new Date(process.env.MOCK_DATE!).getTime())
   );
 }
+
+/**
+ * Canonical cycle-week formula (§3.11) -- previously computed three different ways
+ * across dashboard/cycles/engine (two used `floor`, one used `ceil`, disagreeing near
+ * week boundaries). 1-indexed, capped at the cycle's total duration.
+ */
+export function calculateCycleWeek(startDate: Date, duration: number, now: Date = getCurrentDate()): number {
+  const diffDays = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  return Math.min(Math.floor(diffDays / 7) + 1, duration);
+}

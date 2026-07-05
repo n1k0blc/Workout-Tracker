@@ -2,6 +2,7 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { validate } from './config/env.validation';
 import { CsrfMiddleware } from './common/middleware/csrf.middleware';
 import { PrismaModule } from './prisma/prisma.module';
@@ -13,7 +14,6 @@ import { WorkoutsModule } from './workouts/workouts.module';
 import { WorkoutTemplatesModule } from './workout-templates/workout-templates.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { HealthModule } from './health/health.module';
-import { ORMModule } from './orm/orm.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
@@ -32,6 +32,9 @@ import { DashboardModule } from './dashboard/dashboard.module';
         limit: 100,
       },
     ]),
+    // Explicit, idempotent trigger for auto-completing expired cycles (§3.6) --
+    // replaces the old write-on-read side-effect that ran inside GET handlers.
+    ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -41,7 +44,6 @@ import { DashboardModule } from './dashboard/dashboard.module';
     WorkoutTemplatesModule,
     AnalyticsModule,
     HealthModule,
-    ORMModule,
     DashboardModule,
   ],
   controllers: [],

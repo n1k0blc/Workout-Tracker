@@ -13,7 +13,6 @@ import {
   Equipment,
   HomeGym,
   CycleList,
-  ORMByCycleAnalytics,
   RIRByCycleAnalytics,
   RIRAnalytics,
   DurationAnalytics,
@@ -58,7 +57,6 @@ import { Card, CardContent } from '@/components/ui/card';
 export default function AnalyticsPage() {
   // Data states
   const [volumeData, setVolumeData] = useState<VolumeAnalytics | null>(null);
-  const [ormData, setOrmData] = useState<ORMByCycleAnalytics | null>(null);
   const [rirData, setRirData] = useState<RIRByCycleAnalytics | RIRAnalytics | null>(null);
   const [durationData, setDurationData] = useState<DurationByCycleAnalytics | DurationAnalytics | null>(null);
   const [restTimeData, setRestTimeData] = useState<RestTimeByCycleAnalytics | RestTimeAnalytics | null>(null);
@@ -84,7 +82,7 @@ export default function AnalyticsPage() {
   const [aggregationMode, setAggregationMode] = useState<'day' | 'week'>('week');
   
   // Multi-select filter states
-  const [selectedViews, setSelectedViews] = useState<Array<'volume' | 'orm' | 'rir' | 'duration' | 'restTime' | 'reps' | 'sets'>>(['volume']);
+  const [selectedViews, setSelectedViews] = useState<Array<'volume' | 'rir' | 'duration' | 'restTime' | 'reps' | 'sets'>>(['volume']);
   const [selectedMuscles, setSelectedMuscles] = useState<(MuscleGroup | 'ALL')[]>(['ALL']);
   const [selectedEquipment, setSelectedEquipment] = useState<(Equipment | 'ALL')[]>(['ALL']);
   
@@ -124,7 +122,7 @@ export default function AnalyticsPage() {
   };
 
   // Toggle handlers for multi-select filters
-  const toggleView = (view: 'volume' | 'orm' | 'rir' | 'duration' | 'restTime' | 'reps' | 'sets') => {
+  const toggleView = (view: 'volume' | 'rir' | 'duration' | 'restTime' | 'reps' | 'sets') => {
     const maxAllowed = calculateMaxAllowed('view');
     
     // RIR special case: always single-select (bar chart incompatible with multi-line)
@@ -249,7 +247,6 @@ export default function AnalyticsPage() {
   ): string => {
     const viewNames: Record<string, string> = {
       volume: 'Volumen',
-      orm: 'ORM%',
       rir: 'RIR',
       duration: 'Dauer',
       restTime: 'Pause',
@@ -268,7 +265,6 @@ export default function AnalyticsPage() {
   const getViewConfig = (view: string): { unit: string; yAxisId: string } => {
     const configs: Record<string, { unit: string; yAxisId: string }> = {
       volume: { unit: 'kg', yAxisId: 'left' },
-      orm: { unit: '%', yAxisId: 'left' }, // Y-axis assigned dynamically in mergeChartData
       rir: { unit: 'RIR', yAxisId: 'left' },
       duration: { unit: 'min', yAxisId: 'left' },
       restTime: { unit: 's', yAxisId: 'left' },
@@ -341,7 +337,6 @@ export default function AnalyticsPage() {
           // Determine the value key based on view type
           let value = 0;
           if (combo.view === 'volume') value = point.volume;
-          else if (combo.view === 'orm') value = point.percentORM || point.averageOrmPercentage; // Cycle mode uses percentORM
           else if (combo.view === 'rir') value = point.rir0Count || 0;
           else if (combo.view === 'duration') value = point.duration;
           else if (combo.view === 'restTime') value = point.averageRestTime;
@@ -685,16 +680,6 @@ export default function AnalyticsPage() {
                 aggregation: aggregationMode,
               })
             );
-          } else if (view === 'orm') {
-            allPromises.push(
-              apiClient.getORMByCycle(
-                selectedCycle.id,
-                undefined,
-                undefined,
-                aggregationMode,
-                selectedExercise.id,
-              )
-            );
           } else if (view === 'rir') {
             allPromises.push(
               apiClient.getRIRByCycle(
@@ -763,15 +748,6 @@ export default function AnalyticsPage() {
                   cycleId: selectedCycle.id,
                   aggregation: aggregationMode,
                 })
-              );
-            } else if (view === 'orm') {
-              allPromises.push(
-                apiClient.getORMByCycle(
-                  selectedCycle.id,
-                  muscle,
-                  equip,
-                  aggregationMode,
-                )
               );
             } else if (view === 'rir') {
               allPromises.push(
@@ -843,10 +819,6 @@ export default function AnalyticsPage() {
           dataPoints: volumeResult.dataPoints.filter((point: any) => point.volume > 0),
         });
       }
-    }
-    if (selectedViews.includes('orm')) {
-      const ormResult = results.find((r, i) => filterCombinations[i].view === 'orm');
-      if (ormResult) setOrmData(ormResult);
     }
     if (selectedViews.includes('rir')) {
       const rirResult = results.find((r, i) => filterCombinations[i].view === 'rir');
@@ -958,27 +930,25 @@ export default function AnalyticsPage() {
                     </div>
                   )}
 
-                  {/* Gym Filter (hidden in Cycle Mode when ORM is selected) */}
-                  {!(cycleMode && selectedViews.includes('orm')) && (
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-muted-foreground">
-                        Gym:
-                      </label>
-                      <select
-                        value={gymFilter}
-                        onChange={(e) => setGymFilter(e.target.value)}
-                        className="px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                      >
-                        <option value="alle">Alle</option>
-                        {homeGyms.map((gym) => (
-                          <option key={gym.id} value={gym.id}>
-                            {gym.name}
-                          </option>
-                        ))}
-                        <option value="andere">Andere Gyms</option>
-                      </select>
-                    </div>
-                  )}
+                  {/* Gym Filter */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-muted-foreground">
+                      Gym:
+                    </label>
+                    <select
+                      value={gymFilter}
+                      onChange={(e) => setGymFilter(e.target.value)}
+                      className="px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value="alle">Alle</option>
+                      {homeGyms.map((gym) => (
+                        <option key={gym.id} value={gym.id}>
+                          {gym.name}
+                        </option>
+                      ))}
+                      <option value="andere">Andere Gyms</option>
+                    </select>
+                  </div>
                 </div>
 
                 {/* Row 2: Cycle Navigation (only in Cycle Mode) */}
@@ -1065,19 +1035,6 @@ export default function AnalyticsPage() {
                       >
                         Volumen
                       </Button>
-                      {cycleMode && (
-                        <Button
-                          variant={selectedViews.includes('orm') ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => toggleView('orm')}
-                          disabled={
-                            !selectedViews.includes('orm') && 
-                            selectedViews.length >= calculateMaxAllowed('view')
-                          }
-                        >
-                          %ORM
-                        </Button>
-                      )}
                       <Button
                         variant={selectedViews.includes('rir') ? 'default' : 'outline'}
                         size="sm"
@@ -1260,50 +1217,6 @@ export default function AnalyticsPage() {
                       </div>
                     }
                   />
-                )}
-
-                {/* ORM Chart (only in Cycle Mode) */}
-                {selectedViews.length === 1 && cycleMode && selectedViews.includes('orm') && (
-                  <div className="bg-card border rounded-lg p-6">
-                    {gymFilter === 'andere' ? (
-                      <div className="text-center py-12">
-                        <p className="text-muted-foreground">
-                          %ORM Tracking ist nur für Home Gym Workouts verfügbar.
-                        </p>
-                        <p className="text-sm text-muted-foreground mt-2">
-                          Bitte wähle ein Home Gym oder &apos;Alle&apos; aus.
-                        </p>
-                      </div>
-                    ) : ormData && ormData.dataPoints.length > 0 ? (
-                      <AnalyticsChart
-                        data={ormData.dataPoints}
-                        title="%ORM-Entwicklung"
-                        height={300}
-                        chartType="line"
-                        dataKey="percentORM"
-                        name="%ORM"
-                        stroke={CHART_ACCENT}
-                        yAxisTickFormatter={(value) => `${value}`}
-                        yAxisLabel="%"
-                        footer={
-                          <div className="mt-4 text-center">
-                            <div className="text-sm text-muted-foreground">
-                              Durchschnitt %ORM
-                            </div>
-                            <div className="text-2xl font-bold text-foreground">
-                              {ormData.averagePercentORM}%
-                            </div>
-                          </div>
-                        }
-                      />
-                    ) : (
-                      <div className="text-center py-12">
-                        <p className="text-muted-foreground">
-                          Keine ORM Daten verfügbar für die ausgewählten Filter.
-                        </p>
-                      </div>
-                    )}
-                  </div>
                 )}
 
                 {/* RIR Chart (Cycle Mode) */}

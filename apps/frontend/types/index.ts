@@ -39,22 +39,21 @@ export interface RegisterCredentials {
 }
 
 // Exercise Types
+// PR2 (§3.7): the 12-column percent distribution is the source of truth. `primaryMuscle` is
+// derived server-side (max-percent column), not a stored field -- no more coarse BACK/ABS/LEGS.
 export enum MuscleGroup {
-  CHEST = 'CHEST',
-  BACK = 'BACK',
-  BICEPS = 'BICEPS',
-  TRICEPS = 'TRICEPS',
-  ABS = 'ABS',
-  SHOULDERS = 'SHOULDERS',
-  LEGS = 'LEGS',
   ABDOMEN = 'ABDOMEN',
   LATISSIMUS = 'LATISSIMUS',
   TRAPEZIUS = 'TRAPEZIUS',
   LOWER_BACK = 'LOWER_BACK',
   HAMSTRINGS = 'HAMSTRINGS',
   GLUTES = 'GLUTES',
+  SHOULDERS = 'SHOULDERS',
+  BICEPS = 'BICEPS',
+  CHEST = 'CHEST',
   QUADRICEPS = 'QUADRICEPS',
   CALVES = 'CALVES',
+  TRICEPS = 'TRICEPS',
 }
 
 export enum Equipment {
@@ -70,7 +69,7 @@ export enum Equipment {
 export interface Exercise {
   id: string;
   name: string;
-  muscleGroup: MuscleGroup;
+  primaryMuscle: MuscleGroup;
   equipment: Equipment;
   isUnilateral: boolean;
   isDoubleWeight: boolean;
@@ -93,7 +92,7 @@ export interface Exercise {
 
 export interface UpdateExerciseDto {
   name: string;
-  muscleGroup: MuscleGroup;
+  primaryMuscle?: MuscleGroup;
   equipment: Equipment;
   isUnilateral?: boolean;
   isDoubleWeight?: boolean;
@@ -112,40 +111,40 @@ export interface UpdateExerciseDto {
   tricepsPercent?: number;
 }
 
-export interface ExerciseBenchmark {
-  id: string;
-  cycleId: string;
-  workoutDayId: string;
-  exerciseId: string;
-  ormBenchmark: number;
-  setAtWorkoutId: string;
-  createdAt: string;
-}
-
-export interface ORMAnalytics {
-  workouts: {
-    workoutId: string;
-    date: string;
-    exercises: {
-      exerciseId: string;
-      exerciseName: string;
-      benchmark: number;
-      percentORM: number | null;
-      wasBenchmarkSet: boolean;
-    }[];
-  }[];
-}
-
-// Workout Types
-export enum WorkoutStatus {
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED',
-  DISCARDED = 'DISCARDED',
-}
-
+// Workout tree types.
+// `WorkoutExercise`/`WorkoutSet` mirror the backend wire shape exactly (§3.2/§4.1) and are used
+// for the blueprint/template tree (read-only from the client's perspective) and as the payload
+// shape for the final save.
+// `ExerciseLog`/`SetLog`/`PlannedSet` are the CLIENT-side working model for an in-progress/edited
+// workout draft: `plannedSets` is a local-only "suggested, not yet confirmed" list (sourced from
+// the blueprint/template at draft-build time, never sent to the backend), while `sets` holds the
+// sets the user has actually confirmed/logged. This mirrors the pre-PR2 shape deliberately (field
+// renames only: `restAfterSet`/`actualRestDuration` -> `rest`, dropped `target*`) so the existing
+// exercise-card UI (swipe-to-log, planned-vs-logged rendering) needed no structural rewrite.
 export enum SetType {
   WARMUP = 'WARMUP',
   WORKING = 'WORKING',
+}
+
+export interface WorkoutSet {
+  id: string;
+  order: number;
+  setType: SetType;
+  reps: number;
+  weight: number;
+  rir?: number;
+  rest?: number; // seconds rested after completing this set
+  completedAt?: string; // meaningful only for performed workouts
+}
+
+export interface WorkoutExercise {
+  id: string;
+  exerciseId: string;
+  exerciseName: string;
+  isUnilateral?: boolean;
+  isDoubleWeight?: boolean;
+  order: number;
+  sets: WorkoutSet[];
 }
 
 export interface PlannedSet {
@@ -155,7 +154,7 @@ export interface PlannedSet {
   reps: number;
   weight: number;
   rir: number;
-  restAfterSet: number;
+  rest: number;
 }
 
 export interface SetLog {
@@ -165,11 +164,10 @@ export interface SetLog {
   reps: number;
   weight: number;
   rir?: number;
-  targetReps?: number;
-  targetWeight?: number;
-  targetRir?: number;
   completedAt: string;
-  actualRestDuration?: number;
+  /** Seconds rested after completing this set -- assigned when the NEXT set (anywhere in the
+   *  workout) completes, or defaulted to the planned/90 value at save time for the last set. */
+  rest?: number;
 }
 
 export interface ExerciseLog {
@@ -186,7 +184,6 @@ export interface ExerciseLog {
 export interface Workout {
   id: string;
   date: string;
-  status: WorkoutStatus;
   isFreeWorkout: boolean;
   totalDuration?: number;
   homeGymId?: string | null;
@@ -196,8 +193,9 @@ export interface Workout {
   cycleName?: string;
   workoutDayId?: string;
   workoutDayName?: string;
-  templateId?: string;
-  templateName?: string;
+  originTemplateId?: string;
+  originTemplateName?: string;
+  originTemplateIsCustom?: boolean;
   exercises: ExerciseLog[];
   createdAt: string;
 }
@@ -205,7 +203,6 @@ export interface Workout {
 export interface WorkoutListItem {
   id: string;
   date: string;
-  status: WorkoutStatus;
   isFreeWorkout: boolean;
   totalDuration?: number;
   totalVolume: number;
@@ -214,45 +211,62 @@ export interface WorkoutListItem {
   cycleName?: string;
   workoutDayName?: string;
   workoutDayWeekday?: number;
-  templateId?: string;
-  templateName?: string;
+  originTemplateId?: string;
+  originTemplateName?: string;
   exerciseCount: number;
   createdAt: string;
 }
 
-// Cycle Types
-export interface BlueprintSet {
-  id: string;
+// Save-workout DTOs (§3.4): the single transactional save, with side-effect flags.
+export enum SaveAsTemplateMode {
+  NONE = 'none',
+  NEW = 'new',
+  OVERWRITE = 'overwrite',
+}
+
+export interface WorkoutSetInput {
   order: number;
   setType: SetType;
   reps: number;
   weight: number;
-  rir: number;
-  restAfterSet: number;
+  rir?: number;
+  rest?: number;
+  completedAt?: string;
 }
 
-export interface BlueprintExercise {
-  id: string;
+export interface WorkoutExerciseInput {
   exerciseId: string;
-  exerciseName: string;
-  isUnilateral?: boolean;
-  isDoubleWeight?: boolean;
   order: number;
-  sets: BlueprintSet[];
+  sets: WorkoutSetInput[];
 }
 
-export interface WorkoutBlueprint {
-  id: string;
-  exercises: BlueprintExercise[];
-  updatedAt: string;
+export interface SaveWorkoutDto {
+  date: string;
+  totalDuration?: number;
+  isFreeWorkout?: boolean;
+  homeGymId?: string;
+  cycleId?: string;
+  workoutDayId?: string;
+  originTemplateId?: string;
+  exercises: WorkoutExerciseInput[];
+  overwriteBlueprint?: boolean;
+  saveAsTemplateMode?: SaveAsTemplateMode;
+  saveAsTemplateName?: string;
+  overwriteTemplateId?: string;
 }
 
+// Cycle Types
 export interface WorkoutDay {
   id: string;
   weekday: number;
+  order: number;
   name: string;
   plannedHomeGymId?: string;
-  blueprint?: WorkoutBlueprint;
+  blueprint?: {
+    id: string;
+    updatedAt: string;
+    exercises: WorkoutExercise[];
+  };
 }
 
 export interface WorkoutCycle {
@@ -350,21 +364,6 @@ export interface CycleListItem {
 export interface CycleList {
   activeCycle?: CycleListItem;
   completedCycles: CycleListItem[];
-}
-
-export interface ORMDataPoint {
-  date: string;
-  trainingDay: number;
-  percentORM: number;
-  workoutId: string;
-}
-
-export interface ORMByCycleAnalytics {
-  cycleId: string;
-  cycleName: string;
-  dataPoints: ORMDataPoint[];
-  averagePercentORM: number;
-  totalWorkouts: number;
 }
 
 export interface RIRDataPoint {
@@ -486,24 +485,7 @@ export interface SetsByCycleAnalytics {
   totalWorkouts: number;
 }
 
-// Workout Template Types
-export interface WorkoutTemplateSet {
-  id: string;
-  order: number;
-  isWarmup: boolean;
-  targetReps: number;
-  targetWeight: number;
-  targetRir: number;
-}
-
-export interface WorkoutTemplateExercise {
-  id: string;
-  order: number;
-  exerciseId: string;
-  exerciseName?: string;
-  sets: WorkoutTemplateSet[];
-}
-
+// Workout Template Types (same tree shape as blueprints/workouts, §3.2)
 export interface WorkoutTemplate {
   id: string;
   name: string;
@@ -512,35 +494,21 @@ export interface WorkoutTemplate {
   recommendedGymId?: string;
   recommendedGymName?: string;
   createdAt: string;
-  exercises?: WorkoutTemplateExercise[];
+  exercises?: WorkoutExercise[];
   totalExercises?: number;
   totalSets?: number;
-}
-
-export interface CreateWorkoutTemplateSet {
-  order: number;
-  isWarmup: boolean;
-  targetReps: number;
-  targetWeight: number;
-  targetRir: number;
-}
-
-export interface CreateWorkoutTemplateExercise {
-  exerciseId: string;
-  order: number;
-  sets: CreateWorkoutTemplateSet[];
 }
 
 export interface CreateWorkoutTemplate {
   name: string;
   recommendedGymId?: string;
-  exercises: CreateWorkoutTemplateExercise[];
+  exercises: WorkoutExerciseInput[];
 }
 
 export interface UpdateWorkoutTemplate {
   name?: string;
   recommendedGymId?: string;
-  exercises?: CreateWorkoutTemplateExercise[];
+  exercises?: WorkoutExerciseInput[];
 }
 
 // Dashboard Types
@@ -574,4 +542,31 @@ export interface CycleProgress {
   totalWeeks: number;
   percentage: number;
   cycleName: string;
+}
+
+// Suggested workout / current-cycle-workouts (workout-engine)
+export interface SuggestedWorkout {
+  cycleId: string;
+  cycleName: string;
+  workoutDayId: string;
+  workoutDayName: string;
+  weekday: number;
+  order: number;
+  plannedHomeGymId?: string | null;
+  exercises: WorkoutExercise[];
+}
+
+export interface CycleWorkoutDay {
+  workoutDayId: string;
+  workoutDayName: string;
+  weekday: number;
+  order: number;
+  isSuggested: boolean;
+  exerciseCount: number;
+}
+
+export interface CurrentCycleWorkouts {
+  cycleId: string;
+  cycleName: string;
+  workoutDays: CycleWorkoutDay[];
 }

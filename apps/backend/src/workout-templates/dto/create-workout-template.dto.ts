@@ -1,55 +1,6 @@
-import {
-  IsString,
-  IsOptional,
-  IsArray,
-  ValidateNested,
-  IsBoolean,
-  IsInt,
-  IsNumber,
-  Min,
-  Max,
-  MinLength,
-  MaxLength,
-} from 'class-validator';
+import { IsString, IsOptional, IsArray, ValidateNested, MinLength, MaxLength, ArrayMinSize } from 'class-validator';
 import { Type } from 'class-transformer';
-
-export class CreateWorkoutTemplateSetDto {
-  @IsInt()
-  @Min(0)
-  order: number;
-
-  @IsBoolean()
-  isWarmup: boolean;
-
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  targetReps: number;
-
-  @IsNumber()
-  @Min(0)
-  @Max(1000)
-  targetWeight: number;
-
-  @IsInt()
-  @Min(0)
-  @Max(10)
-  targetRir: number;
-}
-
-export class CreateWorkoutTemplateExerciseDto {
-  @IsString()
-  exerciseId: string;
-
-  @IsInt()
-  @Min(0)
-  order: number;
-
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => CreateWorkoutTemplateSetDto)
-  sets: CreateWorkoutTemplateSetDto[];
-}
+import { WorkoutExerciseInputDto } from '../../common/dto/workout-tree.dto';
 
 export class CreateWorkoutTemplateDto {
   @IsString()
@@ -63,6 +14,7 @@ export class CreateWorkoutTemplateDto {
 
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => CreateWorkoutTemplateExerciseDto)
-  exercises: CreateWorkoutTemplateExerciseDto[];
+  @Type(() => WorkoutExerciseInputDto)
+  @ArrayMinSize(1)
+  exercises: WorkoutExerciseInputDto[];
 }

@@ -1,6 +1,14 @@
-import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto, UserDto, CreateHomeGymDto, UpdateHomeGymDto, HomeGymDto } from './dto';
+
+const ACTIVE_HOME_GYMS_SELECT = {
+  homeGyms: {
+    where: { deletedAt: null },
+    select: { id: true, name: true, createdAt: true },
+    orderBy: { name: 'asc' as const },
+  },
+};
 
 @Injectable()
 export class UsersService {
@@ -18,16 +26,7 @@ export class UsersService {
         height: true,
         weight: true,
         createdAt: true,
-        homeGyms: {
-          select: {
-            id: true,
-            name: true,
-            createdAt: true,
-          },
-          orderBy: {
-            name: 'asc',
-          },
-        },
+        ...ACTIVE_HOME_GYMS_SELECT,
       },
     });
 
@@ -51,7 +50,6 @@ export class UsersService {
       }
     }
 
-    // Convert dateOfBirth string to Date if provided
     if (updateUserDto.dateOfBirth) {
       data.dateOfBirth = new Date(updateUserDto.dateOfBirth);
     }
@@ -68,16 +66,7 @@ export class UsersService {
         height: true,
         weight: true,
         createdAt: true,
-        homeGyms: {
-          select: {
-            id: true,
-            name: true,
-            createdAt: true,
-          },
-          orderBy: {
-            name: 'asc',
-          },
-        },
+        ...ACTIVE_HOME_GYMS_SELECT,
       },
     });
 
@@ -86,33 +75,18 @@ export class UsersService {
 
   // Home Gym CRUD methods
   async getHomeGyms(userId: string): Promise<HomeGymDto[]> {
-    const homeGyms = await this.prisma.homeGym.findMany({
-      where: { userId },
+    return this.prisma.homeGym.findMany({
+      where: { userId, deletedAt: null },
       orderBy: { name: 'asc' },
-      select: {
-        id: true,
-        name: true,
-        createdAt: true,
-      },
+      select: { id: true, name: true, createdAt: true },
     });
-
-    return homeGyms;
   }
 
   async createHomeGym(userId: string, createHomeGymDto: CreateHomeGymDto): Promise<HomeGymDto> {
-    const homeGym = await this.prisma.homeGym.create({
-      data: {
-        userId,
-        name: createHomeGymDto.name,
-      },
-      select: {
-        id: true,
-        name: true,
-        createdAt: true,
-      },
+    return this.prisma.homeGym.create({
+      data: { userId, name: createHomeGymDto.name },
+      select: { id: true, name: true, createdAt: true },
     });
-
-    return homeGym;
   }
 
   async updateHomeGym(
@@ -120,59 +94,44 @@ export class UsersService {
     gymId: string,
     updateHomeGymDto: UpdateHomeGymDto,
   ): Promise<HomeGymDto> {
-    // Verify ownership
-    const gym = await this.prisma.homeGym.findUnique({
-      where: { id: gymId },
-    });
+    const gym = await this.prisma.homeGym.findUnique({ where: { id: gymId } });
 
-    if (!gym) {
+    if (!gym || gym.deletedAt || gym.userId !== userId) {
       throw new NotFoundException('Home gym not found');
     }
 
-    if (gym.userId !== userId) {
-      throw new ForbiddenException('You do not have permission to update this gym');
-    }
-
-    const updatedGym = await this.prisma.homeGym.update({
+    return this.prisma.homeGym.update({
       where: { id: gymId },
       data: { name: updateHomeGymDto.name },
-      select: {
-        id: true,
-        name: true,
-        createdAt: true,
-      },
+      select: { id: true, name: true, createdAt: true },
     });
-
-    return updatedGym;
   }
 
+  /**
+   * Soft-delete (§3.8): hidden from new selection, preserved for history -- past workouts
+   * referencing this gym keep resolving. Blocked only if the gym is still the planned gym
+   * of an active cycle's day (the one case where deleting it would silently break planning).
+   */
   async deleteHomeGym(userId: string, gymId: string): Promise<void> {
-    // Verify ownership
-    const gym = await this.prisma.homeGym.findUnique({
-      where: { id: gymId },
-    });
+    const gym = await this.prisma.homeGym.findUnique({ where: { id: gymId } });
 
-    if (!gym) {
+    if (!gym || gym.deletedAt || gym.userId !== userId) {
       throw new NotFoundException('Home gym not found');
     }
 
-    if (gym.userId !== userId) {
-      throw new ForbiddenException('You do not have permission to delete this gym');
-    }
-
-    // Check if any workouts are using this gym
-    const workoutsCount = await this.prisma.workout.count({
-      where: { homeGymId: gymId },
+    const plannedInActiveCycle = await this.prisma.workoutDay.findFirst({
+      where: { plannedHomeGymId: gymId, cycle: { status: 'ACTIVE' } },
     });
 
-    if (workoutsCount > 0) {
-      throw new ForbiddenException(
-        'Cannot delete home gym that is used in workouts. Please update those workouts first.',
+    if (plannedInActiveCycle) {
+      throw new ConflictException(
+        'Cannot delete a home gym that is planned for an active cycle day. Update those cycle days first.',
       );
     }
 
-    await this.prisma.homeGym.delete({
+    await this.prisma.homeGym.update({
       where: { id: gymId },
+      data: { deletedAt: new Date() },
     });
   }
 }

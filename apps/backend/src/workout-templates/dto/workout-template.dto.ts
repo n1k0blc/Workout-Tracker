@@ -1,19 +1,4 @@
-export class WorkoutTemplateSetDto {
-  id: string;
-  order: number;
-  isWarmup: boolean;
-  targetReps: number;
-  targetWeight: number;
-  targetRir: number;
-}
-
-export class WorkoutTemplateExerciseDto {
-  id: string;
-  order: number;
-  exerciseId: string;
-  exerciseName?: string;
-  sets: WorkoutTemplateSetDto[];
-}
+import { WorkoutExerciseResponseDto } from '../../common/dto/workout-tree.dto';
 
 export class WorkoutTemplateDto {
   id: string;
@@ -23,7 +8,7 @@ export class WorkoutTemplateDto {
   recommendedGymId?: string;
   recommendedGymName?: string;
   createdAt: Date;
-  exercises?: WorkoutTemplateExerciseDto[];
+  exercises?: WorkoutExerciseResponseDto[];
   totalExercises?: number;
   totalSets?: number;
 }

@@ -1,9 +1,11 @@
-import { MuscleGroup, Equipment } from './create-exercise.dto';
+import { MuscleGroup } from '../../common/muscle.util';
+import { Equipment } from './create-exercise.dto';
 
 export class ExerciseDto {
   id: string;
   name: string;
-  muscleGroup: MuscleGroup;
+  // Derived (max-percent column), not stored -- see common/muscle.util.ts.
+  primaryMuscle: MuscleGroup;
   equipment: Equipment;
   isUnilateral: boolean;
   isDoubleWeight: boolean;
