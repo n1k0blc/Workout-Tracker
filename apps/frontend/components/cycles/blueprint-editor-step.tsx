@@ -61,6 +61,10 @@ export default function BlueprintEditorStep({
   // (same pattern as template editor: mode=edit, allow* structural true, allowLogging=false)
   const [currentExercises, setCurrentExercises] = useState<ExerciseLog[]>([]);
 
+  // Exercises added this session start expanded (see addExerciseToBlueprint) so the user
+  // isn't left guessing they need to review/edit its planned set.
+  const [newlyAddedIds, setNewlyAddedIds] = useState<Set<string>>(new Set());
+
   // Load exercises
   useEffect(() => {
     const loadExercises = async () => {
@@ -343,6 +347,7 @@ export default function BlueprintEditorStep({
     const newList = [...currentExercises, newExLog];
     setCurrentExercises(newList);
     syncCurrentExercisesToFormData(newList);
+    setNewlyAddedIds((prev) => new Set(prev).add(newExLog.id));
 
     setShowExerciseModal(false);
   };
@@ -413,6 +418,7 @@ export default function BlueprintEditorStep({
                         allowExerciseActions={true}
                         allowSetManagement={true}
                         allowLogging={false}
+                        defaultOpen={newlyAddedIds.has(exercise.id)}
                         onRemoveExercise={(exId) => {
                           const newList = currentExercises.filter((e) => e.id !== exId);
                           newList.forEach((e, i) => (e.order = i + 1));

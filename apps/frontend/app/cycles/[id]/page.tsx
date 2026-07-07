@@ -140,8 +140,11 @@ export default function CycleDetailPage() {
       // Create a Set of cycle workout IDs for efficient lookup
       const cycleWorkoutIds = new Set(cycleWorkouts.map(w => w.id));
 
-      // Filter PRs to only those from cycle workouts
-      const cyclePRs = prs.recentPRs.filter(pr => cycleWorkoutIds.has(pr.workoutId));
+      // Filter PRs to only those from this cycle's own workouts (kind=WORKOUT, tied to
+      // this cycle via cycleId -- free/template workouts never match). Use allTimePRs,
+      // not recentPRs, since the latter is a 30-day rolling window unrelated to the
+      // cycle's own timeframe and would hide PRs from cycles that closed long ago.
+      const cyclePRs = prs.allTimePRs.filter(pr => cycleWorkoutIds.has(pr.workoutId));
       setPersonalRecords(cyclePRs);
 
     } catch (error) {

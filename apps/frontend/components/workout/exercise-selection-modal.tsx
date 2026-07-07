@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Exercise, MuscleGroup, Equipment } from '@/types';
 import { apiClient } from '@/lib/api';
 import { MUSCLE_GROUP_LABELS } from '@/lib/exercise-utils';
@@ -39,26 +39,54 @@ export default function ExerciseSelectionModal({
   >();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
-  const loadExercises = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await apiClient.getExercises({
-        search: search || undefined,
-        primaryMuscle: muscleGroupFilter,
-        equipment: equipmentFilter,
-        includeCustom: true,
-      });
-      setExercises(data);
-    } catch (error) {
-      console.error('Failed to load exercises:', error);
-    } finally {
-      setLoading(false);
+  // Reset search/filters the moment `open` flips to false, so the next open starts fresh
+  // regardless of how it closed (successful add, cancel, X, outside click, Escape).
+  // Adjusted during render (React's recommended way to sync state to a prop change)
+  // rather than in a useEffect, since this is pure state derivation, not a side effect.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (!open) {
+      setSearch('');
+      setMuscleGroupFilter(undefined);
+      setEquipmentFilter(undefined);
     }
-  }, [search, muscleGroupFilter, equipmentFilter]);
+  }
 
+  // Fetch the full exercise list once per modal open (unfiltered -- the endpoint has
+  // no pagination anyway, so this already covers everything). Search/filters above then
+  // narrow it down purely client-side, with zero network calls while typing/toggling.
   useEffect(() => {
-    loadExercises();
-  }, [loadExercises]);
+    if (!open) return;
+
+    let cancelled = false;
+    setLoading(true);
+    apiClient
+      .getExercises({ includeCustom: true })
+      .then((data) => {
+        if (!cancelled) setExercises(data);
+      })
+      .catch((error) => {
+        console.error('Failed to load exercises:', error);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  const filteredExercises = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return exercises.filter((exercise) => {
+      if (query && !exercise.name.toLowerCase().includes(query)) return false;
+      if (muscleGroupFilter && exercise.primaryMuscle !== muscleGroupFilter) return false;
+      if (equipmentFilter && exercise.equipment !== equipmentFilter) return false;
+      return true;
+    });
+  }, [exercises, search, muscleGroupFilter, equipmentFilter]);
 
   const handleExerciseCreated = (exercise: Exercise) => {
     // Add new exercise to list and select it
@@ -215,9 +243,9 @@ export default function ExerciseSelectionModal({
             <div className="text-center py-8 text-muted-foreground">
               Lädt Übungen...
             </div>
-          ) : exercises.length > 0 ? (
+          ) : filteredExercises.length > 0 ? (
             <div className="space-y-2">
-              {exercises.map((exercise) => (
+              {filteredExercises.map((exercise) => (
                 <button
                   key={exercise.id}
                   onClick={() => onSelect(exercise.id, exercise)}

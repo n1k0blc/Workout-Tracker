@@ -587,6 +587,7 @@ export interface SuggestedWorkout {
   order: number;
   plannedHomeGymId?: string | null;
   exercises: WorkoutExercise[];
+  isDue: boolean;
 }
 
 export interface CycleWorkoutDay {

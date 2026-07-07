@@ -285,8 +285,8 @@ export default function WorkoutStartScreen() {
           </div>
         )}
 
-        {/* Suggested Workout */}
-        {suggestedWorkout && (
+        {/* Suggested Workout — only shown once its scheduled weekday has arrived (or passed) */}
+        {suggestedWorkout && suggestedWorkout.isDue && (
           <Card>
             <CardContent className="p-6">
               <div className="flex items-start gap-3">

@@ -231,13 +231,14 @@ export default function WorkoutDaysStep({
       <div
         ref={setNodeRef}
         style={style}
-        className="touch-none"
       >
         <Card onClick={() => onEdit(index)} className="cursor-pointer hover:border-primary/50 transition-colors">
           <CardContent className="p-3 flex items-center justify-between gap-3">
-            {/* Title area is the drag handle (long-press to reorder) */}
+            {/* Title area is the drag handle (long-press to reorder). touch-none is
+                scoped to just this handle so the rest of the card still allows native
+                horizontal swipe-scrolling on touch devices. */}
             <div
-              className="flex items-center gap-3 flex-1 min-w-0 cursor-grab active:cursor-grabbing"
+              className="flex items-center gap-3 flex-1 min-w-0 cursor-grab active:cursor-grabbing touch-none"
               {...attributes}
               {...listeners}
             >
