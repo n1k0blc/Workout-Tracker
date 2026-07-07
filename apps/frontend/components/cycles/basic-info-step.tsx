@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { CycleFormData } from './cycle-wizard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +15,8 @@ export default function BasicInfoStep({
   updateFormData,
   onNext,
 }: BasicInfoStepProps) {
+  const [durationInput, setDurationInput] = useState(String(formData.duration));
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onNext();
@@ -40,10 +43,21 @@ export default function BasicInfoStep({
         <Input
           id="duration"
           type="number"
-          value={formData.duration}
-          onChange={(e) =>
-            updateFormData({ duration: parseInt(e.target.value) || 1 })
-          }
+          value={durationInput}
+          onChange={(e) => {
+            const raw = e.target.value;
+            setDurationInput(raw);
+            const parsed = parseInt(raw, 10);
+            if (!isNaN(parsed)) {
+              updateFormData({ duration: parsed });
+            }
+          }}
+          onBlur={() => {
+            const parsed = parseInt(durationInput, 10);
+            const clamped = isNaN(parsed) ? 1 : Math.min(52, Math.max(1, parsed));
+            setDurationInput(String(clamped));
+            updateFormData({ duration: clamped });
+          }}
           min="1"
           max="52"
           required

@@ -60,6 +60,9 @@ interface ExerciseCardProps {
 
   /** Pure view mode: everything read-only, no actions, no editing of values/types/sets */
   readonly?: boolean;
+
+  /** Start expanded instead of collapsed -- for exercises just added this session, so the user isn't left guessing they need to add sets. */
+  defaultOpen?: boolean;
 }
 
 
@@ -77,6 +80,7 @@ export default function ExerciseCard({
   onRemoveSet,
   onUpdateSet,
   readonly,
+  defaultOpen,
 }: ExerciseCardProps) {
   // Derive effective flags. For 'active' everything is on.
   // For 'edit' the caller decides (History: all structural/logging off; Blueprint: structural on, logging off).
@@ -106,7 +110,7 @@ export default function ExerciseCard({
   const [editValues, setEditValues] = useState<{[key: number]: {weight: string, reps: string, rir: string, setType: SetType}}>({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showReplaceModal, setShowReplaceModal] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(!defaultOpen);
   const [editingSetId, setEditingSetId] = useState<string | null>(null);
   const [editingValues, setEditingValues] = useState<{
     reps: string;
@@ -272,6 +276,7 @@ export default function ExerciseCard({
     try {
       await replaceExercise(exercise.id, newExerciseId);
       setShowReplaceModal(false);
+      setIsCollapsed(false);
     } catch (error) {
       console.error('Failed to replace exercise:', error);
     }

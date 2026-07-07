@@ -49,6 +49,10 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
 
   const [isReadonlyView, setIsReadonlyView] = useState(false);
 
+  // Exercises added this session start expanded (see handleAddExercise) so the user
+  // isn't left guessing they need to add sets.
+  const [newlyAddedIds, setNewlyAddedIds] = useState<Set<string>>(new Set());
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -91,6 +95,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
       isDoubleWeight: exDetails.isDoubleWeight,
     };
     setExercises(prev => [...prev, newEx]);
+    setNewlyAddedIds((prev) => new Set(prev).add(newEx.id));
     setShowExerciseModal(false);
   };
 
@@ -331,6 +336,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
                           allowExerciseActions={true}
                           allowSetManagement={true}
                           allowLogging={false}
+                          defaultOpen={newlyAddedIds.has(exercise.id)}
                           onRemoveExercise={(id) => setExercises(prev => prev.filter(e => e.id !== id))}
                           onReplaceExercise={(id, newId) => {
                             const exDetails = availableExercises.find((e) => e.id === newId);

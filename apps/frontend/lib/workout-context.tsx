@@ -62,7 +62,7 @@ interface WorkoutContextType {
   loadWorkoutForEdit: (workoutId: string) => Promise<void>;
   completeWorkout: (options?: CompleteWorkoutOptions) => Promise<Workout | null>;
   discardWorkout: () => void;
-  addExercise: (exerciseId: string) => Promise<void>;
+  addExercise: (exerciseId: string) => Promise<string>;
   removeExercise: (exerciseLogId: string) => Promise<void>;
   replaceExercise: (exerciseLogId: string, newExerciseId: string) => Promise<void>;
   reorderExercises: (exerciseIds: string[]) => Promise<void>;
@@ -592,7 +592,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addExercise = async (exerciseId: string) => {
-    if (!activeWorkout) return;
+    if (!activeWorkout) return '';
 
     try {
       const exDetails = await apiClient.getExercise(exerciseId);
@@ -607,6 +607,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         plannedSets: [],
       };
       setActiveWorkoutDirectly({ ...activeWorkout, exercises: [...activeWorkout.exercises, newEx] }, isPastWorkout, pastWorkoutDuration);
+      return newEx.id;
     } catch (error) {
       console.error('Failed to add exercise:', error);
       const stub: ExerciseLog = {
@@ -617,6 +618,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         order: (activeWorkout.exercises.length || 0) + 1,
       };
       setActiveWorkoutDirectly({ ...activeWorkout, exercises: [...activeWorkout.exercises, stub] }, isPastWorkout, pastWorkoutDuration);
+      return stub.id;
     }
   };
 

@@ -52,7 +52,9 @@ export default function EditBlueprintPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showExerciseModal, setShowExerciseModal] = useState(false);
-  const [replacingExerciseId, setReplacingExerciseId] = useState<string | null>(null);
+  // Exercises added this session start expanded (see handleAddExercise) so the user
+  // isn't left guessing they need to review/edit its planned sets.
+  const [newlyAddedIds, setNewlyAddedIds] = useState<Set<string>>(new Set());
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
   const [templateName, setTemplateName] = useState('');
   const [savingTemplate, setSavingTemplate] = useState(false);
@@ -143,25 +145,26 @@ export default function EditBlueprintPage() {
       ],
     };
     setExercises([...exercises, newExercise]);
+    setNewlyAddedIds((prev) => new Set(prev).add(newExercise.id));
     setShowExerciseModal(false);
   };
 
-  const handleReplaceExercise = (exerciseId: string, exercise?: Exercise) => {
-    if (!replacingExerciseId || !exercise) return;
-
-    setExercises(
-      exercises.map((ex) =>
-        ex.id === replacingExerciseId
-          ? {
-              ...ex,
-              exerciseId: exercise.id,
-              exerciseName: exercise.name,
-            }
-          : ex
-      )
-    );
-    setShowExerciseModal(false);
-    setReplacingExerciseId(null);
+  // Passed directly as ExerciseCard's onReplaceExercise: the card owns its own replace
+  // picker modal internally, so this just needs to perform the swap with the picked
+  // exercise's id -- no second, page-level modal involved.
+  const handleReplaceExercise = async (exerciseLogId: string, newExerciseId: string) => {
+    try {
+      const newExercise = await apiClient.getExercise(newExerciseId);
+      setExercises((prev) =>
+        prev.map((ex) =>
+          ex.id === exerciseLogId
+            ? { ...ex, exerciseId: newExercise.id, exerciseName: newExercise.name }
+            : ex
+        )
+      );
+    } catch (error) {
+      console.error('Failed to replace exercise:', error);
+    }
   };
 
   const handleRemoveExercise = (exerciseId: string) => {
@@ -278,13 +281,7 @@ export default function EditBlueprintPage() {
     }
   };
 
-  const openReplaceModal = (exerciseId: string) => {
-    setReplacingExerciseId(exerciseId);
-    setShowExerciseModal(true);
-  };
-
   const openAddModal = () => {
-    setReplacingExerciseId(null);
     setShowExerciseModal(true);
   };
 
@@ -452,8 +449,9 @@ export default function EditBlueprintPage() {
                           allowExerciseActions={true}
                           allowSetManagement={true}
                           allowLogging={false}
+                          defaultOpen={newlyAddedIds.has(log.id)}
                           onRemoveExercise={() => handleRemoveExercise(log.id)}
-                          onReplaceExercise={() => openReplaceModal(log.id)}
+                          onReplaceExercise={handleReplaceExercise}
                           onAddSet={() => {
                             const updated = exercises.map((ex) => {
                               if (ex.id !== log.id) return ex;
@@ -547,18 +545,12 @@ export default function EditBlueprintPage() {
         </main>
       </div>
 
-      {/* Exercise Selection Modal (shadcn Dialog, controlled) */}
+      {/* Exercise Selection Modal (shadcn Dialog, controlled) -- Add only; Replace is
+          handled by each ExerciseCard's own built-in replace modal (onReplaceExercise). */}
       <ExerciseSelectionModal
         open={showExerciseModal}
-        onOpenChange={(isOpen) => {
-          setShowExerciseModal(isOpen);
-          if (!isOpen) {
-            setReplacingExerciseId(null);
-          }
-        }}
-        onSelect={
-          replacingExerciseId ? handleReplaceExercise : handleAddExercise
-        }
+        onOpenChange={setShowExerciseModal}
+        onSelect={handleAddExercise}
       />
 
       {/* Save Template Modal (shadcn) */}

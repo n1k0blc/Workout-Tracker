@@ -69,6 +69,9 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
   } = useWorkout();
 
   const [showExerciseModal, setShowExerciseModal] = useState(false);
+  // Exercises added this session start expanded (see handleAddExercise) so the user
+  // isn't left guessing they need to add sets.
+  const [newlyAddedIds, setNewlyAddedIds] = useState<Set<string>>(new Set());
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [updateBlueprint, setUpdateBlueprint] = useState(false);
@@ -134,7 +137,8 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
     }
 
     try {
-      await addExercise(exerciseId);
+      const newExerciseLogId = await addExercise(exerciseId);
+      setNewlyAddedIds((prev) => new Set(prev).add(newExerciseLogId));
       setShowExerciseModal(false);
     } catch (error) {
       console.error('Failed to add exercise:', error);
@@ -314,6 +318,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
                     allowExerciseActions={true}
                     allowSetManagement={true}
                     allowLogging={!isPastWorkout}
+                    defaultOpen={newlyAddedIds.has(exercise.id)}
                   />
                 ))}
               </SortableContext>

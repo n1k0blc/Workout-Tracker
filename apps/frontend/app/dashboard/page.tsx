@@ -18,7 +18,7 @@ import { PersonalRecordCard } from '@/components/PersonalRecordCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { IconBarbell, IconCalendar, IconChartBar } from '@tabler/icons-react';
+import { IconBarbell, IconCalendar, IconChartBar, IconTrophy } from '@tabler/icons-react';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -191,7 +191,7 @@ export default function DashboardPage() {
                           className="rounded-lg bg-primary text-primary-foreground p-6 cursor-pointer hover:opacity-90 transition-all"
                         >
                           <div className="text-center">
-                            <div className="text-6xl mb-3">🎉</div>
+                            <IconTrophy className="size-12 mx-auto mb-3" stroke={1.5} />
                             <div className="text-sm font-medium mb-1 opacity-80">
                               Zyklus beendet
                             </div>
