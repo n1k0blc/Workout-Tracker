@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { Workout, WorkoutExercise, ExerciseLog, SetLog, PlannedSet, SetType, SaveAsTemplateMode, WorkoutExerciseInput } from '@/types';
 import { apiClient } from '@/lib/api';
+import { reorderExerciseLogs, toExercisePayload } from '@/lib/workout-order';
 
 const DRAFT_STORAGE_KEY = 'activeWorkoutDraft';
 const DRAFT_META_STORAGE_KEY = 'activeWorkoutDraftMeta';
@@ -529,21 +530,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         });
       }
 
-      const exerciseInputs: WorkoutExerciseInput[] = exercises
-        .filter((ex) => ex.sets.length > 0)
-        .map((ex) => ({
-          exerciseId: ex.exerciseId,
-          order: ex.order,
-          sets: ex.sets.map((s) => ({
-            order: s.setNumber,
-            setType: s.setType ?? SetType.WORKING,
-            reps: s.reps,
-            weight: s.weight,
-            rir: s.rir,
-            rest: s.rest ?? 90,
-            completedAt: s.completedAt,
-          })),
-        }));
+      const exerciseInputs: WorkoutExerciseInput[] = toExercisePayload(exercises);
 
       const totalDuration = isPastWorkout ? pastWorkoutDuration : workoutDuration;
 
@@ -653,9 +640,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const reorderExercises = async (exerciseIds: string[]) => {
     if (!activeWorkout) return;
 
-    const reordered = exerciseIds
-      .map((id) => activeWorkout.exercises.find((ex) => ex.id === id))
-      .filter(Boolean) as ExerciseLog[];
+    const reordered = reorderExerciseLogs(activeWorkout.exercises, exerciseIds);
 
     setActiveWorkoutDirectly({ ...activeWorkout, exercises: reordered }, isPastWorkout, pastWorkoutDuration);
   };

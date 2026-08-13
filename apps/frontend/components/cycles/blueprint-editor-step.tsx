@@ -191,10 +191,10 @@ export default function BlueprintEditorStep({
 
     if (oldIndex === -1 || newIndex === -1) return;
 
-    const reordered = arrayMove(currentExercises, oldIndex, newIndex);
-    reordered.forEach((ex, idx) => {
-      ex.order = idx + 1;
-    });
+    const reordered = arrayMove(currentExercises, oldIndex, newIndex).map((ex, idx) => ({
+      ...ex,
+      order: idx + 1,
+    }));
 
     setCurrentExercises(reordered);
     syncCurrentExercisesToFormData(reordered);
@@ -420,8 +420,9 @@ export default function BlueprintEditorStep({
                         allowLogging={false}
                         defaultOpen={newlyAddedIds.has(exercise.id)}
                         onRemoveExercise={(exId) => {
-                          const newList = currentExercises.filter((e) => e.id !== exId);
-                          newList.forEach((e, i) => (e.order = i + 1));
+                          const newList = currentExercises
+                            .filter((e) => e.id !== exId)
+                            .map((e, i) => ({ ...e, order: i + 1 }));
                           setCurrentExercises(newList);
                           syncCurrentExercisesToFormData(newList);
                         }}

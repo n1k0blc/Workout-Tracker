@@ -184,9 +184,12 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
 
     setSaving(true);
     try {
-      const payloadExercises = exercises.map((ex) => ({
+      // `order` comes from array position, not `ex.order`: removals leave gaps that
+      // `handleAddExercise` (length + 1) can collide with, and the backend sorts on `order`
+      // with no tiebreaker -- so the rendered sequence has to be what gets persisted.
+      const payloadExercises = exercises.map((ex, idx) => ({
         exerciseId: ex.exerciseId,
-        order: ex.order,
+        order: idx + 1,
         sets: (ex.sets || []).map((s: any, idx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
           order: s.setNumber || s.order || idx + 1,
           setType: s.setType ?? SetType.WORKING,
