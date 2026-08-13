@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { Workout, WorkoutExercise, ExerciseLog, SetLog, PlannedSet, SetType, SaveAsTemplateMode, WorkoutExerciseInput } from '@/types';
 import { apiClient } from '@/lib/api';
 import { reorderExerciseLogs, toExercisePayload } from '@/lib/workout-order';
+import { replaceExerciseInList } from '@/lib/exercise-replace';
 
 const DRAFT_STORAGE_KEY = 'activeWorkoutDraft';
 const DRAFT_META_STORAGE_KEY = 'activeWorkoutDraftMeta';
@@ -625,11 +626,12 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       const exDetails = await apiClient.getExercise(newExerciseId);
       const updated = {
         ...activeWorkout,
-        exercises: activeWorkout.exercises.map((ex) =>
-          ex.id === exerciseLogId
-            ? { ...ex, exerciseId: newExerciseId, exerciseName: exDetails.name || 'Exercise', sets: ex.sets }
-            : ex
-        ),
+        exercises: replaceExerciseInList(activeWorkout.exercises, exerciseLogId, {
+          id: newExerciseId,
+          name: exDetails.name,
+          isUnilateral: exDetails.isUnilateral,
+          isDoubleWeight: exDetails.isDoubleWeight,
+        }),
       };
       setActiveWorkoutDirectly(updated, isPastWorkout, pastWorkoutDuration);
     } catch (error) {

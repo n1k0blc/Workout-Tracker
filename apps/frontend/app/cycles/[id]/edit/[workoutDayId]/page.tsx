@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/dialog';
 import { IconPlus } from '@tabler/icons-react';
 import type { ExerciseLog } from '@/types';
+import { replaceExerciseInList } from '@/lib/exercise-replace';
 
 export default function EditBlueprintPage() {
   const params = useParams();
@@ -113,6 +114,8 @@ export default function EditBlueprintPage() {
       id: `new-${Date.now()}`, // Temporary ID
       exerciseId: exercise.id,
       exerciseName: exercise.name,
+      isUnilateral: exercise.isUnilateral,
+      isDoubleWeight: exercise.isDoubleWeight,
       order: exercises.length + 1,
       sets: [
         {
@@ -155,13 +158,7 @@ export default function EditBlueprintPage() {
   const handleReplaceExercise = async (exerciseLogId: string, newExerciseId: string) => {
     try {
       const newExercise = await apiClient.getExercise(newExerciseId);
-      setExercises((prev) =>
-        prev.map((ex) =>
-          ex.id === exerciseLogId
-            ? { ...ex, exerciseId: newExercise.id, exerciseName: newExercise.name }
-            : ex
-        )
-      );
+      setExercises((prev) => replaceExerciseInList(prev, exerciseLogId, newExercise));
     } catch (error) {
       console.error('Failed to replace exercise:', error);
     }

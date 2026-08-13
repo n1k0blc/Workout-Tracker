@@ -13,6 +13,7 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import ExerciseCard from '@/components/workout/exercise-card';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import { IconChevronLeft, IconPlus } from '@tabler/icons-react';
+import { replaceExerciseInList } from '@/lib/exercise-replace';
 import {
   DndContext,
   closestCenter,
@@ -121,6 +122,10 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
           id: ex.id || `ex-${Date.now()}-${idx}`,
           exerciseId: ex.exerciseId,
           exerciseName: ex.exerciseName || '',
+          // Templates saved before the flags were persisted fall back to the exercise catalogue,
+          // which is what the "Gewicht (2x)" / "Wdh (2x)" headers read from.
+          isUnilateral: ex.isUnilateral ?? exs.find((e) => e.id === ex.exerciseId)?.isUnilateral ?? false,
+          isDoubleWeight: ex.isDoubleWeight ?? exs.find((e) => e.id === ex.exerciseId)?.isDoubleWeight ?? false,
           order: ex.order === 0 ? idx + 1 : ex.order,
           sets: (ex.sets || []).map((s: any, sIdx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
             id: s.id || `set-${Date.now()}-${sIdx}`,
@@ -343,10 +348,10 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
                           onRemoveExercise={(id) => setExercises(prev => prev.filter(e => e.id !== id))}
                           onReplaceExercise={(id, newId) => {
                             const exDetails = availableExercises.find((e) => e.id === newId);
-                            setExercises(prev => prev.map(e => e.id === id 
-                              ? { ...e, exerciseId: newId, exerciseName: exDetails?.name || 'Exercise' } 
-                              : e
-                            ));
+                            setExercises(prev => replaceExerciseInList(prev, id, {
+                              ...(exDetails ?? { name: 'Exercise' }),
+                              id: newId,
+                            }));
                           }}
                           onAddSet={(id) => {
                             setExercises(prev => prev.map(e => {

@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import type { ExerciseLog } from '@/types';
+import { replaceExerciseInList } from '@/lib/exercise-replace';
 import {
   DndContext,
   closestCenter,
@@ -127,6 +128,10 @@ export default function BlueprintEditorStep({
         id: ex.id || `ex-${ex.exerciseId || idx}`,
         exerciseId: ex.exerciseId,
         exerciseName: ex.exerciseName || exDetails?.name || '',
+        // The blueprint payload only carries exerciseId, so the loading-scheme flags that drive
+        // the "Gewicht (2x)" / "Wdh (2x)" headers have to come from the exercise catalogue.
+        isUnilateral: ex.isUnilateral ?? exDetails?.isUnilateral ?? false,
+        isDoubleWeight: ex.isDoubleWeight ?? exDetails?.isDoubleWeight ?? false,
         order: ex.order || idx + 1,
         sets,
         plannedSets,
@@ -428,11 +433,10 @@ export default function BlueprintEditorStep({
                         }}
                         onReplaceExercise={(exId, newExId) => {
                           const exDetails = exercises.find((e) => e.id === newExId);
-                          const newList = currentExercises.map((e) =>
-                            e.id === exId
-                              ? { ...e, exerciseId: newExId, exerciseName: exDetails?.name || 'Exercise' }
-                              : e
-                          );
+                          const newList = replaceExerciseInList(currentExercises, exId, {
+                            ...(exDetails ?? { name: 'Exercise' }),
+                            id: newExId,
+                          });
                           setCurrentExercises(newList);
                           syncCurrentExercisesToFormData(newList);
                         }}
