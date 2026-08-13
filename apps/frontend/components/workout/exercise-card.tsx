@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ExerciseLog, SetLog, SetType } from '@/types';
 import { useWorkout } from '@/lib/workout-context';
+import { getSetIndicatorSlots, resolveSetRows } from '@/lib/set-slots';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import ExerciseSelectionModal from './exercise-selection-modal';
@@ -343,23 +344,20 @@ export default function ExerciseCard({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, hasPlannedSets, skippedPlannedSetNumbers, isCompletedHijack]);
 
-  const getSetIndicatorSlots = (): number[] => {
-    const slots = new Set<number>();
+  // Bars (collapsed) and rows (expanded) are derived by the same pair of helpers so the two
+  // views cannot drift apart -- see lib/set-slots.ts.
+  const setIndicatorSlots = getSetIndicatorSlots({
+    plannedSets: exercise.plannedSets,
+    sets: exercise.sets,
+    additionalSetNumbers,
+    skippedSetNumbers: skippedPlannedSetNumbers,
+  });
 
-    if (hasPlannedSets && exercise.plannedSets!.length > 0) {
-      exercise.plannedSets!
-        .filter(ps => !skippedPlannedSetNumbers.has(ps.order))
-        .forEach((ps) => slots.add(ps.order));
-    }
-
-    // Include logged sets (covers logged planned + logged extras; for free workouts: all logged)
-    exercise.sets.forEach((s) => slots.add(s.setNumber));
-
-    // Include unlogged additional/extras (for planned workouts with added sets, and free workouts)
-    additionalSetNumbers.forEach((n) => slots.add(n));
-
-    return Array.from(slots).sort((a, b) => a - b);
-  };
+  const setRows = resolveSetRows({
+    plannedSets: exercise.plannedSets,
+    sets: exercise.sets,
+    skippedSetNumbers: skippedPlannedSetNumbers,
+  });
 
   // Swipe helpers
   const SWIPE_THRESHOLD = 70;
@@ -697,7 +695,7 @@ export default function ExerciseCard({
             {/* Collapsed set progress indicators: horizontal lines, foreground for logged */}
             {isCollapsed && (
               <div className="flex items-center gap-1 mt-1 ml-8">
-                {getSetIndicatorSlots().map((slot, i) => {
+                {setIndicatorSlots.map((slot, i) => {
                   // For blueprint/template edit (!allowLogging), always show as "unlogged" (gray) since there's no logging concept.
                   const logged = effectiveAllowLogging && !!getLoggedSet(slot);
                   return (
@@ -760,11 +758,15 @@ export default function ExerciseCard({
             {/* Planned Sets as table rows (filter skipped unlogged ones) */}
             {hasPlannedSets && exercise.plannedSets!
               .filter(ps => !skippedPlannedSetNumbers.has(ps.order))
-              .map((plannedSet) => {
+              .map((plannedSet, rowIdx) => {
               const setNumber = plannedSet.order;
               const loggedSet = getLoggedSet(setNumber);
               const isEditingThis = editingSetId === loggedSet?.id;
-              const currentType = loggedSet ? loggedSet.setType : getEditSetType(setNumber);
+              // `setRows` is built from the same filtered planned list, so it is index-aligned
+              // here -- no second lookup by set number, which is where the two views drifted.
+              const currentType = loggedSet
+                ? setRows[rowIdx].setType
+                : (editValues[setNumber]?.setType ?? setRows[rowIdx].setType);
               const isWarmup = currentType === SetType.WARMUP;
 
               const gridClass = `grid ${colTemplate} items-center gap-x-2 py-1.5 border-b border-border last:border-b-0`;

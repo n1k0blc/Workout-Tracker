@@ -126,10 +126,14 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
           // which is what the "Gewicht (2x)" / "Wdh (2x)" headers read from.
           isUnilateral: ex.isUnilateral ?? exs.find((e) => e.id === ex.exerciseId)?.isUnilateral ?? false,
           isDoubleWeight: ex.isDoubleWeight ?? exs.find((e) => e.id === ex.exerciseId)?.isDoubleWeight ?? false,
-          order: ex.order === 0 ? idx + 1 : ex.order,
+          // Stored order is 1-based and contiguous (migration 20260814080000); it is used as
+          // read. The previous `order === 0 ? index + 1` fixup for 0-based rows mapped the
+          // first two sets of an exercise onto the same number, which is what made the
+          // collapsed card drop a bar and the expanded card mislabel a set's type.
+          order: ex.order,
           sets: (ex.sets || []).map((s: any, sIdx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
             id: s.id || `set-${Date.now()}-${sIdx}`,
-            setNumber: s.order === 0 ? sIdx + 1 : s.order,
+            setNumber: s.order,
             setType: s.setType ?? SetType.WORKING,
             reps: s.reps ?? 0,
             weight: s.weight ?? 0,
@@ -138,7 +142,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
           })),
           plannedSets: (ex.sets || []).map((s: any, sIdx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
             id: s.id || `planned-${Date.now()}-${sIdx}`,
-            order: s.order === 0 ? sIdx + 1 : s.order,
+            order: s.order,
             setType: s.setType ?? SetType.WORKING,
             reps: s.reps ?? 0,
             weight: s.weight ?? 0,
