@@ -10,6 +10,7 @@ import BlueprintEditorStep from './blueprint-editor-step';
 import ReviewStep from './review-step';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { withArrayPositionOrder } from '@/lib/workout-order';
 
 export interface BlueprintSetData {
   order: number;
@@ -85,11 +86,10 @@ export default function CycleWizard() {
           weekday: day.weekday,
           name: day.name,
           plannedHomeGymId: day.plannedHomeGymId,
-          exercises: day.blueprint.exercises.map((ex) => ({
+          exercises: withArrayPositionOrder(day.blueprint.exercises.map((ex) => ({
             exerciseId: ex.exerciseId,
-            order: ex.order,
             sets: ex.sets,
-          })),
+          }))),
         })),
       };
 

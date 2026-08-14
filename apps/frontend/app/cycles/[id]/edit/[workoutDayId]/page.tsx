@@ -37,6 +37,7 @@ import {
 import { IconPlus } from '@tabler/icons-react';
 import type { ExerciseLog } from '@/types';
 import { replaceExerciseInList } from '@/lib/exercise-replace';
+import { withArrayPositionOrder } from '@/lib/workout-order';
 
 export default function EditBlueprintPage() {
   const params = useParams();
@@ -202,18 +203,16 @@ export default function EditBlueprintPage() {
       
       // Transform exercises to match API format
       const blueprintData = {
-        exercises: exercises.map((ex) => ({
+        exercises: withArrayPositionOrder(exercises.map((ex) => ({
           exerciseId: ex.exerciseId,
-          order: ex.order,
           sets: ex.sets.map((set) => ({
-            order: set.order,
             setType: set.setType,
             reps: set.reps,
             weight: set.weight,
             rir: set.rir,
             rest: set.rest,
           })),
-        })),
+        }))),
       };
 
       await apiClient.updateBlueprint(cycleId, workoutDayId, blueprintData);
@@ -247,18 +246,16 @@ export default function EditBlueprintPage() {
       const templateData = {
         name: templateName.trim(),
         recommendedGymId: plannedHomeGymId || undefined,
-        exercises: exercises.map((ex) => ({
+        exercises: withArrayPositionOrder(exercises.map((ex) => ({
           exerciseId: ex.exerciseId,
-          order: ex.order,
           sets: ex.sets.map((set) => ({
-            order: set.order,
             setType: set.setType,
             reps: set.reps,
             weight: set.weight,
             rir: set.rir,
             rest: set.rest,
           })),
-        })),
+        }))),
       };
 
       await apiClient.createWorkoutTemplate(templateData);

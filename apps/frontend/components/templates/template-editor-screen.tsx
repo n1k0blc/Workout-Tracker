@@ -14,6 +14,7 @@ import ExerciseCard from '@/components/workout/exercise-card';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import { IconChevronLeft, IconPlus } from '@tabler/icons-react';
 import { replaceExerciseInList } from '@/lib/exercise-replace';
+import { withArrayPositionOrder } from '@/lib/workout-order';
 import {
   DndContext,
   closestCenter,
@@ -138,6 +139,10 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
             reps: s.reps ?? 0,
             weight: s.weight ?? 0,
             rir: s.rir ?? 0,
+            // `rest` has to ride along: the save payload is built from `sets`, so omitting it
+            // here flattened every set to the 90s default on save -- losing the measured rest
+            // values a template carries when it was created from a performed workout.
+            rest: s.rest ?? 90,
             completedAt: new Date().toISOString(),
           })),
           plannedSets: (ex.sets || []).map((s: any, sIdx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -193,21 +198,20 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
 
     setSaving(true);
     try {
-      // `order` comes from array position, not `ex.order`: removals leave gaps that
-      // `handleAddExercise` (length + 1) can collide with, and the backend sorts on `order`
-      // with no tiebreaker -- so the rendered sequence has to be what gets persisted.
-      const payloadExercises = exercises.map((ex, idx) => ({
+      // `order` comes from array position at both levels, not from `ex.order`/`s.setNumber`:
+      // removals leave gaps that `handleAddExercise` (length + 1) can collide with, and the
+      // backend sorts on `order` with no tiebreaker -- so the rendered sequence has to be
+      // what gets persisted.
+      const payloadExercises = withArrayPositionOrder(exercises.map((ex) => ({
         exerciseId: ex.exerciseId,
-        order: idx + 1,
-        sets: (ex.sets || []).map((s: any, idx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
-          order: s.setNumber || s.order || idx + 1,
+        sets: (ex.sets || []).map((s: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
           setType: s.setType ?? SetType.WORKING,
           reps: s.reps ?? 0,
           weight: s.weight ?? 0,
           rir: s.rir ?? 0,
           rest: s.rest ?? 90,
         })),
-      }));
+      })));
 
       const payload = {
         name: name.trim(),
@@ -391,10 +395,22 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
                           onRemoveSet={(id, setNumber) => {
                             setExercises(prev => prev.map(e => {
                               if (e.id !== id) return e;
+                              // Renumber the survivors so local state stays contiguous: the
+                              // save payload is renumbered anyway, but leaving a gap shows up
+                              // in the collapsed bars' "Satz N" tooltips and in the numbers
+                              // `onAddSet` counts from.
+                              // NB: ExerciseCard keys its own state by set number (editValues,
+                              // skippedPlannedSetNumbers) and is not renumbered with us. That
+                              // is inert here only because every planned set has a logged twin;
+                              // #55 removes that twin, so this has to be revisited there.
                               return {
                                 ...e,
-                                sets: (e.sets || []).filter(s => (s.setNumber ?? 0) !== setNumber),
-                                plannedSets: (e.plannedSets || []).filter(p => p.order !== setNumber),
+                                sets: (e.sets || [])
+                                  .filter(s => (s.setNumber ?? 0) !== setNumber)
+                                  .map((s, i) => ({ ...s, setNumber: i + 1 })),
+                                plannedSets: (e.plannedSets || [])
+                                  .filter(p => p.order !== setNumber)
+                                  .map((p, i) => ({ ...p, order: i + 1 })),
                               };
                             }));
                           }}

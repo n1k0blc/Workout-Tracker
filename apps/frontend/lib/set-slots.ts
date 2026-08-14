@@ -11,7 +11,10 @@ import { SetType } from '@/types';
  * 0-/1-based `order` in the database produced (see migration
  * 20260814080000_normalize_order_to_one_based).
  *
- * These helpers only need set numbers to be *unique* within an exercise. Stored data was
+ * Both helpers *require* set numbers to be unique within an exercise, and neither can detect
+ * a violation: `getSetIndicatorSlots` de-duplicates into a `Set` and `resolveSetRows` resolves
+ * each row with a `find`, so duplicates silently drop a bar and mislabel a row rather than
+ * failing. The tests pin that behaviour so the requirement stays visible. Stored data was
  * made 1-based and contiguous by that migration, but nothing enforces it yet -- the input
  * DTOs validate `@Min(0)` and `replaceTree` persists whatever arrives, so save paths can
  * still write a 0-based or gappy tree. Enforcement is tracked separately; until it lands,

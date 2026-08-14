@@ -763,7 +763,7 @@ export default function ExerciseCard({
               const loggedSet = getLoggedSet(setNumber);
               const isEditingThis = editingSetId === loggedSet?.id;
               // `setRows` is built from the same filtered planned list, so it is index-aligned
-              // here -- no second lookup by set number, which is where the two views drifted.
+              // here: this row and the type resolved for it cannot come from different sets.
               const currentType = loggedSet
                 ? setRows[rowIdx].setType
                 : (editValues[setNumber]?.setType ?? setRows[rowIdx].setType);
