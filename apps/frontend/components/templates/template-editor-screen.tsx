@@ -15,6 +15,7 @@ import ExerciseSelectionModal from '@/components/workout/exercise-selection-moda
 import { IconChevronLeft, IconPlus } from '@tabler/icons-react';
 import { replaceExerciseInList } from '@/lib/exercise-replace';
 import { withArrayPositionOrder } from '@/lib/workout-order';
+import { addPlannedSet, removePlannedSet, updatePlannedSet } from '@/lib/planned-sets';
 import {
   DndContext,
   closestCenter,
@@ -132,19 +133,11 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
           // first two sets of an exercise onto the same number, which is what made the
           // collapsed card drop a bar and the expanded card mislabel a set's type.
           order: ex.order,
-          sets: (ex.sets || []).map((s: any, sIdx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
-            id: s.id || `set-${Date.now()}-${sIdx}`,
-            setNumber: s.order,
-            setType: s.setType ?? SetType.WORKING,
-            reps: s.reps ?? 0,
-            weight: s.weight ?? 0,
-            rir: s.rir ?? 0,
-            // `rest` has to ride along: the save payload is built from `sets`, so omitting it
-            // here flattened every set to the 90s default on save -- losing the measured rest
-            // values a template carries when it was created from a performed workout.
-            rest: s.rest ?? 90,
-            completedAt: new Date().toISOString(),
-          })),
+          // A template is a plan: nothing here was ever performed, so there are no logged
+          // sets. This used to hold a fabricated copy of every planned set stamped with a
+          // completion timestamp, purely because the shared card commits edits by logging --
+          // `onUpdatePlannedSet` replaces that, so `plannedSets` is now the only list.
+          sets: [],
           plannedSets: (ex.sets || []).map((s: any, sIdx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
             id: s.id || `planned-${Date.now()}-${sIdx}`,
             order: s.order,
@@ -190,7 +183,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
     }
 
     // Validate every exercise has at least one set (template requirement).
-    const hasEmpty = exercises.some((ex) => (ex.sets?.length || 0) === 0);
+    const hasEmpty = exercises.some((ex) => (ex.plannedSets?.length || 0) === 0);
     if (hasEmpty) {
       alert('Jede Übung muss mindestens einen Satz haben.');
       return;
@@ -204,7 +197,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
       // what gets persisted.
       const payloadExercises = withArrayPositionOrder(exercises.map((ex) => ({
         exerciseId: ex.exerciseId,
-        sets: (ex.sets || []).map((s: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
+        sets: (ex.plannedSets || []).map((s) => ({
           setType: s.setType ?? SetType.WORKING,
           reps: s.reps ?? 0,
           weight: s.weight ?? 0,
@@ -362,66 +355,25 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
                             }));
                           }}
                           onAddSet={(id) => {
-                            setExercises(prev => prev.map(e => {
-                              if (e.id !== id) return e;
-                              const setNumbers = (e.sets || []).map((s: any) => s.setNumber || s.order || 0); // eslint-disable-line @typescript-eslint/no-explicit-any
-                              const plannedOrders = (e.plannedSets || []).map((p: any) => p.order || p.setNumber || 0); // eslint-disable-line @typescript-eslint/no-explicit-any
-                              const nextOrder = Math.max(0, ...setNumbers, ...plannedOrders) + 1;
-                              const newSet = {
-                                id: `set-${Date.now()}`,
-                                setNumber: nextOrder,
-                                setType: SetType.WORKING,
-                                reps: 10,
-                                weight: 0,
-                                rir: 2,
-                                completedAt: new Date().toISOString(),
-                              };
-                              const newPlanned = {
-                                id: `planned-${Date.now()}`,
-                                order: nextOrder,
-                                setType: SetType.WORKING,
-                                reps: 10,
-                                weight: 0,
-                                rir: 2,
-                                rest: 90,
-                              };
-                              return {
-                                ...e,
-                                sets: [...(e.sets || []), newSet],
-                                plannedSets: [...(e.plannedSets || []), newPlanned],
-                              };
-                            }));
+                            setExercises(prev => prev.map(e =>
+                              e.id === id
+                                ? { ...e, plannedSets: addPlannedSet(e.plannedSets || []) }
+                                : e
+                            ));
                           }}
                           onRemoveSet={(id, setNumber) => {
-                            setExercises(prev => prev.map(e => {
-                              if (e.id !== id) return e;
-                              // Renumber the survivors so local state stays contiguous: the
-                              // save payload is renumbered anyway, but leaving a gap shows up
-                              // in the collapsed bars' "Satz N" tooltips and in the numbers
-                              // `onAddSet` counts from.
-                              // NB: ExerciseCard keys its own state by set number (editValues,
-                              // skippedPlannedSetNumbers) and is not renumbered with us. That
-                              // is inert here only because every planned set has a logged twin;
-                              // #55 removes that twin, so this has to be revisited there.
-                              return {
-                                ...e,
-                                sets: (e.sets || [])
-                                  .filter(s => (s.setNumber ?? 0) !== setNumber)
-                                  .map((s, i) => ({ ...s, setNumber: i + 1 })),
-                                plannedSets: (e.plannedSets || [])
-                                  .filter(p => p.order !== setNumber)
-                                  .map((p, i) => ({ ...p, order: i + 1 })),
-                              };
-                            }));
+                            setExercises(prev => prev.map(e =>
+                              e.id === id
+                                ? { ...e, plannedSets: removePlannedSet(e.plannedSets || [], setNumber) }
+                                : e
+                            ));
                           }}
-                          onUpdateSet={(id, setId, data) => {
-                            setExercises(prev => prev.map(e => {
-                              if (e.id !== id) return e;
-                              return {
-                                ...e,
-                                sets: (e.sets || []).map(s => s.id === setId ? { ...s, ...data } : s),
-                              };
-                            }));
+                          onUpdatePlannedSet={(id, setNumber, data) => {
+                            setExercises(prev => prev.map(e =>
+                              e.id === id
+                                ? { ...e, plannedSets: updatePlannedSet(e.plannedSets || [], setNumber, data) }
+                                : e
+                            ));
                           }}
                         />
                       ))}
