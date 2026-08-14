@@ -13,6 +13,9 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import ExerciseCard from '@/components/workout/exercise-card';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import { IconChevronLeft, IconPlus } from '@tabler/icons-react';
+import { replaceExerciseInList } from '@/lib/exercise-replace';
+import { withArrayPositionOrder } from '@/lib/workout-order';
+import { addPlannedSet, removePlannedSet, updatePlannedSet } from '@/lib/planned-sets';
 import {
   DndContext,
   closestCenter,
@@ -121,19 +124,23 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
           id: ex.id || `ex-${Date.now()}-${idx}`,
           exerciseId: ex.exerciseId,
           exerciseName: ex.exerciseName || '',
-          order: ex.order === 0 ? idx + 1 : ex.order,
-          sets: (ex.sets || []).map((s: any, sIdx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
-            id: s.id || `set-${Date.now()}-${sIdx}`,
-            setNumber: s.order === 0 ? sIdx + 1 : s.order,
-            setType: s.setType ?? SetType.WORKING,
-            reps: s.reps ?? 0,
-            weight: s.weight ?? 0,
-            rir: s.rir ?? 0,
-            completedAt: new Date().toISOString(),
-          })),
+          // Templates saved before the flags were persisted fall back to the exercise catalogue,
+          // which is what the "Gewicht (2x)" / "Wdh (2x)" headers read from.
+          isUnilateral: ex.isUnilateral ?? exs.find((e) => e.id === ex.exerciseId)?.isUnilateral ?? false,
+          isDoubleWeight: ex.isDoubleWeight ?? exs.find((e) => e.id === ex.exerciseId)?.isDoubleWeight ?? false,
+          // Stored order is 1-based and contiguous (migration 20260814080000); it is used as
+          // read. The previous `order === 0 ? index + 1` fixup for 0-based rows mapped the
+          // first two sets of an exercise onto the same number, which is what made the
+          // collapsed card drop a bar and the expanded card mislabel a set's type.
+          order: ex.order,
+          // A template is a plan: nothing here was ever performed, so there are no logged
+          // sets. This used to hold a fabricated copy of every planned set stamped with a
+          // completion timestamp, purely because the shared card commits edits by logging --
+          // `onUpdatePlannedSet` replaces that, so `plannedSets` is now the only list.
+          sets: [],
           plannedSets: (ex.sets || []).map((s: any, sIdx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
             id: s.id || `planned-${Date.now()}-${sIdx}`,
-            order: s.order === 0 ? sIdx + 1 : s.order,
+            order: s.order,
             setType: s.setType ?? SetType.WORKING,
             reps: s.reps ?? 0,
             weight: s.weight ?? 0,
@@ -176,7 +183,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
     }
 
     // Validate every exercise has at least one set (template requirement).
-    const hasEmpty = exercises.some((ex) => (ex.sets?.length || 0) === 0);
+    const hasEmpty = exercises.some((ex) => (ex.plannedSets?.length || 0) === 0);
     if (hasEmpty) {
       alert('Jede Übung muss mindestens einen Satz haben.');
       return;
@@ -184,18 +191,20 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
 
     setSaving(true);
     try {
-      const payloadExercises = exercises.map((ex) => ({
+      // `order` comes from array position at both levels, not from `ex.order`/`s.setNumber`:
+      // removals leave gaps that `handleAddExercise` (length + 1) can collide with, and the
+      // backend sorts on `order` with no tiebreaker -- so the rendered sequence has to be
+      // what gets persisted.
+      const payloadExercises = withArrayPositionOrder(exercises.map((ex) => ({
         exerciseId: ex.exerciseId,
-        order: ex.order,
-        sets: (ex.sets || []).map((s: any, idx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
-          order: s.setNumber || s.order || idx + 1,
+        sets: (ex.plannedSets || []).map((s) => ({
           setType: s.setType ?? SetType.WORKING,
           reps: s.reps ?? 0,
           weight: s.weight ?? 0,
           rir: s.rir ?? 0,
           rest: s.rest ?? 90,
         })),
-      }));
+      })));
 
       const payload = {
         name: name.trim(),
@@ -340,60 +349,31 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
                           onRemoveExercise={(id) => setExercises(prev => prev.filter(e => e.id !== id))}
                           onReplaceExercise={(id, newId) => {
                             const exDetails = availableExercises.find((e) => e.id === newId);
-                            setExercises(prev => prev.map(e => e.id === id 
-                              ? { ...e, exerciseId: newId, exerciseName: exDetails?.name || 'Exercise' } 
-                              : e
-                            ));
+                            setExercises(prev => replaceExerciseInList(prev, id, {
+                              ...(exDetails ?? { name: 'Exercise' }),
+                              id: newId,
+                            }));
                           }}
                           onAddSet={(id) => {
-                            setExercises(prev => prev.map(e => {
-                              if (e.id !== id) return e;
-                              const setNumbers = (e.sets || []).map((s: any) => s.setNumber || s.order || 0); // eslint-disable-line @typescript-eslint/no-explicit-any
-                              const plannedOrders = (e.plannedSets || []).map((p: any) => p.order || p.setNumber || 0); // eslint-disable-line @typescript-eslint/no-explicit-any
-                              const nextOrder = Math.max(0, ...setNumbers, ...plannedOrders) + 1;
-                              const newSet = {
-                                id: `set-${Date.now()}`,
-                                setNumber: nextOrder,
-                                setType: SetType.WORKING,
-                                reps: 10,
-                                weight: 0,
-                                rir: 2,
-                                completedAt: new Date().toISOString(),
-                              };
-                              const newPlanned = {
-                                id: `planned-${Date.now()}`,
-                                order: nextOrder,
-                                setType: SetType.WORKING,
-                                reps: 10,
-                                weight: 0,
-                                rir: 2,
-                                rest: 90,
-                              };
-                              return {
-                                ...e,
-                                sets: [...(e.sets || []), newSet],
-                                plannedSets: [...(e.plannedSets || []), newPlanned],
-                              };
-                            }));
+                            setExercises(prev => prev.map(e =>
+                              e.id === id
+                                ? { ...e, plannedSets: addPlannedSet(e.plannedSets || []) }
+                                : e
+                            ));
                           }}
                           onRemoveSet={(id, setNumber) => {
-                            setExercises(prev => prev.map(e => {
-                              if (e.id !== id) return e;
-                              return {
-                                ...e,
-                                sets: (e.sets || []).filter(s => (s.setNumber ?? 0) !== setNumber),
-                                plannedSets: (e.plannedSets || []).filter(p => p.order !== setNumber),
-                              };
-                            }));
+                            setExercises(prev => prev.map(e =>
+                              e.id === id
+                                ? { ...e, plannedSets: removePlannedSet(e.plannedSets || [], setNumber) }
+                                : e
+                            ));
                           }}
-                          onUpdateSet={(id, setId, data) => {
-                            setExercises(prev => prev.map(e => {
-                              if (e.id !== id) return e;
-                              return {
-                                ...e,
-                                sets: (e.sets || []).map(s => s.id === setId ? { ...s, ...data } : s),
-                              };
-                            }));
+                          onUpdatePlannedSet={(id, setNumber, data) => {
+                            setExercises(prev => prev.map(e =>
+                              e.id === id
+                                ? { ...e, plannedSets: updatePlannedSet(e.plannedSets || [], setNumber, data) }
+                                : e
+                            ));
                           }}
                         />
                       ))}

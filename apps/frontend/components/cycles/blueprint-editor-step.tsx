@@ -17,6 +17,8 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import type { ExerciseLog } from '@/types';
+import { replaceExerciseInList } from '@/lib/exercise-replace';
+import { withArrayPositionOrder } from '@/lib/workout-order';
 import {
   DndContext,
   closestCenter,
@@ -127,6 +129,10 @@ export default function BlueprintEditorStep({
         id: ex.id || `ex-${ex.exerciseId || idx}`,
         exerciseId: ex.exerciseId,
         exerciseName: ex.exerciseName || exDetails?.name || '',
+        // The blueprint payload only carries exerciseId, so the loading-scheme flags that drive
+        // the "Gewicht (2x)" / "Wdh (2x)" headers have to come from the exercise catalogue.
+        isUnilateral: ex.isUnilateral ?? exDetails?.isUnilateral ?? false,
+        isDoubleWeight: ex.isDoubleWeight ?? exDetails?.isDoubleWeight ?? false,
         order: ex.order || idx + 1,
         sets,
         plannedSets,
@@ -135,13 +141,11 @@ export default function BlueprintEditorStep({
   }, [exercises]);
 
   const mapExerciseLogsToBlueprint = useCallback((exLogs: ExerciseLog[]) => {
-    return exLogs.map((ex) => ({
+    return withArrayPositionOrder(exLogs.map((ex) => ({
       exerciseId: ex.exerciseId,
-      order: ex.order,
-      sets: (ex.plannedSets || ex.sets || []).map((s: any, idx: number) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+      sets: (ex.plannedSets || ex.sets || []).map((s: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
         const p = (ex.plannedSets || []).find((pp: any) => (pp.order || pp.setNumber) === (s.setNumber || s.order)) || s; // eslint-disable-line @typescript-eslint/no-explicit-any
         return {
-          order: s.setNumber || s.order || idx + 1,
           setType: s.setType,
           reps: s.reps ?? 0,
           weight: s.weight ?? 0,
@@ -149,7 +153,7 @@ export default function BlueprintEditorStep({
           rest: p.rest ?? 90,
         };
       }),
-    }));
+    })));
   }, []);
 
   // Sync helper: after local changes to currentExercises, push back to formData
@@ -191,10 +195,10 @@ export default function BlueprintEditorStep({
 
     if (oldIndex === -1 || newIndex === -1) return;
 
-    const reordered = arrayMove(currentExercises, oldIndex, newIndex);
-    reordered.forEach((ex, idx) => {
-      ex.order = idx + 1;
-    });
+    const reordered = arrayMove(currentExercises, oldIndex, newIndex).map((ex, idx) => ({
+      ...ex,
+      order: idx + 1,
+    }));
 
     setCurrentExercises(reordered);
     syncCurrentExercisesToFormData(reordered);
@@ -221,18 +225,16 @@ export default function BlueprintEditorStep({
       const templateData = {
         name: templateName.trim(),
         recommendedGymId: currentDay.plannedHomeGymId || undefined,
-        exercises: currentDay.blueprint.exercises.map((ex) => ({
+        exercises: withArrayPositionOrder(currentDay.blueprint.exercises.map((ex) => ({
           exerciseId: ex.exerciseId,
-          order: ex.order - 1, // Convert 1-based to 0-based
           sets: ex.sets.map((set) => ({
-            order: set.order,
             setType: set.setType,
             reps: set.reps,
             weight: set.weight,
             rir: set.rir,
             rest: set.rest,
           })),
-        })),
+        }))),
       };
 
       await apiClient.createWorkoutTemplate(templateData);
@@ -266,18 +268,20 @@ export default function BlueprintEditorStep({
       }
 
       // Convert template data to wizard format
-      const wizardExercises = template.exercises.map((ex) => ({
+      // No base conversion: the API serves 1-based ordering, and array position is what
+      // decides the sequence anyway (see lib/workout-order.ts). The `+ 1` that used to sit
+      // here assumed every template was stored 0-based, which shifted user-created ones to
+      // start at 2.
+      const wizardExercises = withArrayPositionOrder(template.exercises.map((ex) => ({
         exerciseId: ex.exerciseId,
-        order: ex.order + 1, // Convert 0-based to 1-based
         sets: ex.sets.map((set) => ({
-          order: set.order + 1, // Convert 0-based to 1-based
           setType: set.setType,
           reps: set.reps,
           weight: set.weight,
           rir: set.rir ?? 0,
           rest: set.rest ?? 90,
         })),
-      }));
+      })));
 
       // Update the current day with template data
       const updatedDays = [...formData.workoutDays];
@@ -420,18 +424,18 @@ export default function BlueprintEditorStep({
                         allowLogging={false}
                         defaultOpen={newlyAddedIds.has(exercise.id)}
                         onRemoveExercise={(exId) => {
-                          const newList = currentExercises.filter((e) => e.id !== exId);
-                          newList.forEach((e, i) => (e.order = i + 1));
+                          const newList = currentExercises
+                            .filter((e) => e.id !== exId)
+                            .map((e, i) => ({ ...e, order: i + 1 }));
                           setCurrentExercises(newList);
                           syncCurrentExercisesToFormData(newList);
                         }}
                         onReplaceExercise={(exId, newExId) => {
                           const exDetails = exercises.find((e) => e.id === newExId);
-                          const newList = currentExercises.map((e) =>
-                            e.id === exId
-                              ? { ...e, exerciseId: newExId, exerciseName: exDetails?.name || 'Exercise' }
-                              : e
-                          );
+                          const newList = replaceExerciseInList(currentExercises, exId, {
+                            ...(exDetails ?? { name: 'Exercise' }),
+                            id: newExId,
+                          });
                           setCurrentExercises(newList);
                           syncCurrentExercisesToFormData(newList);
                         }}

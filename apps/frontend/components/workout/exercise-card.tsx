@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ExerciseLog, SetLog, SetType } from '@/types';
 import { useWorkout } from '@/lib/workout-context';
+import { getSetIndicatorSlots, resolveSetRows } from '@/lib/set-slots';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import ExerciseSelectionModal from './exercise-selection-modal';
@@ -57,6 +58,15 @@ interface ExerciseCardProps {
   onAddSet?: (exerciseId: string) => void;
   onRemoveSet?: (exerciseId: string, setNumber: number) => void;
   onUpdateSet?: (exerciseId: string, setId: string, data: { reps?: number; weight?: number; rir?: number; setType?: SetType }) => void | Promise<void>;
+  /**
+   * Write-back for editors that own a *plan* and have no logging concept (allowLogging=false),
+   * so a planned row can be edited without first being materialized into a logged set.
+   * Addressed by set number, because a planned set is identified by its position in the plan.
+   * When absent the card keeps its previous behaviour: edits stay in local state until the row
+   * is logged. Callers that still fabricate a logged twin (the blueprint editors) use
+   * `onUpdateSet` and are unaffected.
+   */
+  onUpdatePlannedSet?: (exerciseId: string, setNumber: number, data: { reps?: number; weight?: number; rir?: number; setType?: SetType }) => void;
 
   /** Pure view mode: everything read-only, no actions, no editing of values/types/sets */
   readonly?: boolean;
@@ -79,6 +89,7 @@ export default function ExerciseCard({
   onAddSet,
   onRemoveSet,
   onUpdateSet,
+  onUpdatePlannedSet,
   readonly,
   defaultOpen,
 }: ExerciseCardProps) {
@@ -323,9 +334,26 @@ export default function ExerciseCard({
   // - any setNumbers that have been explicitly discarded/skipped for this session
   // - COMPLETED workouts (history edit): we only edit existing performed sets; do not auto-materialize
   //   never-performed planned sets into the saved data.
+  // `ownsPlan` gates this: a caller that writes planned sets back itself must not have them
+  // materialized into logged ones behind its back -- for the template editor that would
+  // recreate exactly the fabricated list this indirection removes.
+  //
+  // The guard is *not* `effectiveAllowLogging`, even though these callers all set it false:
+  // past-workout tracking is also mode='edit' with allowLogging=false, and since its check
+  // column and LTR swipe are both gated on that flag, this effect is the only thing that
+  // logs its sets at all. Gating on the flag would make finishing a past workout save nothing.
+  //
+  // `!isReadonly` matters just as much: a pure view must never write. The read-only
+  // system-template view is also mode='edit' and, being read-only, passes no
+  // `onUpdatePlannedSet` -- so `ownsPlan` alone does not cover it. It used to be protected by
+  // accident, because the template loader fabricated a logged twin for every planned set and
+  // the `getLoggedSet` check below always short-circuited. That twin is gone, so without this
+  // guard, merely *opening* a system template while a workout draft exists would log its
+  // planned sets into that draft.
+  const ownsPlan = !!onUpdatePlannedSet;
   const isCompletedHijack = isHistoryEdit;
   useEffect(() => {
-    if (mode === 'edit' && hasPlannedSets && !initialEditCommitDone.current && !isCompletedHijack) {
+    if (mode === 'edit' && !ownsPlan && !isReadonly && hasPlannedSets && !initialEditCommitDone.current && !isCompletedHijack) {
       initialEditCommitDone.current = true;
       exercise.plannedSets!.forEach((ps) => {
         const sn = ps.order;
@@ -341,25 +369,24 @@ export default function ExerciseCard({
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, hasPlannedSets, skippedPlannedSetNumbers, isCompletedHijack]);
+  }, [mode, ownsPlan, isReadonly, hasPlannedSets, skippedPlannedSetNumbers, isCompletedHijack]);
 
-  const getSetIndicatorSlots = (): number[] => {
-    const slots = new Set<number>();
+  // Bars (collapsed) and planned rows (expanded) share one derivation -- see lib/set-slots.ts.
+  // They agree on the planned segment only: `setIndicatorSlots` also covers logged extras and
+  // unlogged drafts, which are rendered as their own rows further down, so with extras present
+  // the bar count legitimately exceeds the planned row count.
+  const setIndicatorSlots = getSetIndicatorSlots({
+    plannedSets: exercise.plannedSets,
+    sets: exercise.sets,
+    additionalSetNumbers,
+    skippedSetNumbers: skippedPlannedSetNumbers,
+  });
 
-    if (hasPlannedSets && exercise.plannedSets!.length > 0) {
-      exercise.plannedSets!
-        .filter(ps => !skippedPlannedSetNumbers.has(ps.order))
-        .forEach((ps) => slots.add(ps.order));
-    }
-
-    // Include logged sets (covers logged planned + logged extras; for free workouts: all logged)
-    exercise.sets.forEach((s) => slots.add(s.setNumber));
-
-    // Include unlogged additional/extras (for planned workouts with added sets, and free workouts)
-    additionalSetNumbers.forEach((n) => slots.add(n));
-
-    return Array.from(slots).sort((a, b) => a - b);
-  };
+  const setRows = resolveSetRows({
+    plannedSets: exercise.plannedSets,
+    sets: exercise.sets,
+    skippedSetNumbers: skippedPlannedSetNumbers,
+  });
 
   // Swipe helpers
   const SWIPE_THRESHOLD = 70;
@@ -405,6 +432,13 @@ export default function ExerciseCard({
       if (onRemoveSet) {
         // Controlled usage (template editor, cycle blueprint, etc.): mutate the plan directly.
         onRemoveSet(exercise.id, setNumber);
+        // A controlled remove renumbers the survivors, so every *other* buffered edit is now
+        // filed under the wrong set number and would render on the wrong row. Drop the whole
+        // buffer rather than the one entry: it is only a display buffer for in-flight typing,
+        // and a plan-owning caller has already been told about each change as it happened.
+        if (ownsPlan) {
+          setEditValues({});
+        }
         setAdditionalSetNumbers(prev => prev.filter(n => n !== setNumber));
         setSkippedPlannedSetNumbers(prev => {
           const next = new Set(prev);
@@ -502,7 +536,20 @@ export default function ExerciseCard({
         contextUpdateSet(loggedSet.id, { weight: w, reps: r, rir: ri });
       }
     } else {
+      // Keep the raw string locally so the field shows what was typed (a half-entered "1"
+      // of "10" must not render as 1), and push the parsed value to the owner of the plan.
       updateEditValue(setNumber, field, newValStr);
+      if (onUpdatePlannedSet) {
+        // A cleared field is 0 in the model, never `undefined`: the plan's fields are all
+        // required numbers, and an `undefined` RIR would be copied as the *previous* set's
+        // value by `addPlannedSet` while the row it came from still rendered blank.
+        // The blank display is preserved by the local buffer above.
+        const parsed =
+          field === 'reps' || field === 'rir'
+            ? (parseInt(newValStr) || 0)
+            : (parseFloat(newValStr) || 0);
+        onUpdatePlannedSet(exercise.id, setNumber, { [field]: parsed });
+      }
     }
   };
 
@@ -516,7 +563,7 @@ export default function ExerciseCard({
     const swipeClass = swipeOffset > 0 ? 'bg-primary/5' : swipeOffset < 0 ? 'bg-destructive/5' : '';
 
     const commitIfNeeded = () => {
-      if (mode === 'edit' && !getLoggedSet(setNumber) && !isCompletedHijack) {
+      if (mode === 'edit' && !ownsPlan && !isReadonly && !getLoggedSet(setNumber) && !isCompletedHijack) {
         const w = parseFloat(getEditValue(setNumber, 'weight') || '0');
         const r = parseInt(getEditValue(setNumber, 'reps') || '0');
         if (w > 0 && r > 0) {
@@ -697,7 +744,7 @@ export default function ExerciseCard({
             {/* Collapsed set progress indicators: horizontal lines, foreground for logged */}
             {isCollapsed && (
               <div className="flex items-center gap-1 mt-1 ml-8">
-                {getSetIndicatorSlots().map((slot, i) => {
+                {setIndicatorSlots.map((slot, i) => {
                   // For blueprint/template edit (!allowLogging), always show as "unlogged" (gray) since there's no logging concept.
                   const logged = effectiveAllowLogging && !!getLoggedSet(slot);
                   return (
@@ -760,11 +807,15 @@ export default function ExerciseCard({
             {/* Planned Sets as table rows (filter skipped unlogged ones) */}
             {hasPlannedSets && exercise.plannedSets!
               .filter(ps => !skippedPlannedSetNumbers.has(ps.order))
-              .map((plannedSet) => {
+              .map((plannedSet, rowIdx) => {
               const setNumber = plannedSet.order;
               const loggedSet = getLoggedSet(setNumber);
               const isEditingThis = editingSetId === loggedSet?.id;
-              const currentType = loggedSet ? loggedSet.setType : getEditSetType(setNumber);
+              // `setRows` is built from the same filtered planned list, so it is index-aligned
+              // here: this row and the type resolved for it cannot come from different sets.
+              const currentType = loggedSet
+                ? setRows[rowIdx].setType
+                : (editValues[setNumber]?.setType ?? setRows[rowIdx].setType);
               const isWarmup = currentType === SetType.WARMUP;
 
               const gridClass = `grid ${colTemplate} items-center gap-x-2 py-1.5 border-b border-border last:border-b-0`;
@@ -774,7 +825,7 @@ export default function ExerciseCard({
               const swipeClass = swipeOffset > 0 ? 'bg-primary/5' : swipeOffset < 0 ? 'bg-destructive/5' : '';
 
               const commitIfNeeded = () => {
-                if (!isReadonly && mode === 'edit' && !loggedSet && !isCompletedHijack) {
+                if (!isReadonly && mode === 'edit' && !ownsPlan && !loggedSet && !isCompletedHijack) {
                   const w = parseFloat(getEditValue(setNumber, 'weight') || plannedSet.weight?.toString() || '0');
                   const r = parseInt(getEditValue(setNumber, 'reps') || plannedSet.reps?.toString() || '0');
                   if (w > 0 && r > 0) {
@@ -817,6 +868,7 @@ export default function ExerciseCard({
                             }
                           } else {
                             updateEditValue(setNumber, 'setType', next);
+                            onUpdatePlannedSet?.(exercise.id, setNumber, { setType: next });
                           }
                         }
                       }}

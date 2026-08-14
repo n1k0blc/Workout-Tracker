@@ -20,8 +20,11 @@ import { SetType } from '../types';
  * drift (setType vs isWarmup, order vs setNumber, reps/weight/rir vs target*).
  */
 export class WorkoutSetInputDto {
+  // 1-based, and must equal this set's position in `sets` -- see the WorkoutTreeService
+  // docstring. `@Min(1)` only catches the 0-based case; the positional check lives in
+  // `toExerciseInputs`, because it needs the whole array.
   @IsInt()
-  @Min(0)
+  @Min(1)
   order: number;
 
   @IsEnum(SetType)
@@ -58,8 +61,9 @@ export class WorkoutExerciseInputDto {
   @IsString()
   exerciseId: string;
 
+  // 1-based, and must equal this exercise's position in `exercises` -- see WorkoutSetInputDto.
   @IsInt()
-  @Min(0)
+  @Min(1)
   order: number;
 
   @IsArray()

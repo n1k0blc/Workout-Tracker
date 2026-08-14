@@ -36,6 +36,8 @@ import {
 } from '@/components/ui/dialog';
 import { IconPlus } from '@tabler/icons-react';
 import type { ExerciseLog } from '@/types';
+import { replaceExerciseInList } from '@/lib/exercise-replace';
+import { withArrayPositionOrder } from '@/lib/workout-order';
 
 export default function EditBlueprintPage() {
   const params = useParams();
@@ -113,6 +115,8 @@ export default function EditBlueprintPage() {
       id: `new-${Date.now()}`, // Temporary ID
       exerciseId: exercise.id,
       exerciseName: exercise.name,
+      isUnilateral: exercise.isUnilateral,
+      isDoubleWeight: exercise.isDoubleWeight,
       order: exercises.length + 1,
       sets: [
         {
@@ -155,13 +159,7 @@ export default function EditBlueprintPage() {
   const handleReplaceExercise = async (exerciseLogId: string, newExerciseId: string) => {
     try {
       const newExercise = await apiClient.getExercise(newExerciseId);
-      setExercises((prev) =>
-        prev.map((ex) =>
-          ex.id === exerciseLogId
-            ? { ...ex, exerciseId: newExercise.id, exerciseName: newExercise.name }
-            : ex
-        )
-      );
+      setExercises((prev) => replaceExerciseInList(prev, exerciseLogId, newExercise));
     } catch (error) {
       console.error('Failed to replace exercise:', error);
     }
@@ -205,18 +203,16 @@ export default function EditBlueprintPage() {
       
       // Transform exercises to match API format
       const blueprintData = {
-        exercises: exercises.map((ex) => ({
+        exercises: withArrayPositionOrder(exercises.map((ex) => ({
           exerciseId: ex.exerciseId,
-          order: ex.order,
           sets: ex.sets.map((set) => ({
-            order: set.order,
             setType: set.setType,
             reps: set.reps,
             weight: set.weight,
             rir: set.rir,
             rest: set.rest,
           })),
-        })),
+        }))),
       };
 
       await apiClient.updateBlueprint(cycleId, workoutDayId, blueprintData);
@@ -250,18 +246,16 @@ export default function EditBlueprintPage() {
       const templateData = {
         name: templateName.trim(),
         recommendedGymId: plannedHomeGymId || undefined,
-        exercises: exercises.map((ex) => ({
+        exercises: withArrayPositionOrder(exercises.map((ex) => ({
           exerciseId: ex.exerciseId,
-          order: ex.order,
           sets: ex.sets.map((set) => ({
-            order: set.order,
             setType: set.setType,
             reps: set.reps,
             weight: set.weight,
             rir: set.rir,
             rest: set.rest,
           })),
-        })),
+        }))),
       };
 
       await apiClient.createWorkoutTemplate(templateData);

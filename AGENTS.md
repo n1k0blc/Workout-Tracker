@@ -63,3 +63,34 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+---
+
+## Domain invariants
+
+### Exercise and set ordering
+
+**Array position is authoritative. `order` is 1-based and contiguous within its parent, and must restate the position it was sent in.**
+
+This holds for all three `WorkoutKind`s (`BLUEPRINT`, `TEMPLATE`, `WORKOUT`) and both levels of the tree — `WorkoutExercise.order` within a workout, `WorkoutSet.order` within an exercise.
+
+- **Clients** build save payloads with `withArrayPositionOrder` (`apps/frontend/lib/workout-order.ts`), which stamps `order` from array position. Never send a stored `order` back, and never add or subtract an offset to "convert" between bases.
+- **The API** rejects a payload whose `order` disagrees with its array position with a 400 (`toExerciseInputs`), and writes `order` from array position regardless (`replaceTree`). Both live in `apps/backend/src/workout-tree/workout-tree.service.ts`.
+
+Rejection is deliberate rather than quietly normalizing: an array of A, B, C numbered 3, 1, 2 states two different sequences, and picking one would silently discard a reorder.
+
+The invariant is enforced, not merely assumed — but it was not always. `order` used to be persisted verbatim from whatever each client sent, which left 0-based rows, 1-based rows, gaps and bases above 1 coexisting in the same tables; migration `20260814080000_normalize_order_to_one_based` cleaned that up. Symptoms of a regression here are subtle: the collapsed exercise card de-duplicates set numbers when drawing its bars, so duplicates silently drop a bar and mislabel a set's warm-up/working type rather than failing.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues on `n1k0blc/Workout-Tracker`, driven by the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical triage roles, each label string equal to its name (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context — one `CONTEXT.md` and one `docs/adr/` at the repo root, covering both `apps/backend` and `apps/frontend`. See `docs/agents/domain.md`.
