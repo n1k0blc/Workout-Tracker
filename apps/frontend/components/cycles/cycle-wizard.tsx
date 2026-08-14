@@ -27,6 +27,14 @@ export interface WorkoutDayData {
   plannedHomeGymId?: string;
   blueprint: {
     exercises: Array<{
+      // Client-only draft fields. The blueprint is the single source of truth the editor
+      // re-derives its local state from on every edit, so these have to survive the round trip
+      // (stable React keys, and display data for exercises the catalogue can't describe).
+      // The submit payload below picks only exerciseId and sets, so they never reach the API.
+      id?: string;
+      exerciseName?: string;
+      isUnilateral?: boolean;
+      isDoubleWeight?: boolean;
       exerciseId: string;
       order: number;
       sets: BlueprintSetData[];

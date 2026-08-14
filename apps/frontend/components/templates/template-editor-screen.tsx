@@ -347,8 +347,10 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
                           allowLogging={false}
                           defaultOpen={newlyAddedIds.has(exercise.id)}
                           onRemoveExercise={(id) => setExercises(prev => prev.filter(e => e.id !== id))}
-                          onReplaceExercise={(id, newId) => {
-                            const exDetails = availableExercises.find((e) => e.id === newId);
+                          onReplaceExercise={(id, newId, newEx) => {
+                            // The picker's own entry wins: a custom exercise created during the
+                            // swap isn't in `availableExercises` yet, so the lookup finds nothing.
+                            const exDetails = newEx ?? availableExercises.find((e) => e.id === newId);
                             setExercises(prev => replaceExerciseInList(prev, id, {
                               ...(exDetails ?? { name: 'Exercise' }),
                               id: newId,

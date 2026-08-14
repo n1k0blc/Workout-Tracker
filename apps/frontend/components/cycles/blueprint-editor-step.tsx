@@ -126,7 +126,10 @@ export default function BlueprintEditorStep({
         };
       });
       return {
-        id: ex.id || `ex-${ex.exerciseId || idx}`,
+        // `idx` is part of the fallback because the same exercise may legitimately appear
+        // twice in one day. Keying on exerciseId alone made those two entries share a React
+        // key, which React rejects outright ("two children with the same key").
+        id: ex.id || `ex-${ex.exerciseId || 'unknown'}-${idx}`,
         exerciseId: ex.exerciseId,
         exerciseName: ex.exerciseName || exDetails?.name || '',
         // The blueprint payload only carries exerciseId, so the loading-scheme flags that drive
@@ -140,9 +143,19 @@ export default function BlueprintEditorStep({
     });
   }, [exercises]);
 
+  // Every edit round-trips the local draft through formData and straight back in via the effect
+  // below, so any field this mapping drops is destroyed on the next keystroke. `id` and the three
+  // display fields are carried through for exactly that reason: `id` keeps React keys stable
+  // across the round trip, and the display fields survive for exercises the catalogue can't
+  // describe (a custom one created inside the picker). The submit payload in cycle-wizard picks
+  // only exerciseId and sets, so none of this reaches the API.
   const mapExerciseLogsToBlueprint = useCallback((exLogs: ExerciseLog[]) => {
     return withArrayPositionOrder(exLogs.map((ex) => ({
+      id: ex.id,
       exerciseId: ex.exerciseId,
+      exerciseName: ex.exerciseName,
+      isUnilateral: ex.isUnilateral,
+      isDoubleWeight: ex.isDoubleWeight,
       sets: (ex.plannedSets || ex.sets || []).map((s: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
         const p = (ex.plannedSets || []).find((pp: any) => (pp.order || pp.setNumber) === (s.setNumber || s.order)) || s; // eslint-disable-line @typescript-eslint/no-explicit-any
         return {
@@ -430,8 +443,14 @@ export default function BlueprintEditorStep({
                           setCurrentExercises(newList);
                           syncCurrentExercisesToFormData(newList);
                         }}
-                        onReplaceExercise={(exId, newExId) => {
-                          const exDetails = exercises.find((e) => e.id === newExId);
+                        onReplaceExercise={(exId, newExId, newEx) => {
+                          // Prefer the entry the picker handed over: a custom exercise created
+                          // during this very swap is not in `exercises` yet, so the lookup alone
+                          // would leave the card with an empty name and no 2x headers.
+                          const exDetails = newEx ?? exercises.find((e) => e.id === newExId);
+                          if (newEx && !exercises.some((e) => e.id === newEx.id)) {
+                            setExercises((prev) => [newEx, ...prev]);
+                          }
                           const newList = replaceExerciseInList(currentExercises, exId, {
                             ...(exDetails ?? { name: 'Exercise' }),
                             id: newExId,

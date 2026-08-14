@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { Workout, WorkoutExercise, ExerciseLog, SetLog, PlannedSet, SetType, SaveAsTemplateMode, WorkoutExerciseInput } from '@/types';
+import { Workout, WorkoutExercise, ExerciseLog, SetLog, PlannedSet, SetType, SaveAsTemplateMode, WorkoutExerciseInput, Exercise } from '@/types';
 import { apiClient } from '@/lib/api';
 import { reorderExerciseLogs, toExercisePayload } from '@/lib/workout-order';
 import { replaceExerciseInList } from '@/lib/exercise-replace';
@@ -66,7 +66,7 @@ interface WorkoutContextType {
   discardWorkout: () => void;
   addExercise: (exerciseId: string) => Promise<string>;
   removeExercise: (exerciseLogId: string) => Promise<void>;
-  replaceExercise: (exerciseLogId: string, newExerciseId: string) => Promise<void>;
+  replaceExercise: (exerciseLogId: string, newExerciseId: string, newExercise?: Exercise) => Promise<void>;
   reorderExercises: (exerciseIds: string[]) => Promise<void>;
   logSet: (
     exerciseLogId: string,
@@ -619,11 +619,12 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
-  const replaceExercise = async (exerciseLogId: string, newExerciseId: string) => {
+  const replaceExercise = async (exerciseLogId: string, newExerciseId: string, newExercise?: Exercise) => {
     if (!activeWorkout) return;
 
     try {
-      const exDetails = await apiClient.getExercise(newExerciseId);
+      // The picker already handed us the entry it selected; only fall back to the API when it didn't.
+      const exDetails = newExercise ?? await apiClient.getExercise(newExerciseId);
       const updated = {
         ...activeWorkout,
         exercises: replaceExerciseInList(activeWorkout.exercises, exerciseLogId, {

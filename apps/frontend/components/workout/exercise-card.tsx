@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { ExerciseLog, SetLog, SetType } from '@/types';
+import { ExerciseLog, SetLog, SetType, Exercise } from '@/types';
 import { useWorkout } from '@/lib/workout-context';
 import { getSetIndicatorSlots, resolveSetRows } from '@/lib/set-slots';
 import { useSortable } from '@dnd-kit/sortable';
@@ -54,7 +54,13 @@ interface ExerciseCardProps {
 
   // Optional handlers for controlled usage (e.g. templates without context hijack)
   onRemoveExercise?: (exerciseId: string) => void | Promise<void>;
-  onReplaceExercise?: (exerciseId: string, newExerciseId: string) => void | Promise<void>;
+  /**
+   * `newExercise` is the catalogue entry the user actually picked, handed over so the receiver
+   * does not have to look the id up again. A just-created custom exercise is not in any list
+   * the receiver holds, so a lookup returns nothing and the swap loses the name and the
+   * isUnilateral/isDoubleWeight flags.
+   */
+  onReplaceExercise?: (exerciseId: string, newExerciseId: string, newExercise?: Exercise) => void | Promise<void>;
   onAddSet?: (exerciseId: string) => void;
   onRemoveSet?: (exerciseId: string, setNumber: number) => void;
   onUpdateSet?: (exerciseId: string, setId: string, data: { reps?: number; weight?: number; rir?: number; setType?: SetType }) => void | Promise<void>;
@@ -278,14 +284,14 @@ export default function ExerciseCard({
     }
   };
 
-  const handleReplaceExercise = async (newExerciseId: string) => {
+  const handleReplaceExercise = async (newExerciseId: string, newExercise?: Exercise) => {
     if (hasLoggedSets && !onReplaceExercise) {
       console.warn('Cannot replace exercise after sets have been logged');
       setShowReplaceModal(false);
       return;
     }
     try {
-      await replaceExercise(exercise.id, newExerciseId);
+      await replaceExercise(exercise.id, newExerciseId, newExercise);
       setShowReplaceModal(false);
       setIsCollapsed(false);
     } catch (error) {
