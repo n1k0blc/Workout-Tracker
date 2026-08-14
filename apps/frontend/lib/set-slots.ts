@@ -14,11 +14,15 @@ import { SetType } from '@/types';
  * Both helpers *require* set numbers to be unique within an exercise, and neither can detect
  * a violation: `getSetIndicatorSlots` de-duplicates into a `Set` and `resolveSetRows` resolves
  * each row with a `find`, so duplicates silently drop a bar and mislabel a row rather than
- * failing. The tests pin that behaviour so the requirement stays visible. Stored data was
- * made 1-based and contiguous by that migration, but nothing enforces it yet -- the input
- * DTOs validate `@Min(0)` and `replaceTree` persists whatever arrives, so save paths can
- * still write a 0-based or gappy tree. Enforcement is tracked separately; until it lands,
- * treat contiguity as a property of the data, not a guarantee.
+ * failing. The tests pin that behaviour so the requirement stays visible.
+ *
+ * That requirement is now met by construction rather than by luck: set numbers are 1-based
+ * and contiguous per exercise, enforced end to end. Clients build payloads with
+ * `withArrayPositionOrder` (lib/workout-order.ts), the API rejects a tree whose `order`
+ * disagrees with its array position, and the write derives the numbering from position --
+ * see the `WorkoutTreeService` docstring in the backend. Do not add defensive renumbering
+ * here; a duplicate set number means something upstream broke, and papering over it is what
+ * produced the original bug.
  */
 
 interface PlannedSetLike {

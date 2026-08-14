@@ -90,6 +90,19 @@ describe('resolveSetRows', () => {
     );
   });
 
+  it('covers only the planned segment -- extras get a bar but no planned row', () => {
+    // The two helpers are NOT interchangeable: bars include logged extras and unlogged
+    // drafts, which the card renders as their own rows. Pinned so the "they always agree"
+    // reading does not creep back in.
+    const withExtras = {
+      ...bulgarianSplitSquat,
+      sets: [{ setNumber: 4, setType: SetType.WORKING }],
+    };
+
+    expect(getSetIndicatorSlots(withExtras)).toEqual([1, 2, 3, 4]);
+    expect(resolveSetRows(withExtras).map((r) => r.setNumber)).toEqual([1, 2, 3]);
+  });
+
   it('prefers what was logged over what was planned', () => {
     const rows = resolveSetRows({
       ...bulgarianSplitSquat,

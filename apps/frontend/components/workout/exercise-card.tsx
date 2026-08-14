@@ -344,8 +344,10 @@ export default function ExerciseCard({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, hasPlannedSets, skippedPlannedSetNumbers, isCompletedHijack]);
 
-  // Bars (collapsed) and rows (expanded) are derived by the same pair of helpers so the two
-  // views cannot drift apart -- see lib/set-slots.ts.
+  // Bars (collapsed) and planned rows (expanded) share one derivation -- see lib/set-slots.ts.
+  // They agree on the planned segment only: `setIndicatorSlots` also covers logged extras and
+  // unlogged drafts, which are rendered as their own rows further down, so with extras present
+  // the bar count legitimately exceeds the planned row count.
   const setIndicatorSlots = getSetIndicatorSlots({
     plannedSets: exercise.plannedSets,
     sets: exercise.sets,
