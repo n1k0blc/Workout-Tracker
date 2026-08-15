@@ -8,6 +8,8 @@ export class HomeGymDto {
 export class WorkoutResponseDto {
   id: string;
   date: Date;
+  /** The calendar day the workout happened on in the user's timezone, `YYYY-MM-DD`. */
+  localDate: string;
   isFreeWorkout: boolean;
   totalDuration?: number;
   homeGymId?: string;

@@ -93,6 +93,13 @@ model Workout {
 
   // kind=WORKOUT (performed)
   date          DateTime?
+  // The calendar day the workout happened on in the user's local timezone, `YYYY-MM-DD`.
+  // Deliberately a string, not a date column: a date column comes back through the ORM as a
+  // timestamp at UTC midnight, which is the instant-versus-calendar-day confusion this field
+  // exists to remove. Nullable only because kind=TEMPLATE/BLUEPRINT rows share this table --
+  // for kind=WORKOUT it is required, enforced by a CHECK constraint in the migration SQL and
+  // by the DTO at the API boundary.
+  localDate     String?
   totalDuration Int?
   isFreeWorkout Boolean?
   cycleId       String?

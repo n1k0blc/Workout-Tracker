@@ -184,6 +184,11 @@ export interface ExerciseLog {
 export interface Workout {
   id: string;
   date: string;
+  /**
+   * The calendar day the workout happened on in the user's timezone, `YYYY-MM-DD`.
+   * Fixed at log time, so "which day was this?" never depends on where it is asked from.
+   */
+  localDate: string;
   isFreeWorkout: boolean;
   totalDuration?: number;
   homeGymId?: string | null;
@@ -242,6 +247,7 @@ export interface WorkoutExerciseInput {
 
 export interface SaveWorkoutDto {
   date: string;
+  localDate: string;
   totalDuration?: number;
   isFreeWorkout?: boolean;
   homeGymId?: string;

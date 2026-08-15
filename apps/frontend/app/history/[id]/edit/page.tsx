@@ -72,8 +72,9 @@ export default function EditWorkoutPage() {
   // Seed the date field once the workout has loaded into context.
   useEffect(() => {
     if (activeWorkout) {
-      const date = new Date(activeWorkout.date);
-      setWorkoutDate(date.toISOString().split('T')[0]);
+      // Seeded from the stored calendar day, not from the instant: reading the instant back
+      // in UTC would show (and, on save, write back) the wrong day for a late-night session.
+      setWorkoutDate(activeWorkout.localDate);
     }
   }, [activeWorkout?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -82,9 +83,15 @@ export default function EditWorkoutPage() {
 
     setSaving(true);
     try {
-      // Sync the (possibly-edited) date into the draft before the single save call.
+      // Sync the (possibly-edited) date into the draft before the single save call. The
+      // picked day is already a local calendar day, so it becomes localDate verbatim --
+      // correcting a workout's date has to move both, or the two would disagree.
       setActiveWorkoutDirectly(
-        { ...activeWorkout, date: new Date(workoutDate + 'T12:00:00').toISOString() },
+        {
+          ...activeWorkout,
+          date: new Date(workoutDate + 'T12:00:00').toISOString(),
+          localDate: workoutDate,
+        },
         false,
         0,
       );

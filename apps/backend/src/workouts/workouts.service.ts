@@ -123,6 +123,7 @@ export class WorkoutsService {
           kind: 'WORKOUT',
           userId,
           date: new Date(dto.date),
+          localDate: dto.localDate,
           totalDuration: dto.totalDuration,
           isFreeWorkout: dto.isFreeWorkout ?? false,
           homeGymId: dto.homeGymId || null,
@@ -160,6 +161,7 @@ export class WorkoutsService {
         where: { id },
         data: {
           ...(dto.date !== undefined && { date: new Date(dto.date) }),
+          ...(dto.localDate !== undefined && { localDate: dto.localDate }),
           ...(dto.totalDuration !== undefined && { totalDuration: dto.totalDuration }),
           ...(dto.isFreeWorkout !== undefined && { isFreeWorkout: dto.isFreeWorkout }),
           ...(dto.homeGymId !== undefined && { homeGymId: dto.homeGymId || null }),
@@ -308,6 +310,7 @@ export class WorkoutsService {
     return {
       id: workout.id,
       date: workout.date,
+      localDate: workout.localDate,
       isFreeWorkout: workout.isFreeWorkout,
       totalDuration: workout.totalDuration ?? undefined,
       homeGymId: workout.homeGymId ?? undefined,
