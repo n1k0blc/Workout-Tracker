@@ -3,6 +3,7 @@ import { CycleFormData } from './cycle-wizard';
 import { Exercise } from '@/types';
 import type { ExerciseLog } from '@/types';
 import { apiClient } from '@/lib/api';
+import { sortByCycleWeekday } from '@/lib/weekday';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -90,6 +91,8 @@ export default function ReviewStep({
     0
   );
 
+  const sortedWorkoutDays = sortByCycleWeekday(formData.workoutDays, formData.startDate);
+
   return (
     <div className="space-y-6">
       {/* Summary Card */}
@@ -132,8 +135,8 @@ export default function ReviewStep({
       </Card>
 
       {/* Workout Days Details */}
-      {formData.workoutDays.map((day, dayIndex) => (
-        <Card key={dayIndex}>
+      {sortedWorkoutDays.map((day) => (
+        <Card key={day.weekday}>
           <CardContent className="p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-foreground">

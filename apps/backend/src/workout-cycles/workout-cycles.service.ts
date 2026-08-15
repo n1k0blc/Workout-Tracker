@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { WorkoutTreeService, mapExercisesToResponse, toExerciseInputs, WORKOUT_EXERCISE_TREE_INCLUDE } from '../workout-tree/workout-tree.service';
 import { setWorkingVolume } from '../common/utils/volume.util';
 import { calculateCycleWeek, getCurrentDate } from '../common/utils/date.util';
-import { WEEKDAY_NAMES } from '../common/utils/weekday.util';
+import { WEEKDAY_NAMES, getWeekdayDistanceFromCycleStart } from '../common/utils/weekday.util';
 import { ExercisesService } from '../exercises/exercises.service';
 import {
   CreateCycleDto,
@@ -124,18 +124,19 @@ export class WorkoutCyclesService {
     const allExerciseIds = workoutDays.flatMap((day) => day.exercises.map((e) => e.exerciseId));
     await this.exercisesService.validateAccessible(allExerciseIds, userId);
 
+    const startWeekday = new Date(startDate).getUTCDay();
+
     const cycleId = await this.prisma.$transaction(async (tx) => {
       const cycle = await tx.workoutCycle.create({
         data: { name, duration, startDate: new Date(startDate), userId },
       });
 
-      for (let i = 0; i < workoutDays.length; i++) {
-        const day = workoutDays[i];
+      for (const day of workoutDays) {
         const workoutDay = await tx.workoutDay.create({
           data: {
             cycleId: cycle.id,
             weekday: day.weekday,
-            order: i,
+            order: getWeekdayDistanceFromCycleStart(day.weekday, startWeekday),
             name: day.name,
             plannedHomeGymId: day.plannedHomeGymId || null,
           },
@@ -155,15 +156,38 @@ export class WorkoutCyclesService {
   }
 
   async update(id: string, updateCycleDto: UpdateCycleDto, userId: string): Promise<CycleResponseDto> {
-    await this.findById(id, userId);
+    const cycle = await this.findById(id, userId);
 
-    await this.prisma.workoutCycle.update({
-      where: { id },
-      data: {
-        ...(updateCycleDto.name && { name: updateCycleDto.name }),
-        ...(updateCycleDto.duration && { duration: updateCycleDto.duration }),
-        ...(updateCycleDto.startDate && { startDate: new Date(updateCycleDto.startDate) }),
-      },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.workoutCycle.update({
+        where: { id },
+        data: {
+          ...(updateCycleDto.name && { name: updateCycleDto.name }),
+          ...(updateCycleDto.duration && { duration: updateCycleDto.duration }),
+          ...(updateCycleDto.startDate && { startDate: new Date(updateCycleDto.startDate) }),
+        },
+      });
+
+      // Moving the cycle's start day re-anchors its week, so every day's `order` -- kept in
+      // sync with its distance from the start weekday (#74) -- needs recomputing too. The
+      // new values are a permutation of the old ones, so a single pass risks a transient
+      // clash with the (cycleId, order) unique index; parking everything at negative,
+      // never-colliding placeholders first avoids that.
+      const startWeekday = updateCycleDto.startDate
+        ? new Date(updateCycleDto.startDate).getUTCDay()
+        : undefined;
+
+      if (startWeekday !== undefined && startWeekday !== cycle.startDate.getUTCDay()) {
+        for (const [index, day] of cycle.workoutDays.entries()) {
+          await tx.workoutDay.update({ where: { id: day.id }, data: { order: -1 - index } });
+        }
+        for (const day of cycle.workoutDays) {
+          await tx.workoutDay.update({
+            where: { id: day.id },
+            data: { order: getWeekdayDistanceFromCycleStart(day.weekday, startWeekday) },
+          });
+        }
+      }
     });
 
     return this.findById(id, userId);
@@ -232,12 +256,15 @@ export class WorkoutCyclesService {
       );
     }
 
+    const startWeekday = cycle.startDate.getUTCDay();
+
     try {
       await this.prisma.workoutDay.update({
         where: { id: workoutDayId },
         data: {
           name: updateWorkoutDayDto.name,
           weekday: updateWorkoutDayDto.weekday,
+          order: getWeekdayDistanceFromCycleStart(updateWorkoutDayDto.weekday, startWeekday),
           ...(updateWorkoutDayDto.plannedHomeGymId !== undefined && {
             plannedHomeGymId: updateWorkoutDayDto.plannedHomeGymId,
           }),

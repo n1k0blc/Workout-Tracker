@@ -27,8 +27,14 @@ function makeService() {
   };
 
   const tx = {
-    workoutCycle: { create: jest.fn().mockResolvedValue({ id: 'cycle-1' }) },
-    workoutDay: { create: jest.fn().mockResolvedValue({ id: 'day-1' }) },
+    workoutCycle: {
+      create: jest.fn().mockResolvedValue({ id: 'cycle-1' }),
+      update: jest.fn().mockResolvedValue({}),
+    },
+    workoutDay: {
+      create: jest.fn().mockResolvedValue({ id: 'day-1' }),
+      update: jest.fn().mockResolvedValue({}),
+    },
     workout: { create: jest.fn().mockResolvedValue({ id: 'blueprint-1' }) },
   };
 
@@ -56,7 +62,7 @@ function makeService() {
     exercisesService as never,
   );
 
-  return { service, prisma };
+  return { service, prisma, tx };
 }
 
 describe('WorkoutCyclesService weekday uniqueness', () => {
@@ -141,5 +147,104 @@ describe('WorkoutCyclesService weekday uniqueness', () => {
     await expect(service.create(dto, 'user-1')).rejects.toBeInstanceOf(BadRequestException);
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe('WorkoutCyclesService day ordering (#74)', () => {
+  it('orders a Sunday-start cycle Sunday, Monday, Friday -- not creation-request order', async () => {
+    const { service, tx } = makeService();
+
+    // Sunday=0, Friday=5; the request lists Friday before Sunday to prove order isn't
+    // taken from array position anymore.
+    const dto = {
+      name: 'Full Body',
+      duration: 8,
+      startDate: '2026-08-02', // a Sunday
+      workoutDays: [
+        { weekday: 5, name: 'Friday', exercises },
+        { weekday: 0, name: 'Sunday', exercises },
+        { weekday: 1, name: 'Monday', exercises },
+      ],
+    } as CreateCycleDto;
+
+    await service.create(dto, 'user-1');
+
+    const orderByWeekday = new Map(
+      tx.workoutDay.create.mock.calls.map(([call]: [{ data: { weekday: number; order: number } }]) => [
+        call.data.weekday,
+        call.data.order,
+      ]),
+    );
+
+    expect(orderByWeekday.get(0)).toBe(0); // Sunday, the start weekday
+    expect(orderByWeekday.get(1)).toBe(1); // Monday
+    expect(orderByWeekday.get(5)).toBe(5); // Friday
+  });
+
+  it('leaves a Monday-start cycle Monday-first, as before', async () => {
+    const { service, tx } = makeService();
+
+    const dto = {
+      name: 'Push/Pull',
+      duration: 8,
+      startDate: '2026-08-03', // a Monday
+      workoutDays: [
+        { weekday: 3, name: 'Wednesday', exercises },
+        { weekday: 1, name: 'Monday', exercises },
+      ],
+    } as CreateCycleDto;
+
+    await service.create(dto, 'user-1');
+
+    const orderByWeekday = new Map(
+      tx.workoutDay.create.mock.calls.map(([call]: [{ data: { weekday: number; order: number } }]) => [
+        call.data.weekday,
+        call.data.order,
+      ]),
+    );
+
+    expect(orderByWeekday.get(1)).toBe(0); // Monday, the start weekday
+    expect(orderByWeekday.get(3)).toBe(2); // Wednesday
+  });
+
+  it('recomputes order when a workout day moves to a different weekday', async () => {
+    const { service, prisma } = makeService();
+
+    // Cycle starts Monday (weekday 1); moving day-2 to Friday (weekday 5) anchors it 4 days
+    // after the start.
+    await service.updateWorkoutDay('cycle-1', 'day-2', { name: 'Pull', weekday: 5 }, 'user-1');
+
+    expect(prisma.workoutDay.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'day-2' },
+        data: expect.objectContaining({ weekday: 5, order: 4 }),
+      }),
+    );
+  });
+
+  it('re-anchors every day when the cycle start date moves to a different weekday', async () => {
+    const { service, tx } = makeService();
+
+    // Fixture cycle starts Monday (weekday 1) with Monday (day-1) and Wednesday (day-2)
+    // workouts. Moving startDate to a Wednesday re-anchors: Wednesday becomes day 0, Monday
+    // becomes day 5.
+    await service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1');
+
+    const updateCalls = tx.workoutDay.update.mock.calls;
+    const finalUpdateForDay1 = updateCalls.filter((call: [{ where: { id: string } }]) => call[0].where.id === 'day-1').pop();
+    const finalUpdateForDay2 = updateCalls.filter((call: [{ where: { id: string } }]) => call[0].where.id === 'day-2').pop();
+
+    expect(finalUpdateForDay1[0].data.order).toBe(5); // Monday, 5 days after a Wednesday start
+    expect(finalUpdateForDay2[0].data.order).toBe(0); // Wednesday, the new start weekday
+  });
+
+  it('skips re-anchoring when the new start date falls on the same weekday', async () => {
+    const { service, tx } = makeService();
+
+    // 2026-08-10 is also a Monday, same as the fixture cycle's original start date -- no day
+    // changes its distance from the start weekday, so no order write is needed.
+    await service.update('cycle-1', { startDate: '2026-08-10' }, 'user-1');
+
+    expect(tx.workoutDay.update).not.toHaveBeenCalled();
   });
 });

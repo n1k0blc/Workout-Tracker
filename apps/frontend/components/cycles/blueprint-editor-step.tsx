@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import type { ExerciseLog } from '@/types';
 import { replaceExerciseInList } from '@/lib/exercise-replace';
 import { withArrayPositionOrder } from '@/lib/workout-order';
+import { sortByCycleWeekday } from '@/lib/weekday';
 import {
   DndContext,
   closestCenter,
@@ -380,6 +381,13 @@ export default function BlueprintEditorStep({
     (day) => day.blueprint.exercises.length > 0
   );
 
+  // Tabs read in cycle-week order while `currentDayIndex` keeps indexing into
+  // `formData.workoutDays` directly, so each tab carries its original index along.
+  const orderedDayTabs = sortByCycleWeekday(
+    formData.workoutDays.map((day, index) => ({ ...day, index })),
+    formData.startDate,
+  );
+
   return (
     <>
       <div className="space-y-6">
@@ -387,12 +395,12 @@ export default function BlueprintEditorStep({
         <Card>
           <CardContent className="p-4">
             <div className="flex flex-wrap gap-2">
-              {formData.workoutDays.map((day, index) => (
+              {orderedDayTabs.map((day) => (
                 <Button
-                  key={index}
-                  variant={currentDayIndex === index ? 'default' : 'outline'}
+                  key={day.index}
+                  variant={currentDayIndex === day.index ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => setCurrentDayIndex(index)}
+                  onClick={() => setCurrentDayIndex(day.index)}
                   className="text-sm"
                 >
                   {day.name || getWeekday(day.weekday)}
