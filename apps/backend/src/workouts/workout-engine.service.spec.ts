@@ -113,6 +113,20 @@ describe('getSuggestedWorkout', () => {
     expect(await service.getSuggestedWorkout('user-1', today(MONDAY))).toBeNull();
   });
 
+  it('recommends nothing before the cycle has started, even on a matching weekday', async () => {
+    const { service, prisma } = makeService();
+    // Built on Monday for a cycle that starts the following Monday -- same weekday, wrong week.
+    prisma.workoutCycle.findFirst.mockResolvedValue({
+      id: 'cycle-1',
+      name: 'Hypertrophy',
+      startDate: new Date('2026-08-24T00:00:00.000Z'),
+      duration: 4,
+      workoutDays: cycleDays(),
+    });
+
+    expect(await service.getSuggestedWorkout('user-1', today(MONDAY))).toBeNull();
+  });
+
   it("is decided in the client timezone, not the server's", async () => {
     const { service } = makeService();
     // Sunday 20:30 UTC: still Sunday in Berlin, already Monday in Auckland.
@@ -153,6 +167,19 @@ describe('getCurrentCycleWorkouts', () => {
     const cycle = await service.getCurrentCycleWorkouts('user-1', today(MONDAY));
 
     expect(cycle!.workoutDays.some((day) => day.isSuggested)).toBe(false);
+  });
+
+  it('returns nothing before the cycle has started', async () => {
+    const { service, prisma } = makeService();
+    prisma.workoutCycle.findFirst.mockResolvedValue({
+      id: 'cycle-1',
+      name: 'Hypertrophy',
+      startDate: new Date('2026-08-24T00:00:00.000Z'),
+      duration: 4,
+      workoutDays: cycleDays(),
+    });
+
+    expect(await service.getCurrentCycleWorkouts('user-1', today(MONDAY))).toBeNull();
   });
 });
 
@@ -220,5 +247,41 @@ describe('getNextScheduledWorkout', () => {
     });
 
     expect(await service.getNextScheduledWorkout('user-1', today(MONDAY))).toBeNull();
+  });
+
+  it("answers the cycle's first scheduled day, labelled with the start date, before it has started", async () => {
+    const { service, prisma } = makeService();
+    // Built on Thursday the 20th, for a cycle that starts the following Monday.
+    prisma.workoutCycle.findFirst.mockResolvedValue({
+      id: 'cycle-1',
+      name: 'Hypertrophy',
+      startDate: new Date('2026-08-24T00:00:00.000Z'),
+      duration: 4,
+      workoutDays: cycleDays(),
+    });
+
+    expect(await service.getNextScheduledWorkout('user-1', today(THURSDAY))).toMatchObject({
+      workoutDayId: 'day-mon',
+      localDate: '2026-08-24',
+      cycleStartDate: '2026-08-24',
+    });
+  });
+
+  it("looks past a start-of-cycle weekday with no planned day to the cycle's first one", async () => {
+    const { service, prisma } = makeService();
+    // Starts on a Tuesday; the cycle plans Monday, Wednesday, Saturday -- Wednesday is first.
+    prisma.workoutCycle.findFirst.mockResolvedValue({
+      id: 'cycle-1',
+      name: 'Hypertrophy',
+      startDate: new Date('2026-08-18T00:00:00.000Z'),
+      duration: 4,
+      workoutDays: cycleDays(),
+    });
+
+    expect(await service.getNextScheduledWorkout('user-1', today(MONDAY))).toMatchObject({
+      workoutDayId: 'day-wed',
+      localDate: '2026-08-19',
+      cycleStartDate: '2026-08-18',
+    });
   });
 });

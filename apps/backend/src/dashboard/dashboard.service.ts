@@ -145,6 +145,7 @@ export class DashboardService {
       templateName: null,
       dayOfWeek: next.weekday,
       suggestedDate: next.localDate,
+      cycleStartDate: next.cycleStartDate,
     };
   }
 

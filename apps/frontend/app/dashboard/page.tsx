@@ -360,6 +360,11 @@ export default function DashboardPage() {
                                 {nextWorkout.templateName}
                               </div>
                             )}
+                            {nextWorkout.cycleStartDate && (
+                              <Badge variant="secondary" className="mb-2">
+                                Zyklus beginnt am {formatLocalDate(nextWorkout.cycleStartDate)}
+                              </Badge>
+                            )}
                             <div className="mt-4 pt-4 border-t">
                               <div className="text-lg font-semibold text-primary">
                                 {getDayName(nextWorkout.dayOfWeek)}

@@ -43,6 +43,14 @@ function makeService() {
         exercises: [],
       }),
     },
+    workoutDay: {
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'day-1',
+        cycleId: 'cycle-1',
+        plannedHomeGymId: null,
+        cycle: { userId: 'user-1', startDate: new Date('2026-08-01T00:00:00.000Z') },
+      }),
+    },
     $transaction: jest.fn(async (cb: (client: typeof tx) => unknown) => cb(tx)),
   };
   const workoutTreeService = { replaceTree: jest.fn() };
@@ -116,5 +124,73 @@ describe('WorkoutsService localDate', () => {
     await service.update('workout-1', { totalDuration: 1800 } as UpdateWorkoutDto, 'user-1');
 
     expect(tx.workout.update.mock.calls[0][0].data).not.toHaveProperty('localDate');
+  });
+});
+
+describe('WorkoutsService cycle start boundary', () => {
+  it('refuses to start a cycle workout dated before the cycle begins', async () => {
+    const { service, prisma } = makeService();
+    prisma.workoutDay.findUnique.mockResolvedValue({
+      id: 'day-1',
+      cycleId: 'cycle-1',
+      plannedHomeGymId: null,
+      // Built Thursday for a cycle starting the following Monday.
+      cycle: { userId: 'user-1', startDate: new Date('2026-08-24T00:00:00.000Z') },
+    });
+
+    const dto: CreateWorkoutDto = {
+      date: '2026-08-20T12:00:00.000Z',
+      localDate: '2026-08-20',
+      cycleId: 'cycle-1',
+      workoutDayId: 'day-1',
+      exercises,
+    } as CreateWorkoutDto;
+
+    await expect(service.create(dto, 'user-1')).rejects.toThrow(
+      'Dieser Zyklus hat noch nicht begonnen.',
+    );
+  });
+
+  it('allows starting a cycle workout dated on the cycle start date', async () => {
+    const { service, tx, prisma } = makeService();
+    prisma.workoutDay.findUnique.mockResolvedValue({
+      id: 'day-1',
+      cycleId: 'cycle-1',
+      plannedHomeGymId: null,
+      cycle: { userId: 'user-1', startDate: new Date('2026-08-24T00:00:00.000Z') },
+    });
+
+    const dto: CreateWorkoutDto = {
+      date: '2026-08-24T12:00:00.000Z',
+      localDate: '2026-08-24',
+      cycleId: 'cycle-1',
+      workoutDayId: 'day-1',
+      exercises,
+    } as CreateWorkoutDto;
+
+    await service.create(dto, 'user-1');
+
+    expect(tx.workout.create).toHaveBeenCalled();
+  });
+
+  it('refuses a history edit that moves a cycle workout to a date before the cycle begins', async () => {
+    const { service, prisma } = makeService();
+    prisma.workoutDay.findUnique.mockResolvedValue({
+      id: 'day-1',
+      cycleId: 'cycle-1',
+      plannedHomeGymId: null,
+      cycle: { userId: 'user-1', startDate: new Date('2026-08-24T00:00:00.000Z') },
+    });
+
+    const dto: UpdateWorkoutDto = {
+      workoutDayId: 'day-1',
+      cycleId: 'cycle-1',
+    } as UpdateWorkoutDto;
+
+    // The existing workout's own localDate (2026-08-15) is what's left to compare
+    // once the edit doesn't supply a new one.
+    await expect(service.update('workout-1', dto, 'user-1')).rejects.toThrow(
+      'Dieser Zyklus hat noch nicht begonnen.',
+    );
   });
 });
