@@ -12,4 +12,12 @@ export class UpdateWorkoutDayDto {
   @IsOptional()
   @IsString()
   plannedHomeGymId?: string;
+
+  /**
+   * Set to the id of the day currently holding `weekday` to confirm an atomic swap instead
+   * of a plain move. Ignored when `weekday` isn't actually taken by another day.
+   */
+  @IsOptional()
+  @IsString()
+  swapWithWorkoutDayId?: string;
 }

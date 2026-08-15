@@ -131,6 +131,105 @@ describe('WorkoutCyclesService weekday uniqueness', () => {
     ).rejects.toBe(unrelated);
   });
 
+  it('exchanges both days weekdays atomically when the swap is confirmed', async () => {
+    const { service, tx } = makeService();
+
+    // Cycle starts Monday (weekday 1); day-1 holds Monday, day-2 holds Wednesday. Moving
+    // day-2 onto Monday with day-1 confirmed as the swap partner should exchange both.
+    await service.updateWorkoutDay(
+      'cycle-1',
+      'day-2',
+      { name: 'Pull', weekday: 1, swapWithWorkoutDayId: 'day-1' },
+      'user-1',
+    );
+
+    const day2Update = tx.workoutDay.update.mock.calls
+      .map(([call]: [{ where: { id: string }; data: Record<string, unknown> }]) => call)
+      .filter((call) => call.where.id === 'day-2')
+      .pop();
+    const day1Update = tx.workoutDay.update.mock.calls
+      .map(([call]: [{ where: { id: string }; data: Record<string, unknown> }]) => call)
+      .filter((call) => call.where.id === 'day-1')
+      .pop();
+
+    // day-2 lands on Monday (weekday 1, the start weekday -> order 0) with its own new name.
+    expect(day2Update.data).toEqual(
+      expect.objectContaining({ name: 'Pull', weekday: 1, order: 0 }),
+    );
+    // day-1 takes day-2's old weekday (Wednesday, weekday 3 -> order 2) and keeps its own name.
+    expect(day1Update.data).toEqual(expect.objectContaining({ weekday: 3, order: 2 }));
+    expect(day1Update.data.name).toBeUndefined();
+  });
+
+  it('rejects a move onto a taken weekday when no swap partner is confirmed', async () => {
+    const { service, tx } = makeService();
+
+    await expect(
+      service.updateWorkoutDay('cycle-1', 'day-2', { name: 'Pull', weekday: 1 }, 'user-1'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(tx.workoutDay.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects a swap confirmation naming the wrong partner', async () => {
+    const { service, tx } = makeService();
+
+    await expect(
+      service.updateWorkoutDay(
+        'cycle-1',
+        'day-2',
+        { name: 'Pull', weekday: 1, swapWithWorkoutDayId: 'some-other-day' },
+        'user-1',
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(tx.workoutDay.update).not.toHaveBeenCalled();
+  });
+
+  it('answers 400, not 500, when the swap loses a race to a concurrent write', async () => {
+    const { service, tx } = makeService();
+
+    tx.workoutDay.update.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '6.19.2',
+        meta: { target: 'WorkoutDay_cycleId_weekday_key' },
+      }),
+    );
+
+    await expect(
+      service.updateWorkoutDay(
+        'cycle-1',
+        'day-2',
+        { name: 'Pull', weekday: 1, swapWithWorkoutDayId: 'day-1' },
+        'user-1',
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('answers 400, not 500, when the swap loses a race on the (cycleId, order) index', async () => {
+    const { service, tx } = makeService();
+
+    // The sentinel-parking dance dodges a clash on this transaction's own rows, but a
+    // concurrent write to a *different* day in the same cycle can still win the order index.
+    tx.workoutDay.update.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '6.19.2',
+        meta: { target: 'WorkoutDay_cycleId_order_key' },
+      }),
+    );
+
+    await expect(
+      service.updateWorkoutDay(
+        'cycle-1',
+        'day-2',
+        { name: 'Pull', weekday: 1, swapWithWorkoutDayId: 'day-1' },
+        'user-1',
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
   it('rejects creating a cycle whose workout days share a weekday', async () => {
     const { service, prisma } = makeService();
 

@@ -92,7 +92,7 @@ The weekday decides which workout is recommended, so two days in one cycle both 
 
 Before running the migration against any populated database, run `npm run check:duplicate-weekdays` (in `apps/backend`, `DATABASE_URL` pointed at the target). It is read-only and reports every cycle that would fail the migration.
 
-The day editor currently offers all seven weekdays and lets the user hit the 400 — making it pleasant under the constraint (moving a day to a free weekday, swapping two days) is separate work.
+The day editor offers all seven weekdays; choosing a free one moves the day, choosing a taken one asks to swap and, on confirmation, sends `swapWithWorkoutDayId` back with the update so the two days' weekdays exchange atomically. `updateWorkoutDay` still answers 400 for a taken weekday when `swapWithWorkoutDayId` is absent or names the wrong day — a plain move can't land on an occupied weekday, only a confirmed swap with that specific day can. The swap itself parks the moving day at a sentinel weekday/order first, since both days would otherwise collide on the unique index and on `(cycleId, order)` mid-exchange with each about to take the slot the other holds; names, plans and planned gyms stay with their own day throughout. The creation wizard has no day to swap with yet, so it keeps disabling weekdays already in use instead.
 
 ### Today's workout is the one whose weekday is today
 

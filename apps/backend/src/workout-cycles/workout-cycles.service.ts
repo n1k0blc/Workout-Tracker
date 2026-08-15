@@ -18,18 +18,31 @@ import {
 } from './dto';
 
 const WEEKDAY_UNIQUE_INDEX = 'WorkoutDay_cycleId_weekday_key';
+const ORDER_UNIQUE_INDEX = 'WorkoutDay_cycleId_order_key';
 
-/** A P2002 raised by the unique index on WorkoutDay(cycleId, weekday), and nothing else. */
-function isWeekdayConflict(error: unknown): boolean {
+/** Whether `error` is a P2002 raised by the given WorkoutDay unique index, and nothing else. */
+function isUniqueIndexConflict(error: unknown, indexName: string, fields: string[]): boolean {
   if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
     return false;
   }
   // `meta.target` is the index name on Postgres, but has been a field-name array on other
   // connectors and older client versions -- match either shape.
   const target = error.meta?.target;
-  return Array.isArray(target)
-    ? target.includes('cycleId') && target.includes('weekday')
-    : target === WEEKDAY_UNIQUE_INDEX;
+  return Array.isArray(target) ? fields.every((field) => target.includes(field)) : target === indexName;
+}
+
+function isWeekdayConflict(error: unknown): boolean {
+  return isUniqueIndexConflict(error, WEEKDAY_UNIQUE_INDEX, ['cycleId', 'weekday']);
+}
+
+/**
+ * A P2002 on (cycleId, order) -- the sentinel-parking dance that moves and swaps use to dodge
+ * a transient clash on their *own* rows can still collide with another request's write to a
+ * *different* day in the same cycle. Rare, but real, so it gets the same 400 treatment as a
+ * weekday clash rather than surfacing as a 500.
+ */
+function isOrderConflict(error: unknown): boolean {
+  return isUniqueIndexConflict(error, ORDER_UNIQUE_INDEX, ['cycleId', 'order']);
 }
 
 const CYCLE_TREE_INCLUDE = {
@@ -250,39 +263,90 @@ export class WorkoutCyclesService {
     const conflict = cycle.workoutDays.find(
       (day) => day.weekday === updateWorkoutDayDto.weekday && day.id !== workoutDayId,
     );
-    if (conflict) {
-      throw new BadRequestException(
-        `${WEEKDAY_NAMES[updateWorkoutDayDto.weekday]} ist in diesem Zyklus bereits durch "${conflict.name}" belegt.`,
-      );
-    }
 
     const startWeekday = cycle.startDate.getUTCDay();
+    const newOrder = getWeekdayDistanceFromCycleStart(updateWorkoutDayDto.weekday, startWeekday);
 
-    try {
-      await this.prisma.workoutDay.update({
-        where: { id: workoutDayId },
-        data: {
-          name: updateWorkoutDayDto.name,
-          weekday: updateWorkoutDayDto.weekday,
-          order: getWeekdayDistanceFromCycleStart(updateWorkoutDayDto.weekday, startWeekday),
-          ...(updateWorkoutDayDto.plannedHomeGymId !== undefined && {
-            plannedHomeGymId: updateWorkoutDayDto.plannedHomeGymId,
-          }),
-        },
-      });
-    } catch (error) {
-      // The check above reads the cycle and then writes, so two requests moving different days
-      // onto the same free weekday can both pass it and race into the index. Rare, but the
-      // endpoint must answer 400 rather than let a driver error surface as a 500.
-      if (isWeekdayConflict(error)) {
+    if (conflict) {
+      // A plain move can't land on a taken weekday -- the editor has to ask the user to swap
+      // with the specific day that holds it first, and confirm that by passing its id back.
+      if (updateWorkoutDayDto.swapWithWorkoutDayId !== conflict.id) {
         throw new BadRequestException(
-          `${WEEKDAY_NAMES[updateWorkoutDayDto.weekday]} ist in diesem Zyklus bereits belegt.`,
+          `${WEEKDAY_NAMES[updateWorkoutDayDto.weekday]} ist in diesem Zyklus bereits durch "${conflict.name}" belegt.`,
+        );
+      }
+
+      // Exchange weekdays (and their derived `order`) atomically -- names, plans and planned
+      // gyms stay with their own day. Both rows would collide on (cycleId, weekday) and
+      // (cycleId, order) mid-swap, since each is about to take the slot the other currently
+      // holds, so this day is parked at a sentinel first to free its slot for the conflict day.
+      const conflictOrder = getWeekdayDistanceFromCycleStart(workoutDay.weekday, startWeekday);
+
+      await this.runWorkoutDayWrite(
+        () =>
+          this.prisma.$transaction(async (tx) => {
+            await tx.workoutDay.update({ where: { id: workoutDayId }, data: { weekday: -1, order: -1 } });
+            await tx.workoutDay.update({
+              where: { id: conflict.id },
+              data: { weekday: workoutDay.weekday, order: conflictOrder },
+            });
+            await tx.workoutDay.update({
+              where: { id: workoutDayId },
+              data: {
+                name: updateWorkoutDayDto.name,
+                weekday: updateWorkoutDayDto.weekday,
+                order: newOrder,
+                ...(updateWorkoutDayDto.plannedHomeGymId !== undefined && {
+                  plannedHomeGymId: updateWorkoutDayDto.plannedHomeGymId,
+                }),
+              },
+            });
+          }),
+        updateWorkoutDayDto.weekday,
+      );
+
+      return this.findById(cycleId, userId);
+    }
+
+    await this.runWorkoutDayWrite(
+      () =>
+        this.prisma.workoutDay.update({
+          where: { id: workoutDayId },
+          data: {
+            name: updateWorkoutDayDto.name,
+            weekday: updateWorkoutDayDto.weekday,
+            order: newOrder,
+            ...(updateWorkoutDayDto.plannedHomeGymId !== undefined && {
+              plannedHomeGymId: updateWorkoutDayDto.plannedHomeGymId,
+            }),
+          },
+        }),
+      updateWorkoutDayDto.weekday,
+    );
+
+    return this.findById(cycleId, userId);
+  }
+
+  /**
+   * Runs a WorkoutDay write and maps a P2002 on either of its unique indexes to a 400 --
+   * both the plain move and the swap re-check the weekday before writing, but read-then-write
+   * leaves a window for a concurrent request to win either index first. Rare, but the endpoint
+   * must answer 400 rather than let a driver error surface as a 500.
+   */
+  private async runWorkoutDayWrite<T>(write: () => Promise<T>, weekday: number): Promise<T> {
+    try {
+      return await write();
+    } catch (error) {
+      if (isWeekdayConflict(error)) {
+        throw new BadRequestException(`${WEEKDAY_NAMES[weekday]} ist in diesem Zyklus bereits belegt.`);
+      }
+      if (isOrderConflict(error)) {
+        throw new BadRequestException(
+          'Eine andere Änderung an diesem Zyklus ist dazwischengekommen. Bitte versuche es erneut.',
         );
       }
       throw error;
     }
-
-    return this.findById(cycleId, userId);
   }
 
   async completeCycle(id: string, userId: string): Promise<CycleResponseDto> {

@@ -402,6 +402,7 @@ class ApiClient {
       name: string;
       weekday: number;
       plannedHomeGymId?: string;
+      swapWithWorkoutDayId?: string;
     }
   ): Promise<WorkoutCycle> {
     return this.request<WorkoutCycle>(
