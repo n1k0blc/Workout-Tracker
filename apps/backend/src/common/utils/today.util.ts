@@ -23,8 +23,9 @@ export interface Today {
   weekday: number;
 }
 
-export function resolveTimeZone(header?: string): string {
-  if (!header) return SERVER_TIME_ZONE;
+/** `header` is whatever arrived on the request -- a duplicated header comes through as an array. */
+export function resolveTimeZone(header?: string | string[]): string {
+  if (typeof header !== 'string' || !header) return SERVER_TIME_ZONE;
 
   try {
     new Intl.DateTimeFormat('en-CA', { timeZone: header });
@@ -35,7 +36,7 @@ export function resolveTimeZone(header?: string): string {
   }
 }
 
-export function resolveToday(header?: string, now: Date = getCurrentDate()): Today {
+export function resolveToday(header?: string | string[], now: Date = getCurrentDate()): Today {
   const timeZone = resolveTimeZone(header);
   const localDate = new Intl.DateTimeFormat('en-CA', {
     timeZone,

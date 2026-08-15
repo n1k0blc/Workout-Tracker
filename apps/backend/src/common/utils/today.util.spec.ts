@@ -18,6 +18,10 @@ describe('resolveTimeZone', () => {
   it('falls back to the pinned server zone when the header is not a real zone', () => {
     expect(resolveTimeZone('Mars/Olympus_Mons')).toBe(SERVER_TIME_ZONE);
   });
+
+  it('falls back when the header arrived more than once', () => {
+    expect(resolveTimeZone(['Europe/Berlin', 'Pacific/Auckland'])).toBe(SERVER_TIME_ZONE);
+  });
 });
 
 describe('resolveToday', () => {

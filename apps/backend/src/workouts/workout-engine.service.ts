@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { mapExercisesToResponse, WORKOUT_EXERCISE_TREE_INCLUDE } from '../workout-tree/workout-tree.service';
 import { WorkoutExerciseResponseDto } from '../common/dto/workout-tree.dto';
-import { getCurrentDate } from '../common/utils/date.util';
 import { Today, addLocalDays } from '../common/utils/today.util';
 
 export interface SuggestedWorkout {
@@ -64,8 +63,12 @@ type DayWithBlueprint = {
 export class WorkoutEngineService {
   constructor(private prisma: PrismaService) {}
 
-  private async getActiveCycleWithDays(userId: string) {
-    return this.prisma.workoutCycle.findFirst({
+  /**
+   * The cycle every recommendation reads from: active, not yet run out, days in `order`
+   * (which is all `WorkoutDay.order` still does -- it lists the cycle modal, it never picks).
+   */
+  private async getRecommendableCycle(userId: string, today: Today) {
+    const cycle = await this.prisma.workoutCycle.findFirst({
       where: { userId, status: 'ACTIVE' },
       orderBy: { startDate: 'desc' },
       include: {
@@ -75,12 +78,14 @@ export class WorkoutEngineService {
         },
       },
     });
+
+    return cycle && !this.isCycleExpired(cycle, today) ? cycle : null;
   }
 
-  private isCycleExpired(cycle: { startDate: Date; duration: number }): boolean {
-    const endDate = new Date(cycle.startDate);
-    endDate.setDate(endDate.getDate() + cycle.duration * 7);
-    return getCurrentDate() > endDate;
+  /** Judged on the user's calendar, like everything else here -- not on the server's clock. */
+  private isCycleExpired(cycle: { startDate: Date; duration: number }, today: Today): boolean {
+    const startLocalDate = cycle.startDate.toISOString().slice(0, 10);
+    return today.localDate > addLocalDays(startLocalDate, cycle.duration * 7);
   }
 
   /** The planned day whose weekday is `weekday`, if it has a blueprint to start from. */
@@ -110,8 +115,8 @@ export class WorkoutEngineService {
   }
 
   async getSuggestedWorkout(userId: string, today: Today): Promise<SuggestedWorkout | null> {
-    const activeCycle = await this.getActiveCycleWithDays(userId);
-    if (!activeCycle || this.isCycleExpired(activeCycle)) {
+    const activeCycle = await this.getRecommendableCycle(userId, today);
+    if (!activeCycle) {
       return null;
     }
 
@@ -137,8 +142,8 @@ export class WorkoutEngineService {
    * Monday is done.
    */
   async getNextScheduledWorkout(userId: string, today: Today): Promise<NextScheduledWorkout | null> {
-    const activeCycle = await this.getActiveCycleWithDays(userId);
-    if (!activeCycle || this.isCycleExpired(activeCycle)) {
+    const activeCycle = await this.getRecommendableCycle(userId, today);
+    if (!activeCycle) {
       return null;
     }
 
@@ -161,8 +166,8 @@ export class WorkoutEngineService {
   }
 
   async getCurrentCycleWorkouts(userId: string, today: Today): Promise<CurrentCycleWorkouts | null> {
-    const activeCycle = await this.getActiveCycleWithDays(userId);
-    if (!activeCycle || this.isCycleExpired(activeCycle)) {
+    const activeCycle = await this.getRecommendableCycle(userId, today);
+    if (!activeCycle) {
       return null;
     }
 

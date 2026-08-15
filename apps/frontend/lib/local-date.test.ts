@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll } from 'vitest';
-import { toLocalDateString } from './local-date';
+import { fromLocalDateString, toLocalDateString } from './local-date';
 
 const originalTz = process.env.TZ;
 
@@ -34,5 +34,23 @@ describe('toLocalDateString', () => {
 
     expect(lateEvening.toISOString().slice(0, 10)).toBe('2026-08-16');
     expect(toLocalDateString(lateEvening)).toBe('2026-08-15');
+  });
+});
+
+describe('fromLocalDateString', () => {
+  it('lands on the named day, not the UTC instant behind it', () => {
+    process.env.TZ = 'America/Los_Angeles';
+    const date = fromLocalDateString('2026-08-17');
+
+    expect(date.getFullYear()).toBe(2026);
+    expect(date.getMonth()).toBe(7);
+    expect(date.getDate()).toBe(17);
+    // Parsing the same string as an instant would have shown the 16th here.
+    expect(new Date('2026-08-17').getDate()).toBe(16);
+  });
+
+  it('round-trips with toLocalDateString', () => {
+    process.env.TZ = 'Europe/Berlin';
+    expect(toLocalDateString(fromLocalDateString('2026-01-05'))).toBe('2026-01-05');
   });
 });

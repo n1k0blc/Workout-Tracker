@@ -93,6 +93,19 @@ describe('getSuggestedWorkout', () => {
     expect(await service.getSuggestedWorkout('user-1', today(MONDAY))).toBeNull();
   });
 
+  it('recommends nothing once the cycle has run out', async () => {
+    const { service, prisma } = makeService();
+    prisma.workoutCycle.findFirst.mockResolvedValue({
+      id: 'cycle-1',
+      name: 'Hypertrophy',
+      startDate: new Date('2026-06-01T00:00:00.000Z'),
+      duration: 4, // ends 2026-06-29, long before the Monday under test
+      workoutDays: cycleDays(),
+    });
+
+    expect(await service.getSuggestedWorkout('user-1', today(MONDAY))).toBeNull();
+  });
+
   it('recommends nothing when there is no active cycle', async () => {
     const { service, prisma } = makeService();
     prisma.workoutCycle.findFirst.mockResolvedValue(null);
@@ -185,6 +198,17 @@ describe('getNextScheduledWorkout', () => {
     const { service } = makeService({ workoutDays: [cycleDays()[0]], loggedDates: [MONDAY] });
 
     expect(await service.getNextScheduledWorkout('user-1', today(MONDAY))).toMatchObject({
+      workoutDayId: 'day-mon',
+      localDate: '2026-08-24',
+    });
+  });
+
+  it('looks past a scheduled weekday that has no blueprint to start from', async () => {
+    const days = cycleDays();
+    days[2].workouts = []; // Saturday is scheduled but not authored yet
+    const { service } = makeService({ workoutDays: days });
+
+    expect(await service.getNextScheduledWorkout('user-1', today(THURSDAY))).toMatchObject({
       workoutDayId: 'day-mon',
       localDate: '2026-08-24',
     });
