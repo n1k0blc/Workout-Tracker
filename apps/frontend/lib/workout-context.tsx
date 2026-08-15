@@ -410,10 +410,12 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       let exercises: ExerciseLog[] = [];
+      let workoutDayName: string | undefined;
 
       if (!data.isFreeWorkout && data.cycleId && data.workoutDayId) {
         const cycle = await apiClient.getCycle(data.cycleId);
         const day = cycle.workoutDays.find((d) => d.id === data.workoutDayId);
+        workoutDayName = day?.name;
         if (day?.blueprint?.exercises) {
           exercises = buildExerciseLogsFromTree(day.blueprint.exercises);
         }
@@ -429,6 +431,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         homeGymId: data.homeGymId,
         cycleId: data.cycleId,
         workoutDayId: data.workoutDayId,
+        workoutDayName,
         exercises,
         createdAt: new Date().toISOString(),
       };
