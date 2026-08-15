@@ -590,17 +590,14 @@ export interface SuggestedWorkout {
   workoutDayId: string;
   workoutDayName: string;
   weekday: number;
-  order: number;
   plannedHomeGymId?: string | null;
   exercises: WorkoutExercise[];
-  isDue: boolean;
 }
 
 export interface CycleWorkoutDay {
   workoutDayId: string;
   workoutDayName: string;
   weekday: number;
-  order: number;
   isSuggested: boolean;
   exerciseCount: number;
 }

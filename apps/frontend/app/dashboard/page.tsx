@@ -120,6 +120,19 @@ export default function DashboardPage() {
     }).format(date);
   };
 
+  /**
+   * A calendar day (`YYYY-MM-DD`), not an instant -- `new Date(dateStr)` would read it as
+   * UTC midnight and show the previous day west of Greenwich.
+   */
+  const formatLocalDate = (localDate: string) => {
+    const [year, month, day] = localDate.split('-').map(Number);
+    return new Intl.DateTimeFormat('de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(new Date(year, month - 1, day));
+  };
+
   const formatNumber = (num: number) => {
     return new Intl.NumberFormat('de-DE').format(Math.round(num));
   };
@@ -361,7 +374,7 @@ export default function DashboardPage() {
                                 {getDayName(nextWorkout.dayOfWeek)}
                               </div>
                               <div className="text-sm text-muted-foreground mt-1">
-                                {formatDate(nextWorkout.suggestedDate)}
+                                {formatLocalDate(nextWorkout.suggestedDate)}
                               </div>
                             </div>
                           </div>

@@ -6,6 +6,11 @@
  * UTC instead, which is a different day for anyone logging late at night east of Greenwich
  * or early in the morning west of it.
  */
+/** The user's IANA timezone, sent with every request so the server can answer "what day is it?". */
+export function clientTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
 export function toLocalDateString(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');

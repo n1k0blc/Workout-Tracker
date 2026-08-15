@@ -94,6 +94,18 @@ Before running the migration against any populated database, run `npm run check:
 
 The day editor currently offers all seven weekdays and lets the user hit the 400 — making it pleasant under the constraint (moving a day to a free weekday, swapping two days) is separate work.
 
+### Today's workout is the one whose weekday is today
+
+**The recommendation is today's cycle day, or nothing. A skipped day is missed, never queued.**
+
+Rotation through `WorkoutDay.order` is gone: it advanced from the last performed workout, so skipping a Saturday and training on Monday performed Saturday's plan on Monday and left the user permanently one step out of phase with their own week.
+
+- **One algorithm, three surfaces**: `WorkoutEngineService` (`apps/backend/src/workouts/workout-engine.service.ts`) answers the workout page (`getSuggestedWorkout`), the cycle modal's highlight (`getCurrentCycleWorkouts`), and the dashboard card (`getNextScheduledWorkout` — today's workout while it is still open, otherwise the next scheduled weekday, wrapping into the following week). The modal still lists every cycle day; only the highlight follows the recommendation.
+- **A day is done if _any_ workout carries today's `localDate`** — free, template-started, a different cycle day, or a past-workout entry dated today. Almost every day has exactly one workout, and this keeps the rule stateable in one sentence.
+- **"Today" is the user's day, not the server's**: the client sends `X-Timezone` on every request (`apps/frontend/lib/api/client.ts`) and the `@ClientToday()` decorator resolves the weekday and the done-check in that zone, falling back to the pinned `SERVER_TIME_ZONE` (`apps/backend/src/common/utils/today.util.ts`) when the header is absent — direct API calls and server-side rendering. That fallback zone is the same one the `localDate` backfill assumed.
+
+`WorkoutDay.order` still orders the modal's list. It must never decide *which* workout is recommended again.
+
 ## Agent skills
 
 ### Issue tracker

@@ -33,6 +33,7 @@ import {
   CurrentCycleWorkouts,
   WorkoutExerciseInput,
 } from '@/types';
+import { clientTimeZone } from '@/lib/local-date';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
@@ -71,6 +72,9 @@ class ApiClient {
     const method = (options.method || 'GET').toUpperCase();
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      // The client is the only party that knows the user's zone, and "today" decides which
+      // workout is recommended. Without it the server falls back to its pinned zone.
+      'X-Timezone': clientTimeZone(),
     };
 
     if (options.headers) {
