@@ -1,0 +1,15 @@
+-- One workout day per weekday within a cycle.
+--
+-- Why: the weekday decides which workout is recommended, so two days in the same cycle
+-- claiming Monday leaves "what am I doing on Monday?" with no correct answer. The creation
+-- wizard prevented it by UI convention; the day editor did not, and the update endpoint
+-- wrote whatever it was given -- so the invariant held on one path and was freely violable
+-- on the other. This makes it a real constraint, with a 400 from the service in front of it.
+--
+-- Scoped to the cycle on purpose: two *different* cycles may reuse the same weekday, which
+-- is the normal case (every cycle has its own Monday).
+--
+-- This migration FAILS if any existing cycle already holds duplicate weekdays. Run
+-- `npm run check:duplicate-weekdays` (apps/backend/scripts/check-duplicate-weekdays.ts)
+-- against the target database first -- it is read-only and reports every offending cycle.
+CREATE UNIQUE INDEX "WorkoutDay_cycleId_weekday_key" ON "WorkoutDay"("cycleId", "weekday");

@@ -1,9 +1,11 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { WorkoutTreeService, mapExercisesToResponse, toExerciseInputs, WORKOUT_EXERCISE_TREE_INCLUDE } from '../workout-tree/workout-tree.service';
 import { setWorkingVolume } from '../common/utils/volume.util';
 import { calculateCycleWeek, getCurrentDate } from '../common/utils/date.util';
+import { WEEKDAY_NAMES } from '../common/utils/weekday.util';
 import { ExercisesService } from '../exercises/exercises.service';
 import {
   CreateCycleDto,
@@ -14,6 +16,21 @@ import {
   CycleDetailsDto,
   WorkoutsByGymDto,
 } from './dto';
+
+const WEEKDAY_UNIQUE_INDEX = 'WorkoutDay_cycleId_weekday_key';
+
+/** A P2002 raised by the unique index on WorkoutDay(cycleId, weekday), and nothing else. */
+function isWeekdayConflict(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
+    return false;
+  }
+  // `meta.target` is the index name on Postgres, but has been a field-name array on other
+  // connectors and older client versions -- match either shape.
+  const target = error.meta?.target;
+  return Array.isArray(target)
+    ? target.includes('cycleId') && target.includes('weekday')
+    : target === WEEKDAY_UNIQUE_INDEX;
+}
 
 const CYCLE_TREE_INCLUDE = {
   workoutDays: {
@@ -95,6 +112,14 @@ export class WorkoutCyclesService {
     }
 
     const { name, duration, startDate, workoutDays } = createCycleDto;
+
+    const weekdays = workoutDays.map((day) => day.weekday);
+    const duplicateWeekday = weekdays.find((weekday, i) => weekdays.indexOf(weekday) !== i);
+    if (duplicateWeekday !== undefined) {
+      throw new BadRequestException(
+        `Zwei Trainingstage liegen auf ${WEEKDAY_NAMES[duplicateWeekday]}. Pro Zyklus ist jeder Wochentag nur einmal erlaubt.`,
+      );
+    }
 
     const allExerciseIds = workoutDays.flatMap((day) => day.exercises.map((e) => e.exerciseId));
     await this.exercisesService.validateAccessible(allExerciseIds, userId);
@@ -184,7 +209,7 @@ export class WorkoutCyclesService {
     updateWorkoutDayDto: UpdateWorkoutDayDto,
     userId: string,
   ): Promise<CycleResponseDto> {
-    await this.findById(cycleId, userId);
+    const cycle = await this.findById(cycleId, userId);
 
     const workoutDay = await this.prisma.workoutDay.findUnique({
       where: { id: workoutDayId },
@@ -194,16 +219,41 @@ export class WorkoutCyclesService {
       throw new NotFoundException('Workout day not found');
     }
 
-    await this.prisma.workoutDay.update({
-      where: { id: workoutDayId },
-      data: {
-        name: updateWorkoutDayDto.name,
-        weekday: updateWorkoutDayDto.weekday,
-        ...(updateWorkoutDayDto.plannedHomeGymId !== undefined && {
-          plannedHomeGymId: updateWorkoutDayDto.plannedHomeGymId,
-        }),
-      },
-    });
+    // The weekday decides which workout is recommended, so two days in one cycle sharing a
+    // weekday has no correct answer. The unique index on (cycleId, weekday) would reject this
+    // anyway -- catching it here turns a 500 from a driver-level constraint error into a 400
+    // the editor can show.
+    const conflict = cycle.workoutDays.find(
+      (day) => day.weekday === updateWorkoutDayDto.weekday && day.id !== workoutDayId,
+    );
+    if (conflict) {
+      throw new BadRequestException(
+        `${WEEKDAY_NAMES[updateWorkoutDayDto.weekday]} ist in diesem Zyklus bereits durch "${conflict.name}" belegt.`,
+      );
+    }
+
+    try {
+      await this.prisma.workoutDay.update({
+        where: { id: workoutDayId },
+        data: {
+          name: updateWorkoutDayDto.name,
+          weekday: updateWorkoutDayDto.weekday,
+          ...(updateWorkoutDayDto.plannedHomeGymId !== undefined && {
+            plannedHomeGymId: updateWorkoutDayDto.plannedHomeGymId,
+          }),
+        },
+      });
+    } catch (error) {
+      // The check above reads the cycle and then writes, so two requests moving different days
+      // onto the same free weekday can both pass it and race into the index. Rare, but the
+      // endpoint must answer 400 rather than let a driver error surface as a 500.
+      if (isWeekdayConflict(error)) {
+        throw new BadRequestException(
+          `${WEEKDAY_NAMES[updateWorkoutDayDto.weekday]} ist in diesem Zyklus bereits belegt.`,
+        );
+      }
+      throw error;
+    }
 
     return this.findById(cycleId, userId);
   }
