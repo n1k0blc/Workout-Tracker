@@ -394,6 +394,18 @@ export default function ExerciseCard({
     skippedSetNumbers: skippedPlannedSetNumbers,
   });
 
+  // Collapsed-bar warmup/working lookup: mirrors the expanded row's `currentType` derivation
+  // below (keyed by setNumber instead of row index) so the two views can't disagree -- sourced
+  // from the same tested `setRows` (lib/set-slots.ts), with an in-flight edit-value override for
+  // unlogged planned sets, and a raw fallback for additional/extra sets outside the planned segment.
+  const setTypeByNumber = new Map(setRows.map((row) => [row.setNumber, row.setType]));
+  const getSlotSetType = (setNumber: number): SetType => {
+    const loggedSet = getLoggedSet(setNumber);
+    if (loggedSet) return loggedSet.setType ?? SetType.WORKING;
+    const plannedType = setTypeByNumber.get(setNumber);
+    return editValues[setNumber]?.setType ?? plannedType ?? SetType.WORKING;
+  };
+
   // Swipe helpers
   const SWIPE_THRESHOLD = 70;
   const startSwipe = (key: string | number, clientX: number, clientY: number) => {
@@ -753,11 +765,12 @@ export default function ExerciseCard({
                 {setIndicatorSlots.map((slot, i) => {
                   // For blueprint/template edit (!allowLogging), always show as "unlogged" (gray) since there's no logging concept.
                   const logged = effectiveAllowLogging && !!getLoggedSet(slot);
+                  const isWarmup = getSlotSetType(slot) === SetType.WARMUP;
                   return (
                     <div
                       key={i}
-                      className={`h-[2.5px] w-4 rounded-[1px] transition-colors ${logged ? 'bg-foreground' : 'bg-muted-foreground/30'}`}
-                      title={`Satz ${slot}${logged ? ' geloggt' : ''}`}
+                      className={`h-[2.5px] rounded-[1px] transition-colors ${isWarmup ? 'w-2' : 'w-4'} ${logged ? 'bg-foreground' : 'bg-muted-foreground/30'}`}
+                      title={`Satz ${slot}${isWarmup ? ' (Aufwärmen)' : ''}${logged ? ' geloggt' : ''}`}
                     />
                   );
                 })}
