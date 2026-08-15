@@ -83,20 +83,14 @@ export default function EditWorkoutPage() {
 
     setSaving(true);
     try {
-      // Sync the (possibly-edited) date into the draft before the single save call. The
-      // picked day is already a local calendar day, so it becomes localDate verbatim --
+      // The picked day is already a local calendar day, so it becomes localDate verbatim --
       // correcting a workout's date has to move both, or the two would disagree.
-      setActiveWorkoutDirectly(
-        {
-          ...activeWorkout,
+      await completeWorkout({
+        dateOverride: {
           date: new Date(workoutDate + 'T12:00:00').toISOString(),
           localDate: workoutDate,
         },
-        false,
-        0,
-      );
-
-      await completeWorkout();
+      });
       navigateBack();
     } catch (error) {
       console.error('Failed to save workout:', error);

@@ -28,6 +28,12 @@ interface CompletionEntry {
 }
 
 export interface CompleteWorkoutOptions {
+  /**
+   * A day correction made on the save screen itself (history editor). Passed through the
+   * save call rather than staged into `activeWorkout` first: a state write in the same tick
+   * as the save is invisible to it, so the correction would be silently dropped.
+   */
+  dateOverride?: { date: string; localDate: string };
   overwriteBlueprint?: boolean;
   saveAsTemplateMode?: SaveAsTemplateMode;
   saveAsTemplateName?: string;
@@ -543,10 +549,12 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       // A live session is stamped with the day it is *finished* on -- a session started at
       // 23:50 belongs to the day it ended. A past entry and a history edit keep the day they
       // already carry (picked by the user, or loaded from the server).
-      const localDate = isLive ? toLocalDateString(new Date()) : activeWorkout.localDate;
+      const localDate = isLive
+        ? toLocalDateString(new Date())
+        : options.dateOverride?.localDate ?? activeWorkout.localDate;
 
       const payload = {
-        date: activeWorkout.date,
+        date: options.dateOverride?.date ?? activeWorkout.date,
         localDate,
         totalDuration,
         isFreeWorkout: activeWorkout.isFreeWorkout,
