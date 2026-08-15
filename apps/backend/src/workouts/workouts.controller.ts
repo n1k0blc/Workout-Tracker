@@ -16,6 +16,8 @@ import { WorkoutEngineService, SuggestedWorkout, CurrentCycleWorkouts } from './
 import { CreateWorkoutDto, UpdateWorkoutDto, WorkoutResponseDto, WorkoutListItemDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { ClientToday } from '../common/decorators/client-today.decorator';
+import { Today } from '../common/utils/today.util';
 
 // Logging is now fully client-side (§3.3): the per-set lifecycle endpoints
 // (start/logSet/updateSet/deleteSet/addExercise/removeExercise/reorder/replaceExercise/
@@ -32,15 +34,17 @@ export class WorkoutsController {
   @Get('suggested')
   async getSuggestedWorkout(
     @CurrentUser() user: { id: string },
+    @ClientToday() today: Today,
   ): Promise<SuggestedWorkout | null> {
-    return this.workoutEngineService.getSuggestedWorkout(user.id);
+    return this.workoutEngineService.getSuggestedWorkout(user.id, today);
   }
 
   @Get('cycle/workouts')
   async getCurrentCycleWorkouts(
     @CurrentUser() user: { id: string },
+    @ClientToday() today: Today,
   ): Promise<CurrentCycleWorkouts | null> {
-    return this.workoutEngineService.getCurrentCycleWorkouts(user.id);
+    return this.workoutEngineService.getCurrentCycleWorkouts(user.id, today);
   }
 
   @Get()

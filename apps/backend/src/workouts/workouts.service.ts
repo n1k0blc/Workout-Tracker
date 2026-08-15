@@ -123,6 +123,7 @@ export class WorkoutsService {
           kind: 'WORKOUT',
           userId,
           date: new Date(dto.date),
+          localDate: dto.localDate,
           totalDuration: dto.totalDuration,
           isFreeWorkout: dto.isFreeWorkout ?? false,
           homeGymId: dto.homeGymId || null,
@@ -160,6 +161,7 @@ export class WorkoutsService {
         where: { id },
         data: {
           ...(dto.date !== undefined && { date: new Date(dto.date) }),
+          ...(dto.localDate !== undefined && { localDate: dto.localDate }),
           ...(dto.totalDuration !== undefined && { totalDuration: dto.totalDuration }),
           ...(dto.isFreeWorkout !== undefined && { isFreeWorkout: dto.isFreeWorkout }),
           ...(dto.homeGymId !== undefined && { homeGymId: dto.homeGymId || null }),
@@ -195,7 +197,7 @@ export class WorkoutsService {
   private async resolveSaveContext(
     dto: CreateWorkoutDto | UpdateWorkoutDto,
     userId: string,
-    existing?: { originTemplateId: string | null },
+    existing?: { originTemplateId: string | null; localDate?: string },
   ): Promise<SaveContext> {
     if (dto.exercises) {
       await this.exercisesService.validateAccessible(dto.exercises.map((e) => e.exerciseId), userId);
@@ -212,7 +214,7 @@ export class WorkoutsService {
     if (dto.workoutDayId) {
       const day = await this.prisma.workoutDay.findUnique({
         where: { id: dto.workoutDayId },
-        include: { cycle: { select: { userId: true } } },
+        include: { cycle: { select: { userId: true, startDate: true } } },
       });
       if (!day || day.cycle.userId !== userId) {
         throw new NotFoundException('Workout day not found');
@@ -220,6 +222,15 @@ export class WorkoutsService {
       if (dto.cycleId && day.cycleId !== dto.cycleId) {
         throw new BadRequestException('workoutDayId does not belong to cycleId');
       }
+
+      // A cycle built ahead of its start date (planned Thursday for next Monday) has nothing
+      // to start yet -- no workout of any kind, logged-today or backfilled, can predate it.
+      const localDate = dto.localDate ?? existing?.localDate;
+      const cycleStartLocalDate = day.cycle.startDate.toISOString().slice(0, 10);
+      if (localDate && localDate < cycleStartLocalDate) {
+        throw new BadRequestException('Dieser Zyklus hat noch nicht begonnen.');
+      }
+
       workoutDay = { id: day.id, cycleId: day.cycleId, plannedHomeGymId: day.plannedHomeGymId };
     }
 
@@ -308,6 +319,7 @@ export class WorkoutsService {
     return {
       id: workout.id,
       date: workout.date,
+      localDate: workout.localDate,
       isFreeWorkout: workout.isFreeWorkout,
       totalDuration: workout.totalDuration ?? undefined,
       homeGymId: workout.homeGymId ?? undefined,

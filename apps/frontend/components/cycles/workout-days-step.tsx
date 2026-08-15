@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { CycleFormData, WorkoutDayData } from './cycle-wizard';
+import { sortByCycleWeekday } from '@/lib/weekday';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,23 +14,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-} from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  horizontalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 
 interface WorkoutDaysStepProps {
   formData: CycleFormData;
@@ -62,10 +46,12 @@ export default function WorkoutDaysStep({
   );
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingWeekday, setEditingWeekday] = useState<number | null>(null);
   const [modalWeekday, setModalWeekday] = useState<number>(1);
   const [modalName, setModalName] = useState('');
   const [modalGymId, setModalGymId] = useState('');
+
+  const sortedDaysList = sortByCycleWeekday(selectedDaysList, formData.startDate);
 
   // Sort home gyms alphabetically
   const homeGyms = [...(user?.homeGyms || [])].sort((a, b) =>
@@ -97,19 +83,6 @@ export default function WorkoutDaysStep({
     }
   }, [formData.workoutDays]);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      // Long-press to drag (same as workout page reordering)
-      activationConstraint: {
-        delay: 300,
-        tolerance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
   const getWeekdayLabel = (weekday: number): string => {
     return weekdays.find((w) => w.value === weekday)?.label || `Tag ${weekday}`;
   };
@@ -129,21 +102,22 @@ export default function WorkoutDaysStep({
     setModalWeekday(firstAvailable);
     setModalName('');
     setModalGymId(homeGyms.length > 0 ? homeGyms[0].id : '');
-    setEditingIndex(null);
+    setEditingWeekday(null);
     setIsModalOpen(true);
   };
 
-  const openEditDay = (index: number) => {
-    const day = selectedDaysList[index];
+  const openEditDay = (weekday: number) => {
+    const day = selectedDaysList.find((d) => d.weekday === weekday);
+    if (!day) return;
     setModalWeekday(day.weekday);
     setModalName(day.name);
     setModalGymId(day.plannedHomeGymId || (homeGyms[0]?.id || ''));
-    setEditingIndex(index);
+    setEditingWeekday(weekday);
     setIsModalOpen(true);
   };
 
-  const removeDay = (index: number) => {
-    setSelectedDaysList(selectedDaysList.filter((_, i) => i !== index));
+  const removeDay = (weekday: number) => {
+    setSelectedDaysList(selectedDaysList.filter((d) => d.weekday !== weekday));
   };
 
   const handleModalSave = () => {
@@ -159,31 +133,19 @@ export default function WorkoutDaysStep({
     };
 
     let updated: SelectedDay[];
-    if (editingIndex !== null) {
-      updated = [...selectedDaysList];
-      updated[editingIndex] = newEntry;
+    if (editingWeekday !== null) {
+      updated = selectedDaysList.map((d) => (d.weekday === editingWeekday ? newEntry : d));
     } else {
       updated = [...selectedDaysList, newEntry];
     }
 
     setSelectedDaysList(updated);
     setIsModalOpen(false);
-    setEditingIndex(null);
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (over && active.id !== over.id) {
-      const oldIndex = selectedDaysList.findIndex((d) => d.weekday === active.id);
-      const newIndex = selectedDaysList.findIndex((d) => d.weekday === over.id);
-      if (oldIndex !== -1 && newIndex !== -1) {
-        setSelectedDaysList(arrayMove(selectedDaysList, oldIndex, newIndex));
-      }
-    }
+    setEditingWeekday(null);
   };
 
   const handleNext = () => {
-    const workoutDays: WorkoutDayData[] = selectedDaysList.map((day) => {
+    const workoutDays: WorkoutDayData[] = sortedDaysList.map((day) => {
       const existingDay = formData.workoutDays.find((d) => d.weekday === day.weekday);
       return {
         weekday: day.weekday,
@@ -198,75 +160,6 @@ export default function WorkoutDaysStep({
   };
 
   const isValid = selectedDaysList.length > 0;
-
-  // Sub component for sortable cards
-  // Drag by long-pressing the title area (same UX as ExerciseCard reordering in workout page)
-  function SortableDayCard({
-    day,
-    index,
-    onEdit,
-    onDelete,
-  }: {
-    day: SelectedDay;
-    index: number;
-    onEdit: (idx: number) => void;
-    onDelete: (idx: number) => void;
-  }) {
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      transition,
-      isDragging,
-    } = useSortable({ id: day.weekday });
-
-    const style = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-      opacity: isDragging ? 0.5 : 1,
-    };
-
-    return (
-      <div
-        ref={setNodeRef}
-        style={style}
-      >
-        <Card onClick={() => onEdit(index)} className="cursor-pointer hover:border-primary/50 transition-colors">
-          <CardContent className="p-3 flex items-center justify-between gap-3">
-            {/* Title area is the drag handle (long-press to reorder). touch-none is
-                scoped to just this handle so the rest of the card still allows native
-                horizontal swipe-scrolling on touch devices. */}
-            <div
-              className="flex items-center gap-3 flex-1 min-w-0 cursor-grab active:cursor-grabbing touch-none"
-              {...attributes}
-              {...listeners}
-            >
-              <div className="min-w-0">
-                <div className="font-semibold text-sm text-foreground">
-                  {getWeekdayLabel(day.weekday).toUpperCase()}
-                </div>
-                <div className="text-sm text-foreground truncate">{day.name}</div>
-                <div className="text-xs text-muted-foreground truncate">{getGymDisplay(day)}</div>
-              </div>
-            </div>
-            <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-              {/* No pencil icon: clicking the card opens edit */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8 text-destructive hover:text-destructive"
-                onClick={() => onDelete(index)}
-                aria-label="Entfernen"
-              >
-                <IconTrash className="size-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -297,29 +190,37 @@ export default function WorkoutDaysStep({
             </CardContent>
           </Card>
         ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={selectedDaysList.map((d) => d.weekday)}
-              strategy={horizontalListSortingStrategy}
-            >
-              <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory -mx-1 px-1">
-                {selectedDaysList.map((day, index) => (
-                  <div key={day.weekday} className="snap-start min-w-[170px] flex-shrink-0">
-                    <SortableDayCard
-                      day={day}
-                      index={index}
-                      onEdit={openEditDay}
-                      onDelete={removeDay}
-                    />
-                  </div>
-                ))}
+          <div className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory -mx-1 px-1">
+            {sortedDaysList.map((day) => (
+              <div key={day.weekday} className="snap-start min-w-[170px] flex-shrink-0">
+                <Card
+                  onClick={() => openEditDay(day.weekday)}
+                  className="cursor-pointer hover:border-primary/50 transition-colors"
+                >
+                  <CardContent className="p-3 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-semibold text-sm text-foreground">
+                        {getWeekdayLabel(day.weekday).toUpperCase()}
+                      </div>
+                      <div className="text-sm text-foreground truncate">{day.name}</div>
+                      <div className="text-xs text-muted-foreground truncate">{getGymDisplay(day)}</div>
+                    </div>
+                    <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 text-destructive hover:text-destructive"
+                        onClick={() => removeDay(day.weekday)}
+                        aria-label="Entfernen"
+                      >
+                        <IconTrash className="size-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            </SortableContext>
-          </DndContext>
+            ))}
+          </div>
         )}
 
         <div className="flex justify-center py-3">
@@ -346,11 +247,11 @@ export default function WorkoutDaysStep({
       </div>
 
       {/* Add / Edit Day Modal (styled like exercise selection modals) */}
-      <Dialog open={isModalOpen} onOpenChange={(open) => { if (!open) { setIsModalOpen(false); setEditingIndex(null); } }}>
+      <Dialog open={isModalOpen} onOpenChange={(open) => { if (!open) { setIsModalOpen(false); setEditingWeekday(null); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {editingIndex !== null ? 'Trainingstag bearbeiten' : 'Trainingstag hinzufügen'}
+              {editingWeekday !== null ? 'Trainingstag bearbeiten' : 'Trainingstag hinzufügen'}
             </DialogTitle>
           </DialogHeader>
 
@@ -361,7 +262,7 @@ export default function WorkoutDaysStep({
               <div className="flex flex-wrap gap-2">
                 {weekdays.map((w) => {
                   const used = new Set(selectedDaysList.map((d) => d.weekday));
-                  const isUsed = used.has(w.value) && (editingIndex === null || selectedDaysList[editingIndex]?.weekday !== w.value);
+                  const isUsed = used.has(w.value) && editingWeekday !== w.value;
                   const isActive = modalWeekday === w.value;
                   return (
                     <Button
@@ -431,13 +332,13 @@ export default function WorkoutDaysStep({
               variant="outline"
               onClick={() => {
                 setIsModalOpen(false);
-                setEditingIndex(null);
+                setEditingWeekday(null);
               }}
             >
               Abbrechen
             </Button>
             <Button onClick={handleModalSave} disabled={modalWeekday == null || !modalName.trim()}>
-              {editingIndex !== null ? 'Speichern' : 'Hinzufügen'}
+              {editingWeekday !== null ? 'Speichern' : 'Hinzufügen'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { WorkoutEngineService } from '../workouts/workout-engine.service';
 import { setWorkingVolume } from '../common/utils/volume.util';
 import { calculateCycleWeek, getCurrentDate } from '../common/utils/date.util';
+import { Today } from '../common/utils/today.util';
 import {
   DashboardStatsDto,
   LastSevenDaysStatsDto,
@@ -127,30 +128,24 @@ export class DashboardService {
     return ((newValue - oldValue) / oldValue) * 100;
   }
 
-  /** Delegates to the one next-workout service (§3.6) instead of a second, independent algorithm. */
-  async getNextPlannedWorkout(userId: string): Promise<NextPlannedWorkoutDto | null> {
-    const suggested = await this.workoutEngineService.getSuggestedWorkout(userId);
-    if (!suggested) {
+  /**
+   * Delegates to the one next-workout service (§3.6) instead of a second, independent
+   * algorithm: today's workout while it is still open, otherwise the next scheduled weekday.
+   */
+  async getNextPlannedWorkout(userId: string, today: Today): Promise<NextPlannedWorkoutDto | null> {
+    const next = await this.workoutEngineService.getNextScheduledWorkout(userId, today);
+    if (!next) {
       return null;
     }
 
-    // Suggested date: next occurrence of the day's weekday -- a display hint only,
-    // not the selection mechanism (rotation/order already picked the day).
-    const today = getCurrentDate();
-    let daysUntilNext = suggested.weekday - today.getDay();
-    if (daysUntilNext <= 0) {
-      daysUntilNext += 7;
-    }
-    const suggestedDate = new Date(today);
-    suggestedDate.setDate(today.getDate() + daysUntilNext);
-
     return {
-      workoutDayId: suggested.workoutDayId,
-      workoutDayName: suggested.workoutDayName,
-      cycleName: suggested.cycleName,
+      workoutDayId: next.workoutDayId,
+      workoutDayName: next.workoutDayName,
+      cycleName: next.cycleName,
       templateName: null,
-      dayOfWeek: suggested.weekday,
-      suggestedDate: suggestedDate.toISOString().split('T')[0],
+      dayOfWeek: next.weekday,
+      suggestedDate: next.localDate,
+      cycleStartDate: next.cycleStartDate,
     };
   }
 

@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { derivePrimaryMuscle } from '../common/muscle.util';
 import { getCurrentDate } from '../common/utils/date.util';
 import { setWorkingVolume } from '../common/utils/volume.util';
+import { getWeekdayDistanceFromCycleStart } from '../common/utils/weekday.util';
 import { AnalyticsFilterDto, AnalyticsScope } from '../common/dto/analytics-filter.dto';
 import {
   VolumeAnalyticsDto,
@@ -164,7 +165,7 @@ export class AnalyticsService {
     const referenceDay = cycleStartDate ? cycleStartDate.getUTCDay() : 1; // Monday for calendar mode
     const currentDay = date.getUTCDay();
     const daysSinceWeekStart = cycleStartDate
-      ? (currentDay - referenceDay + 7) % 7
+      ? getWeekdayDistanceFromCycleStart(currentDay, referenceDay)
       : (currentDay + 6) % 7;
 
     const weekStart = new Date(date);

@@ -1,10 +1,11 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { Workout, WorkoutExercise, ExerciseLog, SetLog, PlannedSet, SetType, SaveAsTemplateMode, WorkoutExerciseInput } from '@/types';
+import { Workout, WorkoutExercise, ExerciseLog, SetLog, PlannedSet, SetType, SaveAsTemplateMode, WorkoutExerciseInput, Exercise } from '@/types';
 import { apiClient } from '@/lib/api';
 import { reorderExerciseLogs, toExercisePayload } from '@/lib/workout-order';
 import { replaceExerciseInList } from '@/lib/exercise-replace';
+import { toLocalDateString } from '@/lib/local-date';
 
 const DRAFT_STORAGE_KEY = 'activeWorkoutDraft';
 const DRAFT_META_STORAGE_KEY = 'activeWorkoutDraftMeta';
@@ -27,6 +28,12 @@ interface CompletionEntry {
 }
 
 export interface CompleteWorkoutOptions {
+  /**
+   * A day correction made on the save screen itself (history editor). Passed through the
+   * save call rather than staged into `activeWorkout` first: a state write in the same tick
+   * as the save is invisible to it, so the correction would be silently dropped.
+   */
+  dateOverride?: { date: string; localDate: string };
   overwriteBlueprint?: boolean;
   saveAsTemplateMode?: SaveAsTemplateMode;
   saveAsTemplateName?: string;
@@ -66,7 +73,7 @@ interface WorkoutContextType {
   discardWorkout: () => void;
   addExercise: (exerciseId: string) => Promise<string>;
   removeExercise: (exerciseLogId: string) => Promise<void>;
-  replaceExercise: (exerciseLogId: string, newExerciseId: string) => Promise<void>;
+  replaceExercise: (exerciseLogId: string, newExerciseId: string, newExercise?: Exercise) => Promise<void>;
   reorderExercises: (exerciseIds: string[]) => Promise<void>;
   logSet: (
     exerciseLogId: string,
@@ -403,10 +410,12 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       let exercises: ExerciseLog[] = [];
+      let workoutDayName: string | undefined;
 
       if (!data.isFreeWorkout && data.cycleId && data.workoutDayId) {
         const cycle = await apiClient.getCycle(data.cycleId);
         const day = cycle.workoutDays.find((d) => d.id === data.workoutDayId);
+        workoutDayName = day?.name;
         if (day?.blueprint?.exercises) {
           exercises = buildExerciseLogsFromTree(day.blueprint.exercises);
         }
@@ -415,10 +424,14 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       const workout: Workout = {
         id: generateLocalId('workout'),
         date: data.isPastWorkout && data.pastWorkoutDate ? data.pastWorkoutDate : new Date().toISOString(),
+        // A picked past date is already a local calendar day -- stored verbatim. A live
+        // session's day is re-stamped when it is finished (see completeWorkout).
+        localDate: data.isPastWorkout && data.pastWorkoutDate ? data.pastWorkoutDate : toLocalDateString(new Date()),
         isFreeWorkout: data.isFreeWorkout,
         homeGymId: data.homeGymId,
         cycleId: data.cycleId,
         workoutDayId: data.workoutDayId,
+        workoutDayName,
         exercises,
         createdAt: new Date().toISOString(),
       };
@@ -450,6 +463,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       const workout: Workout = {
         id: generateLocalId('workout'),
         date: isPast && pastWorkoutDate ? pastWorkoutDate : new Date().toISOString(),
+        localDate: isPast && pastWorkoutDate ? pastWorkoutDate : toLocalDateString(new Date()),
         isFreeWorkout: true,
         homeGymId: homeGymId ?? template.recommendedGymId ?? null,
         originTemplateId: template.id,
@@ -535,8 +549,16 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
       const totalDuration = isPastWorkout ? pastWorkoutDuration : workoutDuration;
 
+      // A live session is stamped with the day it is *finished* on -- a session started at
+      // 23:50 belongs to the day it ended. A past entry and a history edit keep the day they
+      // already carry (picked by the user, or loaded from the server).
+      const localDate = isLive
+        ? toLocalDateString(new Date())
+        : options.dateOverride?.localDate ?? activeWorkout.localDate;
+
       const payload = {
-        date: activeWorkout.date,
+        date: options.dateOverride?.date ?? activeWorkout.date,
+        localDate,
         totalDuration,
         isFreeWorkout: activeWorkout.isFreeWorkout,
         homeGymId: activeWorkout.homeGymId ?? undefined,
@@ -619,11 +641,12 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
-  const replaceExercise = async (exerciseLogId: string, newExerciseId: string) => {
+  const replaceExercise = async (exerciseLogId: string, newExerciseId: string, newExercise?: Exercise) => {
     if (!activeWorkout) return;
 
     try {
-      const exDetails = await apiClient.getExercise(newExerciseId);
+      // The picker already handed us the entry it selected; only fall back to the API when it didn't.
+      const exDetails = newExercise ?? await apiClient.getExercise(newExerciseId);
       const updated = {
         ...activeWorkout,
         exercises: replaceExerciseInList(activeWorkout.exercises, exerciseLogId, {
@@ -762,6 +785,12 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     if (savedDraft && savedMeta) {
       try {
         const workout: Workout = JSON.parse(savedDraft);
+        // A draft persisted before workouts carried a localDate: derive one from the
+        // instant so resuming it can still be saved. Only reachable for the first draft
+        // that spans the deploy of this field.
+        if (!workout.localDate) {
+          workout.localDate = toLocalDateString(new Date(workout.date));
+        }
         const meta: DraftMeta = JSON.parse(savedMeta);
         existingWorkoutIdRef.current = meta.existingWorkoutId;
         setIsHistoryEdit(meta.isHistoryEdit);

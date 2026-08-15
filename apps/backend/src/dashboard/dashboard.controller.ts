@@ -1,6 +1,8 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { ClientToday } from '../common/decorators/client-today.decorator';
+import { Today } from '../common/utils/today.util';
 import { DashboardService } from './dashboard.service';
 import { DashboardStatsDto } from './dto/dashboard-stats.dto';
 import { NextPlannedWorkoutDto } from './dto/next-planned-workout.dto';
@@ -21,8 +23,9 @@ export class DashboardController {
   @Get('next-planned-workout')
   async getNextPlannedWorkout(
     @CurrentUser() user: { id: string },
+    @ClientToday() today: Today,
   ): Promise<NextPlannedWorkoutDto | null> {
-    return this.dashboardService.getNextPlannedWorkout(user.id);
+    return this.dashboardService.getNextPlannedWorkout(user.id, today);
   }
 
   @Get('cycle-progress')

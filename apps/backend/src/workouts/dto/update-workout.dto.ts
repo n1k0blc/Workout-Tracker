@@ -13,12 +13,19 @@ import {
 import { Type } from 'class-transformer';
 import { WorkoutExerciseInputDto } from '../../common/dto/workout-tree.dto';
 import { SaveAsTemplateMode } from './create-workout.dto';
+import { IsLocalDate } from '../../common/utils/local-date.util';
 
 /** Editing a saved workout (history correction). Same side-effect flags as create (§3.4). */
 export class UpdateWorkoutDto {
   @IsOptional()
   @IsDateString()
   date?: string;
+
+  // Optional here: a history correction that does not touch the day leaves the stored
+  // localDate as it was logged.
+  @IsOptional()
+  @IsLocalDate()
+  localDate?: string;
 
   @IsOptional()
   @IsInt()

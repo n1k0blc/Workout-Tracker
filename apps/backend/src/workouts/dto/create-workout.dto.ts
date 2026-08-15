@@ -12,6 +12,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { WorkoutExerciseInputDto } from '../../common/dto/workout-tree.dto';
+import { IsLocalDate } from '../../common/utils/local-date.util';
 
 export enum SaveAsTemplateMode {
   NONE = 'none',
@@ -28,6 +29,12 @@ export enum SaveAsTemplateMode {
 export class CreateWorkoutDto {
   @IsDateString()
   date: string;
+
+  // The calendar day the workout happened on, in the user's own timezone -- supplied by the
+  // client, which is the only party that knows it. Required, so no workout can be written
+  // without a day that is fixed at log time rather than recomputed per reader.
+  @IsLocalDate()
+  localDate: string;
 
   @IsOptional()
   @IsInt()

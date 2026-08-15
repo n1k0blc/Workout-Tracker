@@ -16,7 +16,7 @@ export class WorkoutDayDto {
   @IsInt()
   @Min(0)
   @Max(6)
-  weekday: number; // 0 = Sunday, 6 = Saturday; a date hint only, not the rotation order
+  weekday: number; // 0 = Sunday, 6 = Saturday; distance from the cycle's startDate weekday decides WorkoutDay.order (#74)
 
   @IsString()
   name: string; // e.g., "Upper Body", "Leg Day"
@@ -44,7 +44,8 @@ export class CreateCycleDto {
   @IsDateString()
   startDate: string;
 
-  // Array order defines the rotation order (WorkoutDay.order), per §3.6.
+  // Request array order is irrelevant to WorkoutDay.order -- each day's weekday distance
+  // from startDate decides it (#74).
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => WorkoutDayDto)

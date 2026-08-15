@@ -7,6 +7,7 @@ import { apiClient } from '@/lib/api';
 import { SuggestedWorkout } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import ExerciseCard from '@/components/workout/exercise-card';
 import {
   Dialog,
   DialogContent,
@@ -285,8 +286,8 @@ export default function WorkoutStartScreen() {
           </div>
         )}
 
-        {/* Suggested Workout — only shown once its scheduled weekday has arrived (or passed) */}
-        {suggestedWorkout && suggestedWorkout.isDue && (
+        {/* Suggested Workout — today's cycle day, absent once the day is done or nothing is planned */}
+        {suggestedWorkout && (
           <Card>
             <CardContent className="p-6">
               <div className="flex items-start gap-3">
@@ -304,36 +305,32 @@ export default function WorkoutStartScreen() {
                   {suggestedWorkout.exercises.length > 0 ? (
                     <>
                       <div className="space-y-3 mb-4">
-                        {suggestedWorkout.exercises.map((exercise) => (
-                          <div
-                            key={exercise.exerciseId}
-                            className="rounded-md border bg-muted/30 p-4"
-                          >
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm font-medium text-muted-foreground">
-                                    #{exercise.order}
-                                  </span>
-                                  <h3 className="font-semibold text-foreground">
-                                    {exercise.exerciseName}
-                                  </h3>
-                                </div>
-                                {exercise.sets && exercise.sets.length > 0 && (
-                                  <div className="mt-2 space-y-1">
-                                    <div className="text-sm font-medium text-foreground">
-                                      {exercise.sets.length} geplante Sätze:
-                                    </div>
-                                    {exercise.sets.map((set, setIdx) => (
-                                      <div key={setIdx} className="text-sm text-muted-foreground">
-                                        {set.setType === 'WARMUP' ? 'Aufwärmen' : 'Arbeit'} — {set.reps} Wdh × {set.weight} kg @ RIR {set.rir}
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
+                        {suggestedWorkout.exercises.map((exercise, idx) => (
+                          <ExerciseCard
+                            key={exercise.id}
+                            exercise={{
+                              ...exercise,
+                              // Not-yet-performed sets: plannedSets is the single representation
+                              // (see lib/planned-sets.ts) -- no fabricated `sets` copy.
+                              sets: [],
+                              plannedSets: (exercise.sets ?? []).map((s) => ({
+                                id: s.id,
+                                order: s.order,
+                                setType: s.setType,
+                                reps: s.reps,
+                                weight: s.weight,
+                                rir: s.rir ?? 0,
+                                rest: s.rest ?? 90,
+                              })),
+                            }}
+                            exerciseNumber={idx + 1}
+                            mode="edit"
+                            readonly={true}
+                            allowReorder={false}
+                            allowExerciseActions={false}
+                            allowSetManagement={false}
+                            allowLogging={false}
+                          />
                         ))}
                       </div>
 

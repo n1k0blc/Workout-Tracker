@@ -34,10 +34,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { IconPlus } from '@tabler/icons-react';
-import type { ExerciseLog } from '@/types';
+import type { ExerciseLog, WorkoutDay } from '@/types';
 import { replaceExerciseInList } from '@/lib/exercise-replace';
 import { withArrayPositionOrder } from '@/lib/workout-order';
+import { WEEKDAY_NAMES } from '@/lib/weekday';
 
 export default function EditBlueprintPage() {
   const params = useParams();
@@ -60,6 +71,9 @@ export default function EditBlueprintPage() {
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
   const [templateName, setTemplateName] = useState('');
   const [savingTemplate, setSavingTemplate] = useState(false);
+  // The day currently holding `plannedWeekday`, when it isn't this day -- set right before
+  // asking the user to confirm a swap, so the dialog can name it.
+  const [swapConflict, setSwapConflict] = useState<WorkoutDay | null>(null);
 
   // DnD Kit sensors (long-press on title, same as template editor and active workout)
   const sensors = useSensors(
@@ -191,7 +205,22 @@ export default function EditBlueprintPage() {
       alert('Bitte gib einen Workout-Namen ein');
       return;
     }
-    
+
+    // Every weekday in the cycle is unique to one day (#71), so a match here can only be
+    // another day -- this one already owns `plannedWeekday` if it's unchanged. Ask before
+    // exchanging weekdays rather than letting the save hit the API's 400.
+    const conflict = cycle?.workoutDays.find(
+      (day) => day.weekday === plannedWeekday && day.id !== workoutDayId
+    );
+    if (conflict) {
+      setSwapConflict(conflict);
+      return;
+    }
+
+    await saveWorkoutDay();
+  };
+
+  const saveWorkoutDay = async (swapWithWorkoutDayId?: string) => {
     setSaving(true);
     try {
       // First update the workout day name and weekday
@@ -199,8 +228,9 @@ export default function EditBlueprintPage() {
         name: workoutDayName.trim(),
         weekday: plannedWeekday,
         plannedHomeGymId: plannedHomeGymId || undefined,
+        swapWithWorkoutDayId,
       });
-      
+
       // Transform exercises to match API format
       const blueprintData = {
         exercises: withArrayPositionOrder(exercises.map((ex) => ({
@@ -222,6 +252,14 @@ export default function EditBlueprintPage() {
       alert('Fehler beim Speichern des Blueprints');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleConfirmSwap = () => {
+    const conflict = swapConflict;
+    setSwapConflict(null);
+    if (conflict) {
+      saveWorkoutDay(conflict.id);
     }
   };
 
@@ -593,6 +631,27 @@ export default function EditBlueprintPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Swap confirmation -- a taken weekday can't just be moved onto, so this names the
+          day that already holds it and offers to exchange weekdays atomically. */}
+      <AlertDialog open={!!swapConflict} onOpenChange={(open) => !open && setSwapConflict(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tage tauschen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {WEEKDAY_NAMES[plannedWeekday]} ist für &quot;{swapConflict?.name}&quot; belegt. Tage tauschen?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>
+              Abbrechen
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmSwap} disabled={saving}>
+              Tauschen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </ProtectedRoute>
   );
 }

@@ -245,11 +245,6 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
                       ? activeWorkout.originTemplateName || 'Freies Workout'
                       : activeWorkout.workoutDayName || 'Workout'}
                   </h1>
-                  {activeWorkout.cycleName && (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {activeWorkout.cycleName}
-                    </p>
-                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   {/* For past workout tracking we *always* show the manual duration input and never the live timers.

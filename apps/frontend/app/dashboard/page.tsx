@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
+import { fromLocalDateString } from '@/lib/local-date';
 import { 
   WorkoutListItem, 
   PersonalRecord, 
@@ -111,14 +112,17 @@ export default function DashboardPage() {
     checkRecentlyCompletedCycle();
   }, []);
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return new Intl.DateTimeFormat('de-DE', {
+  const formatDay = (date: Date) =>
+    new Intl.DateTimeFormat('de-DE', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
     }).format(date);
-  };
+
+  const formatDate = (dateStr: string) => formatDay(new Date(dateStr));
+
+  /** `suggestedDate` is a calendar day, not an instant -- parse it as one. */
+  const formatLocalDate = (localDate: string) => formatDay(fromLocalDateString(localDate));
 
   const formatNumber = (num: number) => {
     return new Intl.NumberFormat('de-DE').format(Math.round(num));
@@ -356,12 +360,17 @@ export default function DashboardPage() {
                                 {nextWorkout.templateName}
                               </div>
                             )}
+                            {nextWorkout.cycleStartDate && (
+                              <Badge variant="secondary" className="mb-2">
+                                Zyklus beginnt am {formatLocalDate(nextWorkout.cycleStartDate)}
+                              </Badge>
+                            )}
                             <div className="mt-4 pt-4 border-t">
                               <div className="text-lg font-semibold text-primary">
                                 {getDayName(nextWorkout.dayOfWeek)}
                               </div>
                               <div className="text-sm text-muted-foreground mt-1">
-                                {formatDate(nextWorkout.suggestedDate)}
+                                {formatLocalDate(nextWorkout.suggestedDate)}
                               </div>
                             </div>
                           </div>

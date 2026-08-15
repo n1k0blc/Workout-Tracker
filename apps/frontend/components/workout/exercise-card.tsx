@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { ExerciseLog, SetLog, SetType } from '@/types';
+import { ExerciseLog, SetLog, SetType, Exercise } from '@/types';
 import { useWorkout } from '@/lib/workout-context';
 import { getSetIndicatorSlots, resolveSetRows } from '@/lib/set-slots';
 import { useSortable } from '@dnd-kit/sortable';
@@ -54,7 +54,13 @@ interface ExerciseCardProps {
 
   // Optional handlers for controlled usage (e.g. templates without context hijack)
   onRemoveExercise?: (exerciseId: string) => void | Promise<void>;
-  onReplaceExercise?: (exerciseId: string, newExerciseId: string) => void | Promise<void>;
+  /**
+   * `newExercise` is the catalogue entry the user actually picked, handed over so the receiver
+   * does not have to look the id up again. A just-created custom exercise is not in any list
+   * the receiver holds, so a lookup returns nothing and the swap loses the name and the
+   * isUnilateral/isDoubleWeight flags.
+   */
+  onReplaceExercise?: (exerciseId: string, newExerciseId: string, newExercise?: Exercise) => void | Promise<void>;
   onAddSet?: (exerciseId: string) => void;
   onRemoveSet?: (exerciseId: string, setNumber: number) => void;
   onUpdateSet?: (exerciseId: string, setId: string, data: { reps?: number; weight?: number; rir?: number; setType?: SetType }) => void | Promise<void>;
@@ -278,14 +284,14 @@ export default function ExerciseCard({
     }
   };
 
-  const handleReplaceExercise = async (newExerciseId: string) => {
+  const handleReplaceExercise = async (newExerciseId: string, newExercise?: Exercise) => {
     if (hasLoggedSets && !onReplaceExercise) {
       console.warn('Cannot replace exercise after sets have been logged');
       setShowReplaceModal(false);
       return;
     }
     try {
-      await replaceExercise(exercise.id, newExerciseId);
+      await replaceExercise(exercise.id, newExerciseId, newExercise);
       setShowReplaceModal(false);
       setIsCollapsed(false);
     } catch (error) {
@@ -387,6 +393,18 @@ export default function ExerciseCard({
     sets: exercise.sets,
     skippedSetNumbers: skippedPlannedSetNumbers,
   });
+
+  // Collapsed-bar warmup/working lookup: mirrors the expanded row's `currentType` derivation
+  // below (keyed by setNumber instead of row index) so the two views can't disagree -- sourced
+  // from the same tested `setRows` (lib/set-slots.ts), with an in-flight edit-value override for
+  // unlogged planned sets, and a raw fallback for additional/extra sets outside the planned segment.
+  const setTypeByNumber = new Map(setRows.map((row) => [row.setNumber, row.setType]));
+  const getSlotSetType = (setNumber: number): SetType => {
+    const loggedSet = getLoggedSet(setNumber);
+    if (loggedSet) return loggedSet.setType ?? SetType.WORKING;
+    const plannedType = setTypeByNumber.get(setNumber);
+    return editValues[setNumber]?.setType ?? plannedType ?? SetType.WORKING;
+  };
 
   // Swipe helpers
   const SWIPE_THRESHOLD = 70;
@@ -747,11 +765,12 @@ export default function ExerciseCard({
                 {setIndicatorSlots.map((slot, i) => {
                   // For blueprint/template edit (!allowLogging), always show as "unlogged" (gray) since there's no logging concept.
                   const logged = effectiveAllowLogging && !!getLoggedSet(slot);
+                  const isWarmup = getSlotSetType(slot) === SetType.WARMUP;
                   return (
                     <div
                       key={i}
-                      className={`h-[2.5px] w-4 rounded-[1px] transition-colors ${logged ? 'bg-foreground' : 'bg-muted-foreground/30'}`}
-                      title={`Satz ${slot}${logged ? ' geloggt' : ''}`}
+                      className={`h-[2.5px] rounded-[1px] transition-colors ${isWarmup ? 'w-2' : 'w-4'} ${logged ? 'bg-foreground' : 'bg-muted-foreground/30'}`}
+                      title={`Satz ${slot}${isWarmup ? ' (Aufwärmen)' : ''}${logged ? ' geloggt' : ''}`}
                     />
                   );
                 })}

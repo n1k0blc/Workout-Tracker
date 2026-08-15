@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { mapExercisesToResponse, WORKOUT_EXERCISE_TREE_INCLUDE } from '../workout-tree/workout-tree.service';
 import { WorkoutExerciseResponseDto } from '../common/dto/workout-tree.dto';
-import { getCurrentDate } from '../common/utils/date.util';
+import { Today, addLocalDays, weekdayOfLocalDate } from '../common/utils/today.util';
 
 export interface SuggestedWorkout {
   cycleId: string;
@@ -10,18 +10,14 @@ export interface SuggestedWorkout {
   workoutDayId: string;
   workoutDayName: string;
   weekday: number;
-  order: number;
   plannedHomeGymId?: string | null;
   exercises: WorkoutExerciseResponseDto[];
-  /** Whether the scheduled weekday has arrived (or passed) -- gates the "start now" prompt. */
-  isDue: boolean;
 }
 
 export interface CycleWorkoutDay {
   workoutDayId: string;
   workoutDayName: string;
   weekday: number;
-  order: number;
   isSuggested: boolean;
   exerciseCount: number;
 }
@@ -32,29 +28,55 @@ export interface CurrentCycleWorkouts {
   workoutDays: CycleWorkoutDay[];
 }
 
+/** The next planned day the dashboard looks ahead to, with the calendar day it falls on. */
+export interface NextScheduledWorkout {
+  cycleName: string;
+  workoutDayId: string;
+  workoutDayName: string;
+  weekday: number;
+  /** `YYYY-MM-DD` in the user's zone -- today when today's workout is still open. */
+  localDate: string;
+  /** Set only when the cycle hasn't started yet -- `localDate` is then its first scheduled day, not today's. */
+  cycleStartDate?: string;
+}
+
 type DayWithBlueprint = {
   id: string;
   name: string;
   weekday: number;
-  order: number;
   plannedHomeGymId: string | null;
   workouts: any[]; // filtered to kind=BLUEPRINT, 0 or 1 element
 };
 
 /**
  * The one "next workout" service (§3.6), shared by the workouts controller (suggested
- * workout / cycle overview) and the dashboard -- replaces the old weekday-gated engine
- * and the dashboard's independent sequence-based algorithm. Rotation is driven by
- * `WorkoutDay.order`; weekday is now just a date hint, not a gate. Blueprint is the
- * single source of truth for the suggestion (structure, values, and rest, verbatim --
- * no more merging in numbers from the last completed session).
+ * workout / cycle overview) and the dashboard.
+ *
+ * The recommendation is plain weekday matching: today's cycle day, or nothing. Sequence-based
+ * rotation is gone -- it advanced through `WorkoutDay.order` from the last performed workout,
+ * so skipping a Saturday and training on Monday performed Saturday's plan on Monday and left
+ * the user permanently out of phase with their own week. A skipped day is now simply missed.
+ *
+ * A day counts as done if *any* workout carries today's `localDate` -- free, template-started,
+ * a different cycle day, or a past-workout entry dated today. Blueprint is the single source
+ * of truth for the suggestion (structure, values, and rest, verbatim).
+ *
+ * A cycle built ahead of its start date recommends nothing and lists nothing until that date
+ * arrives -- `getNextScheduledWorkout` is the one exception, answering the cycle's first
+ * scheduled day instead of silence so the dashboard can show what's coming. A cycle whose
+ * duration has run out is likewise silenced immediately on read, ahead of the periodic sweep
+ * that flips its stored status (`WorkoutCyclesService.autoCompleteExpiredCyclesSweep`).
  */
 @Injectable()
 export class WorkoutEngineService {
   constructor(private prisma: PrismaService) {}
 
-  private async getActiveCycleWithDays(userId: string) {
-    return this.prisma.workoutCycle.findFirst({
+  /**
+   * The cycle every recommendation reads from: active, not yet run out, days in `order`
+   * (which is all `WorkoutDay.order` still does -- it lists the cycle modal, it never picks).
+   */
+  private async getRecommendableCycle(userId: string, today: Today) {
+    const cycle = await this.prisma.workoutCycle.findFirst({
       where: { userId, status: 'ACTIVE' },
       orderBy: { startDate: 'desc' },
       include: {
@@ -64,100 +86,145 @@ export class WorkoutEngineService {
         },
       },
     });
+
+    return cycle && !this.isCycleExpired(cycle, today) ? cycle : null;
   }
 
-  private isCycleExpired(cycle: { startDate: Date; duration: number }): boolean {
-    const endDate = new Date(cycle.startDate);
-    endDate.setDate(endDate.getDate() + cycle.duration * 7);
-    return getCurrentDate() > endDate;
+  /** Judged on the user's calendar, like everything else here -- not on the server's clock. */
+  private isCycleExpired(cycle: { startDate: Date; duration: number }, today: Today): boolean {
+    return today.localDate > addLocalDays(this.startLocalDate(cycle), cycle.duration * 7);
   }
 
-  /**
-   * The next day in rotation order, based on the workoutDay of the last performed workout,
-   * plus the date it becomes due: the next occurrence of that day's weekday on/after the
-   * last workout's date (or the cycle's start date, for the very first suggestion).
-   */
-  private async findNextWorkoutDay(
-    userId: string,
-    cycle: { id: string; startDate: Date; workoutDays: DayWithBlueprint[] },
-  ): Promise<{ day: DayWithBlueprint; dueDate: Date } | null> {
-    if (cycle.workoutDays.length === 0) {
-      return null;
-    }
+  /** A cycle built ahead of time (e.g. Thursday, for a Monday start) is not recommendable yet. */
+  private isCycleNotStarted(cycle: { startDate: Date }, today: Today): boolean {
+    return today.localDate < this.startLocalDate(cycle);
+  }
 
-    const lastWorkout = await this.prisma.workout.findFirst({
-      where: { userId, cycleId: cycle.id, kind: 'WORKOUT' },
-      orderBy: { date: 'desc' },
-      select: { workoutDayId: true, date: true },
+  private startLocalDate(cycle: { startDate: Date }): string {
+    return cycle.startDate.toISOString().slice(0, 10);
+  }
+
+  /** The planned day whose weekday is `weekday`, if it has a blueprint to start from. */
+  private plannedDay(days: DayWithBlueprint[], weekday: number): DayWithBlueprint | undefined {
+    return days.find((day) => day.weekday === weekday && day.workouts.length > 0);
+  }
+
+  /** Any workout dated today ends the day -- which cycle day it was, or whether it was a cycle day at all, does not matter. */
+  private async isDayDone(userId: string, localDate: string): Promise<boolean> {
+    const logged = await this.prisma.workout.count({
+      where: { userId, kind: 'WORKOUT', localDate },
     });
-
-    const lastIndex = lastWorkout?.workoutDayId
-      ? cycle.workoutDays.findIndex((day) => day.id === lastWorkout.workoutDayId)
-      : -1;
-
-    if (lastIndex === -1) {
-      // No workout logged yet in this cycle: due as soon as the first day's weekday arrives on/after cycle start.
-      return { day: cycle.workoutDays[0], dueDate: this.nextOccurrence(cycle.startDate, cycle.workoutDays[0].weekday, true) };
-    }
-
-    const nextDay = cycle.workoutDays[(lastIndex + 1) % cycle.workoutDays.length];
-    // Due starting the day after the last completed workout's date.
-    return { day: nextDay, dueDate: this.nextOccurrence(lastWorkout!.date, nextDay.weekday, false) };
+    return logged > 0;
   }
 
-  /** Earliest date on/after (or strictly after) `from` that falls on `weekday`. */
-  private nextOccurrence(from: Date, weekday: number, inclusive: boolean): Date {
-    const date = new Date(from);
-    date.setHours(0, 0, 0, 0);
-    if (!inclusive) {
-      date.setDate(date.getDate() + 1);
+  /** Today's planned day, unless the day is already done. */
+  private async findSuggestedDay(
+    userId: string,
+    days: DayWithBlueprint[],
+    today: Today,
+  ): Promise<DayWithBlueprint | null> {
+    const day = this.plannedDay(days, today.weekday);
+    if (!day || (await this.isDayDone(userId, today.localDate))) {
+      return null;
     }
-    date.setDate(date.getDate() + ((weekday - date.getDay() + 7) % 7));
-    return date;
+    return day;
   }
 
-  async getSuggestedWorkout(userId: string): Promise<SuggestedWorkout | null> {
-    const activeCycle = await this.getActiveCycleWithDays(userId);
-    if (!activeCycle || this.isCycleExpired(activeCycle)) {
+  async getSuggestedWorkout(userId: string, today: Today): Promise<SuggestedWorkout | null> {
+    const activeCycle = await this.getRecommendableCycle(userId, today);
+    if (!activeCycle || this.isCycleNotStarted(activeCycle, today)) {
       return null;
     }
 
-    const next = await this.findNextWorkoutDay(userId, activeCycle);
-    const blueprint = next?.day.workouts[0];
-    if (!next || !blueprint) {
-      return null; // no day in rotation, or that day has no blueprint yet
+    const day = await this.findSuggestedDay(userId, activeCycle.workoutDays, today);
+    if (!day) {
+      return null;
     }
-
-    const today = getCurrentDate();
-    today.setHours(0, 0, 0, 0);
 
     return {
       cycleId: activeCycle.id,
       cycleName: activeCycle.name,
-      workoutDayId: next.day.id,
-      workoutDayName: next.day.name,
-      weekday: next.day.weekday,
-      order: next.day.order,
-      plannedHomeGymId: next.day.plannedHomeGymId,
-      exercises: mapExercisesToResponse(blueprint.exercises),
-      isDue: today >= next.dueDate,
+      workoutDayId: day.id,
+      workoutDayName: day.name,
+      weekday: day.weekday,
+      plannedHomeGymId: day.plannedHomeGymId,
+      exercises: mapExercisesToResponse(day.workouts[0].exercises),
     };
   }
 
-  async getCurrentCycleWorkouts(userId: string): Promise<CurrentCycleWorkouts | null> {
-    const activeCycle = await this.getActiveCycleWithDays(userId);
-    if (!activeCycle || this.isCycleExpired(activeCycle)) {
+  /**
+   * Today's workout while it is still open, otherwise the next scheduled weekday -- wrapping
+   * into the following week, so a cycle planning only Mondays answers "next Monday" once
+   * Monday is done. A cycle that hasn't started yet looks ahead from its own start date
+   * instead of today, so the dashboard can show what the plan opens with.
+   */
+  async getNextScheduledWorkout(userId: string, today: Today): Promise<NextScheduledWorkout | null> {
+    const activeCycle = await this.getRecommendableCycle(userId, today);
+    if (!activeCycle) {
       return null;
     }
 
-    const next = await this.findNextWorkoutDay(userId, activeCycle);
+    if (this.isCycleNotStarted(activeCycle, today)) {
+      return this.firstScheduledWorkout(activeCycle);
+    }
+
+    const doneToday = await this.isDayDone(userId, today.localDate);
+
+    for (let offset = doneToday ? 1 : 0; offset <= 7; offset++) {
+      const day = this.plannedDay(activeCycle.workoutDays, (today.weekday + offset) % 7);
+      if (day) {
+        return {
+          cycleName: activeCycle.name,
+          workoutDayId: day.id,
+          workoutDayName: day.name,
+          weekday: day.weekday,
+          localDate: addLocalDays(today.localDate, offset),
+        };
+      }
+    }
+
+    return null;
+  }
+
+  /** The first planned day on or after a not-yet-started cycle's start date. */
+  private firstScheduledWorkout(cycle: {
+    name: string;
+    startDate: Date;
+    workoutDays: DayWithBlueprint[];
+  }): NextScheduledWorkout | null {
+    const startLocalDate = this.startLocalDate(cycle);
+    const startWeekday = weekdayOfLocalDate(startLocalDate);
+
+    for (let offset = 0; offset <= 6; offset++) {
+      const day = this.plannedDay(cycle.workoutDays, (startWeekday + offset) % 7);
+      if (day) {
+        return {
+          cycleName: cycle.name,
+          workoutDayId: day.id,
+          workoutDayName: day.name,
+          weekday: day.weekday,
+          localDate: addLocalDays(startLocalDate, offset),
+          cycleStartDate: startLocalDate,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  async getCurrentCycleWorkouts(userId: string, today: Today): Promise<CurrentCycleWorkouts | null> {
+    const activeCycle = await this.getRecommendableCycle(userId, today);
+    if (!activeCycle || this.isCycleNotStarted(activeCycle, today)) {
+      return null;
+    }
+
+    const suggested = await this.findSuggestedDay(userId, activeCycle.workoutDays, today);
 
     const workoutDays: CycleWorkoutDay[] = activeCycle.workoutDays.map((day) => ({
       workoutDayId: day.id,
       workoutDayName: day.name,
       weekday: day.weekday,
-      order: day.order,
-      isSuggested: next?.day.id === day.id && day.workouts.length > 0,
+      isSuggested: suggested?.id === day.id,
       exerciseCount: day.workouts[0]?.exercises.length ?? 0,
     }));
 
