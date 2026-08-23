@@ -14,7 +14,7 @@ Du bist der Dev-Environment Manager für den Workout Tracker.
 2. Öffne **zwei separate Terminal-Tabs/Fenster** (macOS Terminal oder iTerm) und starte dort automatisch:
    - **Terminal 1 – Backend**
      ```bash
-     cd "$(pwd)/apps/backend" && npm run start:dev
+     cd "$(pwd)/apps/backend" && pnpm run start:dev
 **Für Tests auf iPhone / anderem Gerät im selben WiFi (lokal auf Mac-IP zugreifen):**
 
 Die CORS-Konfiguration ist jetzt dev-freundlich (siehe main.ts):
@@ -31,25 +31,25 @@ Empfohlener Ablauf:
 
 2. Backend starten (meist ohne spezielles CORS_ORIGIN nötig):
    ```bash
-   cd apps/backend && npm run start:dev
+   cd apps/backend && pnpm run start:dev
    ```
    (Bindet automatisch auf 0.0.0.0.)
 
    Falls du explizit sein willst:
    ```bash
-   CORS_ORIGIN="http://192.168.1.42:3000" npm run start:dev
+   CORS_ORIGIN="http://192.168.1.42:3000" pnpm run start:dev
    ```
 
 3. Frontend starten mit der Mac-IP als API-URL (wichtig!):
    Einfach (empfohlen):
    ```bash
-   cd apps/frontend && npm run dev:mobile
+   cd apps/frontend && pnpm run dev:mobile
    ```
    (Das neue Script setzt automatisch NEXT_PUBLIC_API_URL=http://192.168.178.24:3001/api und bindet auf 0.0.0.0.)
 
    Oder manuell:
    ```bash
-   cd apps/frontend && NEXT_PUBLIC_API_URL=http://192.168.178.24:3001/api npm run dev
+   cd apps/frontend && NEXT_PUBLIC_API_URL=http://192.168.178.24:3001/api pnpm run dev
    ```
 
 4. Auf dem iPhone:
@@ -64,10 +64,10 @@ Empfohlener Ablauf:
 1. **Auf dem Mac Terminal (Frontend-Ordner):**
    Empfohlen:
    ```bash
-   npm run dev:mobile
+   pnpm run dev:mobile
    ```
-   - Oder manuell: NEXT_PUBLIC_API_URL=http://192.168.178.24:3001/api npm run dev
-   - Nicht nur `npm run dev`!
+   - Oder manuell: NEXT_PUBLIC_API_URL=http://192.168.178.24:3001/api pnpm run dev
+   - Nicht nur `pnpm run dev`!
    - Warte bis du siehst:
      - Local:   http://localhost:3000
      - **Network: http://192.168.178.24:3000**   <--- das ist die URL fürs iPhone (kopiere sie!)
@@ -77,7 +77,7 @@ Empfohlener Ablauf:
 
 2. **Backend muss auch laufen** (anderes Terminal):
    ```bash
-   cd apps/backend && npm run start:dev
+   cd apps/backend && pnpm run start:dev
    ```
 
 3. **Auf dem iPhone Safari exakt eingeben (kopieren aus dem Mac-Terminal!):**
@@ -99,10 +99,10 @@ Empfohlener Ablauf:
 - Gehe zu: Systemeinstellungen > Netzwerk > Firewall (rechts oben) > "Firewall-Optionen..."
 - In der Liste nach "node", "next", "Terminal" oder "iTerm" suchen und "Eingehende Verbindungen erlauben" anhaken.
 - Alternativ: Firewall temporär komplett deaktivieren (Häkchen oben raus) zum Testen → Server neu starten → wenn es geht, Firewall wieder an und die App erlauben.
-- Wichtig: Nach Firewall-Änderung immer `Ctrl + C` im Terminal und `npm run dev:mobile` neu starten.
+- Wichtig: Nach Firewall-Änderung immer `Ctrl + C` im Terminal und `pnpm run dev:mobile` neu starten.
 
 **Zusätzliche Checks:**
-- Stelle sicher, dass im Mac-Terminal beim Start von `npm run dev:mobile` die Zeile steht (auch wenn sie "0.0.0.0" zeigt):
+- Stelle sicher, dass im Mac-Terminal beim Start von `pnpm run dev:mobile` die Zeile steht (auch wenn sie "0.0.0.0" zeigt):
   Kopiere **deine echte IP** aus dem "Network"-Bereich oder nutze `192.168.178.24:3000` und baue die URL `http://192.168.178.24:3000` auf dem iPhone.
   (0.0.0.0 ist nicht zum Verbinden von anderen Geräten geeignet — immer die reale IP verwenden!)
 - Teste auf dem iPhone, ob du die Mac-IP überhaupt erreichen kannst: Versuche `http://192.168.178.24` (ohne :3000). Wenn das eine Router-Seite oder Fehler zeigt, ist es Netzwerk/Firewall.

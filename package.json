@@ -4,11 +4,11 @@
   "private": true,
   "description": "Personal Workout Tracking Application",
   "scripts": {
-    "dev": "npm run backend & npm run frontend",
-    "backend": "cd apps/backend && npm run start:dev",
-    "frontend": "cd apps/frontend && npm run dev",
-    "backend:build": "cd apps/backend && npm run build",
-    "frontend:build": "cd apps/frontend && npm run build"
+    "dev": "pnpm run backend & pnpm run frontend",
+    "backend": "pnpm --filter backend run start:dev",
+    "frontend": "pnpm --filter frontend run dev",
+    "backend:build": "pnpm --filter backend run build",
+    "frontend:build": "pnpm --filter frontend run build"
   },
   "keywords": [
     "workout",
