@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../generated/prisma';
 
 async function backfillORMBenchmarks() {
   const prisma = new PrismaClient();

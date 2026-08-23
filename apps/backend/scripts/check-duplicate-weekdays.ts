@@ -9,7 +9,7 @@
  *
  *   DATABASE_URL=... npm run check:duplicate-weekdays
  */
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../generated/prisma';
 import { WEEKDAY_NAMES } from '../src/common/utils/weekday.util';
 
 const prisma = new PrismaClient();

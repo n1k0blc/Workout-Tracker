@@ -9,7 +9,7 @@
  * WICHTIG: Dieses Script ist idempotent - kann mehrfach ausgeführt werden
  */
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from './generated/prisma';
 
 const prisma = new PrismaClient();
 

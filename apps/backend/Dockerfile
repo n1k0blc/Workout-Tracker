@@ -36,11 +36,11 @@ COPY apps/backend/package*.json ./apps/backend/
 RUN npm ci --workspace=backend --omit=dev
 
 # Copy built application and prisma from builder. The generated Prisma client
-# (.prisma) is hoisted to the workspace root by npm, not into apps/backend/node_modules --
-# Node's module resolution walks up parent directories, so root-level ./node_modules/.prisma
-# resolves correctly from a cwd of /app/apps/backend.
+# is emitted to apps/backend/generated/prisma (see the `output` path in
+# schema.prisma) rather than node_modules/.prisma, so this copy doesn't rely
+# on npm hoisting the client to the workspace root.
 COPY --from=builder /app/apps/backend/dist ./apps/backend/dist
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/apps/backend/generated ./apps/backend/generated
 COPY --from=builder /app/apps/backend/prisma ./apps/backend/prisma
 
 # Create non-root user

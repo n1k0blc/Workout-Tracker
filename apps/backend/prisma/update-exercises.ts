@@ -1,5 +1,5 @@
 import { config } from 'dotenv';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../generated/prisma';
 import * as fs from 'fs';
 import * as path from 'path';
 

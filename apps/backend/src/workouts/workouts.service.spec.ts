@@ -1,7 +1,7 @@
 import { WorkoutsService } from './workouts.service';
 import { CreateWorkoutDto } from './dto/create-workout.dto';
 import { UpdateWorkoutDto } from './dto/update-workout.dto';
-import { SetType } from '@prisma/client';
+import { SetType } from '../../generated/prisma';
 
 const exercises = [
   {

@@ -1,4 +1,4 @@
-import { CycleStatus } from '@prisma/client';
+import { CycleStatus } from '../../../generated/prisma';
 import { WorkoutExerciseResponseDto } from '../../common/dto/workout-tree.dto';
 
 export class HomeGymDto {
