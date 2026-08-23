@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -21,7 +21,7 @@ WORKDIR /app/apps/backend
 RUN npm run build
 
 # Production Stage
-FROM node:20-alpine
+FROM node:22-alpine
 
 # Needed for the healthcheck in docker-compose.prod.yml (wget http://localhost:3001/api/health)
 RUN apk add --no-cache wget
