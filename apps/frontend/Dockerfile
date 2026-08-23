@@ -2,41 +2,44 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
+RUN corepack enable
+
 # Build argument for API URL
 ARG NEXT_PUBLIC_API_URL=http://localhost:3001/api
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
-# Copy package files
-COPY package*.json ./
-COPY apps/frontend/package*.json ./apps/frontend/
+# Copy workspace manifests
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/frontend/package.json ./apps/frontend/
 
 # Install dependencies
-RUN npm ci --workspace=frontend
+RUN pnpm install --filter=frontend --frozen-lockfile
 
 # Copy source code
 COPY apps/frontend ./apps/frontend
 
 # Build the application
 WORKDIR /app/apps/frontend
-RUN npm run build
+RUN pnpm run build
 
 # Production Stage
 FROM node:22-alpine
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
-COPY apps/frontend/package*.json ./apps/frontend/
+RUN corepack enable
+
+# Copy workspace manifests
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/frontend/package.json ./apps/frontend/
 
 # Install only production dependencies
-RUN npm ci --workspace=frontend --omit=dev
+RUN pnpm install --filter=frontend --frozen-lockfile --prod
 
 # Copy built application from builder
 COPY --from=builder /app/apps/frontend/.next ./apps/frontend/.next
 COPY --from=builder /app/apps/frontend/public ./apps/frontend/public
 COPY apps/frontend/next.config.ts ./apps/frontend/
-COPY apps/frontend/package.json ./apps/frontend/
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
@@ -49,4 +52,4 @@ EXPOSE 3000
 
 WORKDIR /app/apps/frontend
 
-CMD ["npm", "start"]
+CMD ["node_modules/.bin/next", "start"]
