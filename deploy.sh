@@ -62,7 +62,7 @@ git pull origin main
 
 # Build and start containers
 echo -e "${YELLOW}🐳 Building Docker images...${NC}"
-docker compose -f docker-compose.prod.yml build --no-cache
+docker compose -f docker-compose.prod.yml build
 
 echo -e "${YELLOW}🔄 Starting containers...${NC}"
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d
