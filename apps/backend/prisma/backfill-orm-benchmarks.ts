@@ -1,7 +1,7 @@
-import { PrismaClient } from '../generated/prisma';
+import { createPrismaClient } from './create-prisma-client';
 
 async function backfillORMBenchmarks() {
-  const prisma = new PrismaClient();
+  const prisma = createPrismaClient();
   
   console.log('🔄 Starting ORM Benchmark backfill...');
   

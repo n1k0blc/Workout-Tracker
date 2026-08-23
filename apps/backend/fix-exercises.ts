@@ -1,6 +1,6 @@
-import { PrismaClient } from './generated/prisma';
+import { createPrismaClient } from './prisma/create-prisma-client';
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 async function main() {
   console.log('🔧 Fixing 3 exercises with name mismatches...\n');

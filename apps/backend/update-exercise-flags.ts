@@ -1,6 +1,6 @@
-import { PrismaClient } from './generated/prisma';
+import { createPrismaClient } from './prisma/create-prisma-client';
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 async function main() {
   console.log('🔄 Updating exercise flags...\n');

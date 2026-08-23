@@ -11,14 +11,20 @@ COPY apps/backend/package.json ./apps/backend/
 # Install all dependencies (including devDependencies for build)
 RUN pnpm install --filter=backend --frozen-lockfile
 
-# Copy prisma schema and generate client
+# Copy prisma schema/config and generate client. prisma.config.ts (not the schema's
+# datasource block) is where Prisma 7 reads the connection string and migrations path from;
+# `prisma generate` only parses that value, it never connects, so a placeholder is enough
+# to satisfy it during the image build.
 COPY apps/backend/prisma ./apps/backend/prisma
-RUN cd apps/backend && pnpm exec prisma generate
+COPY apps/backend/prisma.config.ts ./apps/backend/
+RUN cd apps/backend && DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder" pnpm exec prisma generate
 
 # Copy source code
 COPY apps/backend ./apps/backend
 
-# Build the application
+# Build the application. The generated Prisma client (apps/backend/generated/prisma) is
+# TypeScript source under Prisma 7's `prisma-client` generator, so it's compiled into
+# dist alongside src rather than copied pre-built (see tsconfig.json's widened rootDir).
 WORKDIR /app/apps/backend
 RUN pnpm run build
 
@@ -39,13 +45,15 @@ COPY apps/backend/package.json ./apps/backend/
 # Install only production dependencies
 RUN pnpm install --filter=backend --frozen-lockfile --prod
 
-# Copy built application and prisma from builder. The generated Prisma client
-# is emitted to apps/backend/generated/prisma (see the `output` path in
-# schema.prisma) rather than node_modules/.prisma, so this copy doesn't rely
-# on hoisting the client to the workspace root.
+# Copy built application from builder. dist/generated/prisma holds the compiled Prisma
+# client (Prisma 7's `prisma-client` generator emits TS source that tsc compiles alongside
+# src — see tsconfig.json), so no separate copy of the raw generated/ directory is needed
+# for the app to run. The prisma/ directory and prisma.config.ts are still needed at
+# runtime: docker-compose.prod.yml's container command runs `npx prisma migrate deploy`
+# before starting the app.
 COPY --from=builder /app/apps/backend/dist ./apps/backend/dist
-COPY --from=builder /app/apps/backend/generated ./apps/backend/generated
 COPY --from=builder /app/apps/backend/prisma ./apps/backend/prisma
+COPY --from=builder /app/apps/backend/prisma.config.ts ./apps/backend/
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
@@ -56,4 +64,4 @@ EXPOSE 3001
 
 WORKDIR /app/apps/backend
 
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]

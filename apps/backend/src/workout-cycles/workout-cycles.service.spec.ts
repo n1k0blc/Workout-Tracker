@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { Prisma } from '../../generated/prisma';
+import { Prisma } from '../../generated/prisma/client';
 import { WorkoutCyclesService } from './workout-cycles.service';
 import { CreateCycleDto } from './dto';
 

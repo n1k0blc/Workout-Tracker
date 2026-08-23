@@ -1,8 +1,8 @@
-import { PrismaClient } from '../generated/prisma';
+import { createPrismaClient } from './create-prisma-client';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 interface ExerciseCsvRow {
   ID: number;

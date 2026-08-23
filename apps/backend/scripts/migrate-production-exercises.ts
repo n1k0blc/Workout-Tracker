@@ -1,8 +1,8 @@
-import { PrismaClient } from '../generated/prisma';
+import { createPrismaClient } from '../prisma/create-prisma-client';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 interface ExerciseMapping {
   id: number;
