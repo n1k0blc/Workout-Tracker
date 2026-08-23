@@ -130,10 +130,12 @@ chmod +x deploy.sh
 chmod +x backup.sh
 ./backup.sh
 
-# Automated backups (cron)
-crontab -e
-# Add: 0 3 * * * /home/pi/apps/workout-tracker/backup.sh
+# Automated backups (cron) - one-time setup on the production host
+chmod +x install-backup-cron.sh
+./install-backup-cron.sh
 ```
+
+`backup.sh` keeps at least `MIN_KEEP` (default 7) most recent dumps regardless of age, and only prunes beyond that floor by age (`KEEP_DAYS`, default 30). It exits non-zero on a failed or empty/corrupt backup instead of silently rotating in a bad dump.
 
 For detailed deployment instructions, see [DEPLOYMENT-PLAN.md](DEPLOYMENT-PLAN.md).bash
 cd apps/backend
