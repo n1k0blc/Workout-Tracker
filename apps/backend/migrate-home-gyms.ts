@@ -1,17 +1,16 @@
 /**
  * Production Data Migration: HomeGym System
- * 
+ *
  * Migriert existierende User und Workouts zum neuen Multi-HomeGym System:
  * 1. Erstellt "Mein Home Gym" für alle User ohne HomeGyms
  * 2. Migriert Workouts: Setzt homeGymId basierend auf User's erstem HomeGym
  * 3. Migriert WorkoutDays: Setzt plannedHomeGymId auf Cycle-Owner's erstes HomeGym
- * 
+ *
  * WICHTIG: Dieses Script ist idempotent - kann mehrfach ausgeführt werden
  */
+import { createPrismaClient } from './prisma/create-prisma-client';
 
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 async function main() {
   console.log('🔄 Starting HomeGym Migration...\n');

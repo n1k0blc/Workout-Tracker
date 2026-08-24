@@ -274,15 +274,10 @@ curl https://workout.nikobjelic.com
 
 ### Automatische Backups:
 ```bash
-# Crontab öffnen
-crontab -e
-
-# Füge hinzu (täglich um 3 Uhr morgens):
-0 3 * * * /home/pi/apps/workout-tracker/backup.sh >> /home/pi/logs/backup.log 2>&1
-
-# Log-Ordner erstellen
-mkdir -p ~/logs
+chmod +x install-backup-cron.sh
+./install-backup-cron.sh
 ```
+Richtet einmalig einen täglichen Cronjob (3 Uhr) für `backup.sh` ein und legt `~/logs/backup.log` an. Idempotent — beim erneuten Ausführen wird kein zweiter Eintrag angelegt.
 
 ### Container Auto-Restart:
 Die Container starten automatisch nach Reboot (wegen `restart: always` in docker-compose.yml)

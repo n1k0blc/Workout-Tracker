@@ -7,10 +7,12 @@ npm-debug.log
 README.md
 .next
 dist
+generated
 .DS_Store
 .vscode
 .idea
 *.log
+*.tsbuildinfo
 coverage
 .nyc_output
 postgres_data
