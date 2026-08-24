@@ -3,16 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "description": "Personal Workout Tracking Application",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
-    "dev": "npm run backend & npm run frontend",
-    "backend": "cd apps/backend && npm run start:dev",
-    "frontend": "cd apps/frontend && npm run dev",
-    "backend:build": "cd apps/backend && npm run build",
-    "frontend:build": "cd apps/frontend && npm run build"
+    "dev": "pnpm run backend & pnpm run frontend",
+    "backend": "pnpm --filter backend run start:dev",
+    "frontend": "pnpm --filter frontend run dev",
+    "backend:build": "pnpm --filter backend run build",
+    "frontend:build": "pnpm --filter frontend run build"
   },
   "keywords": [
     "workout",
@@ -21,7 +17,5 @@
   ],
   "author": "",
   "license": "MIT",
-  "overrides": {
-    "multer": "2.2.0"
-  }
+  "packageManager": "pnpm@11.23.0+sha512.f00082e5b283a199b74e079da28d155c008fe232f44c8a06ea7ddfa014ecf719fc362f790ecc67b28106ddac2afb24c49a9a079159da560b2ce7d1e98efd11af"
 }

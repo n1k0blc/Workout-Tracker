@@ -1,12 +1,12 @@
+import { createPrismaClient } from './create-prisma-client';
 import { config } from 'dotenv';
-import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 
 // Load .env from backend directory
 config({ path: path.join(__dirname, '../.env') });
 
-const prisma = new PrismaClient();
+const prisma = createPrismaClient();
 
 const equipmentMap: Record<string, string> = {
   'Kabel': 'CABLE',
