@@ -8,15 +8,16 @@ RUN corepack enable
 ARG NEXT_PUBLIC_API_URL=http://localhost:3001/api
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
-# Copy workspace manifests
+# Copy workspace manifests and source. Source must land before `pnpm install` runs --
+# pnpm's node_modules uses symlinks (e.g. node_modules/@types/node), and BuildKit's COPY
+# fails with "cannot copy to non-directory" when a later COPY has to merge a directory
+# tree into a destination that already holds one of those symlinks.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/frontend/package.json ./apps/frontend/
-
-# Install dependencies
-RUN pnpm install --filter=frontend --frozen-lockfile
-
-# Copy source code
 COPY apps/frontend ./apps/frontend
+
+# Install dependencies. Cache mount keeps the pnpm store warm across builds now that the
+# install layer is no longer cacheable independently of source changes.
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store pnpm install --filter=frontend --frozen-lockfile
 
 # Build the application
 WORKDIR /app/apps/frontend

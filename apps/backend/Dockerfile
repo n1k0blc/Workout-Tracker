@@ -4,23 +4,23 @@ WORKDIR /app
 
 RUN corepack enable
 
-# Copy workspace manifests
+# Copy workspace manifests and source. Source must land before `pnpm install` runs --
+# pnpm's node_modules uses symlinks (e.g. node_modules/@types/node), and BuildKit's COPY
+# fails with "cannot copy to non-directory" when a later COPY has to merge a directory
+# tree into a destination that already holds one of those symlinks.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/backend/package.json ./apps/backend/
-
-# Install all dependencies (including devDependencies for build)
-RUN pnpm install --filter=backend --frozen-lockfile
-
-# Copy prisma schema/config and generate client. prisma.config.ts (not the schema's
-# datasource block) is where Prisma 7 reads the connection string and migrations path from;
-# `prisma generate` only parses that value, it never connects, so a placeholder is enough
-# to satisfy it during the image build.
-COPY apps/backend/prisma ./apps/backend/prisma
-COPY apps/backend/prisma.config.ts ./apps/backend/
-RUN cd apps/backend && DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder" pnpm exec prisma generate
-
-# Copy source code
 COPY apps/backend ./apps/backend
+
+# Install all dependencies (including devDependencies for build). Cache mount keeps the
+# pnpm store warm across builds now that the install layer is no longer cacheable
+# independently of source changes.
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store pnpm install --filter=backend --frozen-lockfile
+
+# Generate the Prisma client. prisma.config.ts (not the schema's datasource block) is where
+# Prisma 7 reads the connection string and migrations path from; `prisma generate` only
+# parses that value, it never connects, so a placeholder is enough to satisfy it during the
+# image build.
+RUN cd apps/backend && DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder" pnpm exec prisma generate
 
 # Build the application. The generated Prisma client (apps/backend/generated/prisma) is
 # TypeScript source under Prisma 7's `prisma-client` generator, so it's compiled into
