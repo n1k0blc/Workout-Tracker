@@ -25,6 +25,7 @@ function makeWorkout(overrides: Partial<any> = {}) {
   return {
     id: 'workout-1',
     date: new Date('2026-06-01T12:00:00.000Z'),
+    localDate: '2026-06-01',
     totalDuration: 3600,
     homeGym: null,
     exercises: [
@@ -328,6 +329,53 @@ describe('AnalyticsService', () => {
       const cycleStart = new Date('2026-03-02T00:00:00.000Z'); // Monday
       const dayEight = new Date('2026-03-09T00:00:00.000Z'); // start of week 2
       expect((service as any).getCycleWeekNumber(dayEight, cycleStart)).toBe(2);
+    });
+  });
+
+  describe('local-date bucketing (#76)', () => {
+    it('buckets a data point by the workout stored localDate, not by its UTC instant', async () => {
+      prisma.workout.findMany.mockResolvedValue([
+        // Instant is still 2026-06-07 in UTC, but the user logged it after midnight
+        // local time -- localDate is the day they experienced it as.
+        makeWorkout({ date: new Date('2026-06-07T23:30:00.000Z'), localDate: '2026-06-08' }),
+      ]);
+
+      const result = await service.getVolumeAnalytics('user-1', {} as AnalyticsFilterDto);
+
+      expect(result.dataPoints[0].date).toBe('2026-06-08');
+    });
+
+    it('buckets a calendar week by localDate, not by the UTC instant that crosses a week boundary', async () => {
+      prisma.workout.findMany.mockResolvedValue([
+        // Instant is Monday 2026-06-08 in UTC (week starting 06-08), but the session
+        // belonged to Sunday 06-07 local time (week starting 06-01, Monday-based).
+        makeWorkout({ date: new Date('2026-06-08T22:00:00.000Z'), localDate: '2026-06-07' }),
+      ]);
+
+      const result = await service.getVolumeAnalytics('user-1', { aggregation: 'week' } as AnalyticsFilterDto);
+
+      expect(result.dataPoints[0].weekStartDate).toBe('2026-06-01');
+    });
+
+    it('keeps cycle week bucketing anchored to the cycle start weekday, consistent with localDate', async () => {
+      prisma.workoutCycle.findFirst.mockResolvedValue({
+        id: 'cycle-1',
+        name: 'Cycle 1',
+        startDate: new Date('2026-06-01T00:00:00.000Z'), // Monday
+      });
+      prisma.workout.findMany.mockResolvedValue([
+        makeWorkout({ id: 'w1', date: new Date('2026-06-03T20:00:00.000Z'), localDate: '2026-06-03' }), // week 1
+        // Instant is 2026-06-07 in UTC (cycle day 6, week 1), but localDate is Monday
+        // 06-08 -- cycle day 7, week 2.
+        makeWorkout({ id: 'w2', date: new Date('2026-06-07T23:30:00.000Z'), localDate: '2026-06-08' }),
+      ]);
+
+      const result = await service.getVolumeAnalytics('user-1', {
+        cycleId: 'cycle-1',
+        aggregation: 'week',
+      } as AnalyticsFilterDto);
+
+      expect(result.dataPoints.map((p) => p.weekNumber)).toEqual([1, 2]);
     });
   });
 });

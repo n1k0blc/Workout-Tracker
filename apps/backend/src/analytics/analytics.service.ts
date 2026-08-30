@@ -60,6 +60,7 @@ interface AnalyticsCycleContext {
 interface AnalyticsWorkoutRow {
   id: string;
   date: Date;
+  localDate: string;
   totalDuration: number | null;
   homeGym?: { id: string; name: string } | null;
   exercises: Array<{
@@ -139,10 +140,12 @@ export class AnalyticsService {
   }
 
   /**
-   * Canonical week-number/bounds helpers, all UTC-based (§2.11 timezone fix): every
-   * data-point date is already displayed via `toISOString().split('T')[0]` (UTC), so the
-   * bucketing math now uses the same basis instead of local server time -- previously a
-   * workout near midnight could bucket into a different week than its displayed date implied.
+   * Canonical week-number/bounds helpers (#76). Every data point is keyed by the workout's
+   * stored `localDate` -- the user's own calendar day, `YYYY-MM-DD` -- which these helpers
+   * read as a UTC-midnight instant so the day- and week-bucketing math stays internally
+   * consistent. `cycleStartDate` is likewise a UTC-anchored calendar date. A late-night
+   * session now buckets into the day (and week) the user experienced it as, matching its
+   * displayed date, rather than the UTC instant it was stored at.
    */
   private getCycleWeekNumber(date: Date, cycleStartDate: Date): number {
     const diffDays = Math.floor((date.getTime() - cycleStartDate.getTime()) / 86_400_000);
@@ -355,7 +358,7 @@ export class AnalyticsService {
 
       totalVolume += workoutVolume;
       const dataPoint: VolumeDataPoint = {
-        date: toDateKey(workout.date),
+        date: workout.localDate,
         volume: workoutVolume,
         workoutId: workout.id,
       };
@@ -563,7 +566,7 @@ export class AnalyticsService {
       const totalSetsThisWorkout = rir0Count + rir1Count + rir2Count;
       if (totalSetsThisWorkout > 0) {
         const dataPoint: RIRDataPoint = {
-          date: toDateKey(workout.date),
+          date: workout.localDate,
           rir0Count,
           rir1Count,
           rir2Count,
@@ -656,7 +659,7 @@ export class AnalyticsService {
 
       const durationInMinutes = Math.round(workout.totalDuration / 60);
       const dataPoint: DurationDataPoint = {
-        date: toDateKey(workout.date),
+        date: workout.localDate,
         duration: durationInMinutes,
         workoutId: workout.id,
       };
@@ -713,7 +716,7 @@ export class AnalyticsService {
 
       if (workoutRestCount > 0) {
         const dataPoint: RestTimeDataPoint = {
-          date: toDateKey(workout.date),
+          date: workout.localDate,
           averageRestTime: Math.round(workoutRestSum / workoutRestCount),
           workoutId: workout.id,
         };
@@ -769,7 +772,7 @@ export class AnalyticsService {
       }
 
       if (workoutReps > 0 || (muscleGroups.length === 0 && equipments.length === 0 && !filter.exerciseId)) {
-        const dataPoint: RepsDataPoint = { date: toDateKey(workout.date), reps: workoutReps, workoutId: workout.id };
+        const dataPoint: RepsDataPoint = { date: workout.localDate, reps: workoutReps, workoutId: workout.id };
         if (cycle) dataPoint.trainingDay = trainingDayCounter;
         dataPoints.push(dataPoint);
         totalReps += workoutReps;
@@ -821,7 +824,7 @@ export class AnalyticsService {
       }
 
       if (workoutSets > 0 || (muscleGroups.length === 0 && equipments.length === 0 && !filter.exerciseId)) {
-        const dataPoint: SetsDataPoint = { date: toDateKey(workout.date), sets: workoutSets, workoutId: workout.id };
+        const dataPoint: SetsDataPoint = { date: workout.localDate, sets: workoutSets, workoutId: workout.id };
         if (cycle) dataPoint.trainingDay = trainingDayCounter;
         dataPoints.push(dataPoint);
         totalSets += workoutSets;
@@ -881,7 +884,7 @@ export class AnalyticsService {
 
       if (workoutSetCount > 0) {
         const dataPoint: IntensityDataPoint = {
-          date: toDateKey(workout.date),
+          date: workout.localDate,
           intensity: Math.round((workoutIntensitySum / workoutSetCount) * 10) / 10,
           workoutId: workout.id,
         };
