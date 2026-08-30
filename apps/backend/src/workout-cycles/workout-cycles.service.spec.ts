@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client';
 import { WorkoutCyclesService } from './workout-cycles.service';
 import { CreateCycleDto } from './dto';
+import { resolveToday } from '../common/utils/today.util';
 
 const exercises = [{ exerciseId: 'exercise-1', order: 1, sets: [{ order: 1, reps: 8 }] }];
 
@@ -269,10 +270,12 @@ describe('WorkoutCyclesService day ordering (#74)', () => {
     await service.create(dto, 'user-1');
 
     const orderByWeekday = new Map(
-      tx.workoutDay.create.mock.calls.map(([call]: [{ data: { weekday: number; order: number } }]) => [
-        call.data.weekday,
-        call.data.order,
-      ]),
+      tx.workoutDay.create.mock.calls.map(
+        ([call]: [{ data: { weekday: number; order: number } }]) => [
+          call.data.weekday,
+          call.data.order,
+        ],
+      ),
     );
 
     expect(orderByWeekday.get(0)).toBe(0); // Sunday, the start weekday
@@ -296,10 +299,12 @@ describe('WorkoutCyclesService day ordering (#74)', () => {
     await service.create(dto, 'user-1');
 
     const orderByWeekday = new Map(
-      tx.workoutDay.create.mock.calls.map(([call]: [{ data: { weekday: number; order: number } }]) => [
-        call.data.weekday,
-        call.data.order,
-      ]),
+      tx.workoutDay.create.mock.calls.map(
+        ([call]: [{ data: { weekday: number; order: number } }]) => [
+          call.data.weekday,
+          call.data.order,
+        ],
+      ),
     );
 
     expect(orderByWeekday.get(1)).toBe(0); // Monday, the start weekday
@@ -330,8 +335,12 @@ describe('WorkoutCyclesService day ordering (#74)', () => {
     await service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1');
 
     const updateCalls = tx.workoutDay.update.mock.calls;
-    const finalUpdateForDay1 = updateCalls.filter((call: [{ where: { id: string } }]) => call[0].where.id === 'day-1').pop();
-    const finalUpdateForDay2 = updateCalls.filter((call: [{ where: { id: string } }]) => call[0].where.id === 'day-2').pop();
+    const finalUpdateForDay1 = updateCalls
+      .filter((call: [{ where: { id: string } }]) => call[0].where.id === 'day-1')
+      .pop();
+    const finalUpdateForDay2 = updateCalls
+      .filter((call: [{ where: { id: string } }]) => call[0].where.id === 'day-2')
+      .pop();
 
     expect(finalUpdateForDay1[0].data.order).toBe(5); // Monday, 5 days after a Wednesday start
     expect(finalUpdateForDay2[0].data.order).toBe(0); // Wednesday, the new start weekday
@@ -393,8 +402,65 @@ describe('WorkoutCyclesService start-date re-anchor conflicts (#88)', () => {
     const unrelated = new Error('connection lost');
     tx.workoutDay.update.mockRejectedValueOnce(unrelated);
 
+    await expect(service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1')).rejects.toBe(
+      unrelated,
+    );
+  });
+});
+
+/**
+ * The same instant the dashboard's cycle-progress tests are pinned to: 14:30 in the pinned
+ * server zone (Europe/Berlin), already 00:30 the next day in Pacific/Auckland.
+ */
+const DETAILS_INSTANT = new Date('2026-08-30T12:30:00.000Z');
+
+/** Monday, so the week boundary below falls on a whole week from the cycle start. */
+const DETAILS_START = new Date('2026-08-24T00:00:00.000Z');
+
+function makeDetailsService() {
+  const prisma = {
+    workoutCycle: {
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'cycle-1',
+        userId: 'user-1',
+        name: 'Hypertrophy',
+        duration: 8,
+        startDate: DETAILS_START,
+        status: 'ACTIVE',
+        completedAt: null,
+        workoutDays: [],
+      }),
+    },
+    workout: { findMany: jest.fn().mockResolvedValue([]) },
+  };
+
+  return new WorkoutCyclesService(prisma as never, {} as never, {} as never);
+}
+
+describe('WorkoutCyclesService cycle-detail week (#89 follow-up)', () => {
+  it("counts the week from the client's calendar day, not the server's", async () => {
+    const service = makeDetailsService();
+
+    // Auckland has rolled into 2026-08-31 -- 7 days after the start, so week 2.
     await expect(
-      service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1'),
-    ).rejects.toBe(unrelated);
+      service.getCycleDetails(
+        'cycle-1',
+        'user-1',
+        resolveToday('Pacific/Auckland', DETAILS_INSTANT),
+      ),
+    ).resolves.toMatchObject({ currentWeek: 2, totalWeeks: 8 });
+
+    // Berlin is still on 2026-08-30 -- 6 days after the start, so week 1.
+    await expect(
+      service.getCycleDetails('cycle-1', 'user-1', resolveToday('Europe/Berlin', DETAILS_INSTANT)),
+    ).resolves.toMatchObject({ currentWeek: 1, totalWeeks: 8 });
+  });
+
+  it('falls back to the pinned server zone when the request carries no timezone', async () => {
+    const service = makeDetailsService();
+
+    await expect(
+      service.getCycleDetails('cycle-1', 'user-1', resolveToday(undefined, DETAILS_INSTANT)),
+    ).resolves.toMatchObject({ currentWeek: 1 });
   });
 });

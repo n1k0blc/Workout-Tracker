@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { WorkoutTreeService, mapExercisesToResponse, toExerciseInputs, WORKOUT_EXERCISE_TREE_INCLUDE } from '../workout-tree/workout-tree.service';
 import { setWorkingVolume } from '../common/utils/volume.util';
 import { calculateCycleWeek, getCurrentDate } from '../common/utils/date.util';
+import { Today, localDateToInstant } from '../common/utils/today.util';
 import { WEEKDAY_NAMES, getWeekdayDistanceFromCycleStart } from '../common/utils/weekday.util';
 import { ExercisesService } from '../exercises/exercises.service';
 import {
@@ -384,9 +385,13 @@ export class WorkoutCyclesService {
   }
 
   /**
-   * Get detailed statistics and data for a cycle
+   * Get detailed statistics and data for a cycle.
+   *
+   * Takes the client's `Today` for the same reason the dashboard's cycle-progress card does:
+   * this view reports the same week number, so a server-clock "today" here would disagree with
+   * the card near local midnight.
    */
-  async getCycleDetails(id: string, userId: string): Promise<CycleDetailsDto> {
+  async getCycleDetails(id: string, userId: string, today: Today): Promise<CycleDetailsDto> {
     const cycle = await this.prisma.workoutCycle.findUnique({
       where: { id },
       include: { workoutDays: true },
@@ -449,7 +454,11 @@ export class WorkoutCyclesService {
     let percentage: number | undefined;
 
     if (cycle.status === 'ACTIVE') {
-      currentWeek = calculateCycleWeek(cycle.startDate, cycle.duration);
+      currentWeek = calculateCycleWeek(
+        cycle.startDate,
+        cycle.duration,
+        localDateToInstant(today.localDate),
+      );
       totalWeeks = cycle.duration;
       percentage = Math.round(Math.min((currentWeek / totalWeeks) * 100, 100) * 100) / 100;
     }
