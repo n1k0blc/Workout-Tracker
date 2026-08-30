@@ -347,3 +347,54 @@ describe('WorkoutCyclesService day ordering (#74)', () => {
     expect(tx.workoutDay.update).not.toHaveBeenCalled();
   });
 });
+
+describe('WorkoutCyclesService start-date re-anchor conflicts (#88)', () => {
+  it('answers 400, not 500, when a concurrent write wins the order index during sentinel parking', async () => {
+    const { service, tx } = makeService();
+
+    // Re-anchoring parks every day at a negative sentinel before writing its new order.
+    // A concurrent write to the same cycle can take one of those slots mid-window, leaving
+    // the (cycleId, order) index to reject this transaction.
+    tx.workoutDay.update.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '6.19.2',
+        meta: { target: 'WorkoutDay_cycleId_order_key' },
+      }),
+    );
+
+    // The re-anchor has no single weekday to blame, so it reports the generic race.
+    await expect(service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1')).rejects.toThrow(
+      'Eine andere Änderung an diesem Zyklus ist dazwischengekommen. Bitte versuche es erneut.',
+    );
+  });
+
+  it('answers 400, not 500, when a concurrent write wins the weekday index during re-anchoring', async () => {
+    const { service, tx } = makeService();
+
+    tx.workoutDay.update.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '6.19.2',
+        meta: { target: 'WorkoutDay_cycleId_weekday_key' },
+      }),
+    );
+
+    // Same message as the order race: the re-anchor never names a weekday itself, so it
+    // can't blame one -- and WEEKDAY_NAMES[undefined] must never reach the user.
+    await expect(service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1')).rejects.toThrow(
+      'Eine andere Änderung an diesem Zyklus ist dazwischengekommen. Bitte versuche es erneut.',
+    );
+  });
+
+  it('rethrows unrelated database errors raised while re-anchoring', async () => {
+    const { service, tx } = makeService();
+
+    const unrelated = new Error('connection lost');
+    tx.workoutDay.update.mockRejectedValueOnce(unrelated);
+
+    await expect(
+      service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1'),
+    ).rejects.toBe(unrelated);
+  });
+});

@@ -171,37 +171,44 @@ export class WorkoutCyclesService {
   async update(id: string, updateCycleDto: UpdateCycleDto, userId: string): Promise<CycleResponseDto> {
     const cycle = await this.findById(id, userId);
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.workoutCycle.update({
-        where: { id },
-        data: {
-          ...(updateCycleDto.name && { name: updateCycleDto.name }),
-          ...(updateCycleDto.duration && { duration: updateCycleDto.duration }),
-          ...(updateCycleDto.startDate && { startDate: new Date(updateCycleDto.startDate) }),
-        },
-      });
-
-      // Moving the cycle's start day re-anchors its week, so every day's `order` -- kept in
-      // sync with its distance from the start weekday (#74) -- needs recomputing too. The
-      // new values are a permutation of the old ones, so a single pass risks a transient
-      // clash with the (cycleId, order) unique index; parking everything at negative,
-      // never-colliding placeholders first avoids that.
-      const startWeekday = updateCycleDto.startDate
-        ? new Date(updateCycleDto.startDate).getUTCDay()
-        : undefined;
-
-      if (startWeekday !== undefined && startWeekday !== cycle.startDate.getUTCDay()) {
-        for (const [index, day] of cycle.workoutDays.entries()) {
-          await tx.workoutDay.update({ where: { id: day.id }, data: { order: -1 - index } });
-        }
-        for (const day of cycle.workoutDays) {
-          await tx.workoutDay.update({
-            where: { id: day.id },
-            data: { order: getWeekdayDistanceFromCycleStart(day.weekday, startWeekday) },
+    // The re-anchor below writes WorkoutDay rows, so this shares the move and swap paths'
+    // conflict handling: a concurrent write winning either unique index has to answer 400,
+    // not 500. It rewrites every day at once, so there is no single weekday to blame.
+    await this.runWorkoutDayWrite(
+      () =>
+        this.prisma.$transaction(async (tx) => {
+          await tx.workoutCycle.update({
+            where: { id },
+            data: {
+              ...(updateCycleDto.name && { name: updateCycleDto.name }),
+              ...(updateCycleDto.duration && { duration: updateCycleDto.duration }),
+              ...(updateCycleDto.startDate && { startDate: new Date(updateCycleDto.startDate) }),
+            },
           });
-        }
-      }
-    });
+
+          // Moving the cycle's start day re-anchors its week, so every day's `order` -- kept
+          // in sync with its distance from the start weekday (#74) -- needs recomputing too.
+          // The new values are a permutation of the old ones, so a single pass risks a
+          // transient clash with the (cycleId, order) unique index; parking everything at
+          // negative, never-colliding placeholders first avoids that.
+          const startWeekday = updateCycleDto.startDate
+            ? new Date(updateCycleDto.startDate).getUTCDay()
+            : undefined;
+
+          if (startWeekday !== undefined && startWeekday !== cycle.startDate.getUTCDay()) {
+            for (const [index, day] of cycle.workoutDays.entries()) {
+              await tx.workoutDay.update({ where: { id: day.id }, data: { order: -1 - index } });
+            }
+            for (const day of cycle.workoutDays) {
+              await tx.workoutDay.update({
+                where: { id: day.id },
+                data: { order: getWeekdayDistanceFromCycleStart(day.weekday, startWeekday) },
+              });
+            }
+          }
+        }),
+      null,
+    );
 
     return this.findById(id, userId);
   }
@@ -329,18 +336,22 @@ export class WorkoutCyclesService {
 
   /**
    * Runs a WorkoutDay write and maps a P2002 on either of its unique indexes to a 400 --
-   * both the plain move and the swap re-check the weekday before writing, but read-then-write
-   * leaves a window for a concurrent request to win either index first. Rare, but the endpoint
-   * must answer 400 rather than let a driver error surface as a 500.
+   * the plain move, the swap and the start-date re-anchor all read the cycle before writing,
+   * but read-then-write leaves a window for a concurrent request to win either index first.
+   * Rare, but the endpoint must answer 400 rather than let a driver error surface as a 500.
+   *
+   * `weekday` is the day the caller was aiming for, and lets a lost weekday race name it in
+   * the message. The re-anchor rewrites every day at once, so it has no single day to blame
+   * and passes `null` -- for it, either index losing means only "someone raced you".
    */
-  private async runWorkoutDayWrite<T>(write: () => Promise<T>, weekday: number): Promise<T> {
+  private async runWorkoutDayWrite<T>(write: () => Promise<T>, weekday: number | null): Promise<T> {
     try {
       return await write();
     } catch (error) {
-      if (isWeekdayConflict(error)) {
+      if (weekday !== null && isWeekdayConflict(error)) {
         throw new BadRequestException(`${WEEKDAY_NAMES[weekday]} ist in diesem Zyklus bereits belegt.`);
       }
-      if (isOrderConflict(error)) {
+      if (isWeekdayConflict(error) || isOrderConflict(error)) {
         throw new BadRequestException(
           'Eine andere Änderung an diesem Zyklus ist dazwischengekommen. Bitte versuche es erneut.',
         );
