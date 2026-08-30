@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { WorkoutEngineService } from '../workouts/workout-engine.service';
 import { setWorkingVolume } from '../common/utils/volume.util';
 import { calculateCycleWeek, getCurrentDate } from '../common/utils/date.util';
-import { Today } from '../common/utils/today.util';
+import { Today, localDateToInstant } from '../common/utils/today.util';
 import {
   DashboardStatsDto,
   LastSevenDaysStatsDto,
@@ -149,16 +149,28 @@ export class DashboardService {
     };
   }
 
-  async getCycleProgress(userId: string): Promise<CycleProgressDto | null> {
+  /**
+   * Takes the client's `Today` for the same reason `getNextPlannedWorkout` does: near local
+   * midnight a server-clock "today" would put the two dashboard cards in different weeks.
+   * `startDate` is stored as UTC midnight, so reading today's calendar day the same way keeps
+   * the difference a whole number of days.
+   */
+  async getCycleProgress(userId: string, today: Today): Promise<CycleProgressDto | null> {
+    const todayInstant = localDateToInstant(today.localDate);
+
     const activeCycle = await this.prisma.workoutCycle.findFirst({
-      where: { userId, startDate: { lte: getCurrentDate() }, status: 'ACTIVE' },
+      where: { userId, startDate: { lte: todayInstant }, status: 'ACTIVE' },
     });
 
     if (!activeCycle || !activeCycle.duration) {
       return null;
     }
 
-    const currentWeek = calculateCycleWeek(activeCycle.startDate, activeCycle.duration);
+    const currentWeek = calculateCycleWeek(
+      activeCycle.startDate,
+      activeCycle.duration,
+      todayInstant,
+    );
     const totalWeeks = activeCycle.duration;
     const percentage = Math.min((currentWeek / totalWeeks) * 100, 100);
 
