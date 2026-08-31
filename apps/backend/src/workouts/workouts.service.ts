@@ -59,7 +59,7 @@ export class WorkoutsService {
         originTemplate: { select: { id: true, name: true } },
         exercises: {
           include: {
-            exercise: { select: { isUnilateral: true, isDoubleWeight: true } },
+            exercise: { select: { isDoubleWeight: true } },
             sets: true,
           },
         },

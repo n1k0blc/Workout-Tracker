@@ -117,7 +117,7 @@ describe('AnalyticsService', () => {
   });
 
   describe('getVolumeAnalytics', () => {
-    it('excludes warmup sets and applies unilateral/double-weight multipliers via setWorkingVolume', async () => {
+    it('excludes warmup sets and sums per-side data with the double-weight multiplier via setWorkingVolume', async () => {
       prisma.workout.findMany.mockResolvedValue([
         makeWorkout({
           exercises: [
@@ -126,7 +126,18 @@ describe('AnalyticsService', () => {
               exercise: { ...baseExercise, isUnilateral: true, isDoubleWeight: true },
               sets: [
                 { setType: 'WARMUP', reps: 100, weight: 999, rir: null, rest: null, completedAt: null },
-                { setType: 'WORKING', reps: 10, weight: 50, rir: 1, rest: 90, completedAt: null },
+                {
+                  setType: 'WORKING',
+                  reps: 10,
+                  weight: 50,
+                  repsLeft: 10,
+                  repsRight: 10,
+                  weightLeft: 50,
+                  weightRight: 50,
+                  rir: 1,
+                  rest: 90,
+                  completedAt: null,
+                },
               ],
             },
           ],
@@ -135,7 +146,8 @@ describe('AnalyticsService', () => {
 
       const result = await service.getVolumeAnalytics('user-1', {} as AnalyticsFilterDto);
 
-      // 10 reps * 50kg * 2 (unilateral) * 2 (double weight) = 2000, warmup contributes 0
+      // (10*50 left + 10*50 right) * 2 (double weight) = 2000 -- identical to the pre-#99
+      // unilateral doubling; warmup contributes 0
       expect(result.totalVolume).toBe(2000);
       expect(result.dataPoints).toHaveLength(1);
     });

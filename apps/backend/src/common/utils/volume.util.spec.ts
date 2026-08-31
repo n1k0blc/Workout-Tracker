@@ -1,13 +1,12 @@
-import { describe, expect, it } from 'vitest';
-import { setWorkingVolume } from './volume';
-import { SetType } from '@/types';
+import { setWorkingVolume } from './volume.util';
+import { SetType } from '../types';
 
 /**
- * Direct coverage for the shared frontend volume helper -- the twin of the
- * backend `setWorkingVolume`. Pins the new per-side semantics (issue #99):
- * `isUnilateral` is no longer a multiplier, a per-side set sums its two sides,
- * and a symmetric per-side set stays equal to the legacy unilateral doubling so
- * a future regression is caught here at the primitive.
+ * Direct coverage for the one volume primitive -- the twin of the frontend
+ * `setWorkingVolume`. Pins the per-side semantics from issue #99: `isUnilateral`
+ * is no longer a multiplier, a per-side set sums its two sides, and a symmetric
+ * per-side set stays exactly equal to the legacy unilateral doubling so the
+ * migration's central invariant is caught here at the primitive if it regresses.
  */
 const workingSet = { setType: SetType.WORKING, reps: 10, weight: 50 };
 
@@ -20,7 +19,7 @@ describe('setWorkingVolume', () => {
     expect(setWorkingVolume(workingSet, { isDoubleWeight: true })).toBe(1000);
   });
 
-  it('does not apply any unilateral multiplier to a set without per-side data', () => {
+  it('applies no unilateral multiplier to a set without per-side data', () => {
     expect(setWorkingVolume(workingSet, { isDoubleWeight: false })).toBe(500);
   });
 
@@ -34,7 +33,6 @@ describe('setWorkingVolume', () => {
   });
 
   it('keeps a symmetric per-side set equal to the legacy unilateral doubling', () => {
-    // Legacy: reps × weight × 2 (unilateral) = 1000. Sum of equal sides = 1000.
     const legacyDoubling = workingSet.reps * workingSet.weight * 2;
     expect(
       setWorkingVolume(
@@ -45,7 +43,6 @@ describe('setWorkingVolume', () => {
   });
 
   it('applies isDoubleWeight on top of the per-side sum', () => {
-    // Legacy unilateral + double-weight: reps × weight × 2 × 2 = 2000.
     expect(
       setWorkingVolume(
         { ...workingSet, repsLeft: 10, repsRight: 10, weightLeft: 50, weightRight: 50 },
@@ -58,7 +55,15 @@ describe('setWorkingVolume', () => {
     // Sides: 10×50 + 8×40 = 820. Twice the stored aggregate (9×45) would be 810.
     expect(
       setWorkingVolume(
-        { setType: SetType.WORKING, reps: 9, weight: 45, repsLeft: 10, repsRight: 8, weightLeft: 50, weightRight: 40 },
+        {
+          setType: SetType.WORKING,
+          reps: 9,
+          weight: 45,
+          repsLeft: 10,
+          repsRight: 8,
+          weightLeft: 50,
+          weightRight: 40,
+        },
         { isDoubleWeight: false },
       ),
     ).toBe(820);
@@ -66,32 +71,41 @@ describe('setWorkingVolume', () => {
 
   it('falls back to the aggregate when per-side data is incomplete', () => {
     expect(
-      setWorkingVolume(
-        { ...workingSet, repsLeft: 10, weightLeft: 50 },
-        { isDoubleWeight: false },
-      ),
+      setWorkingVolume({ ...workingSet, repsLeft: 10, weightLeft: 50 }, { isDoubleWeight: false }),
     ).toBe(500);
   });
 
   it('treats a zero per-side weight as present, not missing', () => {
     expect(
       setWorkingVolume(
-        { setType: SetType.WORKING, reps: 10, weight: 25, repsLeft: 10, repsRight: 10, weightLeft: 50, weightRight: 0 },
+        {
+          setType: SetType.WORKING,
+          reps: 10,
+          weight: 25,
+          repsLeft: 10,
+          repsRight: 10,
+          weightLeft: 50,
+          weightRight: 0,
+        },
         { isDoubleWeight: false },
       ),
     ).toBe(500);
   });
 
-  it('excludes warmup sets regardless of flags or per-side data', () => {
+  it('excludes non-working sets regardless of per-side data', () => {
     expect(
       setWorkingVolume(
-        { setType: SetType.WARMUP, reps: 10, weight: 50, repsLeft: 10, repsRight: 10, weightLeft: 50, weightRight: 50 },
+        {
+          setType: SetType.WARMUP,
+          reps: 10,
+          weight: 50,
+          repsLeft: 10,
+          repsRight: 10,
+          weightLeft: 50,
+          weightRight: 50,
+        },
         { isDoubleWeight: true },
       ),
     ).toBe(0);
-  });
-
-  it('treats a missing isDoubleWeight flag as not set', () => {
-    expect(setWorkingVolume(workingSet, {})).toBe(500);
   });
 });

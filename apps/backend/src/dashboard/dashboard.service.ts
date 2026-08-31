@@ -51,7 +51,7 @@ export class DashboardService {
     const workoutInclude = {
       exercises: {
         include: {
-          exercise: { select: { isUnilateral: true, isDoubleWeight: true } },
+          exercise: { select: { isDoubleWeight: true } },
           sets: true,
         },
       },
