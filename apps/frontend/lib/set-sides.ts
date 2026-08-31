@@ -78,6 +78,89 @@ export function aggregateSetSides(
   };
 }
 
+/** The raw string state of one side's three inputs in a per-side entry row. */
+export interface SideDraftValues {
+  weight: string;
+  reps: string;
+  rir: string;
+}
+
+export interface DerivedSides {
+  repsLeft: number;
+  repsRight: number;
+  weightLeft: number;
+  weightRight: number;
+  /** `null` only when *both* sides' RIR inputs are empty -- the server rejects RIR on one
+   *  side alone, so a cleared side is filled from the other before this is decided. */
+  rirLeft: number | null;
+  rirRight: number | null;
+  hasRir: boolean;
+  /** reps/weight/rir aggregate, by the server's write-path rule (`aggregateSetSides`). `rir`
+   *  is `null` when `hasRir` is false; each caller maps that to its own payload default. */
+  reps: number;
+  weight: number;
+  rir: number | null;
+}
+
+/**
+ * Turns a unilateral set's two per-side input drafts into the payload every per-side writer
+ * sends: the six side values plus the reps/weight/rir aggregate re-derived exactly as the
+ * server does on save (issue #100). Shared by the plan editors (issue #103) and the history
+ * editor (issue #105) so that rule lives in one place.
+ *
+ * An empty or unparseable weight/reps input falls back to the matching aggregate default
+ * (the set's current value). RIR is filled from the other side when one is cleared, and
+ * reported as absent (`hasRir: false`, `rir: null`) only when neither side carries one.
+ */
+export function deriveSidesFromDrafts(
+  left: SideDraftValues,
+  right: SideDraftValues,
+  fallback: { reps: number; weight: number },
+): DerivedSides {
+  const numOr = (raw: string, fb: number) => {
+    const n = parseFloat(raw);
+    return raw.trim() !== '' && !Number.isNaN(n) ? n : fb;
+  };
+  const intOr = (raw: string, fb: number) => {
+    const n = parseInt(raw);
+    return raw.trim() !== '' && !Number.isNaN(n) ? n : fb;
+  };
+  const parseRir = (raw: string) => {
+    if (raw.trim() === '') return null;
+    const n = parseInt(raw);
+    return Number.isNaN(n) ? null : n;
+  };
+
+  const weightLeft = numOr(left.weight, fallback.weight);
+  const weightRight = numOr(right.weight, fallback.weight);
+  const repsLeft = intOr(left.reps, fallback.reps);
+  const repsRight = intOr(right.reps, fallback.reps);
+
+  let rirLeft = parseRir(left.rir);
+  let rirRight = parseRir(right.rir);
+  if (rirLeft == null && rirRight != null) rirLeft = rirRight;
+  if (rirRight == null && rirLeft != null) rirRight = rirLeft;
+  const hasRir = rirLeft != null;
+
+  const agg = aggregateSetSides(
+    { reps: repsLeft, weight: weightLeft, rir: rirLeft },
+    { reps: repsRight, weight: weightRight, rir: rirRight },
+  );
+
+  return {
+    repsLeft,
+    repsRight,
+    weightLeft,
+    weightRight,
+    rirLeft,
+    rirRight,
+    hasRir,
+    reps: agg.reps || 0,
+    weight: agg.weight || 0,
+    rir: hasRir ? (agg.rir ?? 0) : null,
+  };
+}
+
 interface PlannedSetLikeSides {
   reps: number;
   weight: number;

@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  applyAggregateEdit,
   buildExerciseLogsForEdit,
   reorderExerciseLogs,
   toExercisePayload,
@@ -258,76 +257,6 @@ describe('buildExerciseLogsForEdit', () => {
     expect(payloadSet).not.toHaveProperty('repsLeft');
     expect(payloadSet).not.toHaveProperty('weightRight');
     expect(payloadSet).not.toHaveProperty('rirLeft');
-  });
-});
-
-describe('applyAggregateEdit', () => {
-  const uniSet = {
-    id: 's-1',
-    setNumber: 1,
-    setType: SetType.WORKING,
-    reps: 10,
-    weight: 45,
-    rir: 1,
-    repsLeft: 10,
-    repsRight: 9,
-    weightLeft: 50,
-    weightRight: 40,
-    rirLeft: 1,
-    rirRight: 3,
-    completedAt: '2026-08-14T10:00:00.000Z',
-  };
-
-  it('mirrors a changed weight aggregate onto both sides, collapsing that field', () => {
-    const next = applyAggregateEdit(uniSet, { reps: 10, weight: 60, rir: 1 });
-
-    expect(next).toMatchObject({ weight: 60, weightLeft: 60, weightRight: 60 });
-    // reps and rir were unchanged, so their per-side asymmetry survives.
-    expect(next).toMatchObject({ repsLeft: 10, repsRight: 9, rirLeft: 1, rirRight: 3 });
-  });
-
-  it('leaves every per-side column intact when the card re-sends unchanged aggregates', () => {
-    const next = applyAggregateEdit(uniSet, { reps: 10, weight: 45, rir: 1 });
-
-    expect(next).toMatchObject({
-      repsLeft: 10,
-      repsRight: 9,
-      weightLeft: 50,
-      weightRight: 40,
-      rirLeft: 1,
-      rirRight: 3,
-    });
-  });
-
-  it('patches a bilateral set as-is without inventing per-side columns', () => {
-    const next = applyAggregateEdit(
-      { id: 's', setNumber: 1, reps: 10, weight: 40, rir: 2, completedAt: 'x' },
-      { reps: 12, weight: 45, rir: 1 },
-    );
-
-    expect(next).toMatchObject({ reps: 12, weight: 45, rir: 1 });
-    expect(next).not.toHaveProperty('weightLeft');
-    expect(next).not.toHaveProperty('repsRight');
-  });
-
-  it('round-trips through the save payload with the edited field symmetric', () => {
-    const edited = applyAggregateEdit(uniSet, { reps: 10, weight: 60, rir: 1 });
-    const log: ExerciseLog = {
-      id: 'e',
-      exerciseId: 'ex-1',
-      exerciseName: 'x',
-      order: 1,
-      sets: [edited],
-    } as unknown as ExerciseLog;
-
-    expect(toExercisePayload([log])[0].sets[0]).toMatchObject({
-      weightLeft: 60,
-      weightRight: 60,
-      repsLeft: 10,
-      repsRight: 9,
-      rirLeft: 1,
-      rirRight: 3,
-    });
   });
 });
 

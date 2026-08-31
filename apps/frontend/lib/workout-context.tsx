@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { Workout, WorkoutExercise, ExerciseLog, SetLog, PlannedSet, SetType, SaveAsTemplateMode, WorkoutExerciseInput, Exercise } from '@/types';
 import { apiClient } from '@/lib/api';
-import { applyAggregateEdit, buildExerciseLogsForEdit, reorderExerciseLogs, toExercisePayload } from '@/lib/workout-order';
+import { buildExerciseLogsForEdit, reorderExerciseLogs, toExercisePayload } from '@/lib/workout-order';
 import { aggregateSetSides } from '@/lib/set-sides';
 import { replaceExerciseInList } from '@/lib/exercise-replace';
 import { toLocalDateString } from '@/lib/local-date';
@@ -109,6 +109,15 @@ interface WorkoutContextType {
       weight?: number;
       rir?: number;
       setType?: SetType;
+      // Per-side values for a unilateral set edited in the history editor (issue #105). Sent
+      // together with the re-derived reps/weight/rir aggregate so the set stays consistent;
+      // the server re-derives the aggregate from these on save.
+      repsLeft?: number;
+      repsRight?: number;
+      weightLeft?: number;
+      weightRight?: number;
+      rirLeft?: number;
+      rirRight?: number;
     }
   ) => Promise<void>;
   setActiveWorkoutDirectly: (workout: Workout | null, isPastWorkout?: boolean, pastWorkoutDuration?: number) => void;
@@ -807,13 +816,19 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       weight?: number;
       rir?: number;
       setType?: SetType;
+      repsLeft?: number;
+      repsRight?: number;
+      weightLeft?: number;
+      weightRight?: number;
+      rirLeft?: number;
+      rirRight?: number;
     }
   ) => {
     if (!activeWorkout) return;
 
     const updatedExercises = activeWorkout.exercises.map((ex) => ({
       ...ex,
-      sets: ex.sets.map((s) => (s.id === setLogId ? applyAggregateEdit(s, data) : s)),
+      sets: ex.sets.map((s) => (s.id === setLogId ? { ...s, ...data } : s)),
     }));
     setActiveWorkoutDirectly({ ...activeWorkout, exercises: updatedExercises }, isPastWorkout, pastWorkoutDuration);
   };

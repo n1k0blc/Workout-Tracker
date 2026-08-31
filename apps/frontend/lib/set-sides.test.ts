@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateSetSides, plannedSideFields, setPerSide } from './set-sides';
+import { aggregateSetSides, deriveSidesFromDrafts, plannedSideFields, setPerSide } from './set-sides';
 
 /**
  * Coverage for the per-side breakdown helper (issue #101). It gates whether a
@@ -135,5 +135,50 @@ describe('plannedSideFields', () => {
       rirLeft: 2,
       rirRight: 2,
     });
+  });
+});
+
+/**
+ * Turns a unilateral set's two per-side input drafts into the payload every per-side writer
+ * sends (issue #103/#105). The plan editors and the history editor share this so the server's
+ * write-path aggregation rule (issue #100) lives in one place.
+ */
+describe('deriveSidesFromDrafts', () => {
+  const draft = (weight: string, reps: string, rir = '') => ({ weight, reps, rir });
+  const fb = { reps: 0, weight: 0 };
+
+  it('derives the aggregate from asymmetric sides the way the server does', () => {
+    const d = deriveSidesFromDrafts(draft('50', '10', '1'), draft('40', '9', '3'), fb);
+
+    expect(d).toMatchObject({
+      weightLeft: 50,
+      weightRight: 40,
+      repsLeft: 10,
+      repsRight: 9,
+      rirLeft: 1,
+      rirRight: 3,
+      hasRir: true,
+      weight: 45,
+      reps: 10,
+      rir: 1,
+    });
+  });
+
+  it('falls back to the given aggregate for an empty or unparseable input', () => {
+    const d = deriveSidesFromDrafts(draft('', 'x'), draft('60', '8'), { reps: 12, weight: 55 });
+
+    expect(d).toMatchObject({ weightLeft: 55, repsLeft: 12, weightRight: 60, repsRight: 8 });
+  });
+
+  it('mirrors a cleared rir side from the other', () => {
+    const d = deriveSidesFromDrafts(draft('50', '10', '2'), draft('50', '10', ''), fb);
+
+    expect(d).toMatchObject({ rirLeft: 2, rirRight: 2, hasRir: true, rir: 2 });
+  });
+
+  it('reports rir absent only when neither side carries one', () => {
+    const d = deriveSidesFromDrafts(draft('50', '10'), draft('50', '10'), fb);
+
+    expect(d).toMatchObject({ rirLeft: null, rirRight: null, hasRir: false, rir: null });
   });
 });
