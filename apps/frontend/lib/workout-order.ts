@@ -1,4 +1,4 @@
-import { ExerciseLog, SetType, WorkoutExerciseInput } from '@/types';
+import { ExerciseLog, SetLog, SetType, WorkoutExercise, WorkoutExerciseInput } from '@/types';
 
 /**
  * Array position is authoritative for ordering; `order` on the wire only restates it.
@@ -48,6 +48,38 @@ export function reorderExerciseLogs(exercises: ExerciseLog[], exerciseIds: strin
 }
 
 /**
+ * Server workout tree -> client draft for the history editor (`loadWorkoutForEdit`).
+ *
+ * The response carries only confirmed sets, so they map straight into `sets` with no
+ * `plannedSets` -- history editing is values-only, there is no logging concept. The six
+ * per-side columns (issue #105) ride through untouched: a no-op re-save then round-trips a
+ * historical unilateral workout instead of nulling its backfilled sides. `toExercisePayload`
+ * re-emits them, and the write path (#100) rejects a unilateral set that lost them.
+ */
+export function buildExerciseLogsForEdit(exercises: WorkoutExercise[]): ExerciseLog[] {
+  return exercises.map((ex) => ({
+    ...ex,
+    sets: ex.sets.map((s): SetLog => ({
+      id: s.id,
+      setNumber: s.order,
+      setType: s.setType,
+      reps: s.reps,
+      weight: s.weight,
+      rir: s.rir,
+      repsLeft: s.repsLeft ?? undefined,
+      repsRight: s.repsRight ?? undefined,
+      weightLeft: s.weightLeft ?? undefined,
+      weightRight: s.weightRight ?? undefined,
+      rirLeft: s.rirLeft ?? undefined,
+      rirRight: s.rirRight ?? undefined,
+      rest: s.rest,
+      completedAt: s.completedAt ?? new Date().toISOString(),
+    })),
+    plannedSets: undefined,
+  }));
+}
+
+/**
  * ExerciseLog[] (client draft) -> WorkoutExerciseInput[] (save payload).
  *
  * Ordering comes from array position via `withArrayPositionOrder`, never from `ex.order` or
@@ -66,10 +98,32 @@ export function toExercisePayload(exercises: ExerciseLog[]): WorkoutExerciseInpu
         reps: s.reps,
         weight: s.weight,
         rir: s.rir,
+        // Per-side values for unilateral sets (issue #102). Emitted only when the set
+        // carries them; the server derives reps/weight/rir from these and rejects a
+        // unilateral set that has none. Bilateral sets leave every field undefined and
+        // the key is dropped from the payload, which the server also requires.
+        ...perSideFields(s),
         rest: s.rest ?? 90,
         completedAt: s.completedAt,
       })),
     }));
 
   return withArrayPositionOrder(unordered);
+}
+
+type SideKey = 'repsLeft' | 'repsRight' | 'weightLeft' | 'weightRight' | 'rirLeft' | 'rirRight';
+const SIDE_KEYS: readonly SideKey[] = ['repsLeft', 'repsRight', 'weightLeft', 'weightRight', 'rirLeft', 'rirRight'];
+
+/** The six per-side fields of a set, with any `null`/`undefined` entry dropped so a
+ *  bilateral set contributes nothing to the payload. Used by the workout save path; the
+ *  plan editors use `plannedSideFields` (set-sides.ts), which adds an aggregate fallback. */
+function perSideFields(
+  s: Partial<Record<SideKey, number | null | undefined>>,
+): Partial<Record<SideKey, number>> {
+  const out: Partial<Record<SideKey, number>> = {};
+  for (const key of SIDE_KEYS) {
+    const v = s[key];
+    if (v != null) out[key] = v;
+  }
+  return out;
 }

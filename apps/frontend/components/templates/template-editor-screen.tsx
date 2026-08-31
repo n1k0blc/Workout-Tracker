@@ -13,8 +13,9 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import ExerciseCard from '@/components/workout/exercise-card';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import { IconChevronLeft, IconPlus } from '@tabler/icons-react';
-import { replaceExerciseInList } from '@/lib/exercise-replace';
+import { replacePlanExerciseInList } from '@/lib/exercise-replace';
 import { withArrayPositionOrder } from '@/lib/workout-order';
+import { plannedSideFields } from '@/lib/set-sides';
 import { addPlannedSet, removePlannedSet, updatePlannedSet } from '@/lib/planned-sets';
 import {
   DndContext,
@@ -145,6 +146,14 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
             reps: s.reps ?? 0,
             weight: s.weight ?? 0,
             rir: s.rir ?? 0,
+            // Per-side targets survive from an overwrite-from-workout (issue #103); absent on
+            // legacy symmetric plans, where the editor seeds both sides from the aggregate.
+            repsLeft: s.repsLeft ?? undefined,
+            repsRight: s.repsRight ?? undefined,
+            weightLeft: s.weightLeft ?? undefined,
+            weightRight: s.weightRight ?? undefined,
+            rirLeft: s.rirLeft ?? undefined,
+            rirRight: s.rirRight ?? undefined,
             rest: s.rest ?? 90,
           })),
         }));
@@ -202,6 +211,9 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
           reps: s.reps ?? 0,
           weight: s.weight ?? 0,
           rir: s.rir ?? 0,
+          // Per-side targets for unilateral exercises (issue #103); dropped for bilateral
+          // sets, which the write path requires.
+          ...plannedSideFields(s, ex.isUnilateral),
           rest: s.rest ?? 90,
         })),
       })));
@@ -351,15 +363,15 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
                             // The picker's own entry wins: a custom exercise created during the
                             // swap isn't in `availableExercises` yet, so the lookup finds nothing.
                             const exDetails = newEx ?? availableExercises.find((e) => e.id === newId);
-                            setExercises(prev => replaceExerciseInList(prev, id, {
+                            setExercises(prev => replacePlanExerciseInList(prev, id, {
                               ...(exDetails ?? { name: 'Exercise' }),
                               id: newId,
-                            }));
+                            }, 'plannedSets'));
                           }}
                           onAddSet={(id) => {
                             setExercises(prev => prev.map(e =>
                               e.id === id
-                                ? { ...e, plannedSets: addPlannedSet(e.plannedSets || []) }
+                                ? { ...e, plannedSets: addPlannedSet(e.plannedSets || [], { isUnilateral: e.isUnilateral }) }
                                 : e
                             ));
                           }}

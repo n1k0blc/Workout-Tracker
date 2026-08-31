@@ -5,7 +5,8 @@ import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
-import { Workout, WorkoutExercise, ExerciseLog, SetType } from '@/types';
+import { Workout, WorkoutExercise, ExerciseLog } from '@/types';
+import { setWorkingVolume } from '@/lib/volume';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -66,6 +67,14 @@ export default function WorkoutDetailPage() {
             reps: s.reps,
             weight: s.weight,
             rir: s.rir,
+            // Per-side values kept so the read-only card can show both sides of a
+            // unilateral set instead of the rounded aggregate (issue #101).
+            repsLeft: s.repsLeft,
+            repsRight: s.repsRight,
+            weightLeft: s.weightLeft,
+            weightRight: s.weightRight,
+            rirLeft: s.rirLeft,
+            rirRight: s.rirRight,
             rest: s.rest,
             completedAt: s.completedAt ?? new Date().toISOString(),
           })),
@@ -120,11 +129,7 @@ export default function WorkoutDetailPage() {
     let total = 0;
     for (const exercise of workout.exercises) {
       for (const set of exercise.sets) {
-        if (set.setType === SetType.WORKING) {
-          const unilateralMultiplier = exercise.isUnilateral ? 2 : 1;
-          const doubleWeightMultiplier = exercise.isDoubleWeight ? 2 : 1;
-          total += set.weight * set.reps * unilateralMultiplier * doubleWeightMultiplier;
-        }
+        total += setWorkingVolume(set, exercise);
       }
     }
     return total;

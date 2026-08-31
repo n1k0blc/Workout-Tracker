@@ -3,7 +3,8 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { Workout, WorkoutExercise, ExerciseLog, SetLog, PlannedSet, SetType, SaveAsTemplateMode, WorkoutExerciseInput, Exercise } from '@/types';
 import { apiClient } from '@/lib/api';
-import { reorderExerciseLogs, toExercisePayload } from '@/lib/workout-order';
+import { buildExerciseLogsForEdit, reorderExerciseLogs, toExercisePayload } from '@/lib/workout-order';
+import { aggregateSetSides } from '@/lib/set-sides';
 import { replaceExerciseInList } from '@/lib/exercise-replace';
 import { toLocalDateString } from '@/lib/local-date';
 
@@ -25,6 +26,27 @@ interface CompletionEntry {
   exerciseLogId: string;
   setLogId: string;
   at: number; // epoch ms
+}
+
+/**
+ * A set being logged. For a unilateral exercise the card sends the six per-side fields
+ * (issue #102); `logSet` then derives `reps`/`weight`/`rir` from them with the same rule
+ * the server applies on save, so the local draft shows a consistent aggregate immediately.
+ * A bilateral exercise sends none of them and `reps`/`weight`/`rir` are used as given.
+ */
+export interface LogSetData {
+  setNumber: number;
+  reps: number;
+  weight: number;
+  rir?: number;
+  repsLeft?: number;
+  repsRight?: number;
+  weightLeft?: number;
+  weightRight?: number;
+  rirLeft?: number;
+  rirRight?: number;
+  setType?: SetType;
+  plannedRestAfterSet?: number;
 }
 
 export interface CompleteWorkoutOptions {
@@ -77,14 +99,7 @@ interface WorkoutContextType {
   reorderExercises: (exerciseIds: string[]) => Promise<void>;
   logSet: (
     exerciseLogId: string,
-    data: {
-      setNumber: number;
-      reps: number;
-      weight: number;
-      rir?: number;
-      setType?: SetType;
-      plannedRestAfterSet?: number;
-    }
+    data: LogSetData
   ) => Promise<void>;
   deleteSet: (setLogId: string) => Promise<void>;
   updateSet: (
@@ -94,6 +109,15 @@ interface WorkoutContextType {
       weight?: number;
       rir?: number;
       setType?: SetType;
+      // Per-side values for a unilateral set edited in the history editor (issue #105). Sent
+      // together with the re-derived reps/weight/rir aggregate so the set stays consistent;
+      // the server re-derives the aggregate from these on save.
+      repsLeft?: number;
+      repsRight?: number;
+      weightLeft?: number;
+      weightRight?: number;
+      rirLeft?: number;
+      rirRight?: number;
     }
   ) => Promise<void>;
   setActiveWorkoutDirectly: (workout: Workout | null, isPastWorkout?: boolean, pastWorkoutDuration?: number) => void;
@@ -376,7 +400,27 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
   /** Builds the local draft's ExerciseLog[] from a blueprint/template exercise tree. */
   const buildExerciseLogsFromTree = (
-    exercises: { exerciseId: string; exerciseName: string; isUnilateral?: boolean; isDoubleWeight?: boolean; order: number; sets: { order: number; setType: SetType; reps: number; weight: number; rir?: number; rest?: number }[] }[],
+    exercises: {
+      exerciseId: string;
+      exerciseName: string;
+      isUnilateral?: boolean;
+      isDoubleWeight?: boolean;
+      order: number;
+      sets: {
+        order: number;
+        setType: SetType;
+        reps: number;
+        weight: number;
+        rir?: number;
+        repsLeft?: number;
+        repsRight?: number;
+        weightLeft?: number;
+        weightRight?: number;
+        rirLeft?: number;
+        rirRight?: number;
+        rest?: number;
+      }[];
+    }[],
   ): ExerciseLog[] => {
     return exercises.map((ex) => ({
       id: generateLocalId('ex'),
@@ -393,6 +437,14 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         reps: s.reps,
         weight: s.weight,
         rir: s.rir ?? 0,
+        // Per-side targets so a workout started from an asymmetric plan prefills both sides,
+        // and a left-to-right swipe logs both (issue #103).
+        repsLeft: s.repsLeft ?? undefined,
+        repsRight: s.repsRight ?? undefined,
+        weightLeft: s.weightLeft ?? undefined,
+        weightRight: s.weightRight ?? undefined,
+        rirLeft: s.rirLeft ?? undefined,
+        rirRight: s.rirRight ?? undefined,
         rest: s.rest ?? 90,
       })),
     }));
@@ -489,23 +541,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       const workout = await apiClient.getWorkout(workoutId);
-      // Server tree only has confirmed sets -- map straight into `sets` (no plannedSets;
-      // values-only editing, no logging concept).
       const rawExercises = workout.exercises as unknown as WorkoutExercise[];
-      const exercises: ExerciseLog[] = rawExercises.map((ex) => ({
-        ...ex,
-        sets: ex.sets.map((s): SetLog => ({
-          id: s.id,
-          setNumber: s.order,
-          setType: s.setType,
-          reps: s.reps,
-          weight: s.weight,
-          rir: s.rir,
-          rest: s.rest,
-          completedAt: s.completedAt ?? new Date().toISOString(),
-        })),
-        plannedSets: undefined,
-      }));
+      const exercises: ExerciseLog[] = buildExerciseLogsForEdit(rawExercises);
 
       existingWorkoutIdRef.current = workoutId;
       completionLogRef.current = [];
@@ -672,20 +709,28 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
   const logSet = async (
     exerciseLogId: string,
-    data: {
-      setNumber: number;
-      reps: number;
-      weight: number;
-      rir?: number;
-      setType?: SetType;
-      plannedRestAfterSet?: number;
-    }
+    data: LogSetData
   ) => {
     if (!activeWorkout) return;
 
     const isLive = !isPastWorkout && !isHistoryEdit;
     const now = Date.now();
     const newSetId = generateLocalId('set');
+
+    // Unilateral sets carry both sides; the aggregates the rest of the app reads are
+    // derived from them here with the server's rule, so the draft is consistent before
+    // the save round-trips (issue #102). A bilateral set leaves `hasSides` false.
+    const hasSides =
+      data.repsLeft != null &&
+      data.repsRight != null &&
+      data.weightLeft != null &&
+      data.weightRight != null;
+    const aggregates = hasSides
+      ? aggregateSetSides(
+          { reps: data.repsLeft!, weight: data.weightLeft!, rir: data.rirLeft },
+          { reps: data.repsRight!, weight: data.weightRight!, rir: data.rirRight },
+        )
+      : { reps: data.reps, weight: data.weight, rir: data.rir };
 
     // Past-tracking/history-edit: no real elapsed time to measure -- always use the planned/90
     // fallback directly (§3.5). Live: leave rest undefined; it gets filled in when the NEXT set
@@ -694,9 +739,15 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       id: newSetId,
       setNumber: data.setNumber,
       setType: data.setType || SetType.WORKING,
-      reps: data.reps,
-      weight: data.weight,
-      rir: data.rir,
+      reps: aggregates.reps,
+      weight: aggregates.weight,
+      rir: aggregates.rir,
+      repsLeft: hasSides ? data.repsLeft : undefined,
+      repsRight: hasSides ? data.repsRight : undefined,
+      weightLeft: hasSides ? data.weightLeft : undefined,
+      weightRight: hasSides ? data.weightRight : undefined,
+      rirLeft: hasSides ? data.rirLeft : undefined,
+      rirRight: hasSides ? data.rirRight : undefined,
       completedAt: new Date(now).toISOString(),
       rest: isLive ? undefined : (data.plannedRestAfterSet ?? 90),
     };
@@ -765,6 +816,12 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       weight?: number;
       rir?: number;
       setType?: SetType;
+      repsLeft?: number;
+      repsRight?: number;
+      weightLeft?: number;
+      weightRight?: number;
+      rirLeft?: number;
+      rirRight?: number;
     }
   ) => {
     if (!activeWorkout) return;

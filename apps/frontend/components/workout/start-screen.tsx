@@ -320,6 +320,13 @@ export default function WorkoutStartScreen() {
                                 reps: s.reps,
                                 weight: s.weight,
                                 rir: s.rir ?? 0,
+                                // Per-side targets render as an L/R breakdown in this preview (issue #103).
+                                repsLeft: s.repsLeft ?? undefined,
+                                repsRight: s.repsRight ?? undefined,
+                                weightLeft: s.weightLeft ?? undefined,
+                                weightRight: s.weightRight ?? undefined,
+                                rirLeft: s.rirLeft ?? undefined,
+                                rirRight: s.rirRight ?? undefined,
                                 rest: s.rest ?? 90,
                               })),
                             }}

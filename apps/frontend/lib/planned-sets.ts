@@ -1,4 +1,5 @@
 import { PlannedSet, SetType } from '@/types';
+import { aggregateSetSides } from './set-sides';
 
 /**
  * Structural edits to an exercise's planned sets, for the editors that own a plan rather
@@ -24,9 +25,21 @@ const renumber = (sets: PlannedSet[]): PlannedSet[] =>
 /**
  * Appends a set, seeded from the previous one so adding a third set to a 3x10@60 exercise
  * doesn't hand the user a blank row to retype.
+ *
+ * For a unilateral exercise (`opts.isUnilateral`) the new set carries per-side targets too,
+ * seeded from the previous set's sides -- so adding a set to a plan that was overwritten
+ * asymmetrically keeps both sides rather than collapsing to the aggregate (issue #103). The
+ * aggregate is then re-derived from those sides so the row stays internally consistent.
  */
-export function addPlannedSet(sets: PlannedSet[]): PlannedSet[] {
+export function addPlannedSet(
+  sets: PlannedSet[],
+  opts: { isUnilateral?: boolean } = {},
+): PlannedSet[] {
   const previous = sets[sets.length - 1];
+
+  const reps = previous?.reps ?? 10;
+  const weight = previous?.weight ?? 0;
+  const rir = previous?.rir ?? 2;
 
   const next: PlannedSet = {
     id: `planned-${Date.now()}-${sets.length}`,
@@ -36,11 +49,35 @@ export function addPlannedSet(sets: PlannedSet[]): PlannedSet[] {
     // patches both rows (see set-slots.ts).
     order: Math.max(0, ...sets.map((s) => s.order)) + 1,
     setType: SetType.WORKING,
-    reps: previous?.reps ?? 10,
-    weight: previous?.weight ?? 0,
-    rir: previous?.rir ?? 2,
+    reps,
+    weight,
+    rir,
     rest: previous?.rest ?? DEFAULT_REST_SECONDS,
   };
+
+  if (opts.isUnilateral) {
+    const repsLeft = previous?.repsLeft ?? reps;
+    const repsRight = previous?.repsRight ?? reps;
+    const weightLeft = previous?.weightLeft ?? weight;
+    const weightRight = previous?.weightRight ?? weight;
+    const rirLeft = previous?.rirLeft ?? rir;
+    const rirRight = previous?.rirRight ?? rir;
+    const agg = aggregateSetSides(
+      { reps: repsLeft, weight: weightLeft, rir: rirLeft },
+      { reps: repsRight, weight: weightRight, rir: rirRight },
+    );
+    Object.assign(next, {
+      repsLeft,
+      repsRight,
+      weightLeft,
+      weightRight,
+      rirLeft,
+      rirRight,
+      reps: agg.reps,
+      weight: agg.weight,
+      rir: agg.rir ?? rir,
+    });
+  }
 
   return [...sets, next];
 }
@@ -54,7 +91,22 @@ export function removePlannedSet(sets: PlannedSet[], setNumber: number): Planned
 export function updatePlannedSet(
   sets: PlannedSet[],
   setNumber: number,
-  data: Partial<Pick<PlannedSet, 'reps' | 'weight' | 'rir' | 'rest' | 'setType'>>,
+  data: Partial<
+    Pick<
+      PlannedSet,
+      | 'reps'
+      | 'weight'
+      | 'rir'
+      | 'rest'
+      | 'setType'
+      | 'repsLeft'
+      | 'repsRight'
+      | 'weightLeft'
+      | 'weightRight'
+      | 'rirLeft'
+      | 'rirRight'
+    >
+  >,
 ): PlannedSet[] {
   return sets.map((set) => (set.order === setNumber ? { ...set, ...data } : set));
 }

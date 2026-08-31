@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client';
 import { WorkoutCyclesService } from './workout-cycles.service';
 import { CreateCycleDto } from './dto';
+import { resolveToday } from '../common/utils/today.util';
 
 const exercises = [{ exerciseId: 'exercise-1', order: 1, sets: [{ order: 1, reps: 8 }] }];
 
@@ -54,7 +55,11 @@ function makeService() {
   };
 
   const workoutTreeService = { replaceTree: jest.fn() };
-  const exercisesService = { validateAccessible: jest.fn() };
+  const exercisesService = {
+    validateAccessible: jest
+      .fn()
+      .mockResolvedValue(new Map([['exercise-1', { isUnilateral: false, name: 'Exercise 1' }]])),
+  };
 
   const service = new WorkoutCyclesService(
     prisma as never,
@@ -269,10 +274,12 @@ describe('WorkoutCyclesService day ordering (#74)', () => {
     await service.create(dto, 'user-1');
 
     const orderByWeekday = new Map(
-      tx.workoutDay.create.mock.calls.map(([call]: [{ data: { weekday: number; order: number } }]) => [
-        call.data.weekday,
-        call.data.order,
-      ]),
+      tx.workoutDay.create.mock.calls.map(
+        ([call]: [{ data: { weekday: number; order: number } }]) => [
+          call.data.weekday,
+          call.data.order,
+        ],
+      ),
     );
 
     expect(orderByWeekday.get(0)).toBe(0); // Sunday, the start weekday
@@ -296,10 +303,12 @@ describe('WorkoutCyclesService day ordering (#74)', () => {
     await service.create(dto, 'user-1');
 
     const orderByWeekday = new Map(
-      tx.workoutDay.create.mock.calls.map(([call]: [{ data: { weekday: number; order: number } }]) => [
-        call.data.weekday,
-        call.data.order,
-      ]),
+      tx.workoutDay.create.mock.calls.map(
+        ([call]: [{ data: { weekday: number; order: number } }]) => [
+          call.data.weekday,
+          call.data.order,
+        ],
+      ),
     );
 
     expect(orderByWeekday.get(1)).toBe(0); // Monday, the start weekday
@@ -330,8 +339,12 @@ describe('WorkoutCyclesService day ordering (#74)', () => {
     await service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1');
 
     const updateCalls = tx.workoutDay.update.mock.calls;
-    const finalUpdateForDay1 = updateCalls.filter((call: [{ where: { id: string } }]) => call[0].where.id === 'day-1').pop();
-    const finalUpdateForDay2 = updateCalls.filter((call: [{ where: { id: string } }]) => call[0].where.id === 'day-2').pop();
+    const finalUpdateForDay1 = updateCalls
+      .filter((call: [{ where: { id: string } }]) => call[0].where.id === 'day-1')
+      .pop();
+    const finalUpdateForDay2 = updateCalls
+      .filter((call: [{ where: { id: string } }]) => call[0].where.id === 'day-2')
+      .pop();
 
     expect(finalUpdateForDay1[0].data.order).toBe(5); // Monday, 5 days after a Wednesday start
     expect(finalUpdateForDay2[0].data.order).toBe(0); // Wednesday, the new start weekday
@@ -345,5 +358,113 @@ describe('WorkoutCyclesService day ordering (#74)', () => {
     await service.update('cycle-1', { startDate: '2026-08-10' }, 'user-1');
 
     expect(tx.workoutDay.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('WorkoutCyclesService start-date re-anchor conflicts (#88)', () => {
+  it('answers 400, not 500, when a concurrent write wins the order index during sentinel parking', async () => {
+    const { service, tx } = makeService();
+
+    // Re-anchoring parks every day at a negative sentinel before writing its new order.
+    // A concurrent write to the same cycle can take one of those slots mid-window, leaving
+    // the (cycleId, order) index to reject this transaction.
+    tx.workoutDay.update.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '6.19.2',
+        meta: { target: 'WorkoutDay_cycleId_order_key' },
+      }),
+    );
+
+    // The re-anchor has no single weekday to blame, so it reports the generic race.
+    await expect(service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1')).rejects.toThrow(
+      'Eine andere Änderung an diesem Zyklus ist dazwischengekommen. Bitte versuche es erneut.',
+    );
+  });
+
+  it('answers 400, not 500, when a concurrent write wins the weekday index during re-anchoring', async () => {
+    const { service, tx } = makeService();
+
+    tx.workoutDay.update.mockRejectedValueOnce(
+      new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '6.19.2',
+        meta: { target: 'WorkoutDay_cycleId_weekday_key' },
+      }),
+    );
+
+    // Same message as the order race: the re-anchor never names a weekday itself, so it
+    // can't blame one -- and WEEKDAY_NAMES[undefined] must never reach the user.
+    await expect(service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1')).rejects.toThrow(
+      'Eine andere Änderung an diesem Zyklus ist dazwischengekommen. Bitte versuche es erneut.',
+    );
+  });
+
+  it('rethrows unrelated database errors raised while re-anchoring', async () => {
+    const { service, tx } = makeService();
+
+    const unrelated = new Error('connection lost');
+    tx.workoutDay.update.mockRejectedValueOnce(unrelated);
+
+    await expect(service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1')).rejects.toBe(
+      unrelated,
+    );
+  });
+});
+
+/**
+ * The same instant the dashboard's cycle-progress tests are pinned to: 14:30 in the pinned
+ * server zone (Europe/Berlin), already 00:30 the next day in Pacific/Auckland.
+ */
+const DETAILS_INSTANT = new Date('2026-08-30T12:30:00.000Z');
+
+/** Monday, so the week boundary below falls on a whole week from the cycle start. */
+const DETAILS_START = new Date('2026-08-24T00:00:00.000Z');
+
+function makeDetailsService() {
+  const prisma = {
+    workoutCycle: {
+      findUnique: jest.fn().mockResolvedValue({
+        id: 'cycle-1',
+        userId: 'user-1',
+        name: 'Hypertrophy',
+        duration: 8,
+        startDate: DETAILS_START,
+        status: 'ACTIVE',
+        completedAt: null,
+        workoutDays: [],
+      }),
+    },
+    workout: { findMany: jest.fn().mockResolvedValue([]) },
+  };
+
+  return new WorkoutCyclesService(prisma as never, {} as never, {} as never);
+}
+
+describe('WorkoutCyclesService cycle-detail week (#89 follow-up)', () => {
+  it("counts the week from the client's calendar day, not the server's", async () => {
+    const service = makeDetailsService();
+
+    // Auckland has rolled into 2026-08-31 -- 7 days after the start, so week 2.
+    await expect(
+      service.getCycleDetails(
+        'cycle-1',
+        'user-1',
+        resolveToday('Pacific/Auckland', DETAILS_INSTANT),
+      ),
+    ).resolves.toMatchObject({ currentWeek: 2, totalWeeks: 8 });
+
+    // Berlin is still on 2026-08-30 -- 6 days after the start, so week 1.
+    await expect(
+      service.getCycleDetails('cycle-1', 'user-1', resolveToday('Europe/Berlin', DETAILS_INSTANT)),
+    ).resolves.toMatchObject({ currentWeek: 1, totalWeeks: 8 });
+  });
+
+  it('falls back to the pinned server zone when the request carries no timezone', async () => {
+    const service = makeDetailsService();
+
+    await expect(
+      service.getCycleDetails('cycle-1', 'user-1', resolveToday(undefined, DETAILS_INSTANT)),
+    ).resolves.toMatchObject({ currentWeek: 1 });
   });
 });

@@ -32,3 +32,77 @@ export function replaceExerciseInList<T extends { id: string }>(
       : ex,
   );
 }
+
+/** The aggregate + per-side fields the plan-editor reshape reads and rewrites on one set. */
+interface ShapedSet {
+  reps: number;
+  weight: number;
+  rir?: number;
+  repsLeft?: number;
+  repsRight?: number;
+  weightLeft?: number;
+  weightRight?: number;
+  rirLeft?: number;
+  rirRight?: number;
+}
+
+/** Seeds both sides of a set from the aggregate already there (bilateral -> unilateral). */
+const seedSidesFromAggregate = <T extends ShapedSet>(set: T): T => ({
+  ...set,
+  repsLeft: set.reps,
+  repsRight: set.reps,
+  weightLeft: set.weight,
+  weightRight: set.weight,
+  rirLeft: set.rir,
+  rirRight: set.rir,
+});
+
+/** Drops the per-side data, keeping the aggregate (unilateral -> bilateral). */
+const dropSides = <T extends ShapedSet>(set: T): T => ({
+  ...set,
+  repsLeft: undefined,
+  repsRight: undefined,
+  weightLeft: undefined,
+  weightRight: undefined,
+  rirLeft: undefined,
+  rirRight: undefined,
+});
+
+/**
+ * A plan editor's exercise swap. Replaces the exercise identity like `replaceExerciseInList`
+ * and -- only when the swap flips the unilateral flag -- reshapes that entry's planned sets so
+ * their side data matches the new exercise (issue #104):
+ *
+ *  - bilateral -> unilateral: seed both sides of every set from the aggregate already there
+ *  - unilateral -> bilateral: keep the aggregate, drop the per-side data
+ *
+ * A swap between two exercises of the same shape leaves the sets untouched. This keeps the
+ * numbers the user typed -- the whole reason a plan swap keeps the sets -- while stopping
+ * per-side data from stranding on an exercise that cannot carry it, the same inconsistency the
+ * active workout's swap lock prevents. `setsKey` names the field the editor keeps its plan sets
+ * under: `'plannedSets'` for the template and blueprint editors, `'sets'` for the cycle-day one.
+ */
+export function replacePlanExerciseInList<T extends { id: string; isUnilateral?: boolean }>(
+  exercises: T[],
+  exerciseLogId: string,
+  replacement: ReplacementExercise | undefined,
+  setsKey: keyof T & string,
+): T[] {
+  const replaced = replaceExerciseInList(exercises, exerciseLogId, replacement);
+
+  // Reshape only when the picked exercise's shape is actually known. On a lookup miss the
+  // replacement carries no `isUnilateral`, `replaceExerciseInList` forces it to `false`, and
+  // reshaping off that would let a flag-less swap masquerade as "-> bilateral" and strip a
+  // unilateral entry's per-side numbers -- the opposite of preserving what the user typed.
+  if (replacement?.isUnilateral === undefined) return replaced;
+
+  const wasUnilateral = !!exercises.find((ex) => ex.id === exerciseLogId)?.isUnilateral;
+  if (wasUnilateral === replacement.isUnilateral) return replaced;
+
+  return replaced.map((ex) => {
+    if (ex.id !== exerciseLogId) return ex;
+    const sets = (ex[setsKey] as ShapedSet[] | undefined) ?? [];
+    const reshape = replacement.isUnilateral ? seedSidesFromAggregate : dropSides;
+    return { ...ex, [setsKey]: sets.map(reshape) } as T;
+  });
+}

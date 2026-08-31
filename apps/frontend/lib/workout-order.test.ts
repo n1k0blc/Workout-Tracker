@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { reorderExerciseLogs, toExercisePayload, withArrayPositionOrder } from './workout-order';
-import { ExerciseLog, SetType } from '@/types';
+import {
+  buildExerciseLogsForEdit,
+  reorderExerciseLogs,
+  toExercisePayload,
+  withArrayPositionOrder,
+} from './workout-order';
+import { ExerciseLog, SetType, WorkoutExercise } from '@/types';
 
 const set = (setNumber: number, over: Partial<{ setType: SetType }> = {}) => ({
   id: `set-${setNumber}`,
@@ -121,6 +126,137 @@ describe('toExercisePayload', () => {
       rest: 90,
       completedAt: '2026-08-14T10:00:00.000Z',
     });
+  });
+
+  it('emits the six per-side fields for a unilateral set that carries them', () => {
+    const uni = log('a', 1, [1]);
+    Object.assign(uni.sets[0], {
+      repsLeft: 10,
+      repsRight: 9,
+      weightLeft: 50,
+      weightRight: 40,
+      rirLeft: 1,
+      rirRight: 3,
+    });
+
+    expect(toExercisePayload([uni])[0].sets[0]).toMatchObject({
+      repsLeft: 10,
+      repsRight: 9,
+      weightLeft: 50,
+      weightRight: 40,
+      rirLeft: 1,
+      rirRight: 3,
+    });
+  });
+
+  it('drops per-side keys for a bilateral set so the payload carries none', () => {
+    const set = toExercisePayload([log('a', 1, [1])])[0].sets[0];
+
+    expect(set).not.toHaveProperty('repsLeft');
+    expect(set).not.toHaveProperty('weightRight');
+    expect(set).not.toHaveProperty('rirLeft');
+  });
+
+  it('emits reps/weight sides without RIR when neither side was graded', () => {
+    const uni = log('a', 1, [1]);
+    Object.assign(uni.sets[0], {
+      repsLeft: 10,
+      repsRight: 10,
+      weightLeft: 50,
+      weightRight: 50,
+    });
+
+    const set = toExercisePayload([uni])[0].sets[0];
+    expect(set).toMatchObject({ repsLeft: 10, weightRight: 50 });
+    expect(set).not.toHaveProperty('rirLeft');
+    expect(set).not.toHaveProperty('rirRight');
+  });
+});
+
+describe('buildExerciseLogsForEdit', () => {
+  const serverExercise = (over: Partial<WorkoutExercise['sets'][number]> = {}): WorkoutExercise =>
+    ({
+      id: 'we-1',
+      exerciseId: 'ex-1',
+      exerciseName: 'Bulgarian Split Squat',
+      isUnilateral: true,
+      order: 1,
+      sets: [
+        {
+          id: 's-1',
+          order: 1,
+          setType: SetType.WORKING,
+          reps: 10,
+          weight: 45,
+          rir: 2,
+          rest: 90,
+          completedAt: '2026-08-14T10:00:00.000Z',
+          ...over,
+        },
+      ],
+    }) as WorkoutExercise;
+
+  it('carries the six per-side columns from the server tree into the draft set', () => {
+    const [ex] = buildExerciseLogsForEdit([
+      serverExercise({
+        reps: 10,
+        weight: 45,
+        rir: 2,
+        repsLeft: 10,
+        repsRight: 9,
+        weightLeft: 50,
+        weightRight: 40,
+        rirLeft: 1,
+        rirRight: 3,
+      }),
+    ]);
+
+    expect(ex.sets[0]).toMatchObject({
+      repsLeft: 10,
+      repsRight: 9,
+      weightLeft: 50,
+      weightRight: 40,
+      rirLeft: 1,
+      rirRight: 3,
+    });
+  });
+
+  it('round-trips a historical unilateral workout through load -> save unchanged', () => {
+    const server = [
+      serverExercise({
+        reps: 10,
+        weight: 45,
+        rir: 2,
+        repsLeft: 10,
+        repsRight: 9,
+        weightLeft: 50,
+        weightRight: 40,
+        rirLeft: 1,
+        rirRight: 3,
+      }),
+    ];
+
+    const payloadSet = toExercisePayload(buildExerciseLogsForEdit(server))[0].sets[0];
+
+    expect(payloadSet).toMatchObject({
+      reps: 10,
+      weight: 45,
+      rir: 2,
+      repsLeft: 10,
+      repsRight: 9,
+      weightLeft: 50,
+      weightRight: 40,
+      rirLeft: 1,
+      rirRight: 3,
+    });
+  });
+
+  it('leaves a bilateral set with no per-side keys after the round-trip', () => {
+    const payloadSet = toExercisePayload(buildExerciseLogsForEdit([serverExercise()]))[0].sets[0];
+
+    expect(payloadSet).not.toHaveProperty('repsLeft');
+    expect(payloadSet).not.toHaveProperty('weightRight');
+    expect(payloadSet).not.toHaveProperty('rirLeft');
   });
 });
 

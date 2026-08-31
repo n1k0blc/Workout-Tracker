@@ -11,6 +11,9 @@ export class ExerciseDto {
   isDoubleWeight: boolean;
   isCustom: boolean;
   userId?: string;
+  // True when any WorkoutSet references this exercise (any workout kind). The editor
+  // uses it to lock the isUnilateral toggle -- see issue #98.
+  inUse: boolean;
   // Muscle group distribution percentages
   abdomenPercent: number;
   latissimusPercent: number;

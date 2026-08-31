@@ -284,4 +284,39 @@ describe('getNextScheduledWorkout', () => {
       cycleStartDate: '2026-08-18',
     });
   });
+
+  it("stops looking once the next planned weekday would fall past the cycle's expiry", async () => {
+    const { service, prisma } = makeService();
+    // One-week cycle from Monday the 17th -- it covers through Monday the 24th and no further.
+    // The only planned weekday is Wednesday, so the search wraps into a week the cycle
+    // will already have been auto-completed out of.
+    prisma.workoutCycle.findFirst.mockResolvedValue({
+      id: 'cycle-1',
+      name: 'Deload',
+      startDate: new Date('2026-08-17T00:00:00.000Z'),
+      duration: 1,
+      workoutDays: [cycleDays()[1]],
+    });
+
+    expect(await service.getNextScheduledWorkout('user-1', today(SUNDAY))).toBeNull();
+  });
+
+  it('still offers a planned day landing on the cycle\'s own expiry boundary', async () => {
+    const { service, prisma } = makeService();
+    // Same one-week cycle. Monday the 24th is the boundary itself, which `isCycleExpired`
+    // still counts as inside -- so the search must not cut a day early and disagree with the
+    // recommendation the workout page would give on that same date.
+    prisma.workoutCycle.findFirst.mockResolvedValue({
+      id: 'cycle-1',
+      name: 'Deload',
+      startDate: new Date('2026-08-17T00:00:00.000Z'),
+      duration: 1,
+      workoutDays: [cycleDays()[0]],
+    });
+
+    expect(await service.getNextScheduledWorkout('user-1', today(SUNDAY))).toMatchObject({
+      workoutDayId: 'day-mon',
+      localDate: '2026-08-24',
+    });
+  });
 });

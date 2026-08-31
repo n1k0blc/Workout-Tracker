@@ -92,7 +92,20 @@ export class WorkoutEngineService {
 
   /** Judged on the user's calendar, like everything else here -- not on the server's clock. */
   private isCycleExpired(cycle: { startDate: Date; duration: number }, today: Today): boolean {
-    return today.localDate > addLocalDays(this.startLocalDate(cycle), cycle.duration * 7);
+    return today.localDate > this.lastRecommendableLocalDate(cycle);
+  }
+
+  /**
+   * The last day `isCycleExpired` still treats as inside the cycle -- a week per `duration`.
+   *
+   * This runs one day longer than `autoCompleteExpiredCyclesSweep`'s own boundary, which
+   * completes the cycle *on* this date rather than after it. That disagreement predates this
+   * helper and applies to every read-path surface alike; the point here is that the
+   * next-workout search cuts off exactly where the other recommendations do, not somewhere
+   * of its own.
+   */
+  private lastRecommendableLocalDate(cycle: { startDate: Date; duration: number }): string {
+    return addLocalDays(this.startLocalDate(cycle), cycle.duration * 7);
   }
 
   /** A cycle built ahead of time (e.g. Thursday, for a Monday start) is not recommendable yet. */
@@ -155,8 +168,10 @@ export class WorkoutEngineService {
   /**
    * Today's workout while it is still open, otherwise the next scheduled weekday -- wrapping
    * into the following week, so a cycle planning only Mondays answers "next Monday" once
-   * Monday is done. A cycle that hasn't started yet looks ahead from its own start date
-   * instead of today, so the dashboard can show what the plan opens with.
+   * Monday is done. The wrap stops at the cycle's own expiry: a date the cycle no longer
+   * covers would be auto-completed away before it arrived, so the answer is nothing rather
+   * than a workout that silently vanishes. A cycle that hasn't started yet looks ahead from
+   * its own start date instead of today, so the dashboard can show what the plan opens with.
    */
   async getNextScheduledWorkout(userId: string, today: Today): Promise<NextScheduledWorkout | null> {
     const activeCycle = await this.getRecommendableCycle(userId, today);
@@ -170,7 +185,16 @@ export class WorkoutEngineService {
 
     const doneToday = await this.isDayDone(userId, today.localDate);
 
+    const lastRecommendable = this.lastRecommendableLocalDate(activeCycle);
+
     for (let offset = doneToday ? 1 : 0; offset <= 7; offset++) {
+      const localDate = addLocalDays(today.localDate, offset);
+      // Past the cycle's own expiry the search stops: that date would be auto-completed away
+      // before it arrived, so answering it promises a workout that silently becomes null.
+      if (localDate > lastRecommendable) {
+        return null;
+      }
+
       const day = this.plannedDay(activeCycle.workoutDays, (today.weekday + offset) % 7);
       if (day) {
         return {
@@ -178,7 +202,7 @@ export class WorkoutEngineService {
           workoutDayId: day.id,
           workoutDayName: day.name,
           weekday: day.weekday,
-          localDate: addLocalDays(today.localDate, offset),
+          localDate,
         };
       }
     }

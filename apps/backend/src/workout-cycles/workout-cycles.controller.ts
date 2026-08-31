@@ -21,6 +21,8 @@ import {
 } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { ClientToday } from '../common/decorators/client-today.decorator';
+import { Today } from '../common/utils/today.util';
 
 @Controller('cycles')
 @UseGuards(JwtAuthGuard)
@@ -44,8 +46,9 @@ export class WorkoutCyclesController {
   async getCycleDetails(
     @Param('id') id: string,
     @CurrentUser() user: { id: string },
+    @ClientToday() today: Today,
   ): Promise<CycleDetailsDto> {
-    return this.workoutCyclesService.getCycleDetails(id, user.id);
+    return this.workoutCyclesService.getCycleDetails(id, user.id, today);
   }
 
   @Post()

@@ -1,4 +1,5 @@
 import { Workout, PersonalRecord, SetType } from '@/types';
+import { setWorkingVolume } from './volume';
 
 export interface WorkoutStats {
   totalVolume: number; // in kg
@@ -24,13 +25,7 @@ export function calculateWorkoutStats(
       // Skip warmup sets
       if (set.setType === SetType.WARMUP) continue;
 
-      // Calculate set volume
-      const baseVolume = set.reps * set.weight;
-      const multiplier =
-        (exerciseLog.isUnilateral ? 2 : 1) *
-        (exerciseLog.isDoubleWeight ? 2 : 1);
-      
-      totalVolume += baseVolume * multiplier;
+      totalVolume += setWorkingVolume(set, exerciseLog);
       setCount++;
     }
   }

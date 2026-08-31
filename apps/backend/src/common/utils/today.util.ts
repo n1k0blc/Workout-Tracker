@@ -49,12 +49,16 @@ export function resolveToday(header?: string | string[], now: Date = getCurrentD
 }
 
 /** Read through UTC: a calendar day has no time, so any zone offset here could only mislead. */
+export function localDateToInstant(localDate: string): Date {
+  return new Date(`${localDate}T00:00:00.000Z`);
+}
+
 export function weekdayOfLocalDate(localDate: string): number {
-  return new Date(`${localDate}T00:00:00.000Z`).getUTCDay();
+  return localDateToInstant(localDate).getUTCDay();
 }
 
 export function addLocalDays(localDate: string, days: number): string {
-  const shifted = new Date(`${localDate}T00:00:00.000Z`);
+  const shifted = localDateToInstant(localDate);
   shifted.setUTCDate(shifted.getUTCDate() + days);
   return shifted.toISOString().slice(0, 10);
 }

@@ -31,7 +31,8 @@ export class DashboardController {
   @Get('cycle-progress')
   async getCycleProgress(
     @CurrentUser() user: { id: string },
+    @ClientToday() today: Today,
   ): Promise<CycleProgressDto | null> {
-    return this.dashboardService.getCycleProgress(user.id);
+    return this.dashboardService.getCycleProgress(user.id, today);
   }
 }

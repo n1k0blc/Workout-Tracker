@@ -17,6 +17,13 @@ export interface SetInput {
   reps: number;
   weight: number;
   rir?: number | null;
+  // Per-side values for unilateral sets (issue #65/#97). Round-tripped only for now.
+  repsLeft?: number | null;
+  repsRight?: number | null;
+  weightLeft?: number | null;
+  weightRight?: number | null;
+  rirLeft?: number | null;
+  rirRight?: number | null;
   rest?: number | null;
   completedAt?: Date | null;
 }
@@ -24,6 +31,75 @@ export interface SetInput {
 export interface ExerciseInput {
   exerciseId: string;
   sets: SetInput[];
+}
+
+/** The bits of an exercise the write path needs to check set shape -- see `toExerciseInputs`. */
+export interface ExerciseShape {
+  isUnilateral: boolean;
+  name: string;
+}
+
+const SIDE_KEYS = [
+  'repsLeft',
+  'repsRight',
+  'weightLeft',
+  'weightRight',
+  'rirLeft',
+  'rirRight',
+] as const;
+
+/**
+ * Per-side set shape and the reps/weight/rir aggregates (issue #65/#100).
+ *
+ * `isUnilateral` is a set *shape*: a unilateral set is trained one side then the other and
+ * carries both, a bilateral set carries none. This is the single write path, so it owns the
+ * aggregates outright -- `reps`, `weight` and `rir` are always recomputed from the sides here
+ * and whatever the client sent for them is discarded. Persisting them is what keeps every
+ * analytics endpoint reading `reps`/`weight`/`rir` unchanged.
+ *
+ *   reps   = round(avg(L, R))          -- stays Int
+ *   weight = avg(L, R)
+ *   rir    = min(L, R)                  -- proximity to failure, the limiting side
+ *
+ * A database CHECK cannot express "matches this exercise's shape" without joining to the
+ * exercise, so the rule lives beside the tree-consistency checks that already load them.
+ */
+function deriveSetAggregates(
+  set: SetInput,
+  shape: ExerciseShape,
+  exerciseLabel: string,
+  setNumber: number,
+): SetInput {
+  const carriesSideData = SIDE_KEYS.some((key) => set[key] != null);
+
+  if (!shape.isUnilateral) {
+    if (carriesSideData) {
+      // Every set carrying side data is equally at fault, so this names the exercise, not a set.
+      throw new BadRequestException(
+        `${exerciseLabel} is a bilateral exercise; its sets must not carry per-side values`,
+      );
+    }
+    return set;
+  }
+
+  const { repsLeft, repsRight, weightLeft, weightRight, rirLeft, rirRight } = set;
+  if (repsLeft == null || repsRight == null || weightLeft == null || weightRight == null) {
+    throw new BadRequestException(
+      `${exerciseLabel}, set ${setNumber}: a unilateral exercise needs reps and weight for both sides`,
+    );
+  }
+  if ((rirLeft == null) !== (rirRight == null)) {
+    throw new BadRequestException(
+      `${exerciseLabel}, set ${setNumber}: RIR is set for only one side; provide both or neither`,
+    );
+  }
+
+  return {
+    ...set,
+    reps: Math.round((repsLeft + repsRight) / 2),
+    weight: (weightLeft + weightRight) / 2,
+    rir: rirLeft == null ? null : Math.min(rirLeft, rirRight),
+  };
 }
 
 /**
@@ -74,6 +150,12 @@ export class WorkoutTreeService {
               reps: set.reps,
               weight: set.weight,
               rir: set.rir ?? null,
+              repsLeft: set.repsLeft ?? null,
+              repsRight: set.repsRight ?? null,
+              weightLeft: set.weightLeft ?? null,
+              weightRight: set.weightRight ?? null,
+              rirLeft: set.rirLeft ?? null,
+              rirRight: set.rirRight ?? null,
               rest: set.rest ?? null,
               completedAt: set.completedAt ?? null,
             })),
@@ -113,25 +195,56 @@ function assertOrderMatchesPosition(
  * Every write path funnels through here on its way to `replaceTree`, which makes this the
  * one place the ordering invariant can be enforced without a new DTO forgetting to opt in.
  * See the `WorkoutTreeService` docstring for the invariant itself.
+ *
+ * `shapesById` is the map `ExercisesService.validateAccessible` returns for the same ids --
+ * `deriveSetAggregates` uses it to check per-side set shape and derive the aggregates.
  */
-export function toExerciseInputs(dtos: WorkoutExerciseInputDto[]): ExerciseInput[] {
+export function toExerciseInputs(
+  dtos: WorkoutExerciseInputDto[],
+  shapesById: Map<string, ExerciseShape>,
+): ExerciseInput[] {
   assertOrderMatchesPosition(dtos, 'exercises');
   dtos.forEach((ex, index) =>
     assertOrderMatchesPosition(ex.sets, `exercise at position ${index}: sets`),
   );
 
   // `order` is checked above and then dropped -- past this point the array is the ordering.
-  return dtos.map((ex) => ({
-    exerciseId: ex.exerciseId,
-    sets: ex.sets.map((set) => ({
-      setType: set.setType,
-      reps: set.reps,
-      weight: set.weight,
-      rir: set.rir ?? null,
-      rest: set.rest ?? 90,
-      completedAt: set.completedAt ? new Date(set.completedAt) : null,
-    })),
-  }));
+  return dtos.map((ex, exerciseIndex) => {
+    const shape = shapesById.get(ex.exerciseId);
+    if (!shape) {
+      // Every caller passes the map validateAccessible returned for these same ids, so a miss
+      // is a wiring bug in a write path, not bad client input -- a 500, not a 400.
+      throw new Error(
+        `toExerciseInputs: exercise ${ex.exerciseId} at position ${exerciseIndex} was not loaded for validation`,
+      );
+    }
+
+    const exerciseLabel = `exercise "${shape.name}" (position ${exerciseIndex})`;
+    return {
+      exerciseId: ex.exerciseId,
+      sets: ex.sets.map((set, setIndex) =>
+        deriveSetAggregates(
+          {
+            setType: set.setType,
+            reps: set.reps,
+            weight: set.weight,
+            rir: set.rir ?? null,
+            repsLeft: set.repsLeft ?? null,
+            repsRight: set.repsRight ?? null,
+            weightLeft: set.weightLeft ?? null,
+            weightRight: set.weightRight ?? null,
+            rirLeft: set.rirLeft ?? null,
+            rirRight: set.rirRight ?? null,
+            rest: set.rest ?? 90,
+            completedAt: set.completedAt ? new Date(set.completedAt) : null,
+          },
+          shape,
+          exerciseLabel,
+          setIndex + 1,
+        ),
+      ),
+    };
+  });
 }
 
 type LoadedWorkoutExercise = {
@@ -146,6 +259,12 @@ type LoadedWorkoutExercise = {
     reps: number;
     weight: number;
     rir: number | null;
+    repsLeft: number | null;
+    repsRight: number | null;
+    weightLeft: number | null;
+    weightRight: number | null;
+    rirLeft: number | null;
+    rirRight: number | null;
     rest: number | null;
     completedAt: Date | null;
   }[];
@@ -175,6 +294,12 @@ export function mapExercisesToResponse(
           reps: set.reps,
           weight: set.weight,
           rir: set.rir ?? undefined,
+          repsLeft: set.repsLeft ?? undefined,
+          repsRight: set.repsRight ?? undefined,
+          weightLeft: set.weightLeft ?? undefined,
+          weightRight: set.weightRight ?? undefined,
+          rirLeft: set.rirLeft ?? undefined,
+          rirRight: set.rirRight ?? undefined,
           rest: set.rest ?? undefined,
           completedAt: set.completedAt ?? undefined,
         })),

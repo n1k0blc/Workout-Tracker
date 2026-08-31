@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { WorkoutTreeService, mapExercisesToResponse, toExerciseInputs, WORKOUT_EXERCISE_TREE_INCLUDE } from '../workout-tree/workout-tree.service';
 import { setWorkingVolume } from '../common/utils/volume.util';
 import { calculateCycleWeek, getCurrentDate } from '../common/utils/date.util';
+import { Today, localDateToInstant } from '../common/utils/today.util';
 import { WEEKDAY_NAMES, getWeekdayDistanceFromCycleStart } from '../common/utils/weekday.util';
 import { ExercisesService } from '../exercises/exercises.service';
 import {
@@ -135,7 +136,7 @@ export class WorkoutCyclesService {
     }
 
     const allExerciseIds = workoutDays.flatMap((day) => day.exercises.map((e) => e.exerciseId));
-    await this.exercisesService.validateAccessible(allExerciseIds, userId);
+    const exercisesById = await this.exercisesService.validateAccessible(allExerciseIds, userId);
 
     const startWeekday = new Date(startDate).getUTCDay();
 
@@ -159,7 +160,11 @@ export class WorkoutCyclesService {
           data: { kind: 'BLUEPRINT', userId, workoutDayId: workoutDay.id },
         });
 
-        await this.workoutTreeService.replaceTree(tx, blueprint.id, toExerciseInputs(day.exercises));
+        await this.workoutTreeService.replaceTree(
+          tx,
+          blueprint.id,
+          toExerciseInputs(day.exercises, exercisesById),
+        );
       }
 
       return cycle.id;
@@ -171,37 +176,44 @@ export class WorkoutCyclesService {
   async update(id: string, updateCycleDto: UpdateCycleDto, userId: string): Promise<CycleResponseDto> {
     const cycle = await this.findById(id, userId);
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.workoutCycle.update({
-        where: { id },
-        data: {
-          ...(updateCycleDto.name && { name: updateCycleDto.name }),
-          ...(updateCycleDto.duration && { duration: updateCycleDto.duration }),
-          ...(updateCycleDto.startDate && { startDate: new Date(updateCycleDto.startDate) }),
-        },
-      });
-
-      // Moving the cycle's start day re-anchors its week, so every day's `order` -- kept in
-      // sync with its distance from the start weekday (#74) -- needs recomputing too. The
-      // new values are a permutation of the old ones, so a single pass risks a transient
-      // clash with the (cycleId, order) unique index; parking everything at negative,
-      // never-colliding placeholders first avoids that.
-      const startWeekday = updateCycleDto.startDate
-        ? new Date(updateCycleDto.startDate).getUTCDay()
-        : undefined;
-
-      if (startWeekday !== undefined && startWeekday !== cycle.startDate.getUTCDay()) {
-        for (const [index, day] of cycle.workoutDays.entries()) {
-          await tx.workoutDay.update({ where: { id: day.id }, data: { order: -1 - index } });
-        }
-        for (const day of cycle.workoutDays) {
-          await tx.workoutDay.update({
-            where: { id: day.id },
-            data: { order: getWeekdayDistanceFromCycleStart(day.weekday, startWeekday) },
+    // The re-anchor below writes WorkoutDay rows, so this shares the move and swap paths'
+    // conflict handling: a concurrent write winning either unique index has to answer 400,
+    // not 500. It rewrites every day at once, so there is no single weekday to blame.
+    await this.runWorkoutDayWrite(
+      () =>
+        this.prisma.$transaction(async (tx) => {
+          await tx.workoutCycle.update({
+            where: { id },
+            data: {
+              ...(updateCycleDto.name && { name: updateCycleDto.name }),
+              ...(updateCycleDto.duration && { duration: updateCycleDto.duration }),
+              ...(updateCycleDto.startDate && { startDate: new Date(updateCycleDto.startDate) }),
+            },
           });
-        }
-      }
-    });
+
+          // Moving the cycle's start day re-anchors its week, so every day's `order` -- kept
+          // in sync with its distance from the start weekday (#74) -- needs recomputing too.
+          // The new values are a permutation of the old ones, so a single pass risks a
+          // transient clash with the (cycleId, order) unique index; parking everything at
+          // negative, never-colliding placeholders first avoids that.
+          const startWeekday = updateCycleDto.startDate
+            ? new Date(updateCycleDto.startDate).getUTCDay()
+            : undefined;
+
+          if (startWeekday !== undefined && startWeekday !== cycle.startDate.getUTCDay()) {
+            for (const [index, day] of cycle.workoutDays.entries()) {
+              await tx.workoutDay.update({ where: { id: day.id }, data: { order: -1 - index } });
+            }
+            for (const day of cycle.workoutDays) {
+              await tx.workoutDay.update({
+                where: { id: day.id },
+                data: { order: getWeekdayDistanceFromCycleStart(day.weekday, startWeekday) },
+              });
+            }
+          }
+        }),
+      null,
+    );
 
     return this.findById(id, userId);
   }
@@ -213,7 +225,7 @@ export class WorkoutCyclesService {
     userId: string,
   ): Promise<CycleResponseDto> {
     await this.findById(cycleId, userId);
-    await this.exercisesService.validateAccessible(
+    const exercisesById = await this.exercisesService.validateAccessible(
       updateBlueprintDto.exercises.map((e) => e.exerciseId),
       userId,
     );
@@ -233,7 +245,11 @@ export class WorkoutCyclesService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      await this.workoutTreeService.replaceTree(tx, blueprint.id, toExerciseInputs(updateBlueprintDto.exercises));
+      await this.workoutTreeService.replaceTree(
+        tx,
+        blueprint.id,
+        toExerciseInputs(updateBlueprintDto.exercises, exercisesById),
+      );
       await tx.workout.update({ where: { id: blueprint.id }, data: { updatedAt: new Date() } });
     });
 
@@ -329,18 +345,22 @@ export class WorkoutCyclesService {
 
   /**
    * Runs a WorkoutDay write and maps a P2002 on either of its unique indexes to a 400 --
-   * both the plain move and the swap re-check the weekday before writing, but read-then-write
-   * leaves a window for a concurrent request to win either index first. Rare, but the endpoint
-   * must answer 400 rather than let a driver error surface as a 500.
+   * the plain move, the swap and the start-date re-anchor all read the cycle before writing,
+   * but read-then-write leaves a window for a concurrent request to win either index first.
+   * Rare, but the endpoint must answer 400 rather than let a driver error surface as a 500.
+   *
+   * `weekday` is the day the caller was aiming for, and lets a lost weekday race name it in
+   * the message. The re-anchor rewrites every day at once, so it has no single day to blame
+   * and passes `null` -- for it, either index losing means only "someone raced you".
    */
-  private async runWorkoutDayWrite<T>(write: () => Promise<T>, weekday: number): Promise<T> {
+  private async runWorkoutDayWrite<T>(write: () => Promise<T>, weekday: number | null): Promise<T> {
     try {
       return await write();
     } catch (error) {
-      if (isWeekdayConflict(error)) {
+      if (weekday !== null && isWeekdayConflict(error)) {
         throw new BadRequestException(`${WEEKDAY_NAMES[weekday]} ist in diesem Zyklus bereits belegt.`);
       }
-      if (isOrderConflict(error)) {
+      if (isWeekdayConflict(error) || isOrderConflict(error)) {
         throw new BadRequestException(
           'Eine andere Änderung an diesem Zyklus ist dazwischengekommen. Bitte versuche es erneut.',
         );
@@ -373,9 +393,13 @@ export class WorkoutCyclesService {
   }
 
   /**
-   * Get detailed statistics and data for a cycle
+   * Get detailed statistics and data for a cycle.
+   *
+   * Takes the client's `Today` for the same reason the dashboard's cycle-progress card does:
+   * this view reports the same week number, so a server-clock "today" here would disagree with
+   * the card near local midnight.
    */
-  async getCycleDetails(id: string, userId: string): Promise<CycleDetailsDto> {
+  async getCycleDetails(id: string, userId: string, today: Today): Promise<CycleDetailsDto> {
     const cycle = await this.prisma.workoutCycle.findUnique({
       where: { id },
       include: { workoutDays: true },
@@ -393,7 +417,7 @@ export class WorkoutCyclesService {
       include: {
         exercises: {
           include: {
-            exercise: { select: { isUnilateral: true, isDoubleWeight: true } },
+            exercise: { select: { isDoubleWeight: true } },
             sets: true,
           },
         },
@@ -438,7 +462,11 @@ export class WorkoutCyclesService {
     let percentage: number | undefined;
 
     if (cycle.status === 'ACTIVE') {
-      currentWeek = calculateCycleWeek(cycle.startDate, cycle.duration);
+      currentWeek = calculateCycleWeek(
+        cycle.startDate,
+        cycle.duration,
+        localDateToInstant(today.localDate),
+      );
       totalWeeks = cycle.duration;
       percentage = Math.round(Math.min((currentWeek / totalWeeks) * 100, 100) * 100) / 100;
     }

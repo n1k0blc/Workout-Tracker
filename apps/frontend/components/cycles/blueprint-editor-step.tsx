@@ -17,8 +17,11 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import type { ExerciseLog } from '@/types';
-import { replaceExerciseInList } from '@/lib/exercise-replace';
+import { replacePlanExerciseInList } from '@/lib/exercise-replace';
 import { withArrayPositionOrder } from '@/lib/workout-order';
+import { plannedSideFields } from '@/lib/set-sides';
+import { addPlannedSet } from '@/lib/planned-sets';
+import type { PlannedSet } from '@/types';
 import { sortByCycleWeekday } from '@/lib/weekday';
 import {
   DndContext,
@@ -99,23 +102,10 @@ export default function BlueprintEditorStep({
   const mapBlueprintToExerciseLogs = useCallback((blueprintExercises: any[]): ExerciseLog[] => { // eslint-disable-line @typescript-eslint/no-explicit-any
     return (blueprintExercises || []).map((ex: any, idx: number) => { // eslint-disable-line @typescript-eslint/no-explicit-any
       const exDetails = exercises.find((e) => e.id === ex.exerciseId);
-      // Use the *same* id for the corresponding entry in sets and plannedSets
-      // so that onUpdateSet (which the card calls with the id from the edited set)
-      // can update both sides with a single setId.
-      const sets = (ex.sets || []).map((s: any, sIdx: number) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-        const sid = s.id || `set-${ex.exerciseId || idx}-${sIdx}`;
-        return {
-          id: sid,
-          setNumber: s.order || sIdx + 1,
-          setType: s.setType || SetType.WORKING,
-          reps: s.reps ?? 0,
-          weight: s.weight ?? 0,
-          rir: s.rir ?? 0,
-          completedAt: new Date().toISOString(),
-        };
-      });
+      // A blueprint is a plan: `plannedSets` is the single representation the card edits, and
+      // `onUpdatePlannedSet` writes each change straight back -- no fabricated logged twin.
       const plannedSets = (ex.sets || []).map((s: any, sIdx: number) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-        const sid = s.id || `set-${ex.exerciseId || idx}-${sIdx}`; // reuse the same id
+        const sid = s.id || `set-${ex.exerciseId || idx}-${sIdx}`;
         return {
           id: sid,
           order: s.order || sIdx + 1,
@@ -123,6 +113,12 @@ export default function BlueprintEditorStep({
           reps: s.reps ?? 0,
           weight: s.weight ?? 0,
           rir: s.rir ?? 0,
+          repsLeft: s.repsLeft ?? undefined,
+          repsRight: s.repsRight ?? undefined,
+          weightLeft: s.weightLeft ?? undefined,
+          weightRight: s.weightRight ?? undefined,
+          rirLeft: s.rirLeft ?? undefined,
+          rirRight: s.rirRight ?? undefined,
           rest: s.rest ?? 90,
         };
       });
@@ -138,7 +134,7 @@ export default function BlueprintEditorStep({
         isUnilateral: ex.isUnilateral ?? exDetails?.isUnilateral ?? false,
         isDoubleWeight: ex.isDoubleWeight ?? exDetails?.isDoubleWeight ?? false,
         order: ex.order || idx + 1,
-        sets,
+        sets: [],
         plannedSets,
       } as ExerciseLog;
     });
@@ -157,16 +153,15 @@ export default function BlueprintEditorStep({
       exerciseName: ex.exerciseName,
       isUnilateral: ex.isUnilateral,
       isDoubleWeight: ex.isDoubleWeight,
-      sets: (ex.plannedSets || ex.sets || []).map((s: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
-        const p = (ex.plannedSets || []).find((pp: any) => (pp.order || pp.setNumber) === (s.setNumber || s.order)) || s; // eslint-disable-line @typescript-eslint/no-explicit-any
-        return {
-          setType: s.setType,
-          reps: s.reps ?? 0,
-          weight: s.weight ?? 0,
-          rir: s.rir ?? 0,
-          rest: p.rest ?? 90,
-        };
-      }),
+      sets: (ex.plannedSets || []).map((s: any) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
+        setType: s.setType,
+        reps: s.reps ?? 0,
+        weight: s.weight ?? 0,
+        rir: s.rir ?? 0,
+        // Per-side targets for unilateral exercises (issue #103); dropped for bilateral sets.
+        ...plannedSideFields(s, ex.isUnilateral),
+        rest: s.rest ?? 90,
+      })),
     })));
   }, []);
 
@@ -246,6 +241,8 @@ export default function BlueprintEditorStep({
             reps: set.reps,
             weight: set.weight,
             rir: set.rir,
+            // Carry per-side targets when saving a unilateral blueprint as a template (issue #103).
+            ...plannedSideFields(set, ex.isUnilateral),
             rest: set.rest,
           })),
         }))),
@@ -293,6 +290,8 @@ export default function BlueprintEditorStep({
           reps: set.reps,
           weight: set.weight,
           rir: set.rir ?? 0,
+          // Carry a unilateral template's per-side targets into the blueprint (issue #103).
+          ...plannedSideFields(set, ex.isUnilateral),
           rest: set.rest ?? 90,
         })),
       })));
@@ -331,35 +330,21 @@ export default function BlueprintEditorStep({
       setExercises(prev => [exercise, ...prev]);
     }
 
-    // Create mapped ExerciseLog entry with default set (including rest in planned)
+    // Create mapped ExerciseLog entry with one default planned set. For a unilateral
+    // exercise `addPlannedSet` seeds both sides too, so the save payload is valid even if
+    // the user never opens the sides (issue #103).
     const exDetails = exercises.find((e) => e.id === exerciseId) || exercise;
-    const sharedSetId = `set-${Date.now()}`;
-    const defaultSet = {
-      id: sharedSetId,
-      setNumber: 1,
-      setType: SetType.WORKING,
-      reps: 10,
-      weight: 0,
-      rir: 2,
-      completedAt: new Date().toISOString(),
-    };
-    const defaultPlanned = {
-      id: sharedSetId, // same id so type updates etc. affect both representations
-      order: 1,
-      setType: SetType.WORKING,
-      reps: 10,
-      weight: 0,
-      rir: 2,
-      rest: 90,
-    };
+    const isUnilateral = exDetails?.isUnilateral ?? false;
 
     const newExLog: ExerciseLog = {
       id: `ex-${exerciseId}-${Date.now()}`,
       exerciseId,
       exerciseName: exDetails?.name || '',
+      isUnilateral,
+      isDoubleWeight: exDetails?.isDoubleWeight ?? false,
       order: currentExercises.length + 1,
-      sets: [defaultSet],
-      plannedSets: [defaultPlanned],
+      sets: [],
+      plannedSets: addPlannedSet([], { isUnilateral }),
     };
 
     const newList = [...currentExercises, newExLog];
@@ -459,42 +444,22 @@ export default function BlueprintEditorStep({
                           if (newEx && !exercises.some((e) => e.id === newEx.id)) {
                             setExercises((prev) => [newEx, ...prev]);
                           }
-                          const newList = replaceExerciseInList(currentExercises, exId, {
+                          const newList = replacePlanExerciseInList(currentExercises, exId, {
                             ...(exDetails ?? { name: 'Exercise' }),
                             id: newExId,
-                          });
+                          }, 'plannedSets');
                           setCurrentExercises(newList);
                           syncCurrentExercisesToFormData(newList);
                         }}
                         onAddSet={(exId) => {
                           const newList = currentExercises.map((e) => {
                             if (e.id !== exId) return e;
-                            const setNumbers = (e.sets || []).map((s: any) => s.setNumber || s.order || 0); // eslint-disable-line @typescript-eslint/no-explicit-any
-                            const plannedOrders = (e.plannedSets || []).map((p: any) => p.order || p.setNumber || 0); // eslint-disable-line @typescript-eslint/no-explicit-any
-                            const nextOrder = Math.max(0, ...setNumbers, ...plannedOrders) + 1;
-                            const sharedSetId = `set-${Date.now()}`;
-                            const newSet = {
-                              id: sharedSetId,
-                              setNumber: nextOrder,
-                              setType: SetType.WORKING,
-                              reps: 10,
-                              weight: 0,
-                              rir: 2,
-                              completedAt: new Date().toISOString(),
-                            };
-                            const newPlanned = {
-                              id: sharedSetId, // same id so updates work for both
-                              order: nextOrder,
-                              setType: SetType.WORKING,
-                              reps: 10,
-                              weight: 0,
-                              rir: 2,
-                              rest: 90,
-                            };
                             return {
                               ...e,
-                              sets: [...(e.sets || []), newSet],
-                              plannedSets: [...(e.plannedSets || []), newPlanned],
+                              plannedSets: addPlannedSet(
+                                (e.plannedSets || []) as PlannedSet[],
+                                { isUnilateral: e.isUnilateral },
+                              ),
                             };
                           });
                           setCurrentExercises(newList);
@@ -505,24 +470,22 @@ export default function BlueprintEditorStep({
                             if (e.id !== exId) return e;
                             return {
                               ...e,
-                              sets: (e.sets || []).filter((s: any) => (s.setNumber || s.order) !== setNumber), // eslint-disable-line @typescript-eslint/no-explicit-any
-                              plannedSets: (e.plannedSets || []).filter((p: any) => (p.order || p.setNumber) !== setNumber), // eslint-disable-line @typescript-eslint/no-explicit-any
+                              plannedSets: (e.plannedSets || [])
+                                .filter((p) => p.order !== setNumber)
+                                .map((p, i) => ({ ...p, order: i + 1 })),
                             };
                           });
                           setCurrentExercises(newList);
                           syncCurrentExercisesToFormData(newList);
                         }}
-                        onUpdateSet={(exId, setId, data) => {
+                        onUpdatePlannedSet={(exId, setNumber, data) => {
                           const newList = currentExercises.map((e) => {
                             if (e.id !== exId) return e;
-                            const updateFn = (list: any[]) => // eslint-disable-line @typescript-eslint/no-explicit-any
-                              list.map((s: any) => // eslint-disable-line @typescript-eslint/no-explicit-any
-                                s.id === setId ? { ...s, ...data } : s
-                              );
                             return {
                               ...e,
-                              sets: updateFn(e.sets || []),
-                              plannedSets: updateFn(e.plannedSets || []),
+                              plannedSets: (e.plannedSets || []).map((p) =>
+                                p.order === setNumber ? { ...p, ...data } : p,
+                              ),
                             };
                           });
                           setCurrentExercises(newList);
