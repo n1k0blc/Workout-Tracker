@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import type { ExerciseLog } from '@/types';
-import { replaceExerciseInList } from '@/lib/exercise-replace';
+import { replacePlanExerciseInList } from '@/lib/exercise-replace';
 import { withArrayPositionOrder } from '@/lib/workout-order';
 import { plannedSideFields } from '@/lib/set-sides';
 import { addPlannedSet } from '@/lib/planned-sets';
@@ -444,10 +444,10 @@ export default function BlueprintEditorStep({
                           if (newEx && !exercises.some((e) => e.id === newEx.id)) {
                             setExercises((prev) => [newEx, ...prev]);
                           }
-                          const newList = replaceExerciseInList(currentExercises, exId, {
+                          const newList = replacePlanExerciseInList(currentExercises, exId, {
                             ...(exDetails ?? { name: 'Exercise' }),
                             id: newExId,
-                          });
+                          }, 'plannedSets');
                           setCurrentExercises(newList);
                           syncCurrentExercisesToFormData(newList);
                         }}

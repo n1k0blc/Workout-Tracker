@@ -13,7 +13,7 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import ExerciseCard from '@/components/workout/exercise-card';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import { IconChevronLeft, IconPlus } from '@tabler/icons-react';
-import { replaceExerciseInList } from '@/lib/exercise-replace';
+import { replacePlanExerciseInList } from '@/lib/exercise-replace';
 import { withArrayPositionOrder } from '@/lib/workout-order';
 import { plannedSideFields } from '@/lib/set-sides';
 import { addPlannedSet, removePlannedSet, updatePlannedSet } from '@/lib/planned-sets';
@@ -363,10 +363,10 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
                             // The picker's own entry wins: a custom exercise created during the
                             // swap isn't in `availableExercises` yet, so the lookup finds nothing.
                             const exDetails = newEx ?? availableExercises.find((e) => e.id === newId);
-                            setExercises(prev => replaceExerciseInList(prev, id, {
+                            setExercises(prev => replacePlanExerciseInList(prev, id, {
                               ...(exDetails ?? { name: 'Exercise' }),
                               id: newId,
-                            }));
+                            }, 'plannedSets'));
                           }}
                           onAddSet={(id) => {
                             setExercises(prev => prev.map(e =>

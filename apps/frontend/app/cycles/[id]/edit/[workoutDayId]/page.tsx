@@ -46,7 +46,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { IconPlus } from '@tabler/icons-react';
 import type { ExerciseLog, WorkoutDay } from '@/types';
-import { replaceExerciseInList } from '@/lib/exercise-replace';
+import { replacePlanExerciseInList } from '@/lib/exercise-replace';
 import { withArrayPositionOrder } from '@/lib/workout-order';
 import { plannedSideFields } from '@/lib/set-sides';
 import { addPlannedSet } from '@/lib/planned-sets';
@@ -167,7 +167,7 @@ export default function EditBlueprintPage() {
   const handleReplaceExercise = async (exerciseLogId: string, newExerciseId: string) => {
     try {
       const newExercise = await apiClient.getExercise(newExerciseId);
-      setExercises((prev) => replaceExerciseInList(prev, exerciseLogId, newExercise));
+      setExercises((prev) => replacePlanExerciseInList(prev, exerciseLogId, newExercise, 'sets'));
     } catch (error) {
       console.error('Failed to replace exercise:', error);
     }
