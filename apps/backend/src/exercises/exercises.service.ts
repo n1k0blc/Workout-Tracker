@@ -7,6 +7,7 @@ import {
   sumMusclePercentages,
   MUSCLE_PERCENT_FIELD,
 } from '../common/muscle.util';
+import type { ExerciseShape } from '../workout-tree/workout-tree.service';
 
 const EXERCISE_SELECT = {
   id: true,
@@ -62,23 +63,32 @@ export class ExercisesService {
    * blueprint/template tree from client-submitted exerciseIds must not trust those ids
    * blindly (a plain existence-only check would let a user reference another user's
    * private custom exercise and read its name back out via the tree they just created).
+   *
+   * Returns the accessible exercises keyed by id, so the same load also feeds the set-shape
+   * check in `toExerciseInputs` (issue #100) rather than making the write path query twice.
    */
-  async validateAccessible(exerciseIds: string[], userId: string): Promise<void> {
+  async validateAccessible(
+    exerciseIds: string[],
+    userId: string,
+  ): Promise<Map<string, ExerciseShape>> {
     const uniqueIds = Array.from(new Set(exerciseIds));
-    if (uniqueIds.length === 0) return;
+    if (uniqueIds.length === 0) return new Map();
 
     const exercises = await this.prisma.exercise.findMany({
       where: { id: { in: uniqueIds }, deletedAt: null },
-      select: { id: true, isCustom: true, userId: true },
+      select: { id: true, name: true, isCustom: true, isUnilateral: true, userId: true },
     });
 
-    const accessibleIds = new Set(
-      exercises.filter((e) => !e.isCustom || e.userId === userId).map((e) => e.id),
-    );
+    const accessible = exercises.filter((e) => !e.isCustom || e.userId === userId);
+    const accessibleIds = new Set(accessible.map((e) => e.id));
 
     if (uniqueIds.some((id) => !accessibleIds.has(id))) {
       throw new NotFoundException('One or more exercises not found');
     }
+
+    return new Map(
+      accessible.map((e) => [e.id, { isUnilateral: e.isUnilateral, name: e.name }]),
+    );
   }
 
   /**

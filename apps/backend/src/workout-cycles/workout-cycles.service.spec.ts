@@ -55,7 +55,11 @@ function makeService() {
   };
 
   const workoutTreeService = { replaceTree: jest.fn() };
-  const exercisesService = { validateAccessible: jest.fn() };
+  const exercisesService = {
+    validateAccessible: jest
+      .fn()
+      .mockResolvedValue(new Map([['exercise-1', { isUnilateral: false, name: 'Exercise 1' }]])),
+  };
 
   const service = new WorkoutCyclesService(
     prisma as never,

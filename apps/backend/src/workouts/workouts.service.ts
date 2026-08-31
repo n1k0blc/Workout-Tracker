@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
   WorkoutTreeService,
   ExerciseInput,
+  ExerciseShape,
   mapExercisesToResponse,
   toExerciseInputs,
   WORKOUT_EXERCISE_TREE_INCLUDE,
@@ -25,6 +26,9 @@ const WORKOUT_FULL_INCLUDE = {
 interface SaveContext {
   workoutDay: { id: string; cycleId: string; plannedHomeGymId: string | null } | null;
   overwriteTemplate: { id: string } | null;
+  // Accessible exercises keyed by id, loaded once for both the BOLA check and the set-shape
+  // derivation in `toExerciseInputs`. Empty when the payload carries no tree.
+  exercisesById: Map<string, ExerciseShape>;
 }
 
 @Injectable()
@@ -115,7 +119,7 @@ export class WorkoutsService {
     }
 
     const ctx = await this.resolveSaveContext(dto, userId);
-    const exerciseInputs = toExerciseInputs(dto.exercises);
+    const exerciseInputs = toExerciseInputs(dto.exercises, ctx.exercisesById);
 
     const workoutId = await this.prisma.$transaction(async (tx) => {
       const workout = await tx.workout.create({
@@ -154,7 +158,9 @@ export class WorkoutsService {
     }
 
     const ctx = await this.resolveSaveContext(dto, userId, existing);
-    const exerciseInputs = dto.exercises ? toExerciseInputs(dto.exercises) : null;
+    const exerciseInputs = dto.exercises
+      ? toExerciseInputs(dto.exercises, ctx.exercisesById)
+      : null;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.workout.update({
@@ -199,8 +205,12 @@ export class WorkoutsService {
     userId: string,
     existing?: { originTemplateId: string | null; localDate?: string },
   ): Promise<SaveContext> {
+    let exercisesById: Map<string, ExerciseShape> = new Map();
     if (dto.exercises) {
-      await this.exercisesService.validateAccessible(dto.exercises.map((e) => e.exerciseId), userId);
+      exercisesById = await this.exercisesService.validateAccessible(
+        dto.exercises.map((e) => e.exerciseId),
+        userId,
+      );
     }
 
     if (dto.homeGymId) {
@@ -278,7 +288,7 @@ export class WorkoutsService {
       }
     }
 
-    return { workoutDay, overwriteTemplate };
+    return { workoutDay, overwriteTemplate, exercisesById };
   }
 
   private async applySideEffects(

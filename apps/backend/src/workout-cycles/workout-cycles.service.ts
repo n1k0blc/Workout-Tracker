@@ -136,7 +136,7 @@ export class WorkoutCyclesService {
     }
 
     const allExerciseIds = workoutDays.flatMap((day) => day.exercises.map((e) => e.exerciseId));
-    await this.exercisesService.validateAccessible(allExerciseIds, userId);
+    const exercisesById = await this.exercisesService.validateAccessible(allExerciseIds, userId);
 
     const startWeekday = new Date(startDate).getUTCDay();
 
@@ -160,7 +160,11 @@ export class WorkoutCyclesService {
           data: { kind: 'BLUEPRINT', userId, workoutDayId: workoutDay.id },
         });
 
-        await this.workoutTreeService.replaceTree(tx, blueprint.id, toExerciseInputs(day.exercises));
+        await this.workoutTreeService.replaceTree(
+          tx,
+          blueprint.id,
+          toExerciseInputs(day.exercises, exercisesById),
+        );
       }
 
       return cycle.id;
@@ -221,7 +225,7 @@ export class WorkoutCyclesService {
     userId: string,
   ): Promise<CycleResponseDto> {
     await this.findById(cycleId, userId);
-    await this.exercisesService.validateAccessible(
+    const exercisesById = await this.exercisesService.validateAccessible(
       updateBlueprintDto.exercises.map((e) => e.exerciseId),
       userId,
     );
@@ -241,7 +245,11 @@ export class WorkoutCyclesService {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      await this.workoutTreeService.replaceTree(tx, blueprint.id, toExerciseInputs(updateBlueprintDto.exercises));
+      await this.workoutTreeService.replaceTree(
+        tx,
+        blueprint.id,
+        toExerciseInputs(updateBlueprintDto.exercises, exercisesById),
+      );
       await tx.workout.update({ where: { id: blueprint.id }, data: { updatedAt: new Date() } });
     });
 

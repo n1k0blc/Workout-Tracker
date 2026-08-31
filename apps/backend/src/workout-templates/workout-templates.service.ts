@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { PrismaService } from '../prisma/prisma.service';
 import {
   WorkoutTreeService,
+  ExerciseShape,
   mapExercisesToResponse,
   toExerciseInputs,
   WORKOUT_EXERCISE_TREE_INCLUDE,
@@ -61,7 +62,7 @@ export class WorkoutTemplatesService {
       throw new ConflictException('A template with this name already exists');
     }
 
-    await this.exercisesService.validateAccessible(
+    const exercisesById = await this.exercisesService.validateAccessible(
       createDto.exercises.map((e) => e.exerciseId),
       userId,
     );
@@ -77,7 +78,11 @@ export class WorkoutTemplatesService {
         },
       });
 
-      await this.workoutTreeService.replaceTree(tx, template.id, toExerciseInputs(createDto.exercises));
+      await this.workoutTreeService.replaceTree(
+        tx,
+        template.id,
+        toExerciseInputs(createDto.exercises, exercisesById),
+      );
       return template.id;
     });
 
@@ -109,8 +114,9 @@ export class WorkoutTemplatesService {
       }
     }
 
+    let exercisesById: Map<string, ExerciseShape> = new Map();
     if (updateDto.exercises) {
-      await this.exercisesService.validateAccessible(
+      exercisesById = await this.exercisesService.validateAccessible(
         updateDto.exercises.map((e) => e.exerciseId),
         userId,
       );
@@ -126,7 +132,11 @@ export class WorkoutTemplatesService {
       });
 
       if (updateDto.exercises) {
-        await this.workoutTreeService.replaceTree(tx, id, toExerciseInputs(updateDto.exercises));
+        await this.workoutTreeService.replaceTree(
+          tx,
+          id,
+          toExerciseInputs(updateDto.exercises, exercisesById),
+        );
       }
     });
 

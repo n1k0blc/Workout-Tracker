@@ -44,8 +44,10 @@ export class WorkoutSetInputDto {
   @Max(10)
   rir?: number;
 
-  // Per-side values for unilateral sets (§4.1, issue #65/#97). Optional and currently only
-  // round-tripped -- nothing derives the reps/weight/rir aggregates from them yet.
+  // Per-side values for unilateral sets (§4.1, issue #65). Optional here because a bilateral
+  // set carries none; the write path then requires all four reps/weight sides for a unilateral
+  // exercise, rejects any side data on a bilateral one, and derives reps/weight/rir from the
+  // sides -- see `deriveSetAggregates` in the workout-tree service (issue #100).
   @IsOptional()
   @IsInt()
   @Min(1)

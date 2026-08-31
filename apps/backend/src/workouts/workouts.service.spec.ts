@@ -54,7 +54,11 @@ function makeService() {
     $transaction: jest.fn(async (cb: (client: typeof tx) => unknown) => cb(tx)),
   };
   const workoutTreeService = { replaceTree: jest.fn() };
-  const exercisesService = { validateAccessible: jest.fn() };
+  const exercisesService = {
+    validateAccessible: jest
+      .fn()
+      .mockResolvedValue(new Map([['exercise-1', { isUnilateral: false, name: 'Exercise 1' }]])),
+  };
 
   const service = new WorkoutsService(
     prisma as never,
@@ -62,7 +66,7 @@ function makeService() {
     exercisesService as never,
   );
 
-  return { service, prisma, tx };
+  return { service, prisma, tx, workoutTreeService, exercisesService };
 }
 
 describe('WorkoutsService localDate', () => {
@@ -124,6 +128,72 @@ describe('WorkoutsService localDate', () => {
     await service.update('workout-1', { totalDuration: 1800 } as UpdateWorkoutDto, 'user-1');
 
     expect(tx.workout.update.mock.calls[0][0].data).not.toHaveProperty('localDate');
+  });
+});
+
+describe('WorkoutsService per-side aggregates (#100)', () => {
+  it('hands replaceTree the server-derived reps/weight/rir for a unilateral set, not the client values', async () => {
+    const { service, workoutTreeService, exercisesService } = makeService();
+    exercisesService.validateAccessible.mockResolvedValue(
+      new Map([['exercise-1', { isUnilateral: true, name: 'Split Squat' }]]),
+    );
+
+    const dto: CreateWorkoutDto = {
+      ...lateNight,
+      isFreeWorkout: true,
+      exercises: [
+        {
+          exerciseId: 'exercise-1',
+          order: 1,
+          sets: [
+            {
+              order: 1,
+              setType: SetType.WORKING,
+              reps: 999,
+              weight: 999,
+              rir: 9,
+              repsLeft: 10,
+              repsRight: 9,
+              weightLeft: 40,
+              weightRight: 45,
+              rirLeft: 3,
+              rirRight: 1,
+            },
+          ],
+        },
+      ],
+    } as CreateWorkoutDto;
+
+    await service.create(dto, 'user-1');
+
+    // replaceTree is the one write that persists the tree; the aggregates it receives are what
+    // every analytics endpoint later reads.
+    const [, , exerciseInputs] = workoutTreeService.replaceTree.mock.calls[0];
+    expect(exerciseInputs[0].sets[0]).toMatchObject({
+      reps: 10, // round(avg(10, 9))
+      weight: 42.5, // avg(40, 45)
+      rir: 1, // min(3, 1)
+    });
+  });
+
+  it('rejects a bilateral exercise whose set carries per-side data', async () => {
+    const { service } = makeService(); // validateAccessible defaults exercise-1 to bilateral
+
+    const dto: CreateWorkoutDto = {
+      ...lateNight,
+      isFreeWorkout: true,
+      exercises: [
+        {
+          exerciseId: 'exercise-1',
+          order: 1,
+          sets: [
+            { order: 1, setType: SetType.WORKING, reps: 10, weight: 40, repsLeft: 10, repsRight: 10 },
+          ],
+        },
+      ],
+    } as CreateWorkoutDto;
+
+    await expect(service.create(dto, 'user-1')).rejects.toThrow(/bilateral/);
   });
 });
 
