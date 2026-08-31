@@ -43,3 +43,37 @@ export function setPerSide(set: PerSideSet): PerSideBreakdown | null {
     right: { reps: set.repsRight, weight: set.weightRight, rir: set.rirRight ?? null },
   };
 }
+
+export interface SideInput {
+  reps: number;
+  weight: number;
+  rir?: number | null;
+}
+
+/**
+ * The reps/weight/rir aggregate a unilateral set stores, derived from its two sides.
+ * Mirrors the server's write-path rule exactly (`deriveSetAggregates`, issue #100):
+ * `reps = round(avg(L, R))`, `weight = avg(L, R)`, `rir = min(L, R)` -- the limiting
+ * side is the one that decided whether another rep was possible.
+ *
+ * The client computes this only so the live logging card can show a consistent
+ * aggregate the instant a set is logged (volume, PR hints). The server recomputes
+ * and owns the persisted values; whatever the client sends for these three is
+ * discarded there.
+ *
+ * `rir` is `undefined` unless *both* sides carry one -- the server rejects a set
+ * with RIR on only one side, and the card mirrors RIR between the sides so the
+ * one-sided case never reaches here in practice.
+ */
+export function aggregateSetSides(
+  left: SideInput,
+  right: SideInput,
+): { reps: number; weight: number; rir?: number } {
+  const rir =
+    left.rir == null || right.rir == null ? undefined : Math.min(left.rir, right.rir);
+  return {
+    reps: Math.round((left.reps + right.reps) / 2),
+    weight: (left.weight + right.weight) / 2,
+    rir,
+  };
+}

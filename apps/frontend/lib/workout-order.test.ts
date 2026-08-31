@@ -122,6 +122,50 @@ describe('toExercisePayload', () => {
       completedAt: '2026-08-14T10:00:00.000Z',
     });
   });
+
+  it('emits the six per-side fields for a unilateral set that carries them', () => {
+    const uni = log('a', 1, [1]);
+    Object.assign(uni.sets[0], {
+      repsLeft: 10,
+      repsRight: 9,
+      weightLeft: 50,
+      weightRight: 40,
+      rirLeft: 1,
+      rirRight: 3,
+    });
+
+    expect(toExercisePayload([uni])[0].sets[0]).toMatchObject({
+      repsLeft: 10,
+      repsRight: 9,
+      weightLeft: 50,
+      weightRight: 40,
+      rirLeft: 1,
+      rirRight: 3,
+    });
+  });
+
+  it('drops per-side keys for a bilateral set so the payload carries none', () => {
+    const set = toExercisePayload([log('a', 1, [1])])[0].sets[0];
+
+    expect(set).not.toHaveProperty('repsLeft');
+    expect(set).not.toHaveProperty('weightRight');
+    expect(set).not.toHaveProperty('rirLeft');
+  });
+
+  it('emits reps/weight sides without RIR when neither side was graded', () => {
+    const uni = log('a', 1, [1]);
+    Object.assign(uni.sets[0], {
+      repsLeft: 10,
+      repsRight: 10,
+      weightLeft: 50,
+      weightRight: 50,
+    });
+
+    const set = toExercisePayload([uni])[0].sets[0];
+    expect(set).toMatchObject({ repsLeft: 10, weightRight: 50 });
+    expect(set).not.toHaveProperty('rirLeft');
+    expect(set).not.toHaveProperty('rirRight');
+  });
 });
 
 describe('reorderExerciseLogs', () => {

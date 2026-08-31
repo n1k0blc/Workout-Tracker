@@ -1,4 +1,4 @@
-import { ExerciseLog, SetType, WorkoutExerciseInput } from '@/types';
+import { ExerciseLog, SetLog, SetType, WorkoutExerciseInput } from '@/types';
 
 /**
  * Array position is authoritative for ordering; `order` on the wire only restates it.
@@ -66,10 +66,28 @@ export function toExercisePayload(exercises: ExerciseLog[]): WorkoutExerciseInpu
         reps: s.reps,
         weight: s.weight,
         rir: s.rir,
+        // Per-side values for unilateral sets (issue #102). Emitted only when the set
+        // carries them; the server derives reps/weight/rir from these and rejects a
+        // unilateral set that has none. Bilateral sets leave every field undefined and
+        // the key is dropped from the payload, which the server also requires.
+        ...perSideFields(s),
         rest: s.rest ?? 90,
         completedAt: s.completedAt,
       })),
     }));
 
   return withArrayPositionOrder(unordered);
+}
+
+type SideKey = 'repsLeft' | 'repsRight' | 'weightLeft' | 'weightRight' | 'rirLeft' | 'rirRight';
+const SIDE_KEYS: readonly SideKey[] = ['repsLeft', 'repsRight', 'weightLeft', 'weightRight', 'rirLeft', 'rirRight'];
+
+/** The six per-side fields of a set, with any `undefined` entry dropped so a bilateral
+ *  set contributes nothing to the payload. */
+function perSideFields(s: Pick<SetLog, SideKey>): Partial<Record<SideKey, number>> {
+  const out: Partial<Record<SideKey, number>> = {};
+  for (const key of SIDE_KEYS) {
+    if (s[key] != null) out[key] = s[key];
+  }
+  return out;
 }

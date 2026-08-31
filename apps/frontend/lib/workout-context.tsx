@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { Workout, WorkoutExercise, ExerciseLog, SetLog, PlannedSet, SetType, SaveAsTemplateMode, WorkoutExerciseInput, Exercise } from '@/types';
 import { apiClient } from '@/lib/api';
 import { reorderExerciseLogs, toExercisePayload } from '@/lib/workout-order';
+import { aggregateSetSides } from '@/lib/set-sides';
 import { replaceExerciseInList } from '@/lib/exercise-replace';
 import { toLocalDateString } from '@/lib/local-date';
 
@@ -25,6 +26,27 @@ interface CompletionEntry {
   exerciseLogId: string;
   setLogId: string;
   at: number; // epoch ms
+}
+
+/**
+ * A set being logged. For a unilateral exercise the card sends the six per-side fields
+ * (issue #102); `logSet` then derives `reps`/`weight`/`rir` from them with the same rule
+ * the server applies on save, so the local draft shows a consistent aggregate immediately.
+ * A bilateral exercise sends none of them and `reps`/`weight`/`rir` are used as given.
+ */
+export interface LogSetData {
+  setNumber: number;
+  reps: number;
+  weight: number;
+  rir?: number;
+  repsLeft?: number;
+  repsRight?: number;
+  weightLeft?: number;
+  weightRight?: number;
+  rirLeft?: number;
+  rirRight?: number;
+  setType?: SetType;
+  plannedRestAfterSet?: number;
 }
 
 export interface CompleteWorkoutOptions {
@@ -77,14 +99,7 @@ interface WorkoutContextType {
   reorderExercises: (exerciseIds: string[]) => Promise<void>;
   logSet: (
     exerciseLogId: string,
-    data: {
-      setNumber: number;
-      reps: number;
-      weight: number;
-      rir?: number;
-      setType?: SetType;
-      plannedRestAfterSet?: number;
-    }
+    data: LogSetData
   ) => Promise<void>;
   deleteSet: (setLogId: string) => Promise<void>;
   updateSet: (
@@ -672,20 +687,28 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
   const logSet = async (
     exerciseLogId: string,
-    data: {
-      setNumber: number;
-      reps: number;
-      weight: number;
-      rir?: number;
-      setType?: SetType;
-      plannedRestAfterSet?: number;
-    }
+    data: LogSetData
   ) => {
     if (!activeWorkout) return;
 
     const isLive = !isPastWorkout && !isHistoryEdit;
     const now = Date.now();
     const newSetId = generateLocalId('set');
+
+    // Unilateral sets carry both sides; the aggregates the rest of the app reads are
+    // derived from them here with the server's rule, so the draft is consistent before
+    // the save round-trips (issue #102). A bilateral set leaves `hasSides` false.
+    const hasSides =
+      data.repsLeft != null &&
+      data.repsRight != null &&
+      data.weightLeft != null &&
+      data.weightRight != null;
+    const aggregates = hasSides
+      ? aggregateSetSides(
+          { reps: data.repsLeft!, weight: data.weightLeft!, rir: data.rirLeft },
+          { reps: data.repsRight!, weight: data.weightRight!, rir: data.rirRight },
+        )
+      : { reps: data.reps, weight: data.weight, rir: data.rir };
 
     // Past-tracking/history-edit: no real elapsed time to measure -- always use the planned/90
     // fallback directly (§3.5). Live: leave rest undefined; it gets filled in when the NEXT set
@@ -694,9 +717,15 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       id: newSetId,
       setNumber: data.setNumber,
       setType: data.setType || SetType.WORKING,
-      reps: data.reps,
-      weight: data.weight,
-      rir: data.rir,
+      reps: aggregates.reps,
+      weight: aggregates.weight,
+      rir: aggregates.rir,
+      repsLeft: hasSides ? data.repsLeft : undefined,
+      repsRight: hasSides ? data.repsRight : undefined,
+      weightLeft: hasSides ? data.weightLeft : undefined,
+      weightRight: hasSides ? data.weightRight : undefined,
+      rirLeft: hasSides ? data.rirLeft : undefined,
+      rirRight: hasSides ? data.rirRight : undefined,
       completedAt: new Date(now).toISOString(),
       rest: isLive ? undefined : (data.plannedRestAfterSet ?? 90),
     };
