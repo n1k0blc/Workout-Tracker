@@ -90,6 +90,10 @@ export function ExerciseEditorDialog({
 }: ExerciseEditorDialogProps) {
   const isEditMode = !!exercise && !readonly;
   const isViewMode = !!exercise && readonly;
+  // An exercise already referenced by a set can't switch between unilateral and
+  // bilateral -- that would be a different exercise (issue #98). Lock the toggle
+  // and show why, in both edit and view mode, instead of only failing on save.
+  const unilateralLocked = !!exercise?.inUse;
 
   const [name, setName] = useState('');
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup>(MuscleGroup.CHEST);
@@ -271,18 +275,26 @@ export function ExerciseEditorDialog({
             </div>
 
             <div className="flex flex-wrap gap-x-6 gap-y-2 pt-1">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="isUnilateral"
-                  checked={isUnilateral}
-                  onChange={(e) => setIsUnilateral(e.target.checked)}
-                  disabled={isViewMode}
-                  className="h-4 w-4 accent-primary disabled:opacity-60"
-                />
-                <Label htmlFor="isUnilateral" className="text-sm cursor-pointer">
-                  Unilateral
-                </Label>
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="isUnilateral"
+                    checked={isUnilateral}
+                    onChange={(e) => setIsUnilateral(e.target.checked)}
+                    disabled={isViewMode || unilateralLocked}
+                    className="h-4 w-4 accent-primary disabled:opacity-60"
+                  />
+                  <Label htmlFor="isUnilateral" className="text-sm cursor-pointer">
+                    Unilateral
+                  </Label>
+                </div>
+                {unilateralLocked && (
+                  <p className="text-xs text-muted-foreground max-w-[16rem]">
+                    Wird bereits in Sätzen verwendet – nicht mehr änderbar. Lege dafür
+                    eine neue Übung an.
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <input

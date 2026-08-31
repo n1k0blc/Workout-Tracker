@@ -42,12 +42,13 @@ type ExerciseRow = {
   deletedAt: Date | null;
 } & MusclePercentages;
 
-function toDto(exercise: ExerciseRow): ExerciseDto {
+function toDto(exercise: ExerciseRow, inUse: boolean): ExerciseDto {
   const { deletedAt: _deletedAt, ...rest } = exercise;
   return {
     ...rest,
     userId: rest.userId ?? undefined,
     primaryMuscle: derivePrimaryMuscle(exercise),
+    inUse,
   } as ExerciseDto;
 }
 
@@ -78,6 +79,27 @@ export class ExercisesService {
     if (uniqueIds.some((id) => !accessibleIds.has(id))) {
       throw new NotFoundException('One or more exercises not found');
     }
+  }
+
+  /**
+   * Of the given ids, those referenced by at least one WorkoutSet -- across every
+   * workout kind (performed, template, blueprint; they share the table). Gates the
+   * `isUnilateral` toggle: an exercise that changed shape is a different exercise
+   * (issue #98/#65).
+   */
+  private async findInUseIds(exerciseIds: string[]): Promise<Set<string>> {
+    if (exerciseIds.length === 0) return new Set();
+    const rows = await this.prisma.workoutExercise.findMany({
+      where: { exerciseId: { in: exerciseIds }, sets: { some: {} } },
+      select: { exerciseId: true },
+      distinct: ['exerciseId'],
+    });
+    return new Set(rows.map((r) => r.exerciseId));
+  }
+
+  /** Single-id form of {@link findInUseIds} -- shares its predicate so the two can't drift. */
+  private async isInUse(exerciseId: string): Promise<boolean> {
+    return (await this.findInUseIds([exerciseId])).has(exerciseId);
   }
 
   /**
@@ -155,7 +177,10 @@ export class ExercisesService {
       orderBy: [{ isCustom: 'asc' }, { name: 'asc' }],
     });
 
-    const dtos = exercises.map((e) => toDto(e as ExerciseRow));
+    const inUseIds = await this.findInUseIds(exercises.map((e) => e.id));
+    const dtos = exercises.map((e) =>
+      toDto(e as ExerciseRow, inUseIds.has(e.id)),
+    );
     return primaryMuscle ? dtos.filter((e) => e.primaryMuscle === primaryMuscle) : dtos;
   }
 
@@ -174,7 +199,7 @@ export class ExercisesService {
       throw new NotFoundException('Exercise not found');
     }
 
-    return toDto(exercise as ExerciseRow);
+    return toDto(exercise as ExerciseRow, await this.isInUse(id));
   }
 
   async create(
@@ -215,7 +240,7 @@ export class ExercisesService {
       select: EXERCISE_SELECT,
     });
 
-    return toDto(exercise as ExerciseRow);
+    return toDto(exercise as ExerciseRow, false);
   }
 
   async delete(id: string, userId: string): Promise<void> {
@@ -260,6 +285,18 @@ export class ExercisesService {
       throw new ConflictException('System exercises cannot be modified');
     }
 
+    const inUse = await this.isInUse(id);
+
+    if (
+      updateDto.isUnilateral !== undefined &&
+      updateDto.isUnilateral !== exercise.isUnilateral &&
+      inUse
+    ) {
+      throw new ConflictException(
+        'Diese Übung wird bereits in Sätzen verwendet – unilateral lässt sich nicht mehr ändern. Lege dafür eine neue Übung an.',
+      );
+    }
+
     const percentages = this.validateAndNormalizeMusclePercentages(updateDto);
 
     const updated = await this.prisma.exercise.update({
@@ -274,6 +311,6 @@ export class ExercisesService {
       select: EXERCISE_SELECT,
     });
 
-    return toDto(updated as ExerciseRow);
+    return toDto(updated as ExerciseRow, inUse);
   }
 }

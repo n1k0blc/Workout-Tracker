@@ -75,6 +75,9 @@ export interface Exercise {
   isDoubleWeight: boolean;
   isCustom: boolean;
   userId?: string;
+  // True when any WorkoutSet references this exercise (any workout kind). Locks the
+  // isUnilateral toggle in the editor -- see issue #98.
+  inUse: boolean;
   // Muscle group distribution percentages
   abdomenPercent: number;
   latissimusPercent: number;
