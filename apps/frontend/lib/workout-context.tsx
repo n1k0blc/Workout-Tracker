@@ -391,7 +391,27 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
   /** Builds the local draft's ExerciseLog[] from a blueprint/template exercise tree. */
   const buildExerciseLogsFromTree = (
-    exercises: { exerciseId: string; exerciseName: string; isUnilateral?: boolean; isDoubleWeight?: boolean; order: number; sets: { order: number; setType: SetType; reps: number; weight: number; rir?: number; rest?: number }[] }[],
+    exercises: {
+      exerciseId: string;
+      exerciseName: string;
+      isUnilateral?: boolean;
+      isDoubleWeight?: boolean;
+      order: number;
+      sets: {
+        order: number;
+        setType: SetType;
+        reps: number;
+        weight: number;
+        rir?: number;
+        repsLeft?: number;
+        repsRight?: number;
+        weightLeft?: number;
+        weightRight?: number;
+        rirLeft?: number;
+        rirRight?: number;
+        rest?: number;
+      }[];
+    }[],
   ): ExerciseLog[] => {
     return exercises.map((ex) => ({
       id: generateLocalId('ex'),
@@ -408,6 +428,14 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         reps: s.reps,
         weight: s.weight,
         rir: s.rir ?? 0,
+        // Per-side targets so a workout started from an asymmetric plan prefills both sides,
+        // and a left-to-right swipe logs both (issue #103).
+        repsLeft: s.repsLeft ?? undefined,
+        repsRight: s.repsRight ?? undefined,
+        weightLeft: s.weightLeft ?? undefined,
+        weightRight: s.weightRight ?? undefined,
+        rirLeft: s.rirLeft ?? undefined,
+        rirRight: s.rirRight ?? undefined,
         rest: s.rest ?? 90,
       })),
     }));

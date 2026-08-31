@@ -166,6 +166,16 @@ export interface PlannedSet {
   reps: number;
   weight: number;
   rir: number;
+  // Per-side targets for a unilateral exercise's planned set (issue #103). Present once a
+  // plan has been overwritten from a performed workout (or edited per side); absent on
+  // legacy plans backfilled symmetrically, where reps/weight/rir carry both sides. The
+  // aggregates stay in sync with the sides -- reps=round(avg), weight=avg, rir=min.
+  repsLeft?: number;
+  repsRight?: number;
+  weightLeft?: number;
+  weightRight?: number;
+  rirLeft?: number;
+  rirRight?: number;
   rest: number;
 }
 

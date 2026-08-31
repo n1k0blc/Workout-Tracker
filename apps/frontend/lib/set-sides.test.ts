@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateSetSides, setPerSide } from './set-sides';
+import { aggregateSetSides, plannedSideFields, setPerSide } from './set-sides';
 
 /**
  * Coverage for the per-side breakdown helper (issue #101). It gates whether a
@@ -84,5 +84,56 @@ describe('aggregateSetSides', () => {
 
   it('omits rir when only one side carries one', () => {
     expect(aggregateSetSides({ reps: 10, weight: 50, rir: 2 }, { reps: 10, weight: 50 }).rir).toBeUndefined();
+  });
+});
+
+/**
+ * The per-side fields a plan's set sends on save (issue #103). A bilateral exercise sends
+ * nothing; a unilateral one always sends a complete pair, falling back to the aggregate so a
+ * plan created before per-side targets existed still saves as a valid unilateral tree.
+ */
+describe('plannedSideFields', () => {
+  it('sends nothing for a bilateral exercise', () => {
+    expect(plannedSideFields({ reps: 10, weight: 50, rir: 2 }, false)).toEqual({});
+  });
+
+  it('fills all six sides from the aggregate for a legacy plan with no stored sides', () => {
+    expect(plannedSideFields({ reps: 10, weight: 50, rir: 2 }, true)).toEqual({
+      repsLeft: 10,
+      repsRight: 10,
+      weightLeft: 50,
+      weightRight: 50,
+      rirLeft: 2,
+      rirRight: 2,
+    });
+  });
+
+  it('keeps stored asymmetric sides as-is', () => {
+    expect(
+      plannedSideFields(
+        { reps: 10, weight: 45, rir: 1, repsLeft: 10, repsRight: 9, weightLeft: 50, weightRight: 40, rirLeft: 1, rirRight: 3 },
+        true,
+      ),
+    ).toEqual({
+      repsLeft: 10,
+      repsRight: 9,
+      weightLeft: 50,
+      weightRight: 40,
+      rirLeft: 1,
+      rirRight: 3,
+    });
+  });
+
+  it('omits rir on both sides when the set carries none anywhere', () => {
+    const out = plannedSideFields({ reps: 10, weight: 50 }, true);
+    expect(out).not.toHaveProperty('rirLeft');
+    expect(out).not.toHaveProperty('rirRight');
+  });
+
+  it('mirrors a one-sided rir so the payload is never half-populated', () => {
+    expect(plannedSideFields({ reps: 10, weight: 50, repsLeft: 10, repsRight: 10, weightLeft: 50, weightRight: 50, rirLeft: 2 }, true)).toMatchObject({
+      rirLeft: 2,
+      rirRight: 2,
+    });
   });
 });

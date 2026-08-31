@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { ExerciseLog, SetLog, SetType, Exercise } from '@/types';
 import { useWorkout } from '@/lib/workout-context';
 import { getSetIndicatorSlots, resolveSetRows } from '@/lib/set-slots';
-import { setPerSide, type PerSideBreakdown } from '@/lib/set-sides';
+import { setPerSide, aggregateSetSides, type PerSideBreakdown } from '@/lib/set-sides';
 import type { LogSetData } from '@/lib/workout-context';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -75,7 +75,24 @@ interface ExerciseCardProps {
    * is logged. Callers that still fabricate a logged twin (the blueprint editors) use
    * `onUpdateSet` and are unaffected.
    */
-  onUpdatePlannedSet?: (exerciseId: string, setNumber: number, data: { reps?: number; weight?: number; rir?: number; setType?: SetType }) => void;
+  onUpdatePlannedSet?: (
+    exerciseId: string,
+    setNumber: number,
+    data: {
+      reps?: number;
+      weight?: number;
+      rir?: number;
+      setType?: SetType;
+      // Per-side targets for a unilateral exercise's planned set (issue #103). Sent together
+      // with the re-derived reps/weight/rir aggregate so the plan row stays consistent.
+      repsLeft?: number;
+      repsRight?: number;
+      weightLeft?: number;
+      weightRight?: number;
+      rirLeft?: number;
+      rirRight?: number;
+    },
+  ) => void;
 
   /** Pure view mode: everything read-only, no actions, no editing of values/types/sets */
   readonly?: boolean;
@@ -163,10 +180,14 @@ export default function ExerciseCard({
     ? 'grid-cols-[auto_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)_auto]'
     : 'grid-cols-[auto_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)]';
 
-  // Read-only unilateral cards render each set as an L/R breakdown rather than the
-  // rounded aggregate (issue #101); the column header collapses to match.
+  // Read-only unilateral cards render each set as an L/R breakdown rather than the rounded
+  // aggregate (issue #101); the column header collapses to match. Covers logged sets and
+  // planned rows (the system-template view, the start-screen preview, the cycle review step
+  // -- issue #103); a legacy row with no stored sides falls back to a symmetric breakdown.
   const showPerSideRows =
-    isReadonly && !!exercise.isUnilateral && (exercise.sets || []).some((s) => setPerSide(s));
+    isReadonly &&
+    !!exercise.isUnilateral &&
+    ((exercise.sets || []).length > 0 || (exercise.plannedSets || []).length > 0);
 
   // Local drafts for additional/extra sets (free workouts or sets beyond planned).
   // These are UI-only (not persisted in context) – backend only cares about final logs.
@@ -181,10 +202,18 @@ export default function ExerciseCard({
 
   const initialEditCommitDone = useRef(false);
 
-  // Per-side logging for unilateral exercises (issue #102). Active-workout logging only:
-  // the history editor (#105) and the plan editors (#103) round-trip / enter sides in
-  // their own tickets, and read-only surfaces already render them (#101).
+  // A caller that writes planned sets back itself (the plan editors: template, blueprint,
+  // cycle-day) rather than materializing them into logged sets.
+  const ownsPlan = !!onUpdatePlannedSet;
+
+  // Per-side entry for unilateral exercises: two labelled sub-rows reusing the weight/reps/RIR
+  // columns. Active-workout logging (issue #102) and the plan editors (issue #103) both use it;
+  // the history editor (#105) keeps its aggregate inputs, and read-only surfaces render a
+  // breakdown (#101). `perSidePlanEntry` writes straight through `onUpdatePlannedSet`;
+  // `perSideEntry` buffers a draft that is aggregated on log.
   const perSideEntry = !!exercise.isUnilateral && !isReadonly && !isHistoryEdit && effectiveAllowLogging;
+  const perSidePlanEntry = !!exercise.isUnilateral && !isReadonly && ownsPlan;
+  const perSideCells = perSideEntry || perSidePlanEntry;
 
   // Which side renders first, and its label. Per-exercise, session-only, not persisted --
   // for people who start with the right. It never moves data: the sides stay in named fields.
@@ -198,37 +227,107 @@ export default function ExerciseCard({
   type SetSideDraft = { left: SideDraft; right: SideDraft; trailingTouched: boolean };
   const [sideEdits, setSideEdits] = useState<{ [setNumber: number]: SetSideDraft }>({});
 
-  // A fresh draft for a set: a planned set seeds both sides from its (symmetric) target
-  // so it still logs with one tick; an additional set starts empty.
+  // A fresh draft for a set. A planned set seeds each side from its per-side target when it
+  // carries one (issue #103) -- so a workout started from an asymmetric plan prefills both
+  // sides distinctly, and a left-to-right swipe logs them -- otherwise from the symmetric
+  // aggregate. An additional set starts empty. `trailingTouched` starts set only when the
+  // plan's two sides actually differ, so editing the leading side keeps auto-mirroring for a
+  // symmetric plan (the #97 backfill fills equal sides) but does not clobber a real imbalance.
   const seedSideDraft = useCallback((setNumber: number): SetSideDraft => {
     const planned = exercise.plannedSets?.find((ps) => ps.order === setNumber);
-    const seed: SideDraft = planned
-      ? {
-          weight: planned.weight?.toString() ?? '',
-          reps: planned.reps?.toString() ?? '',
-          rir: planned.rir != null ? planned.rir.toString() : '',
-        }
-      : { weight: '', reps: '', rir: '' };
-    return { left: { ...seed }, right: { ...seed }, trailingTouched: false };
+    if (!planned) {
+      return { left: { weight: '', reps: '', rir: '' }, right: { weight: '', reps: '', rir: '' }, trailingTouched: false };
+    }
+    const sides = setPerSide(planned);
+    const str = (n: number | null | undefined) => (n != null ? n.toString() : '');
+    const sideDraft = (s: { reps: number; weight: number; rir: number | null } | undefined): SideDraft => ({
+      weight: str(s ? s.weight : planned.weight),
+      reps: str(s ? s.reps : planned.reps),
+      rir: str(s ? s.rir : planned.rir),
+    });
+    const sidesDiffer =
+      sides != null &&
+      (sides.left.reps !== sides.right.reps ||
+        sides.left.weight !== sides.right.weight ||
+        sides.left.rir !== sides.right.rir);
+    return {
+      left: sideDraft(sides?.left),
+      right: sideDraft(sides?.right),
+      trailingTouched: sidesDiffer,
+    };
   }, [exercise.plannedSets]);
 
   const getSideDraft = (setNumber: number): SetSideDraft => sideEdits[setNumber] ?? seedSideDraft(setNumber);
 
   const handleSideChange = (setNumber: number, side: 'left' | 'right', field: keyof SideDraft, value: string) => {
-    setSideEdits((prev) => {
-      const base = prev[setNumber] ?? seedSideDraft(setNumber);
-      const isTrailing = side === trailingSide;
-      const next: SetSideDraft = {
-        ...base,
-        [side]: { ...base[side], [field]: value },
-        trailingTouched: base.trailingTouched || isTrailing,
-      };
-      // Auto-mirror: a value typed on the leading side ghost-fills the trailing side
-      // until the trailing side is explicitly edited.
-      if (!isTrailing && !next.trailingTouched) {
-        next[trailingSide] = { ...next[trailingSide], [field]: value };
-      }
-      return { ...prev, [setNumber]: next };
+    // Compute the next draft outside the state updater so it is available synchronously for
+    // the plan write-back below -- capturing it *inside* the updater only works while React
+    // runs updaters eagerly, which it does not once another update is already queued.
+    const base = getSideDraft(setNumber);
+    const isTrailing = side === trailingSide;
+    const next: SetSideDraft = {
+      ...base,
+      [side]: { ...base[side], [field]: value },
+      trailingTouched: base.trailingTouched || isTrailing,
+    };
+    // Auto-mirror: a value typed on the leading side ghost-fills the trailing side
+    // until the trailing side is explicitly edited.
+    if (!isTrailing && !next.trailingTouched) {
+      next[trailingSide] = { ...next[trailingSide], [field]: value };
+    }
+    setSideEdits((prev) => ({ ...prev, [setNumber]: next }));
+    // Plan editors own the plan: write the sides (and the re-derived aggregate) straight back
+    // rather than waiting for a log that never happens (issue #103).
+    if (perSidePlanEntry) {
+      commitPlannedSides(setNumber, next);
+    }
+  };
+
+  // Push a per-side draft to the plan owner: the six side fields plus the reps/weight/rir
+  // aggregate, re-derived so the row stays internally consistent (mirrors the server's rule).
+  const commitPlannedSides = (setNumber: number, draft: SetSideDraft) => {
+    if (!onUpdatePlannedSet) return;
+    const planned = exercise.plannedSets?.find((ps) => ps.order === setNumber);
+    const numOr = (raw: string, fallback: number) => {
+      const n = parseFloat(raw);
+      return raw.trim() !== '' && !Number.isNaN(n) ? n : fallback;
+    };
+    const intOr = (raw: string, fallback: number) => {
+      const n = parseInt(raw);
+      return raw.trim() !== '' && !Number.isNaN(n) ? n : fallback;
+    };
+    const weightLeft = numOr(draft.left.weight, planned?.weight ?? 0);
+    const weightRight = numOr(draft.right.weight, planned?.weight ?? 0);
+    const repsLeft = intOr(draft.left.reps, planned?.reps ?? 0);
+    const repsRight = intOr(draft.right.reps, planned?.reps ?? 0);
+    // RIR on a plan is a single target: if one side is cleared while the other still carries
+    // a value, fill it from that side rather than dropping to 0 (train-to-failure) and wiping
+    // the value the user can still see. Only when *both* sides are empty is RIR omitted, and
+    // the aggregate then falls back to the set's existing RIR rather than 0.
+    const parseRir = (raw: string) => {
+      if (raw.trim() === '') return null;
+      const n = parseInt(raw);
+      return Number.isNaN(n) ? null : n;
+    };
+    let rirLeft = parseRir(draft.left.rir);
+    let rirRight = parseRir(draft.right.rir);
+    if (rirLeft == null && rirRight != null) rirLeft = rirRight;
+    if (rirRight == null && rirLeft != null) rirRight = rirLeft;
+    const hasRir = rirLeft != null; // rirRight != null too, after the fill above
+    const agg = aggregateSetSides(
+      { reps: repsLeft, weight: weightLeft, rir: rirLeft },
+      { reps: repsRight, weight: weightRight, rir: rirRight },
+    );
+    onUpdatePlannedSet(exercise.id, setNumber, {
+      repsLeft,
+      repsRight,
+      weightLeft,
+      weightRight,
+      rirLeft: hasRir ? (rirLeft as number) : undefined,
+      rirRight: hasRir ? (rirRight as number) : undefined,
+      reps: agg.reps || 0,
+      weight: agg.weight || 0,
+      rir: hasRir ? (agg.rir ?? 0) : (planned?.rir ?? 0),
     });
   };
 
@@ -468,7 +567,6 @@ export default function ExerciseCard({
   // the `getLoggedSet` check below always short-circuited. That twin is gone, so without this
   // guard, merely *opening* a system template while a workout draft exists would log its
   // planned sets into that draft.
-  const ownsPlan = !!onUpdatePlannedSet;
   const isCompletedHijack = isHistoryEdit;
   useEffect(() => {
     if (mode === 'edit' && !ownsPlan && !isReadonly && hasPlannedSets && !initialEditCommitDone.current && !isCompletedHijack) {
@@ -569,6 +667,7 @@ export default function ExerciseCard({
         // and a plan-owning caller has already been told about each change as it happened.
         if (ownsPlan) {
           setEditValues({});
+          setSideEdits({});
         }
         setAdditionalSetNumbers(prev => prev.filter(n => n !== setNumber));
         setSkippedPlannedSetNumbers(prev => {
@@ -705,7 +804,7 @@ export default function ExerciseCard({
               onChange={(e) => handleSideChange(setNumber, side, 'weight', e.target.value)}
               placeholder="0"
               className="h-7 text-base md:text-sm tabular-nums"
-              disabled={loading}
+              disabled={loading || isReadonly}
             />
             <Input
               type="number"
@@ -714,7 +813,7 @@ export default function ExerciseCard({
               onChange={(e) => handleSideChange(setNumber, side, 'reps', e.target.value)}
               placeholder="0"
               className="h-7 text-base md:text-sm tabular-nums"
-              disabled={loading}
+              disabled={loading || isReadonly}
             />
             <Input
               type="number"
@@ -723,7 +822,7 @@ export default function ExerciseCard({
               onChange={(e) => handleSideChange(setNumber, side, 'rir', e.target.value)}
               placeholder=""
               className="h-7 text-base md:text-sm tabular-nums"
-              disabled={loading}
+              disabled={loading || isReadonly}
             />
           </div>
         ))}
@@ -753,6 +852,13 @@ export default function ExerciseCard({
       })}
     </div>
   );
+
+  // A read-only L/R view for a unilateral set that carries no stored per-side data (a plan
+  // predating #103, or a set predating the #97 backfill): both sides read the aggregate.
+  const symmetricBreakdown = (s: { reps: number; weight: number; rir?: number | null }): PerSideBreakdown => ({
+    left: { reps: s.reps, weight: s.weight, rir: s.rir ?? null },
+    right: { reps: s.reps, weight: s.weight, rir: s.rir ?? null },
+  });
 
   // The ✓ for an unlogged set. For a unilateral set it stays disabled -- with the reason
   // shown in the row and on hover -- until both sides carry values (issue #102).
@@ -845,7 +951,10 @@ export default function ExerciseCard({
     // would otherwise render as "× 10" and hide the imbalance. Read-only surfaces (#101)
     // and the active card once the set is logged (#102) both use this; the history editor
     // keeps its aggregate inputs until #105 gives it a per-side round-trip.
-    const perSide = (perSideEntry || isReadonly) && exercise.isUnilateral ? setPerSide(set) : null;
+    const perSide =
+      (perSideEntry || isReadonly) && exercise.isUnilateral
+        ? setPerSide(set) ?? (isReadonly ? symmetricBreakdown(set) : null)
+        : null;
 
     const swipeKey = set.id;
     const swipeOffset = activeSwipe && activeSwipe.key === swipeKey ? activeSwipe.offset : 0;
@@ -991,9 +1100,9 @@ export default function ExerciseCard({
             )}
           </div>
           <div className="flex items-center gap-1 mt-0.5">
-            {/* Swap which side is entered first (issue #102). Per-exercise, session-only,
+            {/* Swap which side is entered first (issue #102/#103). Per-exercise, session-only,
                 not persisted -- it flips the display order, the sides stay in named fields. */}
-            {perSideEntry && (
+            {perSideCells && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -1138,7 +1247,9 @@ export default function ExerciseCard({
 
                     {perSideEntry && plannedRowPerSide ? (
                       renderLoggedSideCells(plannedRowPerSide)
-                    ) : perSideEntry && !loggedSet ? (
+                    ) : isReadonly && exercise.isUnilateral && !loggedSet ? (
+                      renderLoggedSideCells(setPerSide(plannedSet) ?? symmetricBreakdown(plannedSet))
+                    ) : perSideCells && !loggedSet ? (
                       renderPerSideEntryCells(setNumber)
                     ) : (
                       <>

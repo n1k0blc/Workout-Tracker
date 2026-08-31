@@ -18,6 +18,14 @@ export interface BlueprintSetData {
   reps: number;
   weight: number;
   rir: number;
+  // Per-side targets for a unilateral exercise's planned set (issue #103). Carried straight
+  // through to the create-cycle payload; absent for bilateral exercises.
+  repsLeft?: number;
+  repsRight?: number;
+  weightLeft?: number;
+  weightRight?: number;
+  rirLeft?: number;
+  rirRight?: number;
   rest: number;
 }
 

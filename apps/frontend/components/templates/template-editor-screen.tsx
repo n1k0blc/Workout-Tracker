@@ -15,6 +15,7 @@ import ExerciseSelectionModal from '@/components/workout/exercise-selection-moda
 import { IconChevronLeft, IconPlus } from '@tabler/icons-react';
 import { replaceExerciseInList } from '@/lib/exercise-replace';
 import { withArrayPositionOrder } from '@/lib/workout-order';
+import { plannedSideFields } from '@/lib/set-sides';
 import { addPlannedSet, removePlannedSet, updatePlannedSet } from '@/lib/planned-sets';
 import {
   DndContext,
@@ -145,6 +146,14 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
             reps: s.reps ?? 0,
             weight: s.weight ?? 0,
             rir: s.rir ?? 0,
+            // Per-side targets survive from an overwrite-from-workout (issue #103); absent on
+            // legacy symmetric plans, where the editor seeds both sides from the aggregate.
+            repsLeft: s.repsLeft ?? undefined,
+            repsRight: s.repsRight ?? undefined,
+            weightLeft: s.weightLeft ?? undefined,
+            weightRight: s.weightRight ?? undefined,
+            rirLeft: s.rirLeft ?? undefined,
+            rirRight: s.rirRight ?? undefined,
             rest: s.rest ?? 90,
           })),
         }));
@@ -202,6 +211,9 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
           reps: s.reps ?? 0,
           weight: s.weight ?? 0,
           rir: s.rir ?? 0,
+          // Per-side targets for unilateral exercises (issue #103); dropped for bilateral
+          // sets, which the write path requires.
+          ...plannedSideFields(s, ex.isUnilateral),
           rest: s.rest ?? 90,
         })),
       })));
@@ -359,7 +371,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
                           onAddSet={(id) => {
                             setExercises(prev => prev.map(e =>
                               e.id === id
-                                ? { ...e, plannedSets: addPlannedSet(e.plannedSets || []) }
+                                ? { ...e, plannedSets: addPlannedSet(e.plannedSets || [], { isUnilateral: e.isUnilateral }) }
                                 : e
                             ));
                           }}

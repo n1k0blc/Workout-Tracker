@@ -43,15 +43,6 @@ export default function ReviewStep({
   const mapDayExercisesToLogs = (dayExercises: any[]): ExerciseLog[] => { // eslint-disable-line @typescript-eslint/no-explicit-any
     return (dayExercises || []).map((ex: any, idx: number) => { // eslint-disable-line @typescript-eslint/no-explicit-any
       const exercise = exercises.find((e) => e.id === ex.exerciseId);
-      const sets = (ex.sets || []).map((s: any, sIdx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
-        id: s.id || `set-${ex.exerciseId}-${sIdx}`,
-        setNumber: s.order || sIdx + 1,
-        setType: s.setType,
-        reps: s.reps ?? 0,
-        weight: s.weight ?? 0,
-        rir: s.rir ?? 0,
-        completedAt: new Date().toISOString(),
-      }));
       const plannedSets = (ex.sets || []).map((s: any, sIdx: number) => ({ // eslint-disable-line @typescript-eslint/no-explicit-any
         id: `planned-${ex.exerciseId}-${sIdx}`,
         order: s.order || sIdx + 1,
@@ -59,14 +50,22 @@ export default function ReviewStep({
         reps: s.reps ?? 0,
         weight: s.weight ?? 0,
         rir: s.rir ?? 0,
+        repsLeft: s.repsLeft ?? undefined,
+        repsRight: s.repsRight ?? undefined,
+        weightLeft: s.weightLeft ?? undefined,
+        weightRight: s.weightRight ?? undefined,
+        rirLeft: s.rirLeft ?? undefined,
+        rirRight: s.rirRight ?? undefined,
         rest: s.rest ?? 90,
       }));
       return {
         id: ex.id || `ex-${ex.exerciseId}-${idx}`,
         exerciseId: ex.exerciseId,
         exerciseName: exercise?.name || 'Übung lädt...',
+        isUnilateral: ex.isUnilateral ?? exercise?.isUnilateral ?? false,
+        isDoubleWeight: ex.isDoubleWeight ?? exercise?.isDoubleWeight ?? false,
         order: ex.order || idx + 1,
-        sets,
+        sets: [],
         plannedSets,
       } as ExerciseLog;
     });

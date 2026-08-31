@@ -1,4 +1,4 @@
-import { ExerciseLog, SetLog, SetType, WorkoutExerciseInput } from '@/types';
+import { ExerciseLog, SetType, WorkoutExerciseInput } from '@/types';
 
 /**
  * Array position is authoritative for ordering; `order` on the wire only restates it.
@@ -82,12 +82,16 @@ export function toExercisePayload(exercises: ExerciseLog[]): WorkoutExerciseInpu
 type SideKey = 'repsLeft' | 'repsRight' | 'weightLeft' | 'weightRight' | 'rirLeft' | 'rirRight';
 const SIDE_KEYS: readonly SideKey[] = ['repsLeft', 'repsRight', 'weightLeft', 'weightRight', 'rirLeft', 'rirRight'];
 
-/** The six per-side fields of a set, with any `undefined` entry dropped so a bilateral
- *  set contributes nothing to the payload. */
-function perSideFields(s: Pick<SetLog, SideKey>): Partial<Record<SideKey, number>> {
+/** The six per-side fields of a set, with any `null`/`undefined` entry dropped so a
+ *  bilateral set contributes nothing to the payload. Used by the workout save path; the
+ *  plan editors use `plannedSideFields` (set-sides.ts), which adds an aggregate fallback. */
+function perSideFields(
+  s: Partial<Record<SideKey, number | null | undefined>>,
+): Partial<Record<SideKey, number>> {
   const out: Partial<Record<SideKey, number>> = {};
   for (const key of SIDE_KEYS) {
-    if (s[key] != null) out[key] = s[key];
+    const v = s[key];
+    if (v != null) out[key] = v;
   }
   return out;
 }

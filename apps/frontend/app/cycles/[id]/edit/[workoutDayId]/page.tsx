@@ -48,6 +48,9 @@ import { IconPlus } from '@tabler/icons-react';
 import type { ExerciseLog, WorkoutDay } from '@/types';
 import { replaceExerciseInList } from '@/lib/exercise-replace';
 import { withArrayPositionOrder } from '@/lib/workout-order';
+import { plannedSideFields } from '@/lib/set-sides';
+import { addPlannedSet } from '@/lib/planned-sets';
+import type { PlannedSet } from '@/types';
 import { WEEKDAY_NAMES } from '@/lib/weekday';
 
 export default function EditBlueprintPage() {
@@ -125,6 +128,12 @@ export default function EditBlueprintPage() {
   const handleAddExercise = (exerciseId: string, exercise?: Exercise) => {
     if (!exercise) return;
 
+    const baseSets = [
+      { id: `set-new-${Date.now()}`, order: 1, setType: SetType.WARMUP, reps: 10, weight: 20, rir: 3, rest: 90 },
+      { id: `set-new-${Date.now()}-1`, order: 2, setType: SetType.WORKING, reps: 10, weight: 40, rir: 2, rest: 90 },
+      { id: `set-new-${Date.now()}-2`, order: 3, setType: SetType.WORKING, reps: 10, weight: 40, rir: 2, rest: 90 },
+    ];
+
     const newExercise: WorkoutExercise = {
       id: `new-${Date.now()}`, // Temporary ID
       exerciseId: exercise.id,
@@ -132,35 +141,20 @@ export default function EditBlueprintPage() {
       isUnilateral: exercise.isUnilateral,
       isDoubleWeight: exercise.isDoubleWeight,
       order: exercises.length + 1,
-      sets: [
-        {
-          id: `set-new-${Date.now()}`,
-          order: 1,
-          setType: SetType.WARMUP,
-          reps: 10,
-          weight: 20,
-          rir: 3,
-          rest: 90,
-        },
-        {
-          id: `set-new-${Date.now()}-1`,
-          order: 2,
-          setType: SetType.WORKING,
-          reps: 10,
-          weight: 40,
-          rir: 2,
-          rest: 90,
-        },
-        {
-          id: `set-new-${Date.now()}-2`,
-          order: 3,
-          setType: SetType.WORKING,
-          reps: 10,
-          weight: 40,
-          rir: 2,
-          rest: 90,
-        },
-      ],
+      // A unilateral exercise's planned sets carry both sides from the start (seeded
+      // symmetrically), so the save payload is a valid unilateral tree even if the user
+      // never opens the sides (issue #103).
+      sets: exercise.isUnilateral
+        ? baseSets.map((s) => ({
+            ...s,
+            repsLeft: s.reps,
+            repsRight: s.reps,
+            weightLeft: s.weight,
+            weightRight: s.weight,
+            rirLeft: s.rir,
+            rirRight: s.rir,
+          }))
+        : baseSets,
     };
     setExercises([...exercises, newExercise]);
     setNewlyAddedIds((prev) => new Set(prev).add(newExercise.id));
@@ -240,6 +234,7 @@ export default function EditBlueprintPage() {
             reps: set.reps,
             weight: set.weight,
             rir: set.rir,
+            ...plannedSideFields(set, ex.isUnilateral),
             rest: set.rest,
           })),
         }))),
@@ -291,6 +286,7 @@ export default function EditBlueprintPage() {
             reps: set.reps,
             weight: set.weight,
             rir: set.rir,
+            ...plannedSideFields(set, ex.isUnilateral),
             rest: set.rest,
           })),
         }))),
@@ -317,16 +313,10 @@ export default function EditBlueprintPage() {
     setShowExerciseModal(true);
   };
 
+  // A blueprint is a plan: `plannedSets` is the single representation the card edits, and
+  // `onUpdatePlannedSet` writes each change straight back to `exercises` (no fabricated
+  // logged twin). Unilateral exercises get the two-sub-row per-side layout (issue #103).
   const exerciseLogs: ExerciseLog[] = exercises.map((ex) => {
-    const sets = ex.sets.map((s) => ({
-      id: s.id,
-      setNumber: s.order,
-      setType: s.setType,
-      reps: s.reps,
-      weight: s.weight,
-      rir: s.rir,
-      completedAt: new Date().toISOString(),
-    }));
     const plannedSets = ex.sets.map((s) => ({
       id: s.id,
       order: s.order,
@@ -334,14 +324,22 @@ export default function EditBlueprintPage() {
       reps: s.reps,
       weight: s.weight,
       rir: s.rir ?? 0,
+      repsLeft: s.repsLeft ?? undefined,
+      repsRight: s.repsRight ?? undefined,
+      weightLeft: s.weightLeft ?? undefined,
+      weightRight: s.weightRight ?? undefined,
+      rirLeft: s.rirLeft ?? undefined,
+      rirRight: s.rirRight ?? undefined,
       rest: s.rest ?? 90,
     }));
     return {
       id: ex.id,
       exerciseId: ex.exerciseId,
       exerciseName: ex.exerciseName,
+      isUnilateral: ex.isUnilateral,
+      isDoubleWeight: ex.isDoubleWeight,
       order: ex.order,
-      sets,
+      sets: [],
       plannedSets,
     } as ExerciseLog;
   });
@@ -487,17 +485,12 @@ export default function EditBlueprintPage() {
                           onAddSet={() => {
                             const updated = exercises.map((ex) => {
                               if (ex.id !== log.id) return ex;
-                              const nextOrder = ex.sets.length + 1;
-                              const newSet = {
-                                id: `set-new-${Date.now()}`,
-                                order: nextOrder,
-                                setType: SetType.WORKING,
-                                reps: 10,
-                                weight: 20,
-                                rir: 2,
-                                rest: 90,
-                              };
-                              return { ...ex, sets: [...ex.sets, newSet] };
+                              // `addPlannedSet` seeds the new set from the previous one -- and
+                              // both sides of it for a unilateral exercise (issue #103).
+                              const seeded = addPlannedSet(ex.sets as unknown as PlannedSet[], {
+                                isUnilateral: ex.isUnilateral,
+                              });
+                              return { ...ex, sets: seeded as unknown as typeof ex.sets };
                             });
                             setExercises(updated);
                           }}
@@ -510,15 +503,12 @@ export default function EditBlueprintPage() {
                             });
                             setExercises(updated);
                           }}
-                          onUpdateSet={(exId, setId, data) => {
+                          onUpdatePlannedSet={(exId, setNumber, data) => {
                             const updated = exercises.map((ex) => {
                               if (ex.id !== exId) return ex;
-                              const updatedSets = ex.sets.map((s) => {
-                                if (s.id === setId) {
-                                  return { ...s, ...data };
-                                }
-                                return s;
-                              });
+                              const updatedSets = ex.sets.map((s) =>
+                                s.order === setNumber ? { ...s, ...data } : s,
+                              );
                               return { ...ex, sets: updatedSets };
                             });
                             setExercises(updated);

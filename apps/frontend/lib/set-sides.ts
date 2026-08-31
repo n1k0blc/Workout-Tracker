@@ -77,3 +77,51 @@ export function aggregateSetSides(
     rir,
   };
 }
+
+interface PlannedSetLikeSides {
+  reps: number;
+  weight: number;
+  rir?: number | null;
+  repsLeft?: number | null;
+  repsRight?: number | null;
+  weightLeft?: number | null;
+  weightRight?: number | null;
+  rirLeft?: number | null;
+  rirRight?: number | null;
+}
+
+type PlannedSideKey =
+  | 'repsLeft'
+  | 'repsRight'
+  | 'weightLeft'
+  | 'weightRight'
+  | 'rirLeft'
+  | 'rirRight';
+
+/**
+ * The per-side fields a plan's set (template / blueprint / cycle-day) sends on save.
+ *
+ * For a bilateral exercise: nothing -- the write path rejects a bilateral set that carries
+ * side data. For a unilateral one: all six sides, falling back to the aggregate for any that
+ * a legacy plan never stored, so the payload is always a valid unilateral tree even for a
+ * plan created before per-side targets existed (issue #103). RIR is emitted on both sides or
+ * neither, matching the server's "both or neither" rule.
+ */
+export function plannedSideFields(
+  s: PlannedSetLikeSides,
+  isUnilateral: boolean | undefined,
+): Partial<Record<PlannedSideKey, number>> {
+  if (!isUnilateral) return {};
+  const out: Partial<Record<PlannedSideKey, number>> = {
+    repsLeft: s.repsLeft ?? s.reps,
+    repsRight: s.repsRight ?? s.reps,
+    weightLeft: s.weightLeft ?? s.weight,
+    weightRight: s.weightRight ?? s.weight,
+  };
+  const rir = s.rirLeft ?? s.rirRight ?? s.rir;
+  if (rir != null) {
+    out.rirLeft = s.rirLeft ?? rir;
+    out.rirRight = s.rirRight ?? rir;
+  }
+  return out;
+}
