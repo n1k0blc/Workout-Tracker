@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { Workout, WorkoutExercise, ExerciseLog, SetLog, PlannedSet, SetType, SaveAsTemplateMode, WorkoutExerciseInput, Exercise } from '@/types';
 import { apiClient } from '@/lib/api';
-import { reorderExerciseLogs, toExercisePayload } from '@/lib/workout-order';
+import { applyAggregateEdit, buildExerciseLogsForEdit, reorderExerciseLogs, toExercisePayload } from '@/lib/workout-order';
 import { aggregateSetSides } from '@/lib/set-sides';
 import { replaceExerciseInList } from '@/lib/exercise-replace';
 import { toLocalDateString } from '@/lib/local-date';
@@ -532,23 +532,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       const workout = await apiClient.getWorkout(workoutId);
-      // Server tree only has confirmed sets -- map straight into `sets` (no plannedSets;
-      // values-only editing, no logging concept).
       const rawExercises = workout.exercises as unknown as WorkoutExercise[];
-      const exercises: ExerciseLog[] = rawExercises.map((ex) => ({
-        ...ex,
-        sets: ex.sets.map((s): SetLog => ({
-          id: s.id,
-          setNumber: s.order,
-          setType: s.setType,
-          reps: s.reps,
-          weight: s.weight,
-          rir: s.rir,
-          rest: s.rest,
-          completedAt: s.completedAt ?? new Date().toISOString(),
-        })),
-        plannedSets: undefined,
-      }));
+      const exercises: ExerciseLog[] = buildExerciseLogsForEdit(rawExercises);
 
       existingWorkoutIdRef.current = workoutId;
       completionLogRef.current = [];
@@ -828,7 +813,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
     const updatedExercises = activeWorkout.exercises.map((ex) => ({
       ...ex,
-      sets: ex.sets.map((s) => (s.id === setLogId ? { ...s, ...data } : s)),
+      sets: ex.sets.map((s) => (s.id === setLogId ? applyAggregateEdit(s, data) : s)),
     }));
     setActiveWorkoutDirectly({ ...activeWorkout, exercises: updatedExercises }, isPastWorkout, pastWorkoutDuration);
   };

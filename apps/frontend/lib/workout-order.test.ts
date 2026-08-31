@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { reorderExerciseLogs, toExercisePayload, withArrayPositionOrder } from './workout-order';
-import { ExerciseLog, SetType } from '@/types';
+import {
+  applyAggregateEdit,
+  buildExerciseLogsForEdit,
+  reorderExerciseLogs,
+  toExercisePayload,
+  withArrayPositionOrder,
+} from './workout-order';
+import { ExerciseLog, SetType, WorkoutExercise } from '@/types';
 
 const set = (setNumber: number, over: Partial<{ setType: SetType }> = {}) => ({
   id: `set-${setNumber}`,
@@ -165,6 +171,163 @@ describe('toExercisePayload', () => {
     expect(set).toMatchObject({ repsLeft: 10, weightRight: 50 });
     expect(set).not.toHaveProperty('rirLeft');
     expect(set).not.toHaveProperty('rirRight');
+  });
+});
+
+describe('buildExerciseLogsForEdit', () => {
+  const serverExercise = (over: Partial<WorkoutExercise['sets'][number]> = {}): WorkoutExercise =>
+    ({
+      id: 'we-1',
+      exerciseId: 'ex-1',
+      exerciseName: 'Bulgarian Split Squat',
+      isUnilateral: true,
+      order: 1,
+      sets: [
+        {
+          id: 's-1',
+          order: 1,
+          setType: SetType.WORKING,
+          reps: 10,
+          weight: 45,
+          rir: 2,
+          rest: 90,
+          completedAt: '2026-08-14T10:00:00.000Z',
+          ...over,
+        },
+      ],
+    }) as WorkoutExercise;
+
+  it('carries the six per-side columns from the server tree into the draft set', () => {
+    const [ex] = buildExerciseLogsForEdit([
+      serverExercise({
+        reps: 10,
+        weight: 45,
+        rir: 2,
+        repsLeft: 10,
+        repsRight: 9,
+        weightLeft: 50,
+        weightRight: 40,
+        rirLeft: 1,
+        rirRight: 3,
+      }),
+    ]);
+
+    expect(ex.sets[0]).toMatchObject({
+      repsLeft: 10,
+      repsRight: 9,
+      weightLeft: 50,
+      weightRight: 40,
+      rirLeft: 1,
+      rirRight: 3,
+    });
+  });
+
+  it('round-trips a historical unilateral workout through load -> save unchanged', () => {
+    const server = [
+      serverExercise({
+        reps: 10,
+        weight: 45,
+        rir: 2,
+        repsLeft: 10,
+        repsRight: 9,
+        weightLeft: 50,
+        weightRight: 40,
+        rirLeft: 1,
+        rirRight: 3,
+      }),
+    ];
+
+    const payloadSet = toExercisePayload(buildExerciseLogsForEdit(server))[0].sets[0];
+
+    expect(payloadSet).toMatchObject({
+      reps: 10,
+      weight: 45,
+      rir: 2,
+      repsLeft: 10,
+      repsRight: 9,
+      weightLeft: 50,
+      weightRight: 40,
+      rirLeft: 1,
+      rirRight: 3,
+    });
+  });
+
+  it('leaves a bilateral set with no per-side keys after the round-trip', () => {
+    const payloadSet = toExercisePayload(buildExerciseLogsForEdit([serverExercise()]))[0].sets[0];
+
+    expect(payloadSet).not.toHaveProperty('repsLeft');
+    expect(payloadSet).not.toHaveProperty('weightRight');
+    expect(payloadSet).not.toHaveProperty('rirLeft');
+  });
+});
+
+describe('applyAggregateEdit', () => {
+  const uniSet = {
+    id: 's-1',
+    setNumber: 1,
+    setType: SetType.WORKING,
+    reps: 10,
+    weight: 45,
+    rir: 1,
+    repsLeft: 10,
+    repsRight: 9,
+    weightLeft: 50,
+    weightRight: 40,
+    rirLeft: 1,
+    rirRight: 3,
+    completedAt: '2026-08-14T10:00:00.000Z',
+  };
+
+  it('mirrors a changed weight aggregate onto both sides, collapsing that field', () => {
+    const next = applyAggregateEdit(uniSet, { reps: 10, weight: 60, rir: 1 });
+
+    expect(next).toMatchObject({ weight: 60, weightLeft: 60, weightRight: 60 });
+    // reps and rir were unchanged, so their per-side asymmetry survives.
+    expect(next).toMatchObject({ repsLeft: 10, repsRight: 9, rirLeft: 1, rirRight: 3 });
+  });
+
+  it('leaves every per-side column intact when the card re-sends unchanged aggregates', () => {
+    const next = applyAggregateEdit(uniSet, { reps: 10, weight: 45, rir: 1 });
+
+    expect(next).toMatchObject({
+      repsLeft: 10,
+      repsRight: 9,
+      weightLeft: 50,
+      weightRight: 40,
+      rirLeft: 1,
+      rirRight: 3,
+    });
+  });
+
+  it('patches a bilateral set as-is without inventing per-side columns', () => {
+    const next = applyAggregateEdit(
+      { id: 's', setNumber: 1, reps: 10, weight: 40, rir: 2, completedAt: 'x' },
+      { reps: 12, weight: 45, rir: 1 },
+    );
+
+    expect(next).toMatchObject({ reps: 12, weight: 45, rir: 1 });
+    expect(next).not.toHaveProperty('weightLeft');
+    expect(next).not.toHaveProperty('repsRight');
+  });
+
+  it('round-trips through the save payload with the edited field symmetric', () => {
+    const edited = applyAggregateEdit(uniSet, { reps: 10, weight: 60, rir: 1 });
+    const log: ExerciseLog = {
+      id: 'e',
+      exerciseId: 'ex-1',
+      exerciseName: 'x',
+      order: 1,
+      sets: [edited],
+    } as unknown as ExerciseLog;
+
+    expect(toExercisePayload([log])[0].sets[0]).toMatchObject({
+      weightLeft: 60,
+      weightRight: 60,
+      repsLeft: 10,
+      repsRight: 9,
+      rirLeft: 1,
+      rirRight: 3,
+    });
   });
 });
 

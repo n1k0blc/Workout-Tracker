@@ -1,4 +1,4 @@
-import { ExerciseLog, SetType, WorkoutExerciseInput } from '@/types';
+import { ExerciseLog, SetLog, SetType, WorkoutExercise, WorkoutExerciseInput } from '@/types';
 
 /**
  * Array position is authoritative for ordering; `order` on the wire only restates it.
@@ -45,6 +45,76 @@ export function reorderExerciseLogs(exercises: ExerciseLog[], exerciseIds: strin
     .map((id) => exercises.find((ex) => ex.id === id))
     .filter(Boolean) as ExerciseLog[])
     .map((ex, index) => ({ ...ex, order: index + 1 }));
+}
+
+/**
+ * Server workout tree -> client draft for the history editor (`loadWorkoutForEdit`).
+ *
+ * The response carries only confirmed sets, so they map straight into `sets` with no
+ * `plannedSets` -- history editing is values-only, there is no logging concept. The six
+ * per-side columns (issue #105) ride through untouched: a no-op re-save then round-trips a
+ * historical unilateral workout instead of nulling its backfilled sides. `toExercisePayload`
+ * re-emits them, and the write path (#100) rejects a unilateral set that lost them.
+ */
+export function buildExerciseLogsForEdit(exercises: WorkoutExercise[]): ExerciseLog[] {
+  return exercises.map((ex) => ({
+    ...ex,
+    sets: ex.sets.map((s): SetLog => ({
+      id: s.id,
+      setNumber: s.order,
+      setType: s.setType,
+      reps: s.reps,
+      weight: s.weight,
+      rir: s.rir,
+      repsLeft: s.repsLeft ?? undefined,
+      repsRight: s.repsRight ?? undefined,
+      weightLeft: s.weightLeft ?? undefined,
+      weightRight: s.weightRight ?? undefined,
+      rirLeft: s.rirLeft ?? undefined,
+      rirRight: s.rirRight ?? undefined,
+      rest: s.rest,
+      completedAt: s.completedAt ?? new Date().toISOString(),
+    })),
+    plannedSets: undefined,
+  }));
+}
+
+/** A values-only edit from the history editor's per-set inputs. */
+type AggregateEdit = { reps?: number; weight?: number; rir?: number; setType?: SetType };
+
+/**
+ * Applies a history-editor value edit to a draft set, mirroring a *changed* aggregate onto
+ * the per-side columns the set carries.
+ *
+ * The history editor shows one aggregate field per set -- there is no per-side entry here
+ * (issue #105). A unilateral set backfilled by #97 carries `repsLeft`/`repsRight` etc., and
+ * the write path (#100) re-derives `reps`/`weight`/`rir` from those sides on save. Patching
+ * only the aggregate would leave the sides stale and the server would silently revert the
+ * edit, so a field whose aggregate actually moved is written to both sides, collapsing that
+ * one field to symmetric. Fields the edit left equal to the stored aggregate keep their
+ * per-side asymmetry -- the card re-sends all three on every keystroke, so only comparing
+ * against the stored value tells an edit from a pass-through. A set with no per-side data
+ * (every bilateral set, unilateral sets from before the backfill) is patched as-is.
+ */
+export function applyAggregateEdit<
+  T extends Partial<Record<SideKey, number | null | undefined>> & {
+    reps?: number;
+    weight?: number;
+    rir?: number;
+  },
+>(s: T, data: AggregateEdit): T {
+  const next = { ...s, ...data };
+  const mirror = (value: number | undefined, current: number | undefined, left: SideKey, right: SideKey) => {
+    if (value == null || value === current) return;
+    if (s[left] != null || s[right] != null) {
+      next[left] = value as T[SideKey];
+      next[right] = value as T[SideKey];
+    }
+  };
+  mirror(data.reps, s.reps, 'repsLeft', 'repsRight');
+  mirror(data.weight, s.weight, 'weightLeft', 'weightRight');
+  mirror(data.rir, s.rir, 'rirLeft', 'rirRight');
+  return next;
 }
 
 /**
