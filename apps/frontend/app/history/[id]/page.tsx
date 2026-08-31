@@ -67,6 +67,14 @@ export default function WorkoutDetailPage() {
             reps: s.reps,
             weight: s.weight,
             rir: s.rir,
+            // Per-side values kept so the read-only card can show both sides of a
+            // unilateral set instead of the rounded aggregate (issue #101).
+            repsLeft: s.repsLeft,
+            repsRight: s.repsRight,
+            weightLeft: s.weightLeft,
+            weightRight: s.weightRight,
+            rirLeft: s.rirLeft,
+            rirRight: s.rirRight,
             rest: s.rest,
             completedAt: s.completedAt ?? new Date().toISOString(),
           })),

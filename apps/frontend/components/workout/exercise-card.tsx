@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { ExerciseLog, SetLog, SetType, Exercise } from '@/types';
 import { useWorkout } from '@/lib/workout-context';
 import { getSetIndicatorSlots, resolveSetRows } from '@/lib/set-slots';
+import { setPerSide } from '@/lib/set-sides';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import ExerciseSelectionModal from './exercise-selection-modal';
@@ -159,6 +160,11 @@ export default function ExerciseCard({
   const colTemplate = showCheckColumn
     ? 'grid-cols-[auto_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)_auto]'
     : 'grid-cols-[auto_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)]';
+
+  // Read-only unilateral cards render each set as an L/R breakdown rather than the
+  // rounded aggregate (issue #101); the column header collapses to match.
+  const showPerSideRows =
+    isReadonly && !!exercise.isUnilateral && (exercise.sets || []).some((s) => setPerSide(s));
 
   // Local drafts for additional/extra sets (free workouts or sets beyond planned).
   // These are UI-only (not persisted in context) – backend only cares about final logs.
@@ -640,6 +646,9 @@ export default function ExerciseCard({
     const gridClass = `grid ${colTemplate} items-center gap-x-2 py-1.5 border-b border-border last:border-b-0`;
     const isWarmup = set.setType === SetType.WARMUP;
     const isEditingThis = editingSetId === set.id;
+    // Read-only unilateral sets show both sides: `reps` is a rounded average, so a
+    // 10/9 set would otherwise render as "× 10" and hide the imbalance (issue #101).
+    const perSide = isReadonly && exercise.isUnilateral ? setPerSide(set) : null;
 
     const swipeKey = set.id;
     const swipeOffset = activeSwipe && activeSwipe.key === swipeKey ? activeSwipe.offset : 0;
@@ -687,38 +696,57 @@ export default function ExerciseCard({
             </button>
           </div>
 
-          {/* Value cells - always inputs for consistent layout; live edit for logged via updateSet */}
-          <Input
-            type="number"
-            step="0.5"
-            inputMode="decimal"
-            value={isEditingThis ? editingValues.weight : set.weight.toString()}
-            onChange={(e) => handleRowValueChange(set.setNumber, set, 'weight', e.target.value)}
-            placeholder="0"
-            className="h-7 text-base md:text-sm tabular-nums"
-            disabled={loading || isReadonly}
-            readOnly={isReadonly}
-          />
-          <Input
-            type="number"
-            inputMode="numeric"
-            value={isEditingThis ? editingValues.reps : set.reps.toString()}
-            onChange={(e) => handleRowValueChange(set.setNumber, set, 'reps', e.target.value)}
-            placeholder="0"
-            className="h-7 text-base md:text-sm tabular-nums"
-            disabled={loading || isReadonly}
-            readOnly={isReadonly}
-          />
-          <Input
-            type="number"
-            inputMode="numeric"
-            value={isEditingThis ? editingValues.rir : (set.rir != null ? set.rir.toString() : '')}
-            onChange={(e) => handleRowValueChange(set.setNumber, set, 'rir', e.target.value)}
-            placeholder=""
-            className="h-7 text-base md:text-sm tabular-nums"
-            disabled={loading || isReadonly}
-            readOnly={isReadonly}
-          />
+          {/* Value cells - always inputs for consistent layout; live edit for logged via updateSet.
+              Read-only unilateral sets replace the trio with an L/R breakdown (issue #101). */}
+          {perSide ? (
+            <div className="col-span-3 flex flex-col gap-0.5 text-sm">
+              {([['L', perSide.left], ['R', perSide.right]] as const).map(([label, side]) => (
+                <div key={label} className="flex items-center gap-2">
+                  <span className="text-muted-foreground text-xs w-3">{label}</span>
+                  <span className="font-medium text-foreground tabular-nums">
+                    {side.weight} kg × {side.reps}
+                  </span>
+                  {side.rir !== null && (
+                    <span className="text-muted-foreground text-xs">RIR {side.rir}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <>
+              <Input
+                type="number"
+                step="0.5"
+                inputMode="decimal"
+                value={isEditingThis ? editingValues.weight : set.weight.toString()}
+                onChange={(e) => handleRowValueChange(set.setNumber, set, 'weight', e.target.value)}
+                placeholder="0"
+                className="h-7 text-base md:text-sm tabular-nums"
+                disabled={loading || isReadonly}
+                readOnly={isReadonly}
+              />
+              <Input
+                type="number"
+                inputMode="numeric"
+                value={isEditingThis ? editingValues.reps : set.reps.toString()}
+                onChange={(e) => handleRowValueChange(set.setNumber, set, 'reps', e.target.value)}
+                placeholder="0"
+                className="h-7 text-base md:text-sm tabular-nums"
+                disabled={loading || isReadonly}
+                readOnly={isReadonly}
+              />
+              <Input
+                type="number"
+                inputMode="numeric"
+                value={isEditingThis ? editingValues.rir : (set.rir != null ? set.rir.toString() : '')}
+                onChange={(e) => handleRowValueChange(set.setNumber, set, 'rir', e.target.value)}
+                placeholder=""
+                className="h-7 text-base md:text-sm tabular-nums"
+                disabled={loading || isReadonly}
+                readOnly={isReadonly}
+              />
+            </>
+          )}
 
           {/* Check cell - fat only, no buttons (delete via swipe) */}
           {showCheckColumn && (
@@ -817,9 +845,15 @@ export default function ExerciseCard({
             {/* Compact column header (optional, saves space on mobile) */}
             <div className={`grid ${colTemplate} items-center gap-x-2 px-1 pb-1 text-[10px] text-muted-foreground font-medium`}>
               <div></div>
-              <div>Gewicht{exercise.isDoubleWeight ? ' (2x)' : ''}</div>
-              <div>Wdh{exercise.isUnilateral ? ' (2x)' : ''}</div>
-              <div>RIR</div>
+              {showPerSideRows ? (
+                <div className="col-span-3">Links / Rechts</div>
+              ) : (
+                <>
+                  <div>Gewicht{exercise.isDoubleWeight ? ' (2x)' : ''}</div>
+                  <div>Wdh{exercise.isUnilateral ? ' (2x)' : ''}</div>
+                  <div>RIR</div>
+                </>
+              )}
               {showCheckColumn && <div className="text-center">✓</div>}
             </div>
 

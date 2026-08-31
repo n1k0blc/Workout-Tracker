@@ -176,6 +176,15 @@ export interface SetLog {
   reps: number;
   weight: number;
   rir?: number;
+  // Per-side values for unilateral sets (§4.1, issue #65/#97). Present on historical
+  // unilateral sets via the backfill; null/absent for bilateral sets. Read-only views
+  // render both sides from these (issue #101).
+  repsLeft?: number;
+  repsRight?: number;
+  weightLeft?: number;
+  weightRight?: number;
+  rirLeft?: number;
+  rirRight?: number;
   completedAt: string;
   /** Seconds rested after completing this set -- assigned when the NEXT set (anywhere in the
    *  workout) completes, or defaulted to the planned/90 value at save time for the last set. */
