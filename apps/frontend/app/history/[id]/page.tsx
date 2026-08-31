@@ -5,7 +5,8 @@ import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
-import { Workout, WorkoutExercise, ExerciseLog, SetType } from '@/types';
+import { Workout, WorkoutExercise, ExerciseLog } from '@/types';
+import { setWorkingVolume } from '@/lib/volume';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -120,11 +121,7 @@ export default function WorkoutDetailPage() {
     let total = 0;
     for (const exercise of workout.exercises) {
       for (const set of exercise.sets) {
-        if (set.setType === SetType.WORKING) {
-          const unilateralMultiplier = exercise.isUnilateral ? 2 : 1;
-          const doubleWeightMultiplier = exercise.isDoubleWeight ? 2 : 1;
-          total += set.weight * set.reps * unilateralMultiplier * doubleWeightMultiplier;
-        }
+        total += setWorkingVolume(set, exercise);
       }
     }
     return total;

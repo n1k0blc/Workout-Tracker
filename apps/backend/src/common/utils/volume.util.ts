@@ -6,6 +6,10 @@ import { SetType } from '../types';
  * dashboard version that read a nonexistent `set.isUnilateral` and never applied
  * `isDoubleWeight` or excluded warmups). Every site should call this instead of
  * re-deriving working volume itself.
+ *
+ * The frontend cannot import from this file, so it keeps a hand-mirrored twin
+ * in `apps/frontend/lib/volume.ts`. Any change to the formula here MUST be
+ * mirrored there -- the two are meant to move together.
  */
 export function setWorkingVolume(
   set: { setType: SetType; reps: number; weight: number },
