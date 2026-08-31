@@ -17,6 +17,13 @@ export interface SetInput {
   reps: number;
   weight: number;
   rir?: number | null;
+  // Per-side values for unilateral sets (issue #65/#97). Round-tripped only for now.
+  repsLeft?: number | null;
+  repsRight?: number | null;
+  weightLeft?: number | null;
+  weightRight?: number | null;
+  rirLeft?: number | null;
+  rirRight?: number | null;
   rest?: number | null;
   completedAt?: Date | null;
 }
@@ -74,6 +81,12 @@ export class WorkoutTreeService {
               reps: set.reps,
               weight: set.weight,
               rir: set.rir ?? null,
+              repsLeft: set.repsLeft ?? null,
+              repsRight: set.repsRight ?? null,
+              weightLeft: set.weightLeft ?? null,
+              weightRight: set.weightRight ?? null,
+              rirLeft: set.rirLeft ?? null,
+              rirRight: set.rirRight ?? null,
               rest: set.rest ?? null,
               completedAt: set.completedAt ?? null,
             })),
@@ -128,6 +141,12 @@ export function toExerciseInputs(dtos: WorkoutExerciseInputDto[]): ExerciseInput
       reps: set.reps,
       weight: set.weight,
       rir: set.rir ?? null,
+      repsLeft: set.repsLeft ?? null,
+      repsRight: set.repsRight ?? null,
+      weightLeft: set.weightLeft ?? null,
+      weightRight: set.weightRight ?? null,
+      rirLeft: set.rirLeft ?? null,
+      rirRight: set.rirRight ?? null,
       rest: set.rest ?? 90,
       completedAt: set.completedAt ? new Date(set.completedAt) : null,
     })),
@@ -146,6 +165,12 @@ type LoadedWorkoutExercise = {
     reps: number;
     weight: number;
     rir: number | null;
+    repsLeft: number | null;
+    repsRight: number | null;
+    weightLeft: number | null;
+    weightRight: number | null;
+    rirLeft: number | null;
+    rirRight: number | null;
     rest: number | null;
     completedAt: Date | null;
   }[];
@@ -175,6 +200,12 @@ export function mapExercisesToResponse(
           reps: set.reps,
           weight: set.weight,
           rir: set.rir ?? undefined,
+          repsLeft: set.repsLeft ?? undefined,
+          repsRight: set.repsRight ?? undefined,
+          weightLeft: set.weightLeft ?? undefined,
+          weightRight: set.weightRight ?? undefined,
+          rirLeft: set.rirLeft ?? undefined,
+          rirRight: set.rirRight ?? undefined,
           rest: set.rest ?? undefined,
           completedAt: set.completedAt ?? undefined,
         })),

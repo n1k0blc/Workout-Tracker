@@ -44,6 +44,40 @@ export class WorkoutSetInputDto {
   @Max(10)
   rir?: number;
 
+  // Per-side values for unilateral sets (§4.1, issue #65/#97). Optional and currently only
+  // round-tripped -- nothing derives the reps/weight/rir aggregates from them yet.
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  repsLeft?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  repsRight?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  weightLeft?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  weightRight?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10)
+  rirLeft?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10)
+  rirRight?: number;
+
   // Seconds rested after completing this set. Optional -- defaults to 90 when omitted
   // (manual blueprint/template creation with no rest input, per §3.5).
   @IsOptional()
@@ -80,6 +114,12 @@ export class WorkoutSetResponseDto {
   reps: number;
   weight: number;
   rir?: number;
+  repsLeft?: number;
+  repsRight?: number;
+  weightLeft?: number;
+  weightRight?: number;
+  rirLeft?: number;
+  rirRight?: number;
   rest?: number;
   completedAt?: Date;
 }

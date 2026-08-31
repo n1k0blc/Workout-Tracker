@@ -154,6 +154,15 @@ model WorkoutSet {
   reps              Int
   weight            Float
   rir               Int?
+  // Per-side values for sets whose exercise isUnilateral = true; null for bilateral sets
+  // (issue #65/#97). reps/weight/rir stay as server-derived aggregates over the two sides.
+  // Backfilled L = R = the pre-existing aggregate, which is symmetric and moves no metric.
+  repsLeft          Int?
+  repsRight         Int?
+  weightLeft        Float?
+  weightRight       Float?
+  rirLeft           Int?
+  rirRight          Int?
   rest              Int? // seconds rested after completing this set; app defaults to 90 when absent
   completedAt       DateTime? // meaningful only for kind=WORKOUT sets
 

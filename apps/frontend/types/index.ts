@@ -133,6 +133,15 @@ export interface WorkoutSet {
   reps: number;
   weight: number;
   rir?: number;
+  // Per-side values for unilateral sets (§4.1, issue #65/#97). Present on historical
+  // unilateral sets via the backfill; null/absent for bilateral sets. Round-tripped only
+  // for now -- reps/weight/rir stay the aggregates every existing surface reads.
+  repsLeft?: number;
+  repsRight?: number;
+  weightLeft?: number;
+  weightRight?: number;
+  rirLeft?: number;
+  rirRight?: number;
   rest?: number; // seconds rested after completing this set
   completedAt?: string; // meaningful only for performed workouts
 }
@@ -235,6 +244,12 @@ export interface WorkoutSetInput {
   reps: number;
   weight: number;
   rir?: number;
+  repsLeft?: number;
+  repsRight?: number;
+  weightLeft?: number;
+  weightRight?: number;
+  rirLeft?: number;
+  rirRight?: number;
   rest?: number;
   completedAt?: string;
 }

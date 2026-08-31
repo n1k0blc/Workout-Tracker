@@ -1,5 +1,9 @@
 import { BadRequestException } from '@nestjs/common';
-import { WorkoutTreeService, toExerciseInputs } from './workout-tree.service';
+import {
+  WorkoutTreeService,
+  toExerciseInputs,
+  mapExercisesToResponse,
+} from './workout-tree.service';
 import { SetType } from '../common/types';
 import { WorkoutExerciseInputDto } from '../common/dto/workout-tree.dto';
 
@@ -84,6 +88,110 @@ describe('toExerciseInputs', () => {
   it('accepts an empty tree', () => {
     expect(toExerciseInputs([])).toEqual([]);
   });
+
+  it('carries per-side values through, defaulting the absent ones to null', () => {
+    const inputs = toExerciseInputs([
+      {
+        exerciseId: 'a',
+        order: 1,
+        sets: [
+          {
+            order: 1,
+            setType: SetType.WORKING,
+            reps: 10,
+            weight: 40,
+            repsLeft: 10,
+            repsRight: 9,
+            weightLeft: 40,
+            weightRight: 42.5,
+            rirLeft: 2,
+            rirRight: 1,
+          },
+        ],
+      },
+    ] as WorkoutExerciseInputDto[]);
+
+    expect(inputs[0].sets[0]).toMatchObject({
+      repsLeft: 10,
+      repsRight: 9,
+      weightLeft: 40,
+      weightRight: 42.5,
+      rirLeft: 2,
+      rirRight: 1,
+    });
+
+    const bilateral = toExerciseInputs([exercise(1, [1])]);
+    expect(bilateral[0].sets[0]).toMatchObject({
+      repsLeft: null,
+      repsRight: null,
+      weightLeft: null,
+      weightRight: null,
+      rirLeft: null,
+      rirRight: null,
+    });
+  });
+});
+
+describe('mapExercisesToResponse', () => {
+  const loadedSet = (over: Record<string, unknown> = {}) => ({
+    id: 's1',
+    order: 1,
+    setType: SetType.WORKING,
+    reps: 10,
+    weight: 40,
+    rir: 2,
+    repsLeft: null,
+    repsRight: null,
+    weightLeft: null,
+    weightRight: null,
+    rirLeft: null,
+    rirRight: null,
+    rest: 90,
+    completedAt: null,
+    ...over,
+  });
+
+  const loadedExercise = (setOver: Record<string, unknown> = {}) =>
+    ({
+      id: 'we1',
+      exerciseId: 'ex1',
+      order: 1,
+      exercise: { name: 'Split Squat', isUnilateral: true, isDoubleWeight: false },
+      sets: [loadedSet(setOver)],
+    }) as Parameters<typeof mapExercisesToResponse>[0][number];
+
+  it('round-trips per-side values from a backfilled unilateral set', () => {
+    const [ex] = mapExercisesToResponse([
+      loadedExercise({
+        repsLeft: 10,
+        repsRight: 10,
+        weightLeft: 40,
+        weightRight: 40,
+        rirLeft: 2,
+        rirRight: 2,
+      }),
+    ]);
+
+    expect(ex.sets[0]).toMatchObject({
+      repsLeft: 10,
+      repsRight: 10,
+      weightLeft: 40,
+      weightRight: 40,
+      rirLeft: 2,
+      rirRight: 2,
+    });
+  });
+
+  it('omits per-side values for a bilateral set (all columns null)', () => {
+    const [ex] = mapExercisesToResponse([loadedExercise()]);
+
+    expect(ex.sets[0].repsLeft).toBeUndefined();
+    expect(ex.sets[0].repsRight).toBeUndefined();
+    expect(ex.sets[0].weightLeft).toBeUndefined();
+    expect(ex.sets[0].weightRight).toBeUndefined();
+    expect(ex.sets[0].rirLeft).toBeUndefined();
+    expect(ex.sets[0].rirRight).toBeUndefined();
+  });
 });
 
 describe('replaceTree', () => {
@@ -121,6 +229,49 @@ describe('replaceTree', () => {
     expect(written.map((d: { exerciseId: string }) => d.exerciseId)).toEqual(['a', 'b']);
     expect(written[0].sets.create.map((s: { order: number }) => s.order)).toEqual([1, 2]);
     expect(written[1].sets.create.map((s: { order: number }) => s.order)).toEqual([1]);
+  });
+
+  it('writes per-side values through, and null for the sides not supplied', async () => {
+    const tx = buildTx();
+
+    await service.replaceTree(tx as never, 'w1', [
+      {
+        exerciseId: 'a',
+        sets: [
+          {
+            setType: SetType.WORKING,
+            reps: 10,
+            weight: 40,
+            repsLeft: 10,
+            repsRight: 9,
+            weightLeft: 40,
+            weightRight: 42.5,
+            rirLeft: 2,
+            rirRight: 1,
+          },
+          { setType: SetType.WORKING, reps: 10, weight: 40 },
+        ],
+      },
+    ]);
+
+    const written = tx.workoutExercise.create.mock.calls[0][0].data.sets.create;
+
+    expect(written[0]).toMatchObject({
+      repsLeft: 10,
+      repsRight: 9,
+      weightLeft: 40,
+      weightRight: 42.5,
+      rirLeft: 2,
+      rirRight: 1,
+    });
+    expect(written[1]).toMatchObject({
+      repsLeft: null,
+      repsRight: null,
+      weightLeft: null,
+      weightRight: null,
+      rirLeft: null,
+      rirRight: null,
+    });
   });
 
   it('clears the existing tree before writing the new one', async () => {
