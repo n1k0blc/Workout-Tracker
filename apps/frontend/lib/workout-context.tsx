@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { Workout, WorkoutExercise, ExerciseLog, SetLog, PlannedSet, SetType, SaveAsTemplateMode, WorkoutExerciseInput, Exercise } from '@/types';
+import { Workout, WorkoutExercise, ExerciseLog, SetLog, PlannedSet, SetType, SaveAsTemplateMode, WorkoutExerciseInput, Exercise, Equipment } from '@/types';
 import { apiClient } from '@/lib/api';
 import { buildExerciseLogsForEdit, reorderExerciseLogs, toExercisePayload } from '@/lib/workout-order';
 import { aggregateSetSides } from '@/lib/set-sides';
@@ -403,6 +403,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     exercises: {
       exerciseId: string;
       exerciseName: string;
+      equipment?: Equipment;
       isUnilateral?: boolean;
       isDoubleWeight?: boolean;
       order: number;
@@ -426,6 +427,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       id: generateLocalId('ex'),
       exerciseId: ex.exerciseId,
       exerciseName: ex.exerciseName,
+      equipment: ex.equipment,
       isUnilateral: ex.isUnilateral,
       isDoubleWeight: ex.isDoubleWeight,
       order: ex.order,
@@ -647,6 +649,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         id: generateLocalId('ex'),
         exerciseId,
         exerciseName: exDetails.name || 'Exercise',
+        equipment: exDetails.equipment,
         isUnilateral: exDetails.isUnilateral,
         isDoubleWeight: exDetails.isDoubleWeight,
         order: (activeWorkout.exercises.length || 0) + 1,
@@ -689,6 +692,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         exercises: replaceExerciseInList(activeWorkout.exercises, exerciseLogId, {
           id: newExerciseId,
           name: exDetails.name,
+          equipment: exDetails.equipment,
           isUnilateral: exDetails.isUnilateral,
           isDoubleWeight: exDetails.isDoubleWeight,
         }),

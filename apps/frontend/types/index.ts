@@ -153,6 +153,10 @@ export interface WorkoutExercise {
   id: string;
   exerciseId: string;
   exerciseName: string;
+  // Catalogue equipment of the exercise (§4.1). Optional because older persisted drafts and
+  // hand-built fixtures predate it; the active-workout UI reads it to let a BODYWEIGHT set log
+  // at 0 kg while keeping the guard for every other exercise.
+  equipment?: Equipment;
   isUnilateral?: boolean;
   isDoubleWeight?: boolean;
   order: number;
@@ -205,6 +209,10 @@ export interface ExerciseLog {
   id: string;
   exerciseId: string;
   exerciseName: string;
+  // Catalogue equipment, carried from the tree / picked exercise so the card's additional-set
+  // guard can allow a 0 kg set on a BODYWEIGHT movement. Optional: older persisted drafts and
+  // fixtures predate it, and an unknown value simply falls back to the strict guard.
+  equipment?: Equipment;
   isUnilateral?: boolean;
   isDoubleWeight?: boolean;
   order: number;

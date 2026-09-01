@@ -5,7 +5,7 @@ import {
   toExerciseInputs,
   mapExercisesToResponse,
 } from './workout-tree.service';
-import { SetType } from '../common/types';
+import { SetType, Equipment } from '../common/types';
 import { WorkoutExerciseInputDto } from '../common/dto/workout-tree.dto';
 
 /**
@@ -233,7 +233,12 @@ describe('mapExercisesToResponse', () => {
       id: 'we1',
       exerciseId: 'ex1',
       order: 1,
-      exercise: { name: 'Split Squat', isUnilateral: true, isDoubleWeight: false },
+      exercise: {
+        name: 'Split Squat',
+        equipment: Equipment.BODYWEIGHT,
+        isUnilateral: true,
+        isDoubleWeight: false,
+      },
       sets: [loadedSet(setOver)],
     }) as Parameters<typeof mapExercisesToResponse>[0][number];
 
@@ -257,6 +262,12 @@ describe('mapExercisesToResponse', () => {
       rirLeft: 2,
       rirRight: 2,
     });
+  });
+
+  it('carries the exercise equipment through to the response', () => {
+    const [ex] = mapExercisesToResponse([loadedExercise()]);
+
+    expect(ex.equipment).toBe(Equipment.BODYWEIGHT);
   });
 
   it('omits per-side values for a bilateral set (all columns null)', () => {

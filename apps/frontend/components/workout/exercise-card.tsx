@@ -5,6 +5,7 @@ import { ExerciseLog, SetLog, SetType, Exercise } from '@/types';
 import { useWorkout } from '@/lib/workout-context';
 import { getSetIndicatorSlots, resolveSetRows } from '@/lib/set-slots';
 import { setPerSide, deriveSidesFromDrafts, type PerSideBreakdown } from '@/lib/set-sides';
+import { canLogAdditionalSet } from '@/lib/log-set-guards';
 import type { LogSetData } from '@/lib/workout-context';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -483,7 +484,9 @@ export default function ExerciseCard({
         if (!ev) return;
         const w = parseFloat(ev.weight || '0');
         const r = parseInt(ev.reps || '0');
-        if (w === 0 || r === 0) {
+        // 0 kg is a real load on a bodyweight movement (dips, pull-ups); reps must still be
+        // non-zero, and every other exercise keeps the strict guard.
+        if (!canLogAdditionalSet({ weight: w, reps: r, equipment: exercise.equipment })) {
           console.warn('Cannot log additional set with empty weight or reps');
           return;
         }
