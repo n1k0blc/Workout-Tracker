@@ -306,6 +306,35 @@ export interface SaveWorkoutDto {
   overwriteTemplateId?: string;
 }
 
+// Last-performance lookup (issue #112): the last time the user actually performed an
+// exercise, plus which step of the gym cascade it was found on. Drives the swap/add
+// prefill in the active workout. `rest` is deliberately absent -- see the endpoint.
+export type LastPerformanceSource = 'CURRENT_GYM' | 'HOME_GYM' | 'ANY_GYM';
+
+export interface LastPerformanceSet {
+  setType: SetType;
+  reps: number;
+  weight: number;
+  rir?: number;
+  repsLeft?: number;
+  repsRight?: number;
+  weightLeft?: number;
+  weightRight?: number;
+  rirLeft?: number;
+  rirRight?: number;
+}
+
+export interface LastPerformance {
+  exerciseId: string;
+  source: LastPerformanceSource;
+  /** The `localDate` (YYYY-MM-DD) of the workout the values came from. */
+  performedOn: string;
+  gymId: string | null;
+  /** `null` when that workout was logged at "Anderes Gym". */
+  gymName: string | null;
+  sets: LastPerformanceSet[];
+}
+
 // Cycle Types
 export interface WorkoutDay {
   id: string;

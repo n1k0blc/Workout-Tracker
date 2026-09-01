@@ -1,12 +1,14 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { Workout, WorkoutExercise, ExerciseLog, SetLog, PlannedSet, SetType, SaveAsTemplateMode, WorkoutExerciseInput, Exercise, Equipment } from '@/types';
+import { Workout, WorkoutExercise, ExerciseLog, SetLog, PlannedSet, SetType, SaveAsTemplateMode, WorkoutExerciseInput, Exercise, Equipment, LastPerformance } from '@/types';
 import { apiClient } from '@/lib/api';
 import { buildExerciseLogsForEdit, reorderExerciseLogs, toExercisePayload } from '@/lib/workout-order';
 import { aggregateSetSides } from '@/lib/set-sides';
 import { replaceExerciseInList } from '@/lib/exercise-replace';
 import { toLocalDateString } from '@/lib/local-date';
+import { blankPlanValues, buildPrefillToastMessage, mapLastPerformanceOntoPlan } from '@/lib/last-performance';
+import { toast } from 'sonner';
 
 const DRAFT_STORAGE_KEY = 'activeWorkoutDraft';
 const DRAFT_META_STORAGE_KEY = 'activeWorkoutDraftMeta';
@@ -132,6 +134,7 @@ function generateLocalId(prefix: string): string {
   return `local-${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+
 export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const [activeWorkout, setActiveWorkout] = useState<Workout | null>(null);
   const [loading, setLoading] = useState(false);
@@ -160,12 +163,19 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
   // Existing workout being edited (history edit) -- save calls update, not create.
   const existingWorkoutIdRef = useRef<string | null>(null);
+  // Latest activeWorkout, for the async last-performance prefill (issue #112): it resolves
+  // after the swap/add has already applied, so it must read state fresher than its closure.
+  const activeWorkoutRef = useRef<Workout | null>(null);
   // Rest-attribution completion log (live sessions only -- see CompletionEntry).
   const completionLogRef = useRef<CompletionEntry[]>([]);
 
   useEffect(() => {
     workoutStartTimeRef.current = workoutStartTime;
   }, [workoutStartTime]);
+
+  useEffect(() => {
+    activeWorkoutRef.current = activeWorkout;
+  }, [activeWorkout]);
 
   const persistDraft = useCallback((workout: Workout | null, meta: DraftMeta | null) => {
     if (typeof window === 'undefined') return;
@@ -640,6 +650,80 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     persistDraft(null, null);
   };
 
+  /**
+   * Fills a just-swapped or just-added exercise's sets from the last time it was actually
+   * performed (issue #112). Runs *after* the swap/add has applied from local state -- it never
+   * blocks that -- and re-reads the workout from `activeWorkoutRef` because its closure is
+   * already stale by the time the request resolves.
+   *
+   * Live sessions only: prefilling a past-workout entry or a history edit would seed a
+   * historical record with last week's numbers, the same reason #68 keeps it out of the
+   * history editor.
+   *
+   * A **failed** lookup returns silently and leaves the fields exactly as they were -- a
+   * transient error must never blank someone's numbers. A **never-performed** exercise (a
+   * `null` result, or history that fits nothing in the plan) is different: the plan slots
+   * still hold the *swapped-out* exercise's numbers, so those are blanked, keeping only the
+   * structure. `isSwap` distinguishes a swap (has stale numbers to blank) from an add (its
+   * plan is empty already, nothing to do).
+   */
+  const prefillFromLastPerformance = async (
+    exerciseLogId: string,
+    exerciseId: string,
+    isSwap: boolean,
+  ) => {
+    if (isHistoryEdit || isPastWorkout) return;
+
+    const workout = activeWorkoutRef.current;
+    if (!workout) return;
+
+    const gymId = workout.homeGymId ?? undefined;
+    // A live draft carries a `local-...` id and is not yet a server row, so there is nothing
+    // to exclude; a resumed/edited one has a real id and must not read itself back.
+    const excludeWorkoutId = workout.id.startsWith('local-') ? undefined : workout.id;
+
+    let result: LastPerformance | null;
+    try {
+      result = await apiClient.getExerciseLastPerformance({ exerciseId, gymId, excludeWorkoutId });
+    } catch {
+      return;
+    }
+
+    const current = activeWorkoutRef.current;
+    if (!current) return;
+    const target = current.exercises.find((ex) => ex.id === exerciseLogId);
+    // The user may have swapped again, removed the card, or started logging while the
+    // request was in flight -- in any of those cases leave the sets alone.
+    if (!target || target.exerciseId !== exerciseId || target.sets.length > 0) return;
+
+    const hasPlan = !!target.plannedSets && target.plannedSets.length > 0;
+
+    const map = result
+      ? mapLastPerformanceOntoPlan(hasPlan ? target.plannedSets! : null, result.sets, () =>
+          generateLocalId('planned'),
+        )
+      : null;
+
+    let nextPlannedSets: PlannedSet[] | undefined;
+    if (map && map.changed) {
+      nextPlannedSets = map.sets;
+    } else if (isSwap && hasPlan) {
+      nextPlannedSets = blankPlanValues(target.plannedSets!); // never performed -> drop stale numbers
+    } else {
+      return; // add with no usable history: its plan is already empty
+    }
+
+    const exercises = current.exercises.map((ex) =>
+      ex.id === exerciseLogId ? { ...ex, plannedSets: nextPlannedSets } : ex,
+    );
+    setActiveWorkoutDirectly({ ...current, exercises }, isPastWorkout, pastWorkoutDuration);
+
+    if (map && map.changed) {
+      const { message, durationMs } = buildPrefillToastMessage(result!, map.setCountMismatch, !!gymId);
+      toast.info(message, { duration: durationMs });
+    }
+  };
+
   const addExercise = async (exerciseId: string) => {
     if (!activeWorkout) return '';
 
@@ -657,6 +741,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         plannedSets: [],
       };
       setActiveWorkoutDirectly({ ...activeWorkout, exercises: [...activeWorkout.exercises, newEx] }, isPastWorkout, pastWorkoutDuration);
+      // Fire-and-forget: an added exercise has no plan, so it takes history's shape wholesale.
+      void prefillFromLastPerformance(newEx.id, exerciseId, false);
       return newEx.id;
     } catch (error) {
       console.error('Failed to add exercise:', error);
@@ -698,6 +784,9 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         }),
       };
       setActiveWorkoutDirectly(updated, isPastWorkout, pastWorkoutDuration);
+      // Fire-and-forget: the swap has already applied from local state; the lookup resolves
+      // after and fills the plan's existing slots from the last performance (issue #112).
+      void prefillFromLastPerformance(exerciseLogId, newExerciseId, true);
     } catch (error) {
       console.error('Failed to replace exercise:', error);
     }

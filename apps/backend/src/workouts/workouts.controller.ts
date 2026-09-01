@@ -10,10 +10,11 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  BadRequestException,
 } from '@nestjs/common';
 import { WorkoutsService } from './workouts.service';
 import { WorkoutEngineService, SuggestedWorkout, CurrentCycleWorkouts } from './workout-engine.service';
-import { CreateWorkoutDto, UpdateWorkoutDto, WorkoutResponseDto, WorkoutListItemDto } from './dto';
+import { CreateWorkoutDto, UpdateWorkoutDto, WorkoutResponseDto, WorkoutListItemDto, LastPerformanceDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ClientToday } from '../common/decorators/client-today.decorator';
@@ -45,6 +46,24 @@ export class WorkoutsController {
     @ClientToday() today: Today,
   ): Promise<CurrentCycleWorkouts | null> {
     return this.workoutEngineService.getCurrentCycleWorkouts(user.id, today);
+  }
+
+  @Get('exercise-last-performance')
+  async getExerciseLastPerformance(
+    @CurrentUser() user: { id: string },
+    @Query('exerciseId') exerciseId: string,
+    @Query('gymId') gymId?: string,
+    @Query('excludeWorkoutId') excludeWorkoutId?: string,
+  ): Promise<LastPerformanceDto | null> {
+    if (!exerciseId) {
+      throw new BadRequestException('exerciseId is required');
+    }
+    return this.workoutsService.findExerciseLastPerformance(
+      user.id,
+      exerciseId,
+      gymId || undefined,
+      excludeWorkoutId || undefined,
+    );
   }
 
   @Get()

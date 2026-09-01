@@ -577,6 +577,11 @@ export default function ExerciseCard({
     }
     try {
       await replaceExercise(exercise.id, newExerciseId, newExercise);
+      // The in-flight typing buffer is keyed by set number, so the old exercise's half-typed
+      // numbers would render on top of the incoming last-performance prefill. Drop the whole
+      // buffer and its per-side twin -- the same thing a controlled plan restructure does.
+      setEditValues({});
+      setSideEdits({});
       setShowReplaceModal(false);
       setIsCollapsed(false);
     } catch (error) {

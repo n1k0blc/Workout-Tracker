@@ -32,6 +32,7 @@ import {
   SuggestedWorkout,
   CurrentCycleWorkouts,
   WorkoutExerciseInput,
+  LastPerformance,
 } from '@/types';
 import { clientTimeZone } from '@/lib/local-date';
 
@@ -323,6 +324,20 @@ class ApiClient {
     await this.request(`/workouts/${id}`, {
       method: 'DELETE',
     });
+  }
+
+  // The last time the user actually performed an exercise, walked through the gym cascade
+  // (issue #112). `gymId` is the asking context's gym; `excludeWorkoutId` drops the open
+  // workout so a session cannot read itself back. Returns null when never performed.
+  async getExerciseLastPerformance(params: {
+    exerciseId: string;
+    gymId?: string;
+    excludeWorkoutId?: string;
+  }): Promise<LastPerformance | null> {
+    const query = new URLSearchParams({ exerciseId: params.exerciseId });
+    if (params.gymId) query.append('gymId', params.gymId);
+    if (params.excludeWorkoutId) query.append('excludeWorkoutId', params.excludeWorkoutId);
+    return this.request<LastPerformance | null>(`/workouts/exercise-last-performance?${query.toString()}`);
   }
 
   async getWorkoutHistory(params?: {
