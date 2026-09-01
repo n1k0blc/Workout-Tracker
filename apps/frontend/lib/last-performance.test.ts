@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { blankPlanValues, buildPrefillToastMessage, mapLastPerformanceOntoPlan } from './last-performance';
+import {
+  blankPlanValues,
+  buildPrefillToastMessage,
+  mapLastPerformanceOntoPlan,
+  resolvePlanPrefill,
+} from './last-performance';
 import { LastPerformance, LastPerformanceSet, PlannedSet, SetType } from '@/types';
 
 const W = SetType.WORKING;
@@ -242,5 +247,82 @@ describe('buildPrefillToastMessage', () => {
   it('falls back to "Anderes Gym" when the gym name is null', () => {
     const { message } = buildPrefillToastMessage({ ...base, source: 'ANY_GYM', gymName: null }, false, true);
     expect(message).toContain('(Anderes Gym)');
+  });
+});
+
+describe('resolvePlanPrefill', () => {
+  const perf = (over: Partial<LastPerformance> = {}): LastPerformance => ({
+    exerciseId: 'ex-1',
+    source: 'CURRENT_GYM',
+    performedOn: '2026-08-20',
+    gymId: 'gym-1',
+    gymName: 'Nordgym',
+    sets: [hist(W, { weight: 100 }), hist(W, { weight: 105 })],
+    ...over,
+  });
+
+  describe('swap (plan structure wins)', () => {
+    it('fills the plan\'s existing slots and keeps their count', () => {
+      const current = [planned(1, W), planned(2, W), planned(3, W)];
+      const decision = resolvePlanPrefill(current, perf(), true, true, makeId);
+
+      expect(decision).not.toBeNull();
+      expect(decision!.sets).toHaveLength(3);
+      expect(decision!.sets[0]).toMatchObject({ id: 'planned-1', weight: 100 });
+      expect(decision!.sets[2]).toMatchObject({ weight: 105 }); // last history entry repeated
+      expect(decision!.toast).not.toBeNull();
+    });
+
+    it('flags a set-count mismatch in the toast', () => {
+      const current = [planned(1, W), planned(2, W)];
+      const decision = resolvePlanPrefill(current, perf({ sets: [hist(W), hist(W), hist(W)] }), true, true, makeId);
+
+      expect(decision!.toast!.message).toContain('Andere Satzanzahl');
+      expect(decision!.toast!.durationMs).toBe(10000);
+    });
+
+    it('blanks the swapped-out exercise\'s stale numbers when never performed', () => {
+      const current = [planned(1, W, { weight: 55, reps: 9 })];
+      const decision = resolvePlanPrefill(current, null, true, true, makeId);
+
+      expect(decision!.sets).toEqual([
+        { id: 'planned-1', order: 1, setType: W, rest: 120, reps: 0, weight: 0, rir: 0 },
+      ]);
+      expect(decision!.toast).toBeNull();
+    });
+
+    it('blanks the stale numbers when history fits nothing in the structure', () => {
+      const current = [planned(1, W, { weight: 55 })];
+      const decision = resolvePlanPrefill(current, perf({ sets: [hist(WU)] }), true, true, makeId);
+
+      expect(decision!.sets[0]).toMatchObject({ weight: 0, reps: 0 });
+      expect(decision!.toast).toBeNull();
+    });
+
+    it('does not label a degraded source when no gym context was given', () => {
+      const current = [planned(1, W), planned(2, W)];
+      const decision = resolvePlanPrefill(current, perf({ source: 'HOME_GYM' }), true, false, makeId);
+
+      expect(decision!.toast!.message).toBe('Werte vom 20.08.2026 (Nordgym) übernommen.');
+    });
+  });
+
+  describe('add (history shape wins wholesale)', () => {
+    it('takes history\'s structure regardless of the editor\'s default sets', () => {
+      const defaults = [planned(1, WU), planned(2, W), planned(3, W)];
+      const decision = resolvePlanPrefill(defaults, perf({ sets: [hist(W, { weight: 100 }), hist(W, { weight: 105 }) ] }), false, true, makeId);
+
+      expect(decision!.sets).toHaveLength(2);
+      expect(decision!.sets.map((s) => s.weight)).toEqual([100, 105]);
+      expect(decision!.toast).not.toBeNull();
+    });
+
+    it('returns null (keep the defaults) when never performed', () => {
+      expect(resolvePlanPrefill([planned(1, W)], null, false, true, makeId)).toBeNull();
+    });
+
+    it('returns null when history has no sets', () => {
+      expect(resolvePlanPrefill([planned(1, W)], perf({ sets: [] }), false, true, makeId)).toBeNull();
+    });
   });
 });

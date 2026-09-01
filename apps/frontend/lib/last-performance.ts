@@ -143,3 +143,50 @@ export function buildPrefillToastMessage(
     durationMs: degraded || setCountMismatch ? PREFILL_TOAST_DURATION_LONG_MS : PREFILL_TOAST_DURATION_MS,
   };
 }
+
+export interface PlanPrefillDecision {
+  /** The planned sets the just-swapped / just-added entry should now hold. */
+  sets: PlannedSet[];
+  /** The one prefill toast, or `null` when nothing was imported (a never-performed swap only
+   *  blanks stale numbers; an add with no history does nothing at all). */
+  toast: { message: string; durationMs: number } | null;
+}
+
+/**
+ * Decides what a *plan editor's* just-swapped or just-added exercise entry should hold, given
+ * the last-performance lookup result (issue #113). The active workout has its own copy of this
+ * decision in `workout-context.tsx`; this is the same rule for the template editor, the
+ * blueprint step and the cycle day editor, where there are only planned sets and no logging.
+ *
+ * - **swap** (`isSwap`): the plan's structure wins. History fills the existing slots' values
+ *   via `mapLastPerformanceOntoPlan` with the current sets as the target. A miss -- no result,
+ *   or history that fits nothing in the structure -- still blanks the numbers the swapped-out
+ *   exercise left behind (`blankPlanValues`) but keeps the slots and their types.
+ * - **add**: history's shape wins wholesale (`null` target), exactly as in the active workout.
+ *   A miss leaves the editor's own default sets untouched -- returns `null`, "nothing to do".
+ *
+ * `hadGymContext` is whether a gym was passed to the lookup: without one, landing on "any home
+ * gym" is the expected path for the standalone template editor, not a degradation to announce.
+ */
+export function resolvePlanPrefill(
+  currentSets: readonly PlannedSet[],
+  result: LastPerformance | null,
+  isSwap: boolean,
+  hadGymContext: boolean,
+  makeId: () => string,
+): PlanPrefillDecision | null {
+  const map = result
+    ? mapLastPerformanceOntoPlan(isSwap ? currentSets : null, result.sets, makeId)
+    : null;
+
+  if (map && map.changed) {
+    return {
+      sets: map.sets,
+      toast: buildPrefillToastMessage(result!, map.setCountMismatch, hadGymContext),
+    };
+  }
+  if (isSwap) {
+    return { sets: blankPlanValues(currentSets), toast: null };
+  }
+  return null;
+}

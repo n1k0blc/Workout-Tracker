@@ -18,6 +18,7 @@ import {
 import { Input } from '@/components/ui/input';
 import type { ExerciseLog } from '@/types';
 import { replacePlanExerciseInList } from '@/lib/exercise-replace';
+import { usePlanExercisePrefill } from '@/lib/plan-exercise-prefill';
 import { withArrayPositionOrder } from '@/lib/workout-order';
 import { plannedSideFields } from '@/lib/set-sides';
 import { addPlannedSet } from '@/lib/planned-sets';
@@ -322,6 +323,25 @@ export default function BlueprintEditorStep({
   const currentDay =
     currentDayIndex !== null ? formData.workoutDays[currentDayIndex] : null;
 
+  const makeSetId = useCallback(
+    () => `set-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    [],
+  );
+
+  // Fills a swapped / added exercise's planned sets from its last performance (issue #113).
+  // The cascade starts from the day's planned gym; every edit still round-trips through
+  // `formData`, so the write goes to both `currentExercises` and the wizard form.
+  const prefillExercise = usePlanExercisePrefill({
+    exercises: currentExercises,
+    setsKey: 'plannedSets',
+    gymId: currentDay?.plannedHomeGymId || undefined,
+    makeSetId,
+    onApply: (next) => {
+      setCurrentExercises(next);
+      syncCurrentExercisesToFormData(next);
+    },
+  });
+
   const addExerciseToBlueprint = (exerciseId: string, exercise?: Exercise) => {
     if (currentDayIndex === null) return;
 
@@ -353,6 +373,8 @@ export default function BlueprintEditorStep({
     setNewlyAddedIds((prev) => new Set(prev).add(newExLog.id));
 
     setShowExerciseModal(false);
+    // Fire-and-forget: an added exercise has no structure, so it takes history's shape wholesale.
+    void prefillExercise(newExLog.id, exerciseId, false);
   };
 
 
@@ -450,6 +472,9 @@ export default function BlueprintEditorStep({
                           }, 'plannedSets');
                           setCurrentExercises(newList);
                           syncCurrentExercisesToFormData(newList);
+                          // The swap has applied from local state; the lookup resolves after
+                          // and fills the plan's existing slots from the last performance.
+                          void prefillExercise(exId, newExId, true);
                         }}
                         onAddSet={(exId) => {
                           const newList = currentExercises.map((e) => {
