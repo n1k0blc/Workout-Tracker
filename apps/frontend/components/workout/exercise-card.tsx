@@ -6,6 +6,7 @@ import { useWorkout } from '@/lib/workout-context';
 import { getSetIndicatorSlots, resolveSetRows } from '@/lib/set-slots';
 import { setPerSide, deriveSidesFromDrafts, type PerSideBreakdown } from '@/lib/set-sides';
 import { canLogAdditionalSet } from '@/lib/log-set-guards';
+import { seedAddedSetValues } from '@/lib/add-set-seed';
 import type { LogSetData } from '@/lib/workout-context';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -407,11 +408,42 @@ export default function ExerciseCard({
       : 0;
     const next = Math.max(maxPlanned, maxLogged, maxDraft) + 1;
 
+    // The new row arrives carrying the previous set's values (issue #111): the last logged set,
+    // falling back to the last planned one, so a third set at the same weight x reps is one tap.
+    // The set *type* is never copied -- an added set is always WORKING. With no previous set at
+    // all the fields stay blank so the user types an estimate into the 0 placeholders.
+    const seed = seedAddedSetValues(exercise.sets, exercise.plannedSets);
+    const toStr = (n: number | null | undefined) => (n == null ? '' : n.toString());
+
     setAdditionalSetNumbers((prev) => [...prev, next]);
     setEditValues((prev) => ({
       ...prev,
-      [next]: { weight: '', reps: '', rir: '', setType: SetType.WORKING },
+      [next]: seed
+        ? { weight: toStr(seed.weight), reps: toStr(seed.reps), rir: toStr(seed.rir), setType: SetType.WORKING }
+        : { weight: '', reps: '', rir: '', setType: SetType.WORKING },
     }));
+
+    // A unilateral card logs from the per-side draft, which seeds empty for a non-planned set --
+    // so copy the previous set's sides across too, with the aggregate left for logSet to
+    // re-derive. `trailingTouched` blocks the leading-side mirror from overwriting them.
+    if (perSideEntry && seed) {
+      setSideEdits((prev) => ({
+        ...prev,
+        [next]: {
+          left: {
+            weight: toStr(seed.weightLeft ?? seed.weight),
+            reps: toStr(seed.repsLeft ?? seed.reps),
+            rir: toStr(seed.rirLeft ?? seed.rir),
+          },
+          right: {
+            weight: toStr(seed.weightRight ?? seed.weight),
+            reps: toStr(seed.repsRight ?? seed.reps),
+            rir: toStr(seed.rirRight ?? seed.rir),
+          },
+          trailingTouched: true,
+        },
+      }));
+    }
   };
 
   const handleLogSet = async (setNumber: number) => {
