@@ -21,12 +21,21 @@ interface ExerciseSelectionModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelect: (exerciseId: string, exercise?: Exercise) => void;
+  /**
+   * When the picker opens to *swap* an exercise, this is the id of the exercise being
+   * replaced. Its muscle group (the derived `primaryMuscle`) is preselected once the
+   * catalogue loads, so the list opens narrowed to alternatives for the same muscle.
+   * Equipment is deliberately left on "Alle" -- the usual reason to swap is that the
+   * equipment is taken. Omitted for plain "add exercise" and the analytics picker.
+   */
+  preselectMuscleFromExerciseId?: string;
 }
 
 export default function ExerciseSelectionModal({
   open,
   onOpenChange,
   onSelect,
+  preselectMuscleFromExerciseId,
 }: ExerciseSelectionModalProps) {
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,7 +73,14 @@ export default function ExerciseSelectionModal({
     apiClient
       .getExercises({ includeCustom: true })
       .then((data) => {
-        if (!cancelled) setExercises(data);
+        if (cancelled) return;
+        setExercises(data);
+        // Preselect the muscle group of the exercise being swapped, resolved from the
+        // freshly-loaded catalogue (the exercise-log shape carries no primaryMuscle).
+        if (preselectMuscleFromExerciseId) {
+          const source = data.find((e) => e.id === preselectMuscleFromExerciseId);
+          if (source) setMuscleGroupFilter(source.primaryMuscle);
+        }
       })
       .catch((error) => {
         console.error('Failed to load exercises:', error);
@@ -76,7 +92,7 @@ export default function ExerciseSelectionModal({
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, preselectMuscleFromExerciseId]);
 
   const filteredExercises = useMemo(() => {
     const query = search.trim().toLowerCase();

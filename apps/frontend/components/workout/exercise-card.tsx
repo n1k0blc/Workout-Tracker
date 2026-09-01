@@ -1455,6 +1455,7 @@ export default function ExerciseCard({
         open={showReplaceModal}
         onOpenChange={setShowReplaceModal}
         onSelect={handleReplaceExercise}
+        preselectMuscleFromExerciseId={exercise.exerciseId}
       />
     </>
   );
