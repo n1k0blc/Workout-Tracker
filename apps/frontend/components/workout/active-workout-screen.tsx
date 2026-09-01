@@ -9,7 +9,7 @@ import ExerciseCard from '@/components/workout/exercise-card';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import WorkoutTimer from '@/components/workout/workout-timer';
 import { RestTimerDisplay } from '@/components/workout/rest-timer-display';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 import {
   DndContext,
   closestCenter,
