@@ -37,9 +37,12 @@ export function addPlannedSet(
 ): PlannedSet[] {
   const previous = sets[sets.length - 1];
 
-  const reps = previous?.reps ?? 10;
+  // No-previous fallback is 0 reps / 0 kg / 0 RIR (rest still 90) so a brand-new exercise
+  // behaves the same here as it does in the active workout (issue #111): obvious 0
+  // placeholders to type an estimate into, not a fabricated 10x0@2.
+  const reps = previous?.reps ?? 0;
   const weight = previous?.weight ?? 0;
-  const rir = previous?.rir ?? 2;
+  const rir = previous?.rir ?? 0;
 
   const next: PlannedSet = {
     id: `planned-${Date.now()}-${sets.length}`,

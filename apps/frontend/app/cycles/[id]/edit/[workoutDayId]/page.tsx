@@ -2,7 +2,7 @@
 
 import { ProtectedRoute } from '@/components/protected-route';
 import { useParams, useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { WorkoutCycle, Exercise, WorkoutExercise, SetType } from '@/types';
@@ -47,6 +47,7 @@ import {
 import { IconPlus } from '@tabler/icons-react';
 import type { ExerciseLog, WorkoutDay } from '@/types';
 import { replacePlanExerciseInList } from '@/lib/exercise-replace';
+import { usePlanExercisePrefill } from '@/lib/plan-exercise-prefill';
 import { withArrayPositionOrder } from '@/lib/workout-order';
 import { plannedSideFields } from '@/lib/set-sides';
 import { addPlannedSet } from '@/lib/planned-sets';
@@ -77,6 +78,21 @@ export default function EditBlueprintPage() {
   // The day currently holding `plannedWeekday`, when it isn't this day -- set right before
   // asking the user to confirm a swap, so the dialog can name it.
   const [swapConflict, setSwapConflict] = useState<WorkoutDay | null>(null);
+
+  const makeSetId = useCallback(
+    () => `set-new-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    [],
+  );
+
+  // Fills a swapped / added exercise's planned sets from its last performance (issue #113).
+  // The cascade starts from the day's planned gym.
+  const prefillExercise = usePlanExercisePrefill({
+    exercises,
+    setsKey: 'sets',
+    gymId: plannedHomeGymId || undefined,
+    makeSetId,
+    onApply: setExercises,
+  });
 
   // DnD Kit sensors (long-press on title, same as template editor and active workout)
   const sensors = useSensors(
@@ -159,6 +175,8 @@ export default function EditBlueprintPage() {
     setExercises([...exercises, newExercise]);
     setNewlyAddedIds((prev) => new Set(prev).add(newExercise.id));
     setShowExerciseModal(false);
+    // Fire-and-forget: an added exercise has no structure, so it takes history's shape wholesale.
+    void prefillExercise(newExercise.id, exercise.id, false);
   };
 
   // Passed directly as ExerciseCard's onReplaceExercise: the card owns its own replace
@@ -168,6 +186,9 @@ export default function EditBlueprintPage() {
     try {
       const newExercise = await apiClient.getExercise(newExerciseId);
       setExercises((prev) => replacePlanExerciseInList(prev, exerciseLogId, newExercise, 'sets'));
+      // The swap has applied from local state; the lookup resolves after and fills the plan's
+      // existing slots from the last performance (issue #113).
+      void prefillExercise(exerciseLogId, newExerciseId, true);
     } catch (error) {
       console.error('Failed to replace exercise:', error);
     }

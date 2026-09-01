@@ -153,6 +153,10 @@ export interface WorkoutExercise {
   id: string;
   exerciseId: string;
   exerciseName: string;
+  // Catalogue equipment of the exercise (§4.1). Optional because older persisted drafts and
+  // hand-built fixtures predate it; the active-workout UI reads it to let a BODYWEIGHT set log
+  // at 0 kg while keeping the guard for every other exercise.
+  equipment?: Equipment;
   isUnilateral?: boolean;
   isDoubleWeight?: boolean;
   order: number;
@@ -205,6 +209,10 @@ export interface ExerciseLog {
   id: string;
   exerciseId: string;
   exerciseName: string;
+  // Catalogue equipment, carried from the tree / picked exercise so the card's additional-set
+  // guard can allow a 0 kg set on a BODYWEIGHT movement. Optional: older persisted drafts and
+  // fixtures predate it, and an unknown value simply falls back to the strict guard.
+  equipment?: Equipment;
   isUnilateral?: boolean;
   isDoubleWeight?: boolean;
   order: number;
@@ -296,6 +304,35 @@ export interface SaveWorkoutDto {
   saveAsTemplateMode?: SaveAsTemplateMode;
   saveAsTemplateName?: string;
   overwriteTemplateId?: string;
+}
+
+// Last-performance lookup (issue #112): the last time the user actually performed an
+// exercise, plus which step of the gym cascade it was found on. Drives the swap/add
+// prefill in the active workout. `rest` is deliberately absent -- see the endpoint.
+export type LastPerformanceSource = 'CURRENT_GYM' | 'HOME_GYM' | 'ANY_GYM';
+
+export interface LastPerformanceSet {
+  setType: SetType;
+  reps: number;
+  weight: number;
+  rir?: number;
+  repsLeft?: number;
+  repsRight?: number;
+  weightLeft?: number;
+  weightRight?: number;
+  rirLeft?: number;
+  rirRight?: number;
+}
+
+export interface LastPerformance {
+  exerciseId: string;
+  source: LastPerformanceSource;
+  /** The `localDate` (YYYY-MM-DD) of the workout the values came from. */
+  performedOn: string;
+  gymId: string | null;
+  /** `null` when that workout was logged at "Anderes Gym". */
+  gymName: string | null;
+  sets: LastPerformanceSet[];
 }
 
 // Cycle Types

@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client';
-import { SetType } from '../common/types';
+import { SetType, Equipment } from '../common/types';
 import {
   WorkoutExerciseInputDto,
   WorkoutExerciseResponseDto,
@@ -251,7 +251,12 @@ type LoadedWorkoutExercise = {
   id: string;
   exerciseId: string;
   order: number;
-  exercise: { name: string; isUnilateral: boolean; isDoubleWeight: boolean };
+  exercise: {
+    name: string;
+    equipment: Equipment;
+    isUnilateral: boolean;
+    isDoubleWeight: boolean;
+  };
   sets: {
     id: string;
     order: number;
@@ -281,6 +286,7 @@ export function mapExercisesToResponse(
       id: ex.id,
       exerciseId: ex.exerciseId,
       exerciseName: ex.exercise.name,
+      equipment: ex.exercise.equipment,
       isUnilateral: ex.exercise.isUnilateral,
       isDoubleWeight: ex.exercise.isDoubleWeight,
       order: ex.order,
@@ -310,7 +316,12 @@ export const WORKOUT_EXERCISE_TREE_INCLUDE = {
   exercises: {
     include: {
       exercise: {
-        select: { name: true, isUnilateral: true, isDoubleWeight: true },
+        select: {
+          name: true,
+          equipment: true,
+          isUnilateral: true,
+          isDoubleWeight: true,
+        },
       },
       sets: { orderBy: { order: 'asc' as const } },
     },

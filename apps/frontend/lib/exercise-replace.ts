@@ -1,7 +1,10 @@
+import type { Equipment } from '@/types';
+
 /** The fields a picked replacement exercise contributes to a draft exercise entry. */
 export interface ReplacementExercise {
   id: string;
   name: string;
+  equipment?: Equipment;
   isUnilateral?: boolean;
   isDoubleWeight?: boolean;
 }
@@ -14,6 +17,10 @@ export interface ReplacementExercise {
  * column headers straight off these two flags, so a carried-over value shows the previous
  * exercise's loading scheme (missing headers after swapping to a dumbbell exercise, stale headers
  * after swapping away from one). Absent flags normalise to `false` for the same reason.
+ *
+ * `equipment` is overwritten on the same principle -- it gates the card's 0 kg additional-set
+ * guard, so a swap away from a BODYWEIGHT exercise must not leave that guard open. A lookup miss
+ * carries no equipment, which drops it and falls back to the strict guard.
  */
 export function replaceExerciseInList<T extends { id: string }>(
   exercises: T[],
@@ -26,6 +33,7 @@ export function replaceExerciseInList<T extends { id: string }>(
           ...ex,
           exerciseId: replacement?.id ?? (ex as { exerciseId?: string }).exerciseId,
           exerciseName: replacement?.name || 'Exercise',
+          equipment: replacement?.equipment,
           isUnilateral: replacement?.isUnilateral ?? false,
           isDoubleWeight: replacement?.isDoubleWeight ?? false,
         }

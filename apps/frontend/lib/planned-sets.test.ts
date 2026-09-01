@@ -41,11 +41,11 @@ describe('addPlannedSet', () => {
     expect(next[1]).toMatchObject({ order: 2, reps: 8, weight: 60, rir: 1, rest: 120 });
   });
 
-  it('starts a working set at sensible defaults for an exercise with no sets', () => {
+  it('starts a working set at 0/0/0 with rest 90 for an exercise with no sets', () => {
     const next = addPlannedSet([]);
 
     expect(next).toHaveLength(1);
-    expect(next[0]).toMatchObject({ order: 1, setType: SetType.WORKING, rest: 90 });
+    expect(next[0]).toMatchObject({ order: 1, setType: SetType.WORKING, reps: 0, weight: 0, rir: 0, rest: 90 });
   });
 
   it('gives the new set its own id', () => {
@@ -98,15 +98,20 @@ describe('addPlannedSet', () => {
     });
   });
 
-  it('starts a unilateral exercise with no sets at sensible defaults on both sides', () => {
+  it('starts a unilateral exercise with no sets at 0 on both sides', () => {
     const next = addPlannedSet([], { isUnilateral: true });
 
     expect(next[0]).toMatchObject({
       order: 1,
       weightLeft: 0,
       weightRight: 0,
-      repsLeft: 10,
-      repsRight: 10,
+      repsLeft: 0,
+      repsRight: 0,
+      rirLeft: 0,
+      rirRight: 0,
+      reps: 0,
+      weight: 0,
+      rir: 0,
     });
   });
 

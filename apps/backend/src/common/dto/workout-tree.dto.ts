@@ -12,7 +12,7 @@ import {
   ArrayMinSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { SetType } from '../types';
+import { SetType, Equipment } from '../types';
 
 /**
  * Shared exercise/set tree vocabulary (§4.1): one shape for blueprints, templates, and
@@ -130,6 +130,10 @@ export class WorkoutExerciseResponseDto {
   id: string;
   exerciseId: string;
   exerciseName: string;
+  // The catalogue equipment of the exercise -- carried so the active-workout UI can tell a
+  // BODYWEIGHT movement (where a 0 kg set is a real load) from every other exercise (where it
+  // is a mistake worth blocking). See the additional-set guard in exercise-card.
+  equipment: Equipment;
   isUnilateral: boolean;
   isDoubleWeight: boolean;
   order: number;

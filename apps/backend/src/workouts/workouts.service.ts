@@ -14,6 +14,7 @@ import { ExercisesService } from '../exercises/exercises.service';
 import { CreateWorkoutDto, SaveAsTemplateMode } from './dto/create-workout.dto';
 import { UpdateWorkoutDto } from './dto/update-workout.dto';
 import { WorkoutResponseDto, WorkoutListItemDto } from './dto/workout-response.dto';
+import { LastPerformanceDto, LastPerformanceSource } from './dto/last-performance.dto';
 
 const WORKOUT_FULL_INCLUDE = {
   cycle: { select: { name: true } },
@@ -111,6 +112,79 @@ export class WorkoutsService {
     }
 
     return this.mapWorkoutToResponse(workout);
+  }
+
+  /**
+   * The last time the user actually performed `exerciseId`, walked through the gym cascade
+   * (issue #112). Returns the *most recent* qualifying performed workout -- never the best --
+   * and reports which cascade step it came from so the caller can label a degraded source.
+   *
+   * `gymId` is the gym of the context asking (the active workout's gym); when absent the
+   * cascade starts at "any home gym". `excludeWorkoutId` drops the workout currently open so
+   * a session cannot read itself back as "last time". Soft-deleted exercises still count --
+   * the lookup keys on `WorkoutExercise.exerciseId`, never on `Exercise.deletedAt`. There is
+   * no staleness cutoff; the date rides along in the response instead.
+   */
+  async findExerciseLastPerformance(
+    userId: string,
+    exerciseId: string,
+    gymId?: string,
+    excludeWorkoutId?: string,
+  ): Promise<LastPerformanceDto | null> {
+    const base: Prisma.WorkoutWhereInput = {
+      userId,
+      kind: 'WORKOUT',
+      exercises: { some: { exerciseId } },
+      ...(excludeWorkoutId ? { id: { not: excludeWorkoutId } } : {}),
+    };
+
+    const steps: { source: LastPerformanceSource; where: Prisma.WorkoutWhereInput }[] = [
+      ...(gymId ? [{ source: 'CURRENT_GYM' as const, where: { ...base, homeGymId: gymId } }] : []),
+      { source: 'HOME_GYM', where: { ...base, homeGymId: { not: null } } },
+      { source: 'ANY_GYM', where: base },
+    ];
+
+    for (const step of steps) {
+      const workout = await this.prisma.workout.findFirst({
+        where: step.where,
+        orderBy: { date: 'desc' },
+        include: {
+          homeGym: { select: { id: true, name: true } },
+          exercises: {
+            where: { exerciseId },
+            include: { sets: { orderBy: { order: 'asc' } } },
+          },
+        },
+      });
+
+      // The workout matched `exercises: { some: { exerciseId } }` and the include filters to
+      // that same exercise, so `exercises[0]` is always the one we asked for; a persisted
+      // performed exercise always has at least one set (the save path drops empty ones).
+      const performedExercise = workout?.exercises[0];
+      if (!workout || !performedExercise) continue;
+
+      return {
+        exerciseId,
+        source: step.source,
+        performedOn: workout.localDate!,
+        gymId: workout.homeGymId,
+        gymName: workout.homeGym?.name ?? null,
+        sets: performedExercise.sets.map((s) => ({
+          setType: s.setType,
+          reps: s.reps,
+          weight: s.weight,
+          rir: s.rir ?? undefined,
+          repsLeft: s.repsLeft ?? undefined,
+          repsRight: s.repsRight ?? undefined,
+          weightLeft: s.weightLeft ?? undefined,
+          weightRight: s.weightRight ?? undefined,
+          rirLeft: s.rirLeft ?? undefined,
+          rirRight: s.rirRight ?? undefined,
+        })),
+      };
+    }
+
+    return null;
   }
 
   async create(dto: CreateWorkoutDto, userId: string): Promise<WorkoutResponseDto> {

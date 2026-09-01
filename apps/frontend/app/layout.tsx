@@ -4,7 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
 import { WorkoutProvider } from "@/lib/workout-context";
 import { MobileNav } from "@/components/mobile-nav";
-import { Toaster } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "next-themes";
 import { cn } from "@/lib/utils";
 
@@ -49,7 +49,7 @@ export default function RootLayout({
         >
           <AuthProvider>
             <WorkoutProvider>
-              <Toaster position="top-center" richColors closeButton />
+              <Toaster />
               <MobileNav />
               {children}
             </WorkoutProvider>

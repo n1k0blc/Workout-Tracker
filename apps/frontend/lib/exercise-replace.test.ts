@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { replaceExerciseInList, replacePlanExerciseInList } from './exercise-replace';
+import { Equipment } from '@/types';
 
 const plainExercise = {
   id: 'log-1',
@@ -39,6 +40,23 @@ describe('replaceExerciseInList', () => {
 
     expect(replaced.isDoubleWeight).toBe(false);
     expect(replaced.isUnilateral).toBe(false);
+  });
+
+  it('adopts the replacement equipment, and drops it back to undefined on a lookup miss', () => {
+    const bodyweight = { ...plainExercise, equipment: Equipment.BODYWEIGHT };
+
+    const [toBarbell] = replaceExerciseInList([bodyweight], 'log-1', {
+      id: 'ex-bb',
+      name: 'Langhantel Rudern',
+      equipment: Equipment.BARBELL,
+    });
+    expect(toBarbell.equipment).toBe(Equipment.BARBELL);
+
+    const [miss] = replaceExerciseInList([bodyweight], 'log-1', {
+      id: 'ex-x',
+      name: 'Nur Name',
+    });
+    expect(miss.equipment).toBeUndefined();
   });
 
   it('keeps sets and order untouched', () => {

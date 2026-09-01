@@ -14,6 +14,7 @@ import ExerciseCard from '@/components/workout/exercise-card';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import { IconChevronLeft, IconPlus } from '@tabler/icons-react';
 import { replacePlanExerciseInList } from '@/lib/exercise-replace';
+import { usePlanExercisePrefill } from '@/lib/plan-exercise-prefill';
 import { withArrayPositionOrder } from '@/lib/workout-order';
 import { plannedSideFields } from '@/lib/set-sides';
 import { addPlannedSet, removePlannedSet, updatePlannedSet } from '@/lib/planned-sets';
@@ -56,6 +57,22 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
   // Exercises added this session start expanded (see handleAddExercise) so the user
   // isn't left guessing they need to add sets.
   const [newlyAddedIds, setNewlyAddedIds] = useState<Set<string>>(new Set());
+
+  const makeSetId = useCallback(
+    () => `planned-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    [],
+  );
+
+  // Fills a swapped / added exercise's planned sets from its last performance (issue #113).
+  // No gym picker on the standalone template editor, so `recommendedGymId` is the only context:
+  // absent, the cascade starts at "any home gym" and the toast names where it landed.
+  const prefillExercise = usePlanExercisePrefill({
+    exercises,
+    setsKey: 'plannedSets',
+    gymId: recommendedGymId || undefined,
+    makeSetId,
+    onApply: setExercises,
+  });
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -101,6 +118,8 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
     setExercises(prev => [...prev, newEx]);
     setNewlyAddedIds((prev) => new Set(prev).add(newEx.id));
     setShowExerciseModal(false);
+    // Fire-and-forget: an added exercise has no structure, so it takes history's shape wholesale.
+    void prefillExercise(newEx.id, exerciseId, false);
   };
 
   const loadData = useCallback(async () => {
@@ -367,6 +386,9 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
                               ...(exDetails ?? { name: 'Exercise' }),
                               id: newId,
                             }, 'plannedSets'));
+                            // The swap has applied from local state; the lookup resolves after
+                            // and fills the plan's existing slots from the last performance.
+                            void prefillExercise(id, newId, true);
                           }}
                           onAddSet={(id) => {
                             setExercises(prev => prev.map(e =>
