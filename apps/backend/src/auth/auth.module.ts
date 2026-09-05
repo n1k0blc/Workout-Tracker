@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { PasswordService } from './password.service';
+import { BreachedPasswordService } from './breached-password.service';
 import { RefreshTokenService } from './refresh-token.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -29,7 +30,14 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, PasswordService, RefreshTokenService, JwtStrategy, JwtAuthGuard],
+  providers: [
+    AuthService,
+    PasswordService,
+    BreachedPasswordService,
+    RefreshTokenService,
+    JwtStrategy,
+    JwtAuthGuard,
+  ],
   exports: [AuthService, PasswordService, RefreshTokenService, JwtAuthGuard, PassportModule],
 })
 export class AuthModule {}

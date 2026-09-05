@@ -1,5 +1,6 @@
 import {
   Injectable,
+  BadRequestException,
   ConflictException,
   UnauthorizedException,
   InternalServerErrorException,
@@ -9,7 +10,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto, LoginDto, ChangePasswordDto } from './dto';
 import { UserDto } from '../users/dto';
 import { PasswordService } from './password.service';
+import { BreachedPasswordService } from './breached-password.service';
 import { RefreshTokenService, IssuedRefreshToken } from './refresh-token.service';
+
+const BREACHED_PASSWORD_MESSAGE =
+  'This password has appeared in a known data breach. Please choose a different password.';
 
 const USER_SELECT = {
   id: true,
@@ -38,6 +43,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private passwordService: PasswordService,
+    private breachedPasswordService: BreachedPasswordService,
     private refreshTokenService: RefreshTokenService,
   ) {}
 
@@ -50,6 +56,10 @@ export class AuthService {
 
     if (existingUser) {
       throw new ConflictException('User with this email already exists');
+    }
+
+    if (await this.breachedPasswordService.isBreached(password)) {
+      throw new BadRequestException(BREACHED_PASSWORD_MESSAGE);
     }
 
     const passwordHash = await this.passwordService.hash(password);
@@ -142,6 +152,10 @@ export class AuthService {
     const isCurrentPasswordValid = await this.passwordService.verify(dto.currentPassword, user.passwordHash);
     if (!isCurrentPasswordValid) {
       throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    if (await this.breachedPasswordService.isBreached(dto.newPassword)) {
+      throw new BadRequestException(BREACHED_PASSWORD_MESSAGE);
     }
 
     const newHash = await this.passwordService.hash(dto.newPassword);
