@@ -12,7 +12,11 @@ async function bootstrap() {
   // Needed so req.ip / throttler / Secure-cookie logic see the real client, not the tunnel.
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
 
-  app.use(helmet());
+  // HSTS is owned by the Cloudflare edge (the single source of truth, since TLS
+  // terminates there and the origin is only reachable through the tunnel).
+  // Emitting it here too would let browsers flip-flop between the edge value and
+  // helmet's default. See issue #124.
+  app.use(helmet({ hsts: false }));
   // Must run before the CSRF middleware and JwtStrategy's cookie extractor.
   app.use(cookieParser());
 

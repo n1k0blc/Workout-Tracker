@@ -16,11 +16,9 @@ describe('next.config security headers', () => {
     expect(nextConfig.poweredByHeader).toBe(false);
   });
 
-  it('sends HSTS with a long max-age', async () => {
-    const value = (await headerMap()).get('Strict-Transport-Security');
-    expect(value).toBeDefined();
-    const maxAge = Number(/max-age=(\d+)/.exec(value!)?.[1]);
-    expect(maxAge).toBeGreaterThanOrEqual(31536000);
+  it('does not send HSTS — the Cloudflare edge is the source of truth (issue #124)', async () => {
+    const keys = [...(await headerMap()).keys()].map((k) => k.toLowerCase());
+    expect(keys).not.toContain('strict-transport-security');
   });
 
   it('sends nosniff', async () => {
