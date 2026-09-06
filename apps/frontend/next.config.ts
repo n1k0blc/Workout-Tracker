@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 // Security response headers that carry no risk of breaking the running app.
-// Content-Security-Policy is deliberately excluded — it can white-screen
-// production and gets its own ticket with a report-only rollout.
+// Content-Security-Policy is deliberately excluded here — it needs a per-request
+// nonce, so it lives in middleware.ts (report-only for now). See issue #125.
 //
 // Strict-Transport-Security is deliberately excluded too: HSTS is owned by the
 // Cloudflare edge (the single source of truth — TLS terminates there and the

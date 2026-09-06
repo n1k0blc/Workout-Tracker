@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Geist, Geist_Mono, Oxanium } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
@@ -7,6 +8,13 @@ import { MobileNav } from "@/components/mobile-nav";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "next-themes";
 import { cn } from "@/lib/utils";
+
+// The CSP (issue #125) uses a per-request nonce with strict-dynamic. Next only
+// stamps that nonce onto its scripts when a route is rendered per request, so
+// every route must render dynamically — a statically prerendered page would ship
+// nonce-less inline scripts that an enforcing policy blocks. These pages all
+// fetch the signed-in user's data on mount anyway, so nothing was truly static.
+export const dynamic = "force-dynamic";
 
 const oxanium = Oxanium({
   subsets: ["latin"],
@@ -29,11 +37,15 @@ export const metadata: Metadata = {
   description: "Personal Workout Tracking Application",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Per-request CSP nonce (set by middleware.ts). next-themes injects an inline
+  // <script>, so it needs the nonce to survive strict-dynamic once enforced.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html
       lang="de"
@@ -46,6 +58,7 @@ export default function RootLayout({
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
+          nonce={nonce}
         >
           <AuthProvider>
             <WorkoutProvider>

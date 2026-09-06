@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import { json } from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -19,6 +20,9 @@ async function bootstrap() {
   app.use(helmet({ hsts: false }));
   // Must run before the CSRF middleware and JwtStrategy's cookie extractor.
   app.use(cookieParser());
+  // Browsers post CSP violation reports with these content types, which the
+  // default JSON body parser ignores (issue #125).
+  app.use(json({ type: ['application/csp-report', 'application/reports+json'], limit: '16kb' }));
 
   // Global prefix for all routes
   app.setGlobalPrefix('api');

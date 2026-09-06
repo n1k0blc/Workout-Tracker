@@ -8,7 +8,13 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 // one. They don't need double-submit CSRF protection: register/login require the
 // attacker to already know the victim's credentials, and refresh is protected by the
 // httpOnly refresh cookie itself (SameSite=Lax + rotation/reuse-detection).
-const EXEMPT_PATHS = new Set(['/api/auth/login', '/api/auth/register', '/api/auth/refresh']);
+const EXEMPT_PATHS = new Set([
+  '/api/auth/login',
+  '/api/auth/register',
+  '/api/auth/refresh',
+  // Browser-sent CSP violation reports carry no cookies and no CSRF token (issue #125).
+  '/api/security/csp-report',
+]);
 
 const CSRF_COOKIE = 'csrf_token';
 const CSRF_HEADER = 'x-csrf-token';
