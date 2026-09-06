@@ -33,7 +33,7 @@ export function MobileNav() {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const { activeWorkout, isHistoryEdit } = useWorkout();
+  const { activeWorkout } = useWorkout();
 
   const getUserInitial = () => {
     if (user?.firstName) return user.firstName[0].toUpperCase();
@@ -48,15 +48,14 @@ export function MobileNav() {
   }, [pathname]);
 
   // Don't show navigation on auth pages, the active workout screen (live or past tracking),
-  // or when there is a real active (IN_PROGRESS) workout session.
-  // Note: completed workouts loaded into context for history edit (via setActiveWorkoutDirectly)
-  // should NOT hide the main site header — they are for viewing/editing historical data.
+  // or whenever a workout is in the context — which now always means a live/past session,
+  // never a history edit (the history editor owns its own state — issue #126).
   if (
     pathname === '/' ||
     pathname === '/login' ||
     pathname === '/register' ||
     pathname?.startsWith('/workout') ||
-    (activeWorkout && !isHistoryEdit)
+    activeWorkout
   ) {
     return null;
   }

@@ -11,7 +11,7 @@ import { Workout, PersonalRecord } from '@/types';
 
 export default function WorkoutPage() {
   const router = useRouter();
-  const { activeWorkout, loading, isPastWorkout, isHistoryEdit } = useWorkout();
+  const { activeWorkout, loading, isPastWorkout } = useWorkout();
 
   // Completion modal state
   const [showCompletionModal, setShowCompletionModal] = useState(false);
@@ -41,7 +41,7 @@ export default function WorkoutPage() {
           </div>
         ) : activeWorkout ? (
           <ActiveWorkoutScreen
-            mode={isPastWorkout || isHistoryEdit ? 'edit' : 'active'}
+            mode={isPastWorkout ? 'edit' : 'active'}
             onWorkoutComplete={handleWorkoutComplete}
           />
         ) : (

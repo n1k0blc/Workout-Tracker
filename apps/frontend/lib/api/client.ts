@@ -299,7 +299,7 @@ class ApiClient {
 
   // NOTE: the raw response's `exercises[].sets[]` use the wire shape (`order`, no
   // `setNumber`/`plannedSets`) -- callers must map into ExerciseLog/SetLog themselves
-  // (see workout-context's loadWorkoutForEdit) before handing this to ExerciseCard.
+  // (see `buildExerciseLogsForEdit` in lib/workout-order) before handing this to ExerciseCard.
   async getWorkout(id: string): Promise<Workout> {
     return this.request<Workout>(`/workouts/${id}`);
   }
