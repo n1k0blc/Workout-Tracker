@@ -7,20 +7,20 @@ import { useWorkout } from '@/lib/workout-context';
 import WorkoutStartScreen from '@/components/workout/start-screen';
 import ActiveWorkoutScreen from '@/components/workout/active-workout-screen';
 import { WorkoutCompletionModal } from '@/components/WorkoutCompletionModal';
+import { Button } from '@/components/ui/button';
 import { Workout, PersonalRecord } from '@/types';
 
 export default function WorkoutPage() {
   const router = useRouter();
-  const { activeWorkout, loading, isPastWorkout } = useWorkout();
+  const { activeWorkout, loading, isPastWorkout, expandWorkout } = useWorkout();
 
-  // Completion modal state
+  // Completion modal state — past-workout tracking only. A live session finishes
+  // inside the overlay, and its completion modal lives in ActiveWorkoutOverlay so it
+  // outlives the unmount (issue #129).
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [completedWorkout, setCompletedWorkout] = useState<Workout | null>(null);
   const [personalRecords, setPersonalRecords] = useState<PersonalRecord[]>([]);
 
-  // Handler for when workout is completed - called from ActiveWorkoutScreen. The template
-  // save/overwrite decision already happened atomically as part of the save itself (§3.4) --
-  // no separate post-completion step needed anymore.
   const handleWorkoutComplete = (workout: Workout, prs: PersonalRecord[]) => {
     setCompletedWorkout(workout);
     setPersonalRecords(prs);
@@ -32,6 +32,8 @@ export default function WorkoutPage() {
     router.push('/dashboard');
   };
 
+  const liveSession = activeWorkout && !isPastWorkout;
+
   return (
     <ProtectedRoute>
       <div className="min-h-screen bg-background">
@@ -39,16 +41,25 @@ export default function WorkoutPage() {
           <div className="flex items-center justify-center min-h-screen">
             <div className="text-lg text-muted-foreground">Lädt...</div>
           </div>
-        ) : activeWorkout ? (
-          <ActiveWorkoutScreen
-            mode={isPastWorkout ? 'edit' : 'active'}
-            onWorkoutComplete={handleWorkoutComplete}
-          />
+        ) : isPastWorkout && activeWorkout ? (
+          <ActiveWorkoutScreen mode="edit" onWorkoutComplete={handleWorkoutComplete} />
+        ) : liveSession ? (
+          // A live session is running in the overlay. This route no longer decides
+          // what the user sees, so it must not offer the start screen — that would
+          // let a second workout start straight over the running one (ADR-0001).
+          <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
+            <h1 className="text-2xl font-bold text-foreground">Ein Workout läuft bereits</h1>
+            <p className="max-w-sm text-sm text-muted-foreground">
+              Du hast eine laufende Trainingseinheit. Öffne sie, um weiterzumachen oder sie zu
+              beenden.
+            </p>
+            <Button onClick={() => expandWorkout()}>Workout öffnen</Button>
+          </div>
         ) : (
           <WorkoutStartScreen />
         )}
 
-        {/* Workout Completion Modal (shadcn Dialog, controlled) */}
+        {/* Completion modal for past-workout tracking (see note above). */}
         <WorkoutCompletionModal
           open={showCompletionModal}
           onOpenChange={(isOpen) => {

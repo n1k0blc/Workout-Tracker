@@ -21,6 +21,9 @@ const TIMER_KEYS: readonly [string, keyof DraftStorageKeys][] = [
 export interface DraftMeta {
   isPastWorkout: boolean;
   pastWorkoutDuration: number;
+  /** Whether the live session is collapsed into the bottom bar (issue #129).
+   *  Absent on drafts that predate the feature -- treated as expanded. */
+  isMinimized?: boolean;
 }
 
 export interface DraftStorageKeys {

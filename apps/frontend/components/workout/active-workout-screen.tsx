@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWorkout } from '@/lib/workout-context';
 import { apiClient } from '@/lib/api';
@@ -37,6 +37,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  IconArrowBarToDown,
   IconPlayerPlay,
   IconPlayerPause,
   IconPlus,
@@ -66,6 +67,8 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
     isPastWorkout,
     pastWorkoutDuration,
     setPastWorkoutDuration,
+    isMinimized,
+    minimizeWorkout,
   } = useWorkout();
 
   const [showExerciseModal, setShowExerciseModal] = useState(false);
@@ -77,6 +80,18 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
   const [updateBlueprint, setUpdateBlueprint] = useState(false);
   const [templateAction, setTemplateAction] = useState<TemplateAction>('none');
   const [newTemplateName, setNewTemplateName] = useState('');
+
+  // Minimizing has to close any open workout dialog, or a portalled picker sits at a
+  // higher z-index floating over the app once the overlay has collapsed (issue #129).
+  // An effect rather than the minimize handler so every future minimize path (drag,
+  // back button) is covered without repeating this.
+  useEffect(() => {
+    if (!isMinimized) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShowExerciseModal(false);
+    setShowCompleteConfirm(false);
+    setShowDiscardConfirm(false);
+  }, [isMinimized]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -267,6 +282,16 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
                         ) : (
                           <IconPlayerPause className="size-6" />
                         )}
+                      </Button>
+                      {/* Collapse the session into the bottom bar (issue #129). */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={minimizeWorkout}
+                        title="Workout minimieren"
+                        aria-label="Workout minimieren"
+                      >
+                        <IconArrowBarToDown className="size-6" />
                       </Button>
                     </>
                   ) : isPastWorkout ? (

@@ -53,6 +53,12 @@ export interface CompleteWorkoutOptions {
 interface WorkoutContextType {
   activeWorkout: Workout | null;
   loading: boolean;
+  // A live session can be collapsed into the bottom bar while the user browses the
+  // rest of the app (issue #129). Live sessions only -- past-workout tracking never
+  // sets this. Persisted alongside the draft, defaulting to expanded when absent.
+  isMinimized: boolean;
+  minimizeWorkout: () => void;
+  expandWorkout: () => void;
   isPaused: boolean;
   togglePause: () => void;
   isRestTimerPaused: boolean;
@@ -127,6 +133,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
   const [activeWorkout, setActiveWorkout] = useState<Workout | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isRestTimerPaused, setIsRestTimerPaused] = useState(false);
   const [isPastWorkout, setIsPastWorkout] = useState(false);
@@ -158,10 +165,17 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   // effect notice a logout / account switch and abandon a session that is no
   // longer ours (issue #127). `undefined` until auth first resolves.
   const restoredForUserRef = useRef<string | null | undefined>(undefined);
+  // Read by setActiveWorkoutDirectly so every draft write carries the current
+  // minimized flag rather than dropping it (issue #129).
+  const isMinimizedRef = useRef(false);
 
   useEffect(() => {
     workoutStartTimeRef.current = workoutStartTime;
   }, [workoutStartTime]);
+
+  useEffect(() => {
+    isMinimizedRef.current = isMinimized;
+  }, [isMinimized]);
 
   useEffect(() => {
     activeWorkoutRef.current = activeWorkout;
@@ -401,8 +415,25 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     persistDraft(workout, {
       isPastWorkout: isPast ?? false,
       pastWorkoutDuration: pastDuration ?? 0,
+      // A live session carries its collapsed state into the draft so a reload
+      // restores it as it was (issue #129); past tracking never minimizes.
+      isMinimized: isPast ? undefined : isMinimizedRef.current,
     });
   }, [persistDraft, keys, clearAllTimerState]);
+
+  // Both minimize paths route through here (ADR-0001): flip the flag and rewrite the
+  // draft meta in the same call, so the persisted state can never lag the UI.
+  const setMinimized = useCallback((next: boolean) => {
+    isMinimizedRef.current = next;
+    setIsMinimized(next);
+    const workout = activeWorkoutRef.current;
+    if (workout && !isPastWorkout) {
+      persistDraft(workout, { isPastWorkout: false, pastWorkoutDuration, isMinimized: next });
+    }
+  }, [persistDraft, isPastWorkout, pastWorkoutDuration]);
+
+  const minimizeWorkout = useCallback(() => setMinimized(true), [setMinimized]);
+  const expandWorkout = useCallback(() => setMinimized(false), [setMinimized]);
 
   /** Builds the local draft's ExerciseLog[] from a blueprint/template exercise tree. */
   const buildExerciseLogsFromTree = (
@@ -597,6 +628,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
       completionLogRef.current = [];
       setActiveWorkout(null);
+      isMinimizedRef.current = false;
+      setIsMinimized(false);
       clearAllTimerState();
       persistDraft(null, null);
 
@@ -612,6 +645,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const discardWorkout = () => {
     completionLogRef.current = [];
     setActiveWorkout(null);
+    isMinimizedRef.current = false;
+    setIsMinimized(false);
     clearAllTimerState();
     persistDraft(null, null);
   };
@@ -907,6 +942,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setActiveWorkout(null);
     setIsPastWorkout(false);
     setPastWorkoutDuration(0);
+    isMinimizedRef.current = false;
+    setIsMinimized(false);
     completionLogRef.current = [];
     resetTimerState();
 
@@ -935,6 +972,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
           setActiveWorkout(workout);
           setIsPastWorkout(meta.isPastWorkout);
           setPastWorkoutDuration(meta.pastWorkoutDuration);
+          // Absent on a draft written before this feature -- resume expanded (issue #129).
+          const restoredMinimized = !meta.isPastWorkout && meta.isMinimized === true;
+          isMinimizedRef.current = restoredMinimized;
+          setIsMinimized(restoredMinimized);
           restored = true;
         }
       } catch {
@@ -969,6 +1010,9 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       value={{
         activeWorkout,
         loading,
+        isMinimized,
+        minimizeWorkout,
+        expandWorkout,
         isPaused,
         togglePause,
         isRestTimerPaused,
