@@ -6,10 +6,18 @@ import { useWorkout } from '@/lib/workout-context';
 import { Workout, PersonalRecord } from '@/types';
 import ActiveWorkoutScreen from '@/components/workout/active-workout-screen';
 import { MinimizedWorkoutBar } from '@/components/workout/minimized-workout-bar';
+import { WorkoutDragHandle } from '@/components/workout/workout-drag-handle';
 import { WorkoutCompletionModal } from '@/components/WorkoutCompletionModal';
+import { useDragToMinimize } from '@/hooks/useDragToMinimize';
+import { cn } from '@/lib/utils';
 
 /** Resting height of the minimized bar; the collapsed transform is anchored to it. */
 const BAR_HEIGHT = 72;
+
+const EXPANDED_TRANSFORM = `translateY(-${BAR_HEIGHT}px)`;
+const MINIMIZED_TRANSFORM = `translateY(calc(100dvh - ${BAR_HEIGHT}px))`;
+const RESTING_TRANSITION =
+  'transition-transform duration-[320ms] ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none';
 
 /**
  * The persistent home of a live workout (ADR-0001, issue #129). Mounted in the root
@@ -21,9 +29,10 @@ const BAR_HEIGHT = 72;
  * routes and never reach this.
  */
 export function ActiveWorkoutOverlay() {
-  const { activeWorkout, isPastWorkout, isMinimized, expandWorkout } = useWorkout();
+  const { activeWorkout, isPastWorkout, isMinimized, minimizeWorkout, expandWorkout } = useWorkout();
   const pathname = usePathname();
   const router = useRouter();
+  const drag = useDragToMinimize(minimizeWorkout);
 
   const [completed, setCompleted] = useState<{ workout: Workout; prs: PersonalRecord[] } | null>(
     null,
@@ -62,20 +71,47 @@ export function ActiveWorkoutOverlay() {
     };
   }, [isLiveSession, isMinimized]);
 
+  // The overlay is one transformed unit, so the drag and the collapse are literally
+  // the same motion (issue #131): dragging interpolates the same translateY that the
+  // resting states sit at. The drag phases drive the transition inline off the shared
+  // animation constant; the resting tap/nav path keeps its own (320ms) class.
+  const animating = drag.phase === 'committing' || drag.phase === 'springing';
+  let transform: string;
+  if (drag.phase === 'dragging') {
+    transform = `translateY(calc(-${BAR_HEIGHT}px + ${drag.dragY}px))`;
+  } else if (drag.phase === 'committing') {
+    transform = MINIMIZED_TRANSFORM;
+  } else if (drag.phase === 'springing') {
+    transform = EXPANDED_TRANSFORM;
+  } else {
+    transform = isMinimized ? MINIMIZED_TRANSFORM : EXPANDED_TRANSFORM;
+  }
+
   return (
     <>
       {isLiveSession && (
         <div
-          className="fixed inset-x-0 top-0 z-40 flex flex-col overflow-hidden bg-background transition-transform duration-[320ms] ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none"
+          className={cn(
+            'fixed inset-x-0 top-0 z-40 flex flex-col overflow-hidden bg-background',
+            RESTING_TRANSITION,
+          )}
           style={{
             height: `calc(100dvh + ${BAR_HEIGHT}px)`,
-            transform: isMinimized
-              ? `translateY(calc(100dvh - ${BAR_HEIGHT}px))`
-              : `translateY(-${BAR_HEIGHT}px)`,
+            transform,
+            transition: drag.phase === 'dragging'
+              ? 'none'
+              : animating
+              ? `transform ${drag.animationMs}ms ease-out`
+              : undefined,
           }}
         >
           <MinimizedWorkoutBar workout={activeWorkout} onExpand={expandWorkout} />
           <div className="h-[100dvh] shrink-0 overflow-y-auto">
+            <WorkoutDragHandle
+              phase={drag.phase}
+              onPointerDown={drag.onPointerDown}
+              onClick={drag.onClick}
+            />
             <ActiveWorkoutScreen
               mode="active"
               onWorkoutComplete={(workout, prs) => setCompleted({ workout, prs })}
