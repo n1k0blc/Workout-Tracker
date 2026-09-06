@@ -15,6 +15,7 @@ import { WorkoutTemplatesModule } from './workout-templates/workout-templates.mo
 import { AnalyticsModule } from './analytics/analytics.module';
 import { HealthModule } from './health/health.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { SecurityModule } from './security/security.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     AnalyticsModule,
     HealthModule,
     DashboardModule,
+    SecurityModule,
   ],
   controllers: [],
   providers: [

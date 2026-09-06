@@ -62,6 +62,18 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   MOCK_DATE?: string;
+
+  // Have I Been Pwned "Pwned Passwords" range API. Both optional — sensible
+  // defaults live in BreachedPasswordService. Override the URL to point at a
+  // mirror; raise the timeout on a slow link.
+  @IsOptional()
+  @IsString()
+  PWNED_PASSWORDS_API_URL?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  PWNED_PASSWORDS_TIMEOUT_MS?: number;
 }
 
 export function validate(config: Record<string, unknown>) {

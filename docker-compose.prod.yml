@@ -39,7 +39,9 @@ services:
       # so pool sizing is documented rather than implicit.
       DATABASE_URL: postgresql://${DB_USER:-workoutuser}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-workout_tracker}?schema=public&connection_limit=10
       JWT_SECRET: ${JWT_SECRET}
-      JWT_EXPIRATION: ${JWT_EXPIRATION:-7d}
+      # Access tokens are not revoked on logout (only the refresh token is), so keep
+      # this short — the backend's own default is 15m. Do not raise it (issue #122).
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-15m}
       CORS_ORIGIN: ${CORS_ORIGIN:-https://workout.nikobjelic.com}
     ports:
       - "3001:3001"

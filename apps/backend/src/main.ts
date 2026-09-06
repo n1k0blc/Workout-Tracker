@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import { json } from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -12,9 +13,16 @@ async function bootstrap() {
   // Needed so req.ip / throttler / Secure-cookie logic see the real client, not the tunnel.
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
 
-  app.use(helmet());
+  // HSTS is owned by the Cloudflare edge (the single source of truth, since TLS
+  // terminates there and the origin is only reachable through the tunnel).
+  // Emitting it here too would let browsers flip-flop between the edge value and
+  // helmet's default. See issue #124.
+  app.use(helmet({ hsts: false }));
   // Must run before the CSRF middleware and JwtStrategy's cookie extractor.
   app.use(cookieParser());
+  // Browsers post CSP violation reports with these content types, which the
+  // default JSON body parser ignores (issue #125).
+  app.use(json({ type: ['application/csp-report', 'application/reports+json'], limit: '16kb' }));
 
   // Global prefix for all routes
   app.setGlobalPrefix('api');
