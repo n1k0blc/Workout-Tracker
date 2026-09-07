@@ -53,6 +53,11 @@ export function localDateToInstant(localDate: string): Date {
   return new Date(`${localDate}T00:00:00.000Z`);
 }
 
+/** The `YYYY-MM-DD` UTC calendar day of an instant -- the inverse of `localDateToInstant`. */
+export function instantToLocalDate(instant: Date): string {
+  return instant.toISOString().slice(0, 10);
+}
+
 export function weekdayOfLocalDate(localDate: string): number {
   return localDateToInstant(localDate).getUTCDay();
 }
@@ -60,5 +65,5 @@ export function weekdayOfLocalDate(localDate: string): number {
 export function addLocalDays(localDate: string, days: number): string {
   const shifted = localDateToInstant(localDate);
   shifted.setUTCDate(shifted.getUTCDate() + days);
-  return shifted.toISOString().slice(0, 10);
+  return instantToLocalDate(shifted);
 }

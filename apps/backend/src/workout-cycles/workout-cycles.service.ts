@@ -6,7 +6,7 @@ import { WorkoutTreeService, mapExercisesToResponse, toExerciseInputs, WORKOUT_E
 import { setWorkingVolume } from '../common/utils/volume.util';
 import { calculateCycleWeek, getCurrentDate } from '../common/utils/date.util';
 import { Today, localDateToInstant } from '../common/utils/today.util';
-import { WEEKDAY_NAMES, getWeekdayDistanceFromCycleStart } from '../common/utils/weekday.util';
+import { WEEKDAY_NAMES, cycleStartWeekday, getWeekdayDistanceFromCycleStart } from '../common/utils/weekday.util';
 import { ExercisesService } from '../exercises/exercises.service';
 import {
   CreateCycleDto,
@@ -138,7 +138,7 @@ export class WorkoutCyclesService {
     const allExerciseIds = workoutDays.flatMap((day) => day.exercises.map((e) => e.exerciseId));
     const exercisesById = await this.exercisesService.validateAccessible(allExerciseIds, userId);
 
-    const startWeekday = new Date(startDate).getUTCDay();
+    const startWeekday = cycleStartWeekday(startDate);
 
     const cycleId = await this.prisma.$transaction(async (tx) => {
       const cycle = await tx.workoutCycle.create({
@@ -197,10 +197,10 @@ export class WorkoutCyclesService {
           // transient clash with the (cycleId, order) unique index; parking everything at
           // negative, never-colliding placeholders first avoids that.
           const startWeekday = updateCycleDto.startDate
-            ? new Date(updateCycleDto.startDate).getUTCDay()
+            ? cycleStartWeekday(updateCycleDto.startDate)
             : undefined;
 
-          if (startWeekday !== undefined && startWeekday !== cycle.startDate.getUTCDay()) {
+          if (startWeekday !== undefined && startWeekday !== cycleStartWeekday(cycle.startDate)) {
             for (const [index, day] of cycle.workoutDays.entries()) {
               await tx.workoutDay.update({ where: { id: day.id }, data: { order: -1 - index } });
             }
@@ -280,7 +280,7 @@ export class WorkoutCyclesService {
       (day) => day.weekday === updateWorkoutDayDto.weekday && day.id !== workoutDayId,
     );
 
-    const startWeekday = cycle.startDate.getUTCDay();
+    const startWeekday = cycleStartWeekday(cycle.startDate);
     const newOrder = getWeekdayDistanceFromCycleStart(updateWorkoutDayDto.weekday, startWeekday);
 
     if (conflict) {

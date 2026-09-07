@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { fromLocalDateString } from '@/lib/local-date';
+import { WEEKDAY_NAMES } from '@/lib/weekday';
 import { 
   WorkoutListItem, 
   PersonalRecord, 
@@ -128,10 +129,7 @@ export default function DashboardPage() {
     return new Intl.NumberFormat('de-DE').format(Math.round(num));
   };
 
-  const getDayName = (dayOfWeek: number): string => {
-    const days = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-    return days[dayOfWeek];
-  };
+  const getDayName = (dayOfWeek: number): string => WEEKDAY_NAMES[dayOfWeek];
 
   return (
     <ProtectedRoute>
