@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useWorkout } from '@/lib/workout-context';
 import { apiClient } from '@/lib/api';
 import { Workout, PersonalRecord, SaveAsTemplateMode } from '@/types';
@@ -56,7 +55,6 @@ interface ActiveWorkoutScreenProps {
 type TemplateAction = 'none' | 'overwrite' | 'new';
 
 export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active', showBottomBar = true, showHeader = true, headerTop = 'top-0' }: ActiveWorkoutScreenProps) {
-  const router = useRouter();
   const {
     activeWorkout,
     completeWorkout,
@@ -229,8 +227,10 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
   };
 
   const handleDiscard = () => {
+    // The overlay unmounts itself once the session is gone; the collapse-catcher
+    // history entry is cleaned up by ActiveWorkoutOverlay (issue #132). No forced
+    // navigation -- like completion, discarding leaves the user where they were.
     discardWorkout();
-    router.push('/dashboard');
   };
 
   const formatTime = (seconds: number): string => {

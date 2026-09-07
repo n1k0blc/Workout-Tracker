@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useWorkout } from '@/lib/workout-context';
 import { Workout, PersonalRecord } from '@/types';
@@ -9,7 +9,11 @@ import { MinimizedWorkoutBar } from '@/components/workout/minimized-workout-bar'
 import { WorkoutDragHandle } from '@/components/workout/workout-drag-handle';
 import { WorkoutCompletionModal } from '@/components/WorkoutCompletionModal';
 import { useDragToMinimize } from '@/hooks/useDragToMinimize';
+import { reconcileCollapseEntry, handleBackPress } from '@/lib/workout-collapse-history';
 import { cn } from '@/lib/utils';
+
+/** History-state marker on the collapse-catcher entry (issue #132). */
+const EXPANDED_MARKER = '__workoutExpanded';
 
 /** Resting height of the minimized bar; the collapsed transform is anchored to it. */
 const BAR_HEIGHT = 72;
@@ -50,15 +54,70 @@ export function ActiveWorkoutOverlay() {
     lastNonWorkoutRoute.current = pathname;
   }, [pathname]);
 
-  // Minimizing while the /workout route is showing would leave the guard screen
-  // behind the bar -- send the user back to where they were instead.
-  const wasMinimized = useRef(isMinimized);
+  // Collapsing while /workout is the route would leave the guard screen stranded
+  // behind the bar. `replace` (not `push`) so it also overwrites our collapse-catcher
+  // history entry -- one step, no stray entry, no popstate to race.
+  const leaveWorkoutRoute = useCallback(() => {
+    router.replace(lastNonWorkoutRoute.current);
+  }, [router]);
+
+  // Back gesture (issue #132): while an expanded live workout covers the screen,
+  // hold one extra history entry so browser / Android back collapses it instead of
+  // navigating the hidden page. Every minimize path already flips `isMinimized`, so
+  // this reconciles off that -- no per-path wiring.
+  const collapseEntryRef = useRef(false);
+  const skipPopStateRef = useRef(false);
+  const expandedOnScreen = isLiveSession && !isMinimized;
+
   useEffect(() => {
-    if (isMinimized && !wasMinimized.current && pathname?.startsWith('/workout')) {
-      router.push(lastNonWorkoutRoute.current);
+    if (typeof window === 'undefined') return;
+    const markerOnStack = window.history.state?.[EXPANDED_MARKER] === true;
+    const onWorkoutRoute = pathname?.startsWith('/workout') ?? false;
+    const { hasEntry, effect } = reconcileCollapseEntry(
+      collapseEntryRef.current,
+      expandedOnScreen,
+      markerOnStack,
+    );
+    collapseEntryRef.current = hasEntry;
+
+    if (effect === 'push') {
+      window.history.pushState({ ...window.history.state, [EXPANDED_MARKER]: true }, '');
+    } else if (effect === 'consume') {
+      if (onWorkoutRoute) {
+        // The route change overwrites the marker entry; nothing else to consume.
+        leaveWorkoutRoute();
+      } else {
+        // Drop our entry silently -- the resulting popstate is ours, not a back press.
+        skipPopStateRef.current = true;
+        window.history.back();
+        // Safety net: if a concurrent navigation supersedes the traversal its
+        // popstate may never arrive, so don't leave the skip flag armed.
+        window.setTimeout(() => {
+          skipPopStateRef.current = false;
+        }, 200);
+      }
     }
-    wasMinimized.current = isMinimized;
-  }, [isMinimized, pathname, router]);
+  }, [expandedOnScreen, pathname, leaveWorkoutRoute]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onPopState = () => {
+      if (skipPopStateRef.current) {
+        skipPopStateRef.current = false;
+        return;
+      }
+      const { hasEntry, effect } = handleBackPress(collapseEntryRef.current);
+      collapseEntryRef.current = hasEntry;
+      if (effect === 'collapse') {
+        minimizeWorkout();
+        // The browser already popped our marker; if that left the guard screen
+        // showing, swap it for the page to return to.
+        if (window.location.pathname.startsWith('/workout')) leaveWorkoutRoute();
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [minimizeWorkout, leaveWorkoutRoute]);
 
   // Every page needs room under the bar so its last card clears it. Toggling a body
   // style keeps this in one place instead of touching every scroll container.
