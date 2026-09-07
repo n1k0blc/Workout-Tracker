@@ -56,9 +56,11 @@ export class AnalyticsFilterDto {
   @IsString({ each: true })
   equipment?: string[];
 
-  // Overrides muscleGroup/equipment entirely when set.
+  // Overrides muscleGroup/equipment entirely when set. Not @IsUUID: global/seeded
+  // exercises carry non-UUID ids (e.g. "seed-bayesian-curl"), same as the write path's
+  // WorkoutExerciseInputDto.exerciseId.
   @IsOptional()
-  @IsUUID()
+  @IsString()
   exerciseId?: string;
 
   @IsOptional()
