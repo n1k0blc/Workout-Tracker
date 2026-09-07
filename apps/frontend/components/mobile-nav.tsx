@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/drawer';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { LogoutButton } from '@/components/logout-button';
 import { cn } from '@/lib/utils';
 
 /**
@@ -72,7 +73,7 @@ function WorkoutNavEntry({
 export function MobileNav() {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { activeWorkout, isMinimized } = useWorkout();
 
   const getUserInitial = () => {
@@ -109,10 +110,6 @@ export function MobileNav() {
     { href: '/history', label: 'Verlauf', icon: IconHistory },
     { href: '/analytics', label: 'Analytics', icon: IconChartBar },
   ];
-
-  const handleLogout = async () => {
-    await logout();
-  };
 
   return (
     <>
@@ -179,14 +176,14 @@ export function MobileNav() {
                   <div className="px-1 text-sm text-muted-foreground truncate">
                     {user?.email}
                   </div>
-                  <Button
+                  <LogoutButton
                     variant="outline"
                     className="w-full justify-start gap-2"
-                    onClick={handleLogout}
+                    onRequestConfirm={() => setIsOpen(false)}
                   >
                     <IconLogout data-icon="inline-start" />
                     Abmelden
-                  </Button>
+                  </LogoutButton>
                 </div>
               </div>
             </DrawerContent>
