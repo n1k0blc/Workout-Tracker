@@ -92,6 +92,9 @@ export function ActiveWorkoutOverlay() {
       {isLiveSession && (
         <div
           className={cn(
+            // Above the nav, below dialogs (ADR-0001). The Menü drawer keeps the
+            // minimized bar visible by insetting its own scrim/sheet, not by the
+            // bar out-stacking it (#128 §4).
             'fixed inset-x-0 top-0 z-40 flex flex-col overflow-hidden bg-background',
             RESTING_TRANSITION,
           )}
@@ -114,6 +117,7 @@ export function ActiveWorkoutOverlay() {
             />
             <ActiveWorkoutScreen
               mode="active"
+              headerTop="top-7"
               onWorkoutComplete={(workout, prs) => setCompleted({ workout, prs })}
             />
           </div>

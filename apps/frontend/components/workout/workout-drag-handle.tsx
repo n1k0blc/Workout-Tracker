@@ -22,7 +22,7 @@ export function WorkoutDragHandle({ phase, onPointerDown, onClick }: WorkoutDrag
       aria-label="Workout minimieren"
       onPointerDown={onPointerDown}
       onClick={onClick}
-      className="flex h-7 w-full shrink-0 touch-none cursor-grab items-center justify-center bg-background active:cursor-grabbing"
+      className="sticky top-0 z-20 flex h-7 w-full shrink-0 touch-none cursor-grab items-center justify-center bg-background active:cursor-grabbing"
     >
       <span
         className={cn(

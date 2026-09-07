@@ -1,7 +1,7 @@
 'use client';
 
 import { Workout } from '@/types';
-import { nextExerciseLine } from '@/lib/workout-next-exercise';
+import { barExerciseLine } from '@/lib/workout-bar-exercise';
 import { RestTimerDisplay } from '@/components/workout/rest-timer-display';
 
 interface MinimizedWorkoutBarProps {
@@ -18,7 +18,7 @@ export function MinimizedWorkoutBar({ workout, onExpand }: MinimizedWorkoutBarPr
   const name = workout.isFreeWorkout
     ? workout.originTemplateName || 'Freies Workout'
     : workout.workoutDayName || 'Workout';
-  const next = nextExerciseLine(workout.exercises);
+  const exercise = barExerciseLine(workout.exercises);
 
   return (
     <div
@@ -42,9 +42,9 @@ export function MinimizedWorkoutBar({ workout, onExpand }: MinimizedWorkoutBarPr
       <div className="flex min-w-0 flex-1 items-center justify-between gap-3 px-4 pt-0.5 pb-[18px]">
         <div className="flex min-w-0 flex-col">
           <span className="text-sm font-semibold leading-tight">{name}</span>
-          {next && (
+          {exercise && (
             <span className="truncate text-xs leading-snug opacity-65 dark:opacity-70">
-              #{next.index} {next.exerciseName}
+              #{exercise.index} {exercise.exerciseName}
             </span>
           )}
         </div>

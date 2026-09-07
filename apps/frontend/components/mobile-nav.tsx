@@ -131,7 +131,16 @@ export function MobileNav() {
               </Button>
             </DrawerTrigger>
 
-            <DrawerContent className="md:hidden">
+            <DrawerContent
+              className={cn(
+                'md:hidden',
+                // Inset the sheet and its scrim by the minimized bar's height so the
+                // running session stays visible below the drawer (#128 §4). 72px ==
+                // BAR_HEIGHT in active-workout-overlay.tsx.
+                isMinimized && 'data-[vaul-drawer-direction=bottom]:bottom-[72px]',
+              )}
+              overlayClassName={cn(isMinimized && 'bottom-[72px]')}
+            >
               <DrawerHeader className="text-left">
                 <DrawerTitle>Menü</DrawerTitle>
               </DrawerHeader>

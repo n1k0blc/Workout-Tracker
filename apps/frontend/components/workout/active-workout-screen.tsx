@@ -41,17 +41,21 @@ import {
   IconPlayerPause,
   IconPlus,
 } from '@tabler/icons-react';
+import { cn } from '@/lib/utils';
 
 interface ActiveWorkoutScreenProps {
   onWorkoutComplete?: (workout: Workout, prs: PersonalRecord[]) => void;
   mode?: 'active' | 'edit';
   showBottomBar?: boolean;
   showHeader?: boolean;
+  /** Where the sticky header pins. `top-7` clears the overlay's own sticky drag
+   *  handle (28px, issue #131); the default pins it to the top. */
+  headerTop?: 'top-0' | 'top-7';
 }
 
 type TemplateAction = 'none' | 'overwrite' | 'new';
 
-export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active', showBottomBar = true, showHeader = true }: ActiveWorkoutScreenProps) {
+export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active', showBottomBar = true, showHeader = true, headerTop = 'top-0' }: ActiveWorkoutScreenProps) {
   const router = useRouter();
   const {
     activeWorkout,
@@ -249,7 +253,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
             where the parent provides its own chrome. For isPastWorkout (past tracking) the header
             provides the duration input, so it stays unless explicitly hidden. */}
         {showHeader && (
-          <div className="bg-card border-b sticky top-0 z-10">
+          <div className={cn('bg-card border-b sticky z-10', headerTop)}>
             <div className="max-w-4xl mx-auto px-4 py-4">
               <div className="flex items-center justify-between">
                 <div>
