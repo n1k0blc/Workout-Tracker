@@ -134,10 +134,12 @@ export function MobileNav() {
             <DrawerContent
               className={cn(
                 'md:hidden',
-                // Inset the sheet and its scrim by the minimized bar's height so the
-                // running session stays visible below the drawer (#128 §4). 72px ==
-                // BAR_HEIGHT in active-workout-overlay.tsx.
-                isMinimized && 'data-[vaul-drawer-direction=bottom]:bottom-[72px]',
+                // Keep the minimized workout bar visible below the drawer (#128 §4):
+                // inset the sheet and its scrim by the bar height, and drop vaul's
+                // `::after` gap-filler which is a `bg-popover` block that would paint
+                // over the bar. 72px == BAR_HEIGHT in active-workout-overlay.tsx.
+                isMinimized &&
+                  'data-[vaul-drawer-direction=bottom]:bottom-[72px] after:hidden',
               )}
               overlayClassName={cn(isMinimized && 'bottom-[72px]')}
             >
