@@ -19,6 +19,23 @@ if [ ! -f .env.production ]; then
     exit 1
 fi
 
+# docker-compose.prod.yml interpolates ${DB_PASSWORD} / ${JWT_SECRET} with no default, so a
+# missing, blank, or still-placeholder value silently starts Postgres with a weak/blank
+# superuser password and the backend with a public JWT secret (issue #118). Fail here.
+env_value() {
+    # trimmed, unquoted value of the last `VAR=...` assignment in $2 (last wins, like --env-file)
+    sed -n "s/^[[:space:]]*$1=//p" "$2" | tail -n1 \
+        | sed -e 's/[[:space:]]*$//' -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/"
+}
+for var in DB_PASSWORD JWT_SECRET; do
+    val="$(env_value "$var" .env.production)"
+    if [ -z "${val// /}" ] || [ "${val#CHANGE_THIS}" != "$val" ]; then
+        echo -e "${RED}❌ Error: ${var} in .env.production is empty or still the .env.production.example placeholder${NC}"
+        echo "Set a real secret (see .env.production.example) and re-run."
+        exit 1
+    fi
+done
+
 # Check available memory
 AVAILABLE_MEM=$(free -m | awk 'NR==2{print $7}')
 if [ $AVAILABLE_MEM -lt 500 ]; then
