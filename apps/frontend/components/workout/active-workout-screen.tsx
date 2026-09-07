@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { useWorkout } from '@/lib/workout-context';
 import { apiClient } from '@/lib/api';
 import { Workout, PersonalRecord, SaveAsTemplateMode } from '@/types';
@@ -41,18 +40,21 @@ import {
   IconPlayerPause,
   IconPlus,
 } from '@tabler/icons-react';
+import { cn } from '@/lib/utils';
 
 interface ActiveWorkoutScreenProps {
   onWorkoutComplete?: (workout: Workout, prs: PersonalRecord[]) => void;
   mode?: 'active' | 'edit';
   showBottomBar?: boolean;
   showHeader?: boolean;
+  /** Where the sticky header pins. `top-7` clears the overlay's own sticky drag
+   *  handle (28px, issue #131); the default pins it to the top. */
+  headerTop?: 'top-0' | 'top-7';
 }
 
 type TemplateAction = 'none' | 'overwrite' | 'new';
 
-export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active', showBottomBar = true, showHeader = true }: ActiveWorkoutScreenProps) {
-  const router = useRouter();
+export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active', showBottomBar = true, showHeader = true, headerTop = 'top-0' }: ActiveWorkoutScreenProps) {
   const {
     activeWorkout,
     completeWorkout,
@@ -66,6 +68,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
     isPastWorkout,
     pastWorkoutDuration,
     setPastWorkoutDuration,
+    isMinimized,
   } = useWorkout();
 
   const [showExerciseModal, setShowExerciseModal] = useState(false);
@@ -77,6 +80,18 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
   const [updateBlueprint, setUpdateBlueprint] = useState(false);
   const [templateAction, setTemplateAction] = useState<TemplateAction>('none');
   const [newTemplateName, setNewTemplateName] = useState('');
+
+  // Minimizing has to close any open workout dialog, or a portalled picker sits at a
+  // higher z-index floating over the app once the overlay has collapsed (issue #129).
+  // Keyed off the flag rather than any one handler so every minimize path -- tap,
+  // drag (#131), back button -- is covered without repeating this.
+  useEffect(() => {
+    if (!isMinimized) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShowExerciseModal(false);
+    setShowCompleteConfirm(false);
+    setShowDiscardConfirm(false);
+  }, [isMinimized]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -212,8 +227,10 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
   };
 
   const handleDiscard = () => {
+    // The overlay unmounts itself once the session is gone; the collapse-catcher
+    // history entry is cleaned up by ActiveWorkoutOverlay (issue #132). No forced
+    // navigation -- like completion, discarding leaves the user where they were.
     discardWorkout();
-    router.push('/dashboard');
   };
 
   const formatTime = (seconds: number): string => {
@@ -236,7 +253,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
             where the parent provides its own chrome. For isPastWorkout (past tracking) the header
             provides the duration input, so it stays unless explicitly hidden. */}
         {showHeader && (
-          <div className="bg-card border-b sticky top-0 z-10">
+          <div className={cn('bg-card border-b sticky z-10', headerTop)}>
             <div className="max-w-4xl mx-auto px-4 py-4">
               <div className="flex items-center justify-between">
                 <div>

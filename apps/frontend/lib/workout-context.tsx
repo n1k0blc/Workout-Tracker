@@ -1,24 +1,16 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
-import { Workout, WorkoutExercise, ExerciseLog, SetLog, PlannedSet, SetType, SaveAsTemplateMode, WorkoutExerciseInput, Exercise, Equipment, LastPerformance } from '@/types';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Workout, ExerciseLog, SetLog, PlannedSet, SetType, SaveAsTemplateMode, WorkoutExerciseInput, Exercise, Equipment, LastPerformance } from '@/types';
 import { apiClient } from '@/lib/api';
-import { buildExerciseLogsForEdit, reorderExerciseLogs, toExercisePayload } from '@/lib/workout-order';
+import { useAuth } from '@/lib/auth-context';
+import { reorderExerciseLogs, toExercisePayload } from '@/lib/workout-order';
 import { aggregateSetSides } from '@/lib/set-sides';
 import { replaceExerciseInList } from '@/lib/exercise-replace';
 import { toLocalDateString } from '@/lib/local-date';
 import { blankPlanValues, buildPrefillToastMessage, mapLastPerformanceOntoPlan } from '@/lib/last-performance';
+import { draftStorageKeys, claimDraftForUser, DraftMeta } from '@/lib/workout-draft-storage';
 import { toast } from 'sonner';
-
-const DRAFT_STORAGE_KEY = 'activeWorkoutDraft';
-const DRAFT_META_STORAGE_KEY = 'activeWorkoutDraftMeta';
-
-interface DraftMeta {
-  isPastWorkout: boolean;
-  pastWorkoutDuration: number;
-  isHistoryEdit: boolean;
-  existingWorkoutId: string | null;
-}
 
 /** One entry per set actually logged during a *live* session, in completion order. Drives
  *  rest-attribution (§3.5): when a new set completes, the previous entry's set gets its `rest`
@@ -52,12 +44,6 @@ export interface LogSetData {
 }
 
 export interface CompleteWorkoutOptions {
-  /**
-   * A day correction made on the save screen itself (history editor). Passed through the
-   * save call rather than staged into `activeWorkout` first: a state write in the same tick
-   * as the save is invisible to it, so the correction would be silently dropped.
-   */
-  dateOverride?: { date: string; localDate: string };
   overwriteBlueprint?: boolean;
   saveAsTemplateMode?: SaveAsTemplateMode;
   saveAsTemplateName?: string;
@@ -67,6 +53,12 @@ export interface CompleteWorkoutOptions {
 interface WorkoutContextType {
   activeWorkout: Workout | null;
   loading: boolean;
+  // A live session can be collapsed into the bottom bar while the user browses the
+  // rest of the app (issue #129). Live sessions only -- past-workout tracking never
+  // sets this. Persisted alongside the draft, defaulting to expanded when absent.
+  isMinimized: boolean;
+  minimizeWorkout: () => void;
+  expandWorkout: () => void;
   isPaused: boolean;
   togglePause: () => void;
   isRestTimerPaused: boolean;
@@ -74,8 +66,6 @@ interface WorkoutContextType {
   isPastWorkout: boolean;
   pastWorkoutDuration: number;
   setPastWorkoutDuration: (duration: number) => void;
-  /** Editing an already-saved workout (history edit): values-only, no rest computation, saves via update. */
-  isHistoryEdit: boolean;
   startWorkout: (data: {
     cycleId?: string;
     workoutDayId?: string;
@@ -92,7 +82,6 @@ interface WorkoutContextType {
     pastWorkoutDate?: string,
     pastWorkoutDuration?: number,
   ) => Promise<void>;
-  loadWorkoutForEdit: (workoutId: string) => Promise<void>;
   completeWorkout: (options?: CompleteWorkoutOptions) => Promise<Workout | null>;
   discardWorkout: () => void;
   addExercise: (exerciseId: string) => Promise<string>;
@@ -136,13 +125,19 @@ function generateLocalId(prefix: string): string {
 
 
 export function WorkoutProvider({ children }: { children: React.ReactNode }) {
+  const { user, loading: authLoading } = useAuth();
+  // Every localStorage key holding this session's state is namespaced by the
+  // signed-in account (issue #127), so a second user on the same device never
+  // resumes the first user's workout.
+  const keys = useMemo(() => draftStorageKeys(user?.id ?? null), [user?.id]);
+
   const [activeWorkout, setActiveWorkout] = useState<Workout | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isRestTimerPaused, setIsRestTimerPaused] = useState(false);
   const [isPastWorkout, setIsPastWorkout] = useState(false);
   const [pastWorkoutDuration, setPastWorkoutDuration] = useState(0);
-  const [isHistoryEdit, setIsHistoryEdit] = useState(false);
   const [workoutDuration, setWorkoutDuration] = useState(0);
   const [restTimer, setRestTimer] = useState(0);
   const [restTimerTarget, setRestTimerTarget] = useState(0);
@@ -161,17 +156,26 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const workoutTimerRef = useRef<NodeJS.Timeout | null>(null);
   const restTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Existing workout being edited (history edit) -- save calls update, not create.
-  const existingWorkoutIdRef = useRef<string | null>(null);
   // Latest activeWorkout, for the async last-performance prefill (issue #112): it resolves
   // after the swap/add has already applied, so it must read state fresher than its closure.
   const activeWorkoutRef = useRef<Workout | null>(null);
   // Rest-attribution completion log (live sessions only -- see CompletionEntry).
   const completionLogRef = useRef<CompletionEntry[]>([]);
+  // The account the in-memory session was last restored for. Lets the restore
+  // effect notice a logout / account switch and abandon a session that is no
+  // longer ours (issue #127). `undefined` until auth first resolves.
+  const restoredForUserRef = useRef<string | null | undefined>(undefined);
+  // Read by setActiveWorkoutDirectly so every draft write carries the current
+  // minimized flag rather than dropping it (issue #129).
+  const isMinimizedRef = useRef(false);
 
   useEffect(() => {
     workoutStartTimeRef.current = workoutStartTime;
   }, [workoutStartTime]);
+
+  useEffect(() => {
+    isMinimizedRef.current = isMinimized;
+  }, [isMinimized]);
 
   useEffect(() => {
     activeWorkoutRef.current = activeWorkout;
@@ -180,13 +184,13 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const persistDraft = useCallback((workout: Workout | null, meta: DraftMeta | null) => {
     if (typeof window === 'undefined') return;
     if (!workout || !meta) {
-      localStorage.removeItem(DRAFT_STORAGE_KEY);
-      localStorage.removeItem(DRAFT_META_STORAGE_KEY);
+      localStorage.removeItem(keys.draft);
+      localStorage.removeItem(keys.meta);
       return;
     }
-    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(workout));
-    localStorage.setItem(DRAFT_META_STORAGE_KEY, JSON.stringify(meta));
-  }, []);
+    localStorage.setItem(keys.draft, JSON.stringify(workout));
+    localStorage.setItem(keys.meta, JSON.stringify(meta));
+  }, [keys]);
 
   const togglePause = () => {
     setIsPaused(prev => {
@@ -200,7 +204,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
           const newStartTime = Date.now() - (pausedWorkoutDuration * 1000);
           setWorkoutStartTime(newStartTime);
           if (typeof window !== 'undefined') {
-            localStorage.setItem('workoutStartTime', newStartTime.toString());
+            localStorage.setItem(keys.workoutStartTime, newStartTime.toString());
           }
           setPausedWorkoutDuration(null);
         }
@@ -209,7 +213,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
           const newRestStartTime = Date.now() - (pausedRestTimer * 1000);
           setRestStartTime(newRestStartTime);
           if (typeof window !== 'undefined') {
-            localStorage.setItem('restStartTime', newRestStartTime.toString());
+            localStorage.setItem(keys.restStartTime, newRestStartTime.toString());
           }
           setPausedRestTimer(null);
         }
@@ -230,7 +234,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
           const newRestStartTime = Date.now() - (pausedRestTimerValue * 1000);
           setRestStartTime(newRestStartTime);
           if (typeof window !== 'undefined') {
-            localStorage.setItem('restStartTime', newRestStartTime.toString());
+            localStorage.setItem(keys.restStartTime, newRestStartTime.toString());
           }
           setPausedRestTimerValue(null);
         }
@@ -242,12 +246,12 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
   // Workout Duration Timer (timestamp-based, persists across tab switches and app restarts)
   useEffect(() => {
-    if (activeWorkout && !isHistoryEdit && !isPaused && !isPastWorkout) {
+    if (activeWorkout && !isPaused && !isPastWorkout) {
       if (workoutStartTime === null) {
         const now = Date.now();
         setWorkoutStartTime(now);
         if (typeof window !== 'undefined') {
-          localStorage.setItem('workoutStartTime', now.toString());
+          localStorage.setItem(keys.workoutStartTime, now.toString());
         }
       }
 
@@ -271,8 +275,11 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         setWorkoutDuration(0);
         setWorkoutStartTime(null);
         setPausedWorkoutDuration(null);
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('workoutStartTime');
+        // Only clear our own namespaced key. Before auth resolves `user` is null
+        // and `keys` falls back to the bare names -- a pre-namespace draft's timers
+        // still live there waiting to be adopted, so leave them alone (issue #127).
+        if (typeof window !== 'undefined' && user) {
+          localStorage.removeItem(keys.workoutStartTime);
         }
       }
     }
@@ -282,7 +289,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         clearInterval(workoutTimerRef.current);
       }
     };
-  }, [activeWorkout, isHistoryEdit, isPaused, isPastWorkout, workoutStartTime, pausedWorkoutDuration]);
+  }, [activeWorkout, isPaused, isPastWorkout, workoutStartTime, pausedWorkoutDuration, keys, user]);
 
   // Rest Timer (timestamp-based, persists across tab switches)
   useEffect(() => {
@@ -290,8 +297,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       if (restStartTime === null) {
         setRestStartTime(restTimerStartedAt);
         if (typeof window !== 'undefined') {
-          localStorage.setItem('restStartTime', restTimerStartedAt.toString());
-          localStorage.setItem('restTimerTarget', restTimerTarget.toString());
+          localStorage.setItem(keys.restStartTime, restTimerStartedAt.toString());
+          localStorage.setItem(keys.restTimerTarget, restTimerTarget.toString());
         }
       }
 
@@ -321,9 +328,11 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         setPausedRestTimer(null);
         setPausedRestTimerValue(null);
         setIsRestTimerPaused(false);
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('restStartTime');
-          localStorage.removeItem('restTimerTarget');
+        // See the workout-timer effect: don't touch the bare keys before auth
+        // resolves, a pre-namespace draft may still need them (issue #127).
+        if (typeof window !== 'undefined' && user) {
+          localStorage.removeItem(keys.restStartTime);
+          localStorage.removeItem(keys.restTimerTarget);
         }
       }
     }
@@ -333,9 +342,11 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         clearInterval(restTimerRef.current);
       }
     };
-  }, [restTimerStartedAt, restTimerTarget, isPaused, isRestTimerPaused, isPastWorkout, restStartTime, pausedRestTimer, pausedRestTimerValue]);
+  }, [restTimerStartedAt, restTimerTarget, isPaused, isRestTimerPaused, isPastWorkout, restStartTime, pausedRestTimer, pausedRestTimerValue, keys, user]);
 
-  const clearAllTimerState = () => {
+  // In-memory timer reset only -- leaves persisted keys alone. Used when a session
+  // is abandoned because the account changed under us (issue #127).
+  const resetTimerState = useCallback(() => {
     setWorkoutDuration(0);
     setRestTimer(0);
     setRestTimerStartedAt(null);
@@ -347,20 +358,22 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setPausedRestTimerValue(null);
     setIsPaused(false);
     setIsRestTimerPaused(false);
+  }, []);
+
+  const clearAllTimerState = useCallback(() => {
+    resetTimerState();
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('workoutStartTime');
-      localStorage.removeItem('restStartTime');
-      localStorage.removeItem('restTimerTarget');
+      localStorage.removeItem(keys.workoutStartTime);
+      localStorage.removeItem(keys.restStartTime);
+      localStorage.removeItem(keys.restTimerTarget);
     }
-  };
+  }, [resetTimerState, keys]);
 
   const setActiveWorkoutDirectly = useCallback((workout: Workout | null, isPast?: boolean, pastDuration?: number) => {
     if (!workout) {
       setActiveWorkout(null);
       setIsPastWorkout(false);
       setPastWorkoutDuration(0);
-      setIsHistoryEdit(false);
-      existingWorkoutIdRef.current = null;
       completionLogRef.current = [];
       clearAllTimerState();
       persistDraft(null, null);
@@ -377,36 +390,50 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setIsPaused(false);
     setIsRestTimerPaused(false);
 
-    const isLiveSession = !isPast && !isHistoryEdit;
+    const isLiveSession = !isPast;
     if (isLiveSession) {
       if (workoutStartTimeRef.current === null) {
         const now = Date.now();
         setWorkoutStartTime(now);
         if (typeof window !== 'undefined') {
-          localStorage.setItem('workoutStartTime', now.toString());
+          localStorage.setItem(keys.workoutStartTime, now.toString());
         }
       }
     }
 
-    if (isPast || isHistoryEdit) {
+    if (isPast) {
       setRestTimerStartedAt(null);
       setRestTimerTarget(0);
       setRestTimer(0);
       setRestStartTime(null);
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('restStartTime');
-        localStorage.removeItem('restTimerTarget');
+        localStorage.removeItem(keys.restStartTime);
+        localStorage.removeItem(keys.restTimerTarget);
       }
     }
 
     persistDraft(workout, {
       isPastWorkout: isPast ?? false,
       pastWorkoutDuration: pastDuration ?? 0,
-      isHistoryEdit,
-      existingWorkoutId: existingWorkoutIdRef.current,
+      // A live session carries its collapsed state into the draft so a reload
+      // restores it as it was (issue #129); past tracking never minimizes.
+      isMinimized: isPast ? undefined : isMinimizedRef.current,
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isHistoryEdit, persistDraft]);
+  }, [persistDraft, keys, clearAllTimerState]);
+
+  // Both minimize paths route through here (ADR-0001): flip the flag and rewrite the
+  // draft meta in the same call, so the persisted state can never lag the UI.
+  const setMinimized = useCallback((next: boolean) => {
+    isMinimizedRef.current = next;
+    setIsMinimized(next);
+    const workout = activeWorkoutRef.current;
+    if (workout && !isPastWorkout) {
+      persistDraft(workout, { isPastWorkout: false, pastWorkoutDuration, isMinimized: next });
+    }
+  }, [persistDraft, isPastWorkout, pastWorkoutDuration]);
+
+  const minimizeWorkout = useCallback(() => setMinimized(true), [setMinimized]);
+  const expandWorkout = useCallback(() => setMinimized(false), [setMinimized]);
 
   /** Builds the local draft's ExerciseLog[] from a blueprint/template exercise tree. */
   const buildExerciseLogsFromTree = (
@@ -500,9 +527,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         createdAt: new Date().toISOString(),
       };
 
-      existingWorkoutIdRef.current = null;
       completionLogRef.current = [];
-      setIsHistoryEdit(false);
       setActiveWorkoutDirectly(workout, data.isPastWorkout, data.pastWorkoutDuration);
     } catch (error) {
       console.error('Failed to start workout:', error);
@@ -537,31 +562,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         createdAt: new Date().toISOString(),
       };
 
-      existingWorkoutIdRef.current = null;
       completionLogRef.current = [];
-      setIsHistoryEdit(false);
       setActiveWorkoutDirectly(workout, isPast, pastWorkoutDuration);
     } catch (error) {
       console.error('Failed to start workout from template:', error);
-      throw error;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadWorkoutForEdit = async (workoutId: string) => {
-    setLoading(true);
-    try {
-      const workout = await apiClient.getWorkout(workoutId);
-      const rawExercises = workout.exercises as unknown as WorkoutExercise[];
-      const exercises: ExerciseLog[] = buildExerciseLogsForEdit(rawExercises);
-
-      existingWorkoutIdRef.current = workoutId;
-      completionLogRef.current = [];
-      setIsHistoryEdit(true);
-      setActiveWorkoutDirectly({ ...workout, exercises }, false, workout.totalDuration ?? 0);
-    } catch (error) {
-      console.error('Failed to load workout for edit:', error);
       throw error;
     } finally {
       setLoading(false);
@@ -573,7 +577,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
     setLoading(true);
     try {
-      const isLive = !isPastWorkout && !isHistoryEdit;
+      const isLive = !isPastWorkout;
 
       // Finalize rest-attribution for the last completed set of a live session (§3.5):
       // it never got a follow-up completion to measure against, so fall back to its
@@ -599,14 +603,13 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       const totalDuration = isPastWorkout ? pastWorkoutDuration : workoutDuration;
 
       // A live session is stamped with the day it is *finished* on -- a session started at
-      // 23:50 belongs to the day it ended. A past entry and a history edit keep the day they
-      // already carry (picked by the user, or loaded from the server).
+      // 23:50 belongs to the day it ended. A past entry keeps the day the user picked.
       const localDate = isLive
         ? toLocalDateString(new Date())
-        : options.dateOverride?.localDate ?? activeWorkout.localDate;
+        : activeWorkout.localDate;
 
       const payload = {
-        date: options.dateOverride?.date ?? activeWorkout.date,
+        date: activeWorkout.date,
         localDate,
         totalDuration,
         isFreeWorkout: activeWorkout.isFreeWorkout,
@@ -621,14 +624,12 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         overwriteTemplateId: options.overwriteTemplateId,
       };
 
-      const saved = existingWorkoutIdRef.current
-        ? await apiClient.updateWorkout(existingWorkoutIdRef.current, payload)
-        : await apiClient.createWorkout(payload);
+      const saved = await apiClient.createWorkout(payload);
 
-      existingWorkoutIdRef.current = null;
       completionLogRef.current = [];
       setActiveWorkout(null);
-      setIsHistoryEdit(false);
+      isMinimizedRef.current = false;
+      setIsMinimized(false);
       clearAllTimerState();
       persistDraft(null, null);
 
@@ -642,10 +643,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   };
 
   const discardWorkout = () => {
-    existingWorkoutIdRef.current = null;
     completionLogRef.current = [];
     setActiveWorkout(null);
-    setIsHistoryEdit(false);
+    isMinimizedRef.current = false;
+    setIsMinimized(false);
     clearAllTimerState();
     persistDraft(null, null);
   };
@@ -656,9 +657,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
    * blocks that -- and re-reads the workout from `activeWorkoutRef` because its closure is
    * already stale by the time the request resolves.
    *
-   * Live sessions only: prefilling a past-workout entry or a history edit would seed a
-   * historical record with last week's numbers, the same reason #68 keeps it out of the
-   * history editor.
+   * Live sessions only: prefilling a past-workout entry would seed a historical record with
+   * last week's numbers, the same reason #68 keeps it out of the history editor.
    *
    * A **failed** lookup returns silently and leaves the fields exactly as they were -- a
    * transient error must never blank someone's numbers. A **never-performed** exercise (a
@@ -672,7 +672,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     exerciseId: string,
     isSwap: boolean,
   ) => {
-    if (isHistoryEdit || isPastWorkout) return;
+    if (isPastWorkout) return;
 
     const workout = activeWorkoutRef.current;
     if (!workout) return;
@@ -806,7 +806,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   ) => {
     if (!activeWorkout) return;
 
-    const isLive = !isPastWorkout && !isHistoryEdit;
+    const isLive = !isPastWorkout;
     const now = Date.now();
     const newSetId = generateLocalId('set');
 
@@ -884,8 +884,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       setIsRestTimerPaused(false);
       setPausedRestTimerValue(null);
       if (typeof window !== 'undefined') {
-        localStorage.setItem('restStartTime', now.toString());
-        localStorage.setItem('restTimerTarget', data.plannedRestAfterSet.toString());
+        localStorage.setItem(keys.restStartTime, now.toString());
+        localStorage.setItem(keys.restTimerTarget, data.plannedRestAfterSet.toString());
       }
     }
   };
@@ -926,36 +926,70 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setActiveWorkoutDirectly({ ...activeWorkout, exercises: updatedExercises }, isPastWorkout, pastWorkoutDuration);
   };
 
-  // Restore a persisted draft (crash/refresh resume) or timer state on mount.
+  // Restore this account's persisted draft (crash/refresh resume) once auth has
+  // resolved, and re-run whenever the signed-in account changes (issue #127).
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (authLoading) return;
 
-    const savedDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
-    const savedMeta = localStorage.getItem(DRAFT_META_STORAGE_KEY);
+    const uid = user?.id ?? null;
+    if (restoredForUserRef.current === uid) return;
+    restoredForUserRef.current = uid;
+
+    // Account changed (first load, logout, or a switch on a shared device):
+    // abandon whatever session is in memory -- it belonged to the previous
+    // account -- without touching any persisted draft on disk.
+    setActiveWorkout(null);
+    setIsPastWorkout(false);
+    setPastWorkoutDuration(0);
+    isMinimizedRef.current = false;
+    setIsMinimized(false);
+    completionLogRef.current = [];
+    resetTimerState();
+
+    if (!uid) return;
+
+    const { draft: savedDraft, meta: savedMeta } = claimDraftForUser(localStorage, uid);
+    let restored = false;
+
     if (savedDraft && savedMeta) {
       try {
-        const workout: Workout = JSON.parse(savedDraft);
-        // A draft persisted before workouts carried a localDate: derive one from the
-        // instant so resuming it can still be saved. Only reachable for the first draft
-        // that spans the deploy of this field.
-        if (!workout.localDate) {
-          workout.localDate = toLocalDateString(new Date(workout.date));
+        const meta: DraftMeta & { isHistoryEdit?: boolean } = JSON.parse(savedMeta);
+        // A draft written by the old history editor hijacked this slot (pre issue #126).
+        // The history editor now owns its own state, and a workout in this context means a
+        // live/past session -- so drop such a draft rather than resurrecting it as one.
+        if (meta.isHistoryEdit) {
+          localStorage.removeItem(keys.draft);
+          localStorage.removeItem(keys.meta);
+        } else {
+          const workout: Workout = JSON.parse(savedDraft);
+          // A draft persisted before workouts carried a localDate: derive one from the
+          // instant so resuming it can still be saved. Only reachable for the first draft
+          // that spans the deploy of this field.
+          if (!workout.localDate) {
+            workout.localDate = toLocalDateString(new Date(workout.date));
+          }
+          setActiveWorkout(workout);
+          setIsPastWorkout(meta.isPastWorkout);
+          setPastWorkoutDuration(meta.pastWorkoutDuration);
+          // Absent on a draft written before this feature -- resume expanded (issue #129).
+          const restoredMinimized = !meta.isPastWorkout && meta.isMinimized === true;
+          isMinimizedRef.current = restoredMinimized;
+          setIsMinimized(restoredMinimized);
+          restored = true;
         }
-        const meta: DraftMeta = JSON.parse(savedMeta);
-        existingWorkoutIdRef.current = meta.existingWorkoutId;
-        setIsHistoryEdit(meta.isHistoryEdit);
-        setActiveWorkout(workout);
-        setIsPastWorkout(meta.isPastWorkout);
-        setPastWorkoutDuration(meta.pastWorkoutDuration);
       } catch {
-        localStorage.removeItem(DRAFT_STORAGE_KEY);
-        localStorage.removeItem(DRAFT_META_STORAGE_KEY);
+        localStorage.removeItem(keys.draft);
+        localStorage.removeItem(keys.meta);
       }
     }
 
-    const savedWorkoutStartTime = localStorage.getItem('workoutStartTime');
-    const savedRestStartTime = localStorage.getItem('restStartTime');
-    const savedRestTarget = localStorage.getItem('restTimerTarget');
+    // Timers only mean anything alongside a restored draft.
+    if (!restored) return;
+
+    const savedWorkoutStartTime = localStorage.getItem(keys.workoutStartTime);
+    const savedRestStartTime = localStorage.getItem(keys.restStartTime);
+    const savedRestTarget = localStorage.getItem(keys.restTimerTarget);
 
     if (savedWorkoutStartTime) {
       setWorkoutStartTime(parseInt(savedWorkoutStartTime));
@@ -969,13 +1003,16 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [authLoading, user]);
 
   return (
     <WorkoutContext.Provider
       value={{
         activeWorkout,
         loading,
+        isMinimized,
+        minimizeWorkout,
+        expandWorkout,
         isPaused,
         togglePause,
         isRestTimerPaused,
@@ -983,10 +1020,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         isPastWorkout,
         pastWorkoutDuration,
         setPastWorkoutDuration,
-        isHistoryEdit,
         startWorkout,
         startWorkoutFromTemplate,
-        loadWorkoutForEdit,
         completeWorkout,
         discardWorkout,
         addExercise,

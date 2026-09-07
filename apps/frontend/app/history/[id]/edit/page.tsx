@@ -3,6 +3,9 @@
 import { ProtectedRoute } from '@/components/protected-route';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
+import { apiClient } from '@/lib/api';
+import { ExerciseLog, SetLog, Workout, WorkoutExercise } from '@/types';
+import { buildExerciseLogsForEdit, toExercisePayload } from '@/lib/workout-order';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
@@ -10,10 +13,25 @@ import { Badge } from '@/components/ui/badge';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { DatePicker } from '@/components/date-picker';
 import ExerciseCard from '@/components/workout/exercise-card';
-import { useWorkout } from '@/lib/workout-context';
 import {
   IconChevronLeft,
 } from '@tabler/icons-react';
+
+type SetEditData = Partial<
+  Pick<
+    SetLog,
+    | 'reps'
+    | 'weight'
+    | 'rir'
+    | 'setType'
+    | 'repsLeft'
+    | 'repsRight'
+    | 'weightLeft'
+    | 'weightRight'
+    | 'rirLeft'
+    | 'rirRight'
+  >
+>;
 
 export default function EditWorkoutPage() {
   const router = useRouter();
@@ -25,8 +43,12 @@ export default function EditWorkoutPage() {
   const fromCycle = searchParams.get('from') === 'cycle';
   const cycleId = searchParams.get('cycleId');
 
-  const { setActiveWorkoutDirectly, activeWorkout, loadWorkoutForEdit, completeWorkout } = useWorkout();
-
+  // The history editor owns its workout state locally and saves through its own update call
+  // -- it never touches the shared workout context, the way the template and cycle blueprint
+  // editors already work (issue #126). That keeps "a workout is in the context" meaning
+  // unambiguously "a live session is running".
+  const [workout, setWorkout] = useState<Workout | null>(null);
+  const [exercises, setExercises] = useState<ExerciseLog[]>([]);
   const [workoutDate, setWorkoutDate] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -39,18 +61,15 @@ export default function EditWorkoutPage() {
     }
   };
 
-  // Clear the hijacked workout from global context when leaving this edit view
-  // (browser back, or unmount). This prevents the main site header/nav from staying hidden.
-  useEffect(() => {
-    return () => {
-      setActiveWorkoutDirectly(null);
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- rely on stable ref from context; including it caused update loops on clear
-
   const loadWorkout = useCallback(async () => {
     setLoading(true);
     try {
-      await loadWorkoutForEdit(workoutId);
+      const data = await apiClient.getWorkout(workoutId);
+      setWorkout(data);
+      setExercises(buildExerciseLogsForEdit(data.exercises as unknown as WorkoutExercise[]));
+      // Seeded from the stored calendar day, not from the instant: reading the instant back
+      // in UTC would show (and, on save, write back) the wrong day for a late-night session.
+      setWorkoutDate(data.localDate);
     } catch (error) {
       console.error('Failed to load workout:', error);
       alert('Fehler beim Laden des Workouts');
@@ -69,27 +88,33 @@ export default function EditWorkoutPage() {
     loadWorkout();
   }, [loadWorkout]);
 
-  // Seed the date field once the workout has loaded into context.
-  useEffect(() => {
-    if (activeWorkout) {
-      // Seeded from the stored calendar day, not from the instant: reading the instant back
-      // in UTC would show (and, on save, write back) the wrong day for a late-night session.
-      setWorkoutDate(activeWorkout.localDate);
-    }
-  }, [activeWorkout?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const handleUpdateSet = (exerciseId: string, setId: string, data: SetEditData) => {
+    setExercises((prev) =>
+      prev.map((ex) =>
+        ex.id === exerciseId
+          ? { ...ex, sets: ex.sets.map((s) => (s.id === setId ? { ...s, ...data } : s)) }
+          : ex,
+      ),
+    );
+  };
 
-  const handleSaveFromShared = async () => {
-    if (!activeWorkout) return;
+  const handleSave = async () => {
+    if (!workout) return;
 
     setSaving(true);
     try {
       // The picked day is already a local calendar day, so it becomes localDate verbatim --
       // correcting a workout's date has to move both, or the two would disagree.
-      await completeWorkout({
-        dateOverride: {
-          date: new Date(workoutDate + 'T12:00:00').toISOString(),
-          localDate: workoutDate,
-        },
+      await apiClient.updateWorkout(workoutId, {
+        date: new Date(workoutDate + 'T12:00:00').toISOString(),
+        localDate: workoutDate,
+        totalDuration: workout.totalDuration ?? 0,
+        isFreeWorkout: workout.isFreeWorkout,
+        homeGymId: workout.homeGymId ?? undefined,
+        cycleId: workout.cycleId,
+        workoutDayId: workout.workoutDayId,
+        originTemplateId: workout.originTemplateId,
+        exercises: toExercisePayload(exercises),
       });
       navigateBack();
     } catch (error) {
@@ -110,7 +135,7 @@ export default function EditWorkoutPage() {
     }).format(date);
   };
 
-  if (loading || !activeWorkout) {
+  if (loading || !workout) {
     return (
       <ProtectedRoute>
         <div className="min-h-screen bg-background flex items-center justify-center">
@@ -144,10 +169,10 @@ export default function EditWorkoutPage() {
                       Workout bearbeiten
                     </h2>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {activeWorkout.isFreeWorkout
-                        ? activeWorkout.originTemplateName || 'Freies Workout'
-                        : activeWorkout.workoutDayName || 'Workout'}
-                      {activeWorkout.cycleName && ` - ${activeWorkout.cycleName}`}
+                      {workout.isFreeWorkout
+                        ? workout.originTemplateName || 'Freies Workout'
+                        : workout.workoutDayName || 'Workout'}
+                      {workout.cycleName && ` - ${workout.cycleName}`}
                     </p>
                   </div>
                   <Badge variant="outline">Bearbeitung</Badge>
@@ -176,16 +201,17 @@ export default function EditWorkoutPage() {
                   />
                 </Field>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Ursprünglich: {formatDate(activeWorkout.date)}
+                  Ursprünglich: {formatDate(workout.date)}
                 </p>
               </CardContent>
             </Card>
 
             {/* Exercises rendered directly with central ExerciseCard in restricted history-edit mode.
                 No reordering, no exercise actions (replace/delete), no set add/delete, no logging.
-                Only value edits, type changes and collapse/expand are allowed. */}
+                Only value edits, type changes and collapse/expand are allowed, written straight
+                back into this screen's local state via the injected `onUpdateSet`. */}
             <div className="space-y-4">
-              {activeWorkout?.exercises?.map((exercise, idx) => (
+              {exercises.map((exercise, idx) => (
                 <ExerciseCard
                   key={exercise.id}
                   exercise={exercise}
@@ -195,14 +221,15 @@ export default function EditWorkoutPage() {
                   allowExerciseActions={false}
                   allowSetManagement={false}
                   allowLogging={false}
+                  onUpdateSet={handleUpdateSet}
                 />
               ))}
             </div>
 
             <div className="flex justify-end">
               <Button
-                onClick={handleSaveFromShared}
-                disabled={saving || !activeWorkout}
+                onClick={handleSave}
+                disabled={saving}
                 className="w-full md:w-auto"
               >
                 {saving ? 'Speichert...' : 'Speichern'}

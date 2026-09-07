@@ -68,6 +68,16 @@ interface ExerciseCardProps {
   onReplaceExercise?: (exerciseId: string, newExerciseId: string, newExercise?: Exercise) => void | Promise<void>;
   onAddSet?: (exerciseId: string) => void;
   onRemoveSet?: (exerciseId: string, setNumber: number) => void;
+  /**
+   * Deletion of an *already-logged* set for a caller that owns its workout state and must not
+   * reach the shared workout context -- the injected-handler counterpart to `onRemoveSet`
+   * (which mutates a *plan*), completing the set of escape hatches so `ExerciseCard` never
+   * writes the context behind a state-owning editor's back (issue #126). Addressed by set
+   * number to match `onRemoveSet`; reached only with `allowSetManagement` on, like its
+   * siblings. When absent the card falls back to the context's direct-set path, as the
+   * active-workout and past-tracking flows do.
+   */
+  onDeleteSet?: (exerciseId: string, setNumber: number) => void;
   onUpdateSet?: (
     exerciseId: string,
     setId: string,
@@ -133,6 +143,7 @@ export default function ExerciseCard({
   onReplaceExercise,
   onAddSet,
   onRemoveSet,
+  onDeleteSet,
   onUpdateSet,
   onUpdatePlannedSet,
   readonly,
@@ -156,7 +167,6 @@ export default function ExerciseCard({
     setActiveWorkoutDirectly,
     isPastWorkout,
     pastWorkoutDuration,
-    isHistoryEdit,
   } = useWorkout();
 
   // Prefer injected handlers (for decoupled template usage, no context hijack) over context
@@ -225,15 +235,21 @@ export default function ExerciseCard({
   // cycle-day) rather than materializing them into logged sets.
   const ownsPlan = !!onUpdatePlannedSet;
 
+  // A caller that edits already-logged sets in place through an injected handler and has no
+  // logging concept -- i.e. the history editor (issue #126), which owns its own workout state
+  // and passes `onUpdateSet` instead of touching the shared context. Past tracking also lacks
+  // a logging concept but writes through the context, so `!!onUpdateSet` tells the two apart.
+  const editsLoggedSets = !!onUpdateSet && !effectiveAllowLogging && !ownsPlan && !isReadonly;
+
   // Per-side entry for unilateral exercises: two labelled sub-rows reusing the weight/reps/RIR
   // columns. Active-workout logging (issue #102), the plan editors (issue #103) and the history
   // editor (issue #105) all use it; read-only surfaces render a breakdown instead (#101).
   // `perSidePlanEntry` writes straight through `onUpdatePlannedSet`; `perSideEntry` buffers a
   // draft that is aggregated on log; `perSideHistoryEdit` writes each already-logged set's
-  // sides straight back via `updateSet`, re-deriving the aggregate the same way the server does.
-  const perSideEntry = !!exercise.isUnilateral && !isReadonly && !isHistoryEdit && effectiveAllowLogging;
+  // sides straight back via `onUpdateSet`, re-deriving the aggregate the same way the server does.
+  const perSideEntry = !!exercise.isUnilateral && !isReadonly && effectiveAllowLogging;
   const perSidePlanEntry = !!exercise.isUnilateral && !isReadonly && ownsPlan;
-  const perSideHistoryEdit = !!exercise.isUnilateral && !isReadonly && isHistoryEdit;
+  const perSideHistoryEdit = !!exercise.isUnilateral && !isReadonly && editsLoggedSets;
   const perSideCells = perSideEntry || perSidePlanEntry;
 
   // Which side renders first, and its label. Per-exercise, session-only, not persisted --
@@ -628,8 +644,8 @@ export default function ExerciseCard({
   // so that on "beenden" the current field values (planned or edited) are saved.
   // Skip:
   // - any setNumbers that have been explicitly discarded/skipped for this session
-  // - COMPLETED workouts (history edit): we only edit existing performed sets; do not auto-materialize
-  //   never-performed planned sets into the saved data.
+  // - the history editor (`editsLoggedSets`): it only edits existing performed sets and has no
+  //   planned sets at all, so it must never auto-materialize anything into the saved data.
   // `ownsPlan` gates this: a caller that writes planned sets back itself must not have them
   // materialized into logged ones behind its back -- for the template editor that would
   // recreate exactly the fabricated list this indirection removes.
@@ -646,9 +662,8 @@ export default function ExerciseCard({
   // the `getLoggedSet` check below always short-circuited. That twin is gone, so without this
   // guard, merely *opening* a system template while a workout draft exists would log its
   // planned sets into that draft.
-  const isCompletedHijack = isHistoryEdit;
   useEffect(() => {
-    if (mode === 'edit' && !ownsPlan && !isReadonly && hasPlannedSets && !initialEditCommitDone.current && !isCompletedHijack) {
+    if (mode === 'edit' && !ownsPlan && !isReadonly && hasPlannedSets && !initialEditCommitDone.current && !editsLoggedSets) {
       initialEditCommitDone.current = true;
       exercise.plannedSets!.forEach((ps) => {
         const sn = ps.order;
@@ -664,7 +679,7 @@ export default function ExerciseCard({
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, ownsPlan, isReadonly, hasPlannedSets, skippedPlannedSetNumbers, isCompletedHijack]);
+  }, [mode, ownsPlan, isReadonly, hasPlannedSets, skippedPlannedSetNumbers, editsLoggedSets]);
 
   // Bars (collapsed) and planned rows (expanded) share one derivation -- see lib/set-slots.ts.
   // They agree on the planned segment only: `setIndicatorSlots` also covers logged extras and
@@ -757,11 +772,12 @@ export default function ExerciseCard({
         return;
       }
 
-      // Hijack / shared execution flows (active workout, past tracking, history edit of completed):
+      // Shared execution flows (active workout, past tracking) and editors that own their
+      // workout state (the history editor, via `onDeleteSet` -- issue #126):
       // - plannedSets are *initial suggestions only*. Never mutate them here.
       // - For an unlogged planned set: just mark it skipped for this session (render filter hides the row).
-      // - For already-logged sets or additional drafts: remove locally from sets (fully local now --
-      //   there's no server round-trip until the final save, so this is always a plain local delete).
+      // - For already-logged sets or additional drafts: remove them from the workout -- through
+      //   the injected `onDeleteSet` when present, otherwise the context's direct-set path.
       if (isPlannedSlot && !getLoggedSet(setNumber)) {
         // Session-level skip of a planned suggestion. Survives server re-sync because we filter on render.
         setSkippedPlannedSetNumbers(prev => {
@@ -775,6 +791,18 @@ export default function ExerciseCard({
 
       // Remove from local sets (covers: removing an already-logged set in supported modes,
       // or cleaning an additional draft). Fully local -- no server round-trip until save.
+      if (onDeleteSet) {
+        // Injected owner (history editor): never reach into the shared workout context.
+        onDeleteSet(exercise.id, setNumber);
+        setAdditionalSetNumbers(prev => prev.filter(n => n !== setNumber));
+        setSkippedPlannedSetNumbers(prev => {
+          const next = new Set(prev);
+          next.delete(setNumber);
+          return next;
+        });
+        return;
+      }
+
       if (activeWorkout && setActiveWorkoutDirectly) {
         const updatedExercises = activeWorkout.exercises.map((ex: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
           if (ex.id !== exercise.id) return ex;
@@ -986,7 +1014,7 @@ export default function ExerciseCard({
     const swipeClass = swipeOffset > 0 ? 'bg-primary/5' : swipeOffset < 0 ? 'bg-destructive/5' : '';
 
     const commitIfNeeded = () => {
-      if (mode === 'edit' && !ownsPlan && !isReadonly && !getLoggedSet(setNumber) && !isCompletedHijack) {
+      if (mode === 'edit' && !ownsPlan && !isReadonly && !getLoggedSet(setNumber) && !editsLoggedSets) {
         const w = parseFloat(getEditValue(setNumber, 'weight') || '0');
         const r = parseInt(getEditValue(setNumber, 'reps') || '0');
         if (w > 0 && r > 0) {
@@ -1292,7 +1320,7 @@ export default function ExerciseCard({
               const swipeClass = swipeOffset > 0 ? 'bg-primary/5' : swipeOffset < 0 ? 'bg-destructive/5' : '';
 
               const commitIfNeeded = () => {
-                if (!isReadonly && mode === 'edit' && !ownsPlan && !loggedSet && !isCompletedHijack) {
+                if (!isReadonly && mode === 'edit' && !ownsPlan && !loggedSet && !editsLoggedSets) {
                   const w = parseFloat(getEditValue(setNumber, 'weight') || plannedSet.weight?.toString() || '0');
                   const r = parseInt(getEditValue(setNumber, 'reps') || plannedSet.reps?.toString() || '0');
                   if (w > 0 && r > 0) {

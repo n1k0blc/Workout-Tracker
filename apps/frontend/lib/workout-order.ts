@@ -48,7 +48,7 @@ export function reorderExerciseLogs(exercises: ExerciseLog[], exerciseIds: strin
 }
 
 /**
- * Server workout tree -> client draft for the history editor (`loadWorkoutForEdit`).
+ * Server workout tree -> client draft for the history editor (`app/history/[id]/edit`).
  *
  * The response carries only confirmed sets, so they map straight into `sets` with no
  * `plannedSets` -- history editing is values-only, there is no logging concept. The six

@@ -27,13 +27,54 @@ import {
 } from '@/components/ui/drawer';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { LogoutButton } from '@/components/logout-button';
 import { cn } from '@/lib/utils';
+
+/**
+ * A nav entry that navigates, except the Workout entry while a session is live:
+ * that one expands the overlay instead of routing (issue #129). Shared by the
+ * mobile drawer and the desktop bar so the rule lives in one place.
+ */
+function WorkoutNavEntry({
+  href,
+  className,
+  onNavigate,
+  children,
+}: {
+  href: string;
+  className: string;
+  onNavigate?: () => void;
+  children: React.ReactNode;
+}) {
+  const { activeWorkout, expandWorkout } = useWorkout();
+
+  if (href === '/workout' && activeWorkout) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          onNavigate?.();
+          expandWorkout();
+        }}
+        className={className}
+      >
+        {children}
+      </button>
+    );
+  }
+
+  return (
+    <Link href={href} onClick={onNavigate} className={className}>
+      {children}
+    </Link>
+  );
+}
 
 export function MobileNav() {
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
-  const { user, logout } = useAuth();
-  const { activeWorkout, isHistoryEdit } = useWorkout();
+  const { user } = useAuth();
+  const { activeWorkout, isMinimized } = useWorkout();
 
   const getUserInitial = () => {
     if (user?.firstName) return user.firstName[0].toUpperCase();
@@ -47,16 +88,16 @@ export function MobileNav() {
     return () => clearTimeout(id);
   }, [pathname]);
 
-  // Don't show navigation on auth pages, the active workout screen (live or past tracking),
-  // or when there is a real active (IN_PROGRESS) workout session.
-  // Note: completed workouts loaded into context for history edit (via setActiveWorkoutDirectly)
-  // should NOT hide the main site header — they are for viewing/editing historical data.
+  // Don't show navigation on auth pages, the workout route, or while an expanded live
+  // session covers the screen. A *minimized* session keeps the nav — that is the whole
+  // point of the overlay (issue #129). A workout in the context always means a live or
+  // past session now, never a history edit (issue #126).
   if (
     pathname === '/' ||
     pathname === '/login' ||
     pathname === '/register' ||
     pathname?.startsWith('/workout') ||
-    (activeWorkout && !isHistoryEdit)
+    (activeWorkout && !isMinimized)
   ) {
     return null;
   }
@@ -69,10 +110,6 @@ export function MobileNav() {
     { href: '/history', label: 'Verlauf', icon: IconHistory },
     { href: '/analytics', label: 'Analytics', icon: IconChartBar },
   ];
-
-  const handleLogout = async () => {
-    await logout();
-  };
 
   return (
     <>
@@ -91,7 +128,18 @@ export function MobileNav() {
               </Button>
             </DrawerTrigger>
 
-            <DrawerContent className="md:hidden">
+            <DrawerContent
+              className={cn(
+                'md:hidden',
+                // Keep the minimized workout bar visible below the drawer (#128 §4):
+                // inset the sheet and its scrim by the bar height, and drop vaul's
+                // `::after` gap-filler which is a `bg-popover` block that would paint
+                // over the bar. 72px == BAR_HEIGHT in active-workout-overlay.tsx.
+                isMinimized &&
+                  'data-[vaul-drawer-direction=bottom]:bottom-[72px] after:hidden',
+              )}
+              overlayClassName={cn(isMinimized && 'bottom-[72px]')}
+            >
               <DrawerHeader className="text-left">
                 <DrawerTitle>Menü</DrawerTitle>
               </DrawerHeader>
@@ -103,12 +151,12 @@ export function MobileNav() {
                     const Icon = link.icon;
                     const isActive = pathname === link.href;
                     return (
-                      <Link
+                      <WorkoutNavEntry
                         key={link.href}
                         href={link.href}
-                        onClick={() => setIsOpen(false)}
+                        onNavigate={() => setIsOpen(false)}
                         className={cn(
-                          'flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition-colors',
+                          'flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition-colors w-full text-left',
                           isActive
                             ? 'bg-primary text-primary-foreground'
                             : 'text-foreground hover:bg-muted'
@@ -116,7 +164,7 @@ export function MobileNav() {
                       >
                         <Icon className="size-5" />
                         {link.label}
-                      </Link>
+                      </WorkoutNavEntry>
                     );
                   })}
                 </nav>
@@ -128,14 +176,14 @@ export function MobileNav() {
                   <div className="px-1 text-sm text-muted-foreground truncate">
                     {user?.email}
                   </div>
-                  <Button
+                  <LogoutButton
                     variant="outline"
                     className="w-full justify-start gap-2"
-                    onClick={handleLogout}
+                    onRequestConfirm={() => setIsOpen(false)}
                   >
                     <IconLogout data-icon="inline-start" />
                     Abmelden
-                  </Button>
+                  </LogoutButton>
                 </div>
               </div>
             </DrawerContent>
@@ -170,7 +218,7 @@ export function MobileNav() {
                 {navigationLinks.map((link) => {
                   const isActive = pathname === link.href;
                   return (
-                    <Link
+                    <WorkoutNavEntry
                       key={link.href}
                       href={link.href}
                       className={cn(
@@ -179,7 +227,7 @@ export function MobileNav() {
                       )}
                     >
                       {link.label}
-                    </Link>
+                    </WorkoutNavEntry>
                   );
                 })}
               </div>

@@ -15,6 +15,7 @@ import {
 } from '@tabler/icons-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { LogoutButton } from '@/components/logout-button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DatePicker } from '@/components/date-picker';
@@ -206,11 +207,6 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleLogout = async () => {
-    await logout();
-    router.push('/login');
   };
 
   const handleChangePassword = async () => {
@@ -611,14 +607,9 @@ export default function ProfilePage() {
         {/* Logout Section */}
         <Card>
           <CardContent className="pt-6">
-            <Button
-              variant="destructive"
-              className="w-full"
-              size="lg"
-              onClick={handleLogout}
-            >
+            <LogoutButton variant="destructive" className="w-full" size="lg">
               Abmelden
-            </Button>
+            </LogoutButton>
           </CardContent>
         </Card>
       </div>
