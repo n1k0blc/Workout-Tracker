@@ -23,6 +23,12 @@ import { useBarcodeScanner } from '@/hooks/useBarcodeScanner';
  * its transformed ancestor instead of the viewport, and sit under its overlay. Every layer in
  * this app is `z-50`, so what ends up on top is portal mount order -- which is open order,
  * and therefore already what you want.
+ *
+ * That portal is also why the root sets `pointer-events: auto` explicitly. While a modal
+ * drawer or dialog is open, Radix's dismissable layer sets `pointer-events: none` on
+ * `document.body` and re-enables it only inside its own content. This overlay is a sibling of
+ * that content, so without the override it inherits `none` and every control in it is dead --
+ * the camera still decodes, the result still renders, and not a single button responds.
  */
 export function BarcodeCapture({
   open,
@@ -91,7 +97,7 @@ export function BarcodeCapture({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex flex-col bg-zinc-950 text-zinc-50"
+      className="pointer-events-auto fixed inset-0 z-50 flex flex-col bg-zinc-950 text-zinc-50"
       role="dialog"
       aria-modal="true"
       aria-label="Barcode scannen"
@@ -173,7 +179,7 @@ export function BarcodeCapture({
 /** The bottom sheet a result rides in: grab handle, light surface over the dark scanner. */
 export function CaptureSheet({ children }: { children: React.ReactNode }) {
   return (
-    <div className="shrink-0 border-t bg-popover text-foreground">
+    <div className="max-h-[75vh] shrink-0 overflow-y-auto border-t bg-popover text-foreground">
       <div className="mx-auto mt-3 h-1.5 w-24 rounded-full bg-muted" />
       <div className="mx-auto max-w-2xl px-4 pb-4 pt-3.5">{children}</div>
     </div>
