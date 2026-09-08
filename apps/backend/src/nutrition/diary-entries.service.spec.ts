@@ -47,7 +47,17 @@ function makeService(overrides: {
   slots?: unknown[];
   entries?: unknown[];
   deleteCount?: number;
+  foods?: unknown[];
 } = {}) {
+  const foodCreate = jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+    id: 'food-new',
+    ...data,
+  }));
+  const diaryCreate = jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
+    ...ENTRY,
+    ...data,
+  }));
+
   const prisma = {
     mealSlot: {
       findFirst: jest.fn().mockResolvedValue(
@@ -55,11 +65,15 @@ function makeService(overrides: {
       ),
       findMany: jest.fn().mockResolvedValue(overrides.slots ?? []),
     },
+    food: {
+      create: foodCreate,
+      findMany: jest.fn().mockResolvedValue(overrides.foods ?? []),
+    },
     diaryEntry: {
-      create: jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
-        ...ENTRY,
-        ...data,
-      })),
+      create: diaryCreate,
+      createMany: jest.fn(
+        async ({ data }: { data: Array<Record<string, unknown>> }) => ({ count: data.length }),
+      ),
       findFirst: jest.fn().mockResolvedValue(
         'entry' in overrides ? overrides.entry : { ...ENTRY },
       ),
@@ -70,6 +84,10 @@ function makeService(overrides: {
       })),
       deleteMany: jest.fn().mockResolvedValue({ count: overrides.deleteCount ?? 1 }),
     },
+    // Interactive transaction: run the callback against the same mock.
+    $transaction: jest.fn(async (cb: (tx: unknown) => unknown) =>
+      cb({ food: { create: foodCreate }, diaryEntry: { create: diaryCreate } }),
+    ),
   };
   return { service: new DiaryEntriesService(prisma as never), prisma };
 }
@@ -261,5 +279,163 @@ describe('DiaryEntriesService.getDay — day read model', () => {
 
     expect(day.slots.map((s) => s.id)).toEqual(['slot-1', 'slot-2']);
     expect(day.totals).toEqual({ kcal: 0, carbs: 0, protein: 0, fat: 0 });
+  });
+});
+
+const FOOD = {
+  id: 'food-oats',
+  name: 'Haferflocken',
+  isLiquid: false,
+  kcal: 372,
+  carbs: 58.7,
+  protein: 13.5,
+  fat: 7,
+};
+const OAT_DRINK = {
+  id: 'food-oatdrink',
+  name: 'Haferdrink',
+  isLiquid: true,
+  kcal: 59,
+  carbs: 6.5,
+  protein: 1,
+  fat: 3,
+};
+
+function batchDto(items: { foodId: string; grams: number; quantityLabel?: string }[]) {
+  return { mealSlotId: 'slot-1', localDate: '2026-09-07', items };
+}
+
+describe('DiaryEntriesService.createFromFoodBatch — snapshot math', () => {
+  it('scales the food\'s per-100 values by grams / 100 (grams case)', async () => {
+    const { service, prisma } = makeService({ foods: [FOOD] });
+
+    await service.createFromFoodBatch(
+      'user-1',
+      batchDto([{ foodId: 'food-oats', grams: 40, quantityLabel: '150 g' }]),
+    );
+
+    const [row] = prisma.diaryEntry.createMany.mock.calls[0][0].data;
+    expect(row).toMatchObject({
+      userId: 'user-1',
+      mealSlotId: 'slot-1',
+      localDate: '2026-09-07',
+      foodId: 'food-oats',
+      mealId: null,
+      name: 'Haferflocken',
+      quantity: 40,
+      quantityLabel: '150 g',
+    });
+    expect(row.kcal).toBeCloseTo(148.8, 6);
+    expect(row.carbs).toBeCloseTo(23.48, 6);
+    expect(row.protein).toBeCloseTo(5.4, 6);
+    expect(row.fat).toBeCloseTo(2.8, 6);
+  });
+
+  it('does the same math for a named portion (client resolves it to grams first)', async () => {
+    const { service, prisma } = makeService({ foods: [FOOD] });
+
+    await service.createFromFoodBatch(
+      'user-1',
+      batchDto([{ foodId: 'food-oats', grams: 40, quantityLabel: '1 Portion (40 g)' }]),
+    );
+
+    const [row] = prisma.diaryEntry.createMany.mock.calls[0][0].data;
+    expect(row.quantityLabel).toBe('1 Portion (40 g)');
+    expect(row.kcal).toBeCloseTo(148.8, 6);
+  });
+
+  it('treats the amount as millilitres for a liquid food and defaults the label to "N ml"', async () => {
+    const { service, prisma } = makeService({ foods: [OAT_DRINK] });
+
+    await service.createFromFoodBatch(
+      'user-1',
+      batchDto([{ foodId: 'food-oatdrink', grams: 200 }]),
+    );
+
+    const [row] = prisma.diaryEntry.createMany.mock.calls[0][0].data;
+    expect(row.quantityLabel).toBe('200 ml');
+    expect(row.kcal).toBeCloseTo(118, 6);
+    expect(row.carbs).toBeCloseTo(13, 6);
+  });
+
+  it('commits several items in one createMany call', async () => {
+    const { service, prisma } = makeService({ foods: [FOOD, OAT_DRINK] });
+
+    const result = await service.createFromFoodBatch(
+      'user-1',
+      batchDto([
+        { foodId: 'food-oats', grams: 40 },
+        { foodId: 'food-oatdrink', grams: 200 },
+      ]),
+    );
+
+    expect(prisma.diaryEntry.createMany).toHaveBeenCalledTimes(1);
+    expect(prisma.diaryEntry.createMany.mock.calls[0][0].data).toHaveLength(2);
+    expect(result).toEqual({ count: 2 });
+  });
+
+  it('404s (and writes nothing) when an item references an unknown food', async () => {
+    const { service, prisma } = makeService({ foods: [FOOD] });
+
+    await expect(
+      service.createFromFoodBatch(
+        'user-1',
+        batchDto([
+          { foodId: 'food-oats', grams: 40 },
+          { foodId: 'food-ghost', grams: 40 },
+        ]),
+      ),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.diaryEntry.createMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects the batch when the Abschnitt is archived', async () => {
+    const { service } = makeService({
+      slot: { id: 'slot-1', archivedAt: new Date('2026-01-01') },
+      foods: [FOOD],
+    });
+
+    await expect(
+      service.createFromFoodBatch('user-1', batchDto([{ foodId: 'food-oats', grams: 40 }])),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+});
+
+describe('DiaryEntriesService.createEntry — saveAsFood', () => {
+  it('creates a USER food from the entered per-100 values and links the entry to it', async () => {
+    const { service, prisma } = makeService();
+
+    const result = await service.createEntry(
+      'user-1',
+      baseCreateDto({ name: 'Overnight Oats', saveAsFood: true }),
+    );
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.food.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        name: 'Overnight Oats',
+        source: 'USER',
+        createdById: 'user-1',
+        isLiquid: false,
+        kcal: 540,
+        carbs: 48,
+        protein: 22,
+        fat: 24,
+      }),
+    });
+    expect(prisma.diaryEntry.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ foodId: 'food-new' }),
+    });
+    expect(result.foodId).toBe('food-new');
+  });
+
+  it('leaves foodId null and creates no food when the toggle is off', async () => {
+    const { service, prisma } = makeService();
+
+    const result = await service.createEntry('user-1', baseCreateDto());
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.food.create).not.toHaveBeenCalled();
+    expect(result.foodId).toBeNull();
   });
 });

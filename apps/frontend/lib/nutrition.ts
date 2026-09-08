@@ -42,6 +42,41 @@ export function addDays(localDate: string, n: number): string {
   return toLocalDateString(date);
 }
 
+export interface Per100 {
+  kcal: number;
+  carbs: number;
+  protein: number;
+  fat: number;
+}
+
+/**
+ * The nutrients of `grams` (grams or millilitres) of a food, from its per-100 values. The
+ * picker previews with this; the server does the identical `* grams / 100` when it snapshots
+ * the entry, so preview and stored value cannot drift.
+ */
+export function scalePer100(per100: Per100, grams: number): Per100 {
+  const factor = grams / 100;
+  return {
+    kcal: per100.kcal * factor,
+    carbs: per100.carbs * factor,
+    protein: per100.protein * factor,
+    fat: per100.fat * factor,
+  };
+}
+
+/**
+ * How a picked amount reads and is stored: a named portion becomes `"1 Portion (40 g)"`, a
+ * free amount just `"150 g"` (or `ml` for a liquid).
+ */
+export function formatQuantityLabel(
+  portionLabel: string | null,
+  grams: number,
+  isLiquid: boolean,
+): string {
+  const amount = `${Math.round(grams)} ${isLiquid ? 'ml' : 'g'}`;
+  return portionLabel ? `${portionLabel} (${amount})` : amount;
+}
+
 /** `"53 g KH · 20 g P · 20 g F"` -- the macro summary line used across the nutrition screens. */
 export function formatMacroLine(macros: Macros): string {
   return `${Math.round(macros.carbs)} g KH · ${Math.round(macros.protein)} g P · ${Math.round(

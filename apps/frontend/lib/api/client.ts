@@ -36,6 +36,7 @@ import {
   NutritionDay,
   DiaryEntry,
   CreateDiaryEntryInput,
+  DiaryEntriesBatchInput,
   MealSlot,
   MealSlotList,
   Food,
@@ -555,6 +556,16 @@ class ApiClient {
 
   async createDiaryEntry(data: CreateDiaryEntryInput): Promise<DiaryEntry> {
     return this.request<DiaryEntry>('/nutrition/entries', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Commits the picker's basket -- several food entries into one Abschnitt/day in one request.
+  async createDiaryEntriesBatch(
+    data: DiaryEntriesBatchInput,
+  ): Promise<{ count: number }> {
+    return this.request<{ count: number }>('/nutrition/entries/batch', {
       method: 'POST',
       body: JSON.stringify(data),
     });

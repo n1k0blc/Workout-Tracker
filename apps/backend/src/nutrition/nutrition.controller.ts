@@ -21,6 +21,7 @@ import { DiaryEntriesService } from './diary-entries.service';
 import { MealSlotsService } from './meal-slots.service';
 import {
   CreateDiaryEntryDto,
+  CreateDiaryEntriesBatchDto,
   UpdateDiaryEntryDto,
   DiaryEntryDto,
   NutritionDayDto,
@@ -107,6 +108,15 @@ export class NutritionController {
     @Body() dto: CreateDiaryEntryDto,
   ): Promise<DiaryEntryDto> {
     return this.diaryEntries.createEntry(user.id, dto);
+  }
+
+  // The picker's basket: several food entries in one request (#144).
+  @Post('entries/batch')
+  async createEntriesBatch(
+    @CurrentUser() user: { id: string },
+    @Body() dto: CreateDiaryEntriesBatchDto,
+  ): Promise<{ count: number }> {
+    return this.diaryEntries.createFromFoodBatch(user.id, dto);
   }
 
   @Patch('entries/:id')

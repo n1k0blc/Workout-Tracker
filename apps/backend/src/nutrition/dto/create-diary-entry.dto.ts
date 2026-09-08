@@ -6,6 +6,7 @@ import {
   Min,
   IsOptional,
   IsPositive,
+  IsBoolean,
 } from 'class-validator';
 import { IsLocalDate } from '../../common/utils/local-date.util';
 
@@ -57,4 +58,11 @@ export class CreateDiaryEntryDto {
   @IsString()
   @MaxLength(60)
   quantityLabel?: string;
+
+  // When true, the entered name and kcal/macros are also saved as a new USER Lebensmittel
+  // (per-100 values), and this entry references it. The Schnelleintrag form's "Als
+  // Lebensmittel speichern" toggle (#144).
+  @IsOptional()
+  @IsBoolean()
+  saveAsFood?: boolean;
 }

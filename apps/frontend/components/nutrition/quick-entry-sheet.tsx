@@ -47,6 +47,7 @@ export function QuickEntrySheet({
   const [carbs, setCarbs] = useState('');
   const [protein, setProtein] = useState('');
   const [fat, setFat] = useState('');
+  const [saveAsFood, setSaveAsFood] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Reset to a clean form on the closed -> open transition, seeded with the slot it opened
@@ -62,6 +63,7 @@ export function QuickEntrySheet({
       setCarbs('');
       setProtein('');
       setFat('');
+      setSaveAsFood(false);
       setSaving(false);
     }
   }
@@ -87,6 +89,7 @@ export function QuickEntrySheet({
         carbs: macros.carbs,
         protein: macros.protein,
         fat: macros.fat,
+        saveAsFood: saveAsFood || undefined,
       });
       onOpenChange(false);
       onCreated();
@@ -180,6 +183,21 @@ export function QuickEntrySheet({
               ))}
             </div>
           </div>
+
+          <label className="flex items-center gap-3 border p-3.5">
+            <input
+              type="checkbox"
+              checked={saveAsFood}
+              onChange={(e) => setSaveAsFood(e.target.checked)}
+              className="size-4 shrink-0 accent-primary"
+            />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium">Als Lebensmittel speichern</span>
+              <span className="block text-xs text-muted-foreground">
+                Erscheint danach in Vorlagen › Lebensmittel
+              </span>
+            </span>
+          </label>
 
           {hint && (
             <div className="flex items-start gap-2.5 border p-3.5 text-xs text-muted-foreground">

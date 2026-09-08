@@ -752,6 +752,21 @@ export interface CreateDiaryEntryInput {
   fat: number;
   quantity?: number;
   quantityLabel?: string;
+  /** Also save the entered values as a new USER Lebensmittel and link this entry to it. */
+  saveAsFood?: boolean;
+}
+
+/** One food picked in the drawer; `grams` is already normalized to g / ml. */
+export interface DiaryEntryFromFoodInput {
+  foodId: string;
+  grams: number;
+  quantityLabel?: string;
+}
+
+export interface DiaryEntriesBatchInput {
+  mealSlotId: string;
+  localDate: string;
+  items: DiaryEntryFromFoodInput[];
 }
 
 // Lebensmittel library (#143)

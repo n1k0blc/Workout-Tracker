@@ -12,7 +12,7 @@ import { addDays } from '@/lib/nutrition';
 import { NutritionDayBar } from '@/components/nutrition/nutrition-day-bar';
 import { NutritionTotalsCard } from '@/components/nutrition/nutrition-totals-card';
 import { MealSlotRow } from '@/components/nutrition/meal-slot-row';
-import { QuickEntrySheet } from '@/components/nutrition/quick-entry-sheet';
+import { FoodPickerSheet } from '@/components/nutrition/food-picker-sheet';
 import { ManageSlotsSheet } from '@/components/nutrition/manage-slots-sheet';
 
 export default function NutritionPage() {
@@ -21,8 +21,7 @@ export default function NutritionPage() {
   const [day, setDay] = useState<NutritionDay | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const [quickOpen, setQuickOpen] = useState(false);
-  const [quickSlotId, setQuickSlotId] = useState<string | null>(null);
+  const [pickerSlot, setPickerSlot] = useState<{ id: string; name: string } | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -42,7 +41,7 @@ export default function NutritionPage() {
 
   // Horizontal swipe moves between days, the same gesture the design calls for. Suspended
   // while a sheet is open so a swipe (or a slot drag) inside it doesn't change the day behind.
-  const sheetOpen = quickOpen || manageOpen;
+  const sheetOpen = pickerSlot !== null || manageOpen;
   useSwipe({
     onSwipeLeft: sheetOpen ? undefined : () => setDate((d) => addDays(d, 1)),
     onSwipeRight: sheetOpen ? undefined : () => setDate((d) => addDays(d, -1)),
@@ -84,10 +83,7 @@ export default function NutritionPage() {
                       key={slot.id}
                       slot={slot}
                       date={date}
-                      onQuickAdd={() => {
-                        setQuickSlotId(slot.id);
-                        setQuickOpen(true);
-                      }}
+                      onQuickAdd={() => setPickerSlot({ id: slot.id, name: slot.name })}
                     />
                   ))}
                 </div>
@@ -101,15 +97,15 @@ export default function NutritionPage() {
         </div>
       </main>
 
-      <QuickEntrySheet
-        open={quickOpen}
-        onOpenChange={setQuickOpen}
-        slots={(day?.slots ?? [])
-          .filter((slot) => !slot.archived)
-          .map((slot) => ({ id: slot.id, name: slot.name }))}
-        defaultSlotId={quickSlotId}
+      <FoodPickerSheet
+        open={pickerSlot !== null}
+        onOpenChange={(o) => {
+          if (!o) setPickerSlot(null);
+        }}
+        slotId={pickerSlot?.id ?? ''}
+        slotName={pickerSlot?.name ?? ''}
         date={date}
-        onCreated={load}
+        onCommitted={load}
       />
 
       <ManageSlotsSheet

@@ -9,9 +9,9 @@ import { SlotIcon } from './slot-icon';
 
 /**
  * One Abschnitt row on the Tagesansicht. The body links through to the Abschnitt page for the
- * day in view; the "+" is a shortcut that logs straight into this slot (a Schnelleintrag
- * until the picker lands in #144). An archived Abschnitt only appears here on a past day that
- * has entries in it, and renders read-only -- no "+", muted label (#142).
+ * day in view; the "+" opens the food picker for this slot (#144). An archived Abschnitt only
+ * appears here on a past day that has entries in it, and renders read-only -- no "+", muted
+ * label (#142).
  */
 export function MealSlotRow({
   slot,
@@ -61,7 +61,7 @@ export function MealSlotRow({
         <Button
           variant="outline"
           size="icon"
-          aria-label={`Schnelleintrag zu ${slot.name}`}
+          aria-label={`${slot.name}: Lebensmittel hinzufügen`}
           onClick={onQuickAdd}
         >
           <IconPlus />

@@ -14,6 +14,7 @@ import { formatKcal } from '@/lib/nutrition';
 import { DiaryEntryRow } from '@/components/nutrition/diary-entry-row';
 import { QuickEntrySheet } from '@/components/nutrition/quick-entry-sheet';
 import { QuantityEditorSheet } from '@/components/nutrition/quantity-editor-sheet';
+import { FoodPickerSheet } from '@/components/nutrition/food-picker-sheet';
 
 function formatGrams(value: number): string {
   return `${value.toLocaleString('de-DE', {
@@ -56,6 +57,7 @@ export default function AbschnittPage() {
   const [loading, setLoading] = useState(true);
 
   const [quickOpen, setQuickOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [editEntry, setEditEntry] = useState<DiaryEntry | null>(null);
   const [editOpen, setEditOpen] = useState(false);
 
@@ -189,8 +191,7 @@ export default function AbschnittPage() {
                 </p>
               ) : (
                 <div className="flex gap-2">
-                  {/* TODO(#144): "Hinzufügen" opens the food / meal picker; both open Schnelleintrag for now. */}
-                  <Button className="flex-1" onClick={() => setQuickOpen(true)}>
+                  <Button className="flex-1" onClick={() => setPickerOpen(true)}>
                     <IconPlus data-icon="inline-start" />
                     Hinzufügen
                   </Button>
@@ -215,6 +216,16 @@ export default function AbschnittPage() {
         )}
       </div>
 
+      {slot && (
+        <FoodPickerSheet
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          slotId={slot.id}
+          slotName={slot.name}
+          date={date}
+          onCommitted={load}
+        />
+      )}
       <QuickEntrySheet
         open={quickOpen}
         onOpenChange={setQuickOpen}
