@@ -132,15 +132,21 @@ export function useBarcodeScanner({
       setState('scanning');
 
       let busy = false;
+      // One barcode per scanning session. Stopping the loop takes a React render to reach
+      // here via `active`, and the camera is still pointed at the same barcode meanwhile, so
+      // without this the next few ticks report it again -- each one a duplicate lookup, and a
+      // result sheet that rebuilds under the user's finger just as they reach for it.
+      let handled = false;
       timer = setInterval(async () => {
         // A decode can outlast the interval on a slow phone -- skip rather than pile up.
-        if (busy || cancelled || !readerRef.current || video.readyState < 2) return;
+        if (busy || handled || cancelled || !readerRef.current || video.readyState < 2) return;
         busy = true;
         try {
           for (const result of await readerRef.current.detect(video)) {
             const barcode = normalizeBarcode(result.rawValue);
             // A misread is common at an angle; ignore it and let the next frame try again.
-            if (barcode && !cancelled) {
+            if (barcode && !cancelled && !handled) {
+              handled = true;
               onDetectedRef.current(barcode);
               break;
             }
