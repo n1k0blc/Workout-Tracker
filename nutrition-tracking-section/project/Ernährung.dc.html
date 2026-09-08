@@ -1,0 +1,1515 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oxanium:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root, [data-theme="dark"] {
+    --bg: oklch(0.141 0.005 285.823);
+    --fg: oklch(0.985 0 0);
+    --card: oklch(0.21 0.006 285.885);
+    --muted: oklch(0.274 0.006 286.033);
+    --muted-fg: oklch(0.705 0.015 286.067);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --primary: oklch(0.92 0.004 286.32);
+    --primary-fg: oklch(0.21 0.006 285.885);
+    --secondary: oklch(0.274 0.006 286.033);
+    --destructive: oklch(0.704 0.191 22.216);
+    --popover: oklch(0.21 0.006 285.885);
+    --scrim: oklch(0 0 0 / 45%);
+  }
+  [data-theme="light"] {
+    --bg: oklch(1 0 0);
+    --fg: oklch(0.141 0.005 285.823);
+    --card: oklch(1 0 0);
+    --muted: oklch(0.967 0.001 286.375);
+    --muted-fg: oklch(0.552 0.016 285.938);
+    --border: oklch(0.92 0.004 286.32);
+    --input: oklch(0.92 0.004 286.32);
+    --primary: oklch(0.21 0.006 285.885);
+    --primary-fg: oklch(0.985 0 0);
+    --secondary: oklch(0.967 0.001 286.375);
+    --destructive: oklch(0.577 0.245 27.325);
+    --popover: oklch(1 0 0);
+    --scrim: oklch(0 0 0 / 20%);
+  }
+  body { margin: 0; background: oklch(0.205 0.004 285.9); font-family: Oxanium, system-ui, sans-serif; }
+  a { color: var(--fg); }
+  a:hover { color: var(--muted-fg); }
+</style>
+</helmet>
+<div data-theme="{{ theme }}" style="min-height:100vh;padding:40px;background:var(--bg);color:var(--fg);font-family:Oxanium, system-ui, sans-serif;box-sizing:border-box">
+
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:8px">
+    <div>
+      <div style="font-family:'Geist Mono', ui-monospace, monospace;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted-fg)">Workout Tracker · Modul</div>
+      <h1 style="margin:8px 0 0;font-size:32px;font-weight:700;letter-spacing:-0.01em">Ernährung</h1>
+      <p style="margin:6px 0 0;font-size:14px;color:var(--muted-fg);max-width:62ch">kcal, Kohlenhydrate, Protein und Fett — pro Tag, pro Abschnitt, pro Eintrag. Bestehendes Muster: Top-Header mit Drawer, Line-Tabs, Bottom-Sheets.</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button type="button" onClick="{{ setDark }}" style="height:40px;padding:0 20px;border:1px solid var(--border);background:var(--card);color:var(--fg);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Dark</button>
+      <button type="button" onClick="{{ setLight }}" style="height:40px;padding:0 20px;border:1px solid var(--border);background:var(--card);color:var(--fg);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Light</button>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:48px;margin-top:40px;align-items:flex-start">
+
+    <div style="width:390px">
+      <div style="font-family:'Geist Mono', ui-monospace, monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:10px">01 · Tagesansicht</div>
+      <div data-screen-label="01 Tagesansicht" style="width:390px;height:844px;overflow:hidden;background:var(--bg);border:1px solid var(--border);position:relative;display:flex;flex-direction:column">
+
+        <div style="height:64px;flex:0 0 auto;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 8px;position:relative">
+          <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l16 0"></path><path d="M4 12l16 0"></path><path d="M4 18l16 0"></path></svg>
+          </div>
+          <div style="position:absolute;left:50%;transform:translateX(-50%);font-size:18px;font-weight:600">Workout Tracker</div>
+          <div style="width:40px;height:40px;border-radius:9999px;background:var(--muted);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600">N</div>
+        </div>
+
+        <div style="flex:1 1 auto;overflow:hidden;padding:24px 16px;display:flex;flex-direction:column;gap:24px">
+
+          <div>
+            <h2 style="margin:0;font-size:24px;font-weight:700">Ernährung</h2>
+            <p style="margin:4px 0 0;font-size:14px;color:var(--muted-fg)">Kalorien und Makros pro Tag</p>
+          </div>
+
+          <div style="border:1px solid var(--border);background:var(--card);display:flex;align-items:center;justify-content:space-between;padding:0 4px;height:56px">
+            <button type="button" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--fg);cursor:pointer">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6l6 6"></path></svg>
+            </button>
+            <div style="text-align:center">
+              <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg)">Heute</div>
+              <div style="font-size:15px;font-weight:600;margin-top:2px">Mo, 07.09.2026</div>
+            </div>
+            <div style="display:flex;align-items:center">
+              <button type="button" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--muted-fg);cursor:pointer">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12"></path><path d="M16 3v4"></path><path d="M8 3v4"></path><path d="M4 11h16"></path><path d="M11 15h1"></path><path d="M12 15v3"></path></svg>
+              </button>
+              <button type="button" style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--fg);cursor:pointer">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6l-6 6"></path></svg>
+              </button>
+            </div>
+          </div>
+
+          <div style="border:1px solid var(--border);background:var(--card);padding:20px">
+            <div style="display:flex;align-items:flex-end;justify-content:space-between">
+              <div>
+                <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg)">Gegessen</div>
+                <div style="display:flex;align-items:baseline;gap:6px;margin-top:6px">
+                  <span style="font-size:34px;font-weight:700;line-height:1">1.842</span>
+                  <span style="font-size:14px;color:var(--muted-fg)">/ 2.400 kcal</span>
+                </div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg)">Übrig</div>
+                <div style="font-size:18px;font-weight:600;margin-top:6px">558</div>
+              </div>
+            </div>
+            <div style="height:2px;background:var(--muted);margin-top:16px">
+              <div style="width:77%;height:2px;background:var(--fg)"></div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3, minmax(0,1fr));gap:12px;margin-top:20px">
+              <div>
+                <div style="font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted-fg)">Kohlenh.</div>
+                <div style="height:2px;background:var(--muted);margin-top:8px"><div style="width:72%;height:2px;background:var(--fg)"></div></div>
+                <div style="font-size:13px;font-weight:600;margin-top:8px">186 <span style="color:var(--muted-fg);font-weight:400">/ 260 g</span></div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted-fg)">Protein</div>
+                <div style="height:2px;background:var(--muted);margin-top:8px"><div style="width:79%;height:2px;background:var(--fg)"></div></div>
+                <div style="font-size:13px;font-weight:600;margin-top:8px">118 <span style="color:var(--muted-fg);font-weight:400">/ 150 g</span></div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted-fg)">Fett</div>
+                <div style="height:2px;background:var(--muted);margin-top:8px"><div style="width:76%;height:2px;background:var(--fg)"></div></div>
+                <div style="font-size:13px;font-weight:600;margin-top:8px">61 <span style="color:var(--muted-fg);font-weight:400">/ 80 g</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+              <div style="font-size:18px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase">Abschnitte</div>
+              <button type="button" style="display:flex;align-items:center;gap:6px;height:28px;padding:0 12px;border:1px solid var(--border);background:transparent;color:var(--fg);font-family:inherit;font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;cursor:pointer">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 5.5l1.5 1.5l2.5 -2.5"></path><path d="M3.5 11.5l1.5 1.5l2.5 -2.5"></path><path d="M3.5 17.5l1.5 1.5l2.5 -2.5"></path><path d="M11 6l9 0"></path><path d="M11 12l9 0"></path><path d="M11 18l9 0"></path></svg>
+                Verwalten
+              </button>
+            </div>
+
+            <div style="border:1px solid var(--border);background:var(--card)">
+              <div style="display:flex;align-items:center;gap:12px;padding:14px 16px">
+                <div style="width:40px;height:40px;flex:0 0 auto;background:var(--muted);display:flex;align-items:center;justify-content:center;color:var(--fg)">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 14c.83 .642 2.077 1.017 3.5 1c1.423 .017 2.67 -.358 3.5 -1c.83 -.642 2.077 -1.017 3.5 -1c1.423 -.017 2.67 .358 3.5 1"></path><path d="M8 3a2.4 2.4 0 0 0 -1 2a2.4 2.4 0 0 0 1 2"></path><path d="M12 3a2.4 2.4 0 0 0 -1 2a2.4 2.4 0 0 0 1 2"></path><path d="M3 10h14v5a6 6 0 0 1 -6 6h-2a6 6 0 0 1 -6 -6v-5"></path><path d="M16.746 16.726a3 3 0 1 0 .252 -5.555"></path></svg>
+                </div>
+                <div style="flex:1 1 auto;min-width:0">
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <span style="font-size:14px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase">Frühstück</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg)"><path d="M9 6l6 6l-6 6"></path></svg>
+                  </div>
+                  <div style="font-size:13px;font-weight:600;margin-top:3px">486 kcal</div>
+                  <div style="font-size:12px;color:var(--muted-fg);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">53 g KH · 20 g P · 20 g F</div>
+                </div>
+                <button type="button" style="width:40px;height:40px;flex:0 0 auto;border:1px solid var(--border);background:transparent;color:var(--fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l0 14"></path><path d="M5 12l14 0"></path></svg>
+                </button>
+              </div>
+              <div style="height:1px;background:var(--border)"></div>
+              <div style="display:flex;align-items:center;gap:12px;padding:14px 16px">
+                <div style="width:40px;height:40px;flex:0 0 auto;background:var(--muted);display:flex;align-items:center;justify-content:center;color:var(--fg)">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11h16a1 1 0 0 1 1 1v.5c0 1.5 -2.517 5.573 -4 6.5v1a1 1 0 0 1 -1 1h-8a1 1 0 0 1 -1 -1v-1c-1.687 -1.054 -4 -5 -4 -6.5v-.5a1 1 0 0 1 1 -1"></path><path d="M8 7c1.657 0 3 -.895 3 -2s-1.343 -2 -3 -2s-3 .895 -3 2s1.343 2 3 2"></path><path d="M11 5h9"></path></svg>
+                </div>
+                <div style="flex:1 1 auto;min-width:0">
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <span style="font-size:14px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase">Mittagessen</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg)"><path d="M9 6l6 6l-6 6"></path></svg>
+                  </div>
+                  <div style="font-size:13px;font-weight:600;margin-top:3px">742 kcal</div>
+                  <div style="font-size:12px;color:var(--muted-fg);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Reis, Hähnchenbrust, Brokkoli</div>
+                </div>
+                <button type="button" style="width:40px;height:40px;flex:0 0 auto;border:1px solid var(--border);background:transparent;color:var(--fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l0 14"></path><path d="M5 12l14 0"></path></svg>
+                </button>
+              </div>
+              <div style="height:1px;background:var(--border)"></div>
+              <div style="display:flex;align-items:center;gap:12px;padding:14px 16px">
+                <div style="width:40px;height:40px;flex:0 0 auto;background:var(--muted);display:flex;align-items:center;justify-content:center;color:var(--fg)">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11h16a1 1 0 0 1 1 1v.5c0 1.5 -2.517 5.573 -4 6.5v1a1 1 0 0 1 -1 1h-8a1 1 0 0 1 -1 -1v-1c-1.687 -1.054 -4 -5 -4 -6.5v-.5a1 1 0 0 1 1 -1"></path><path d="M18.5 11c.351 -1.017 .426 -2.236 .5 -3.714v-1.286h-2.256c-2.83 0 -4.616 .804 -5.64 2.076"></path><path d="M5.255 11.008a12.204 12.204 0 0 1 -.255 -2.008v-1h1.755c.98 0 1.801 .124 2.479 .35"></path><path d="M8 8l1 -4l4 2.5"></path><path d="M13 11v-.5a2.5 2.5 0 1 0 -5 0v.5"></path></svg>
+                </div>
+                <div style="flex:1 1 auto;min-width:0">
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <span style="font-size:14px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase">Abendessen</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg)"><path d="M9 6l6 6l-6 6"></path></svg>
+                  </div>
+                  <div style="font-size:13px;font-weight:600;margin-top:3px">0 kcal</div>
+                  <div style="font-size:12px;color:var(--muted-fg);margin-top:2px">Noch nichts erfasst</div>
+                </div>
+                <button type="button" style="width:40px;height:40px;flex:0 0 auto;border:1px solid var(--border);background:transparent;color:var(--fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l0 14"></path><path d="M5 12l14 0"></path></svg>
+                </button>
+              </div>
+              <div style="height:1px;background:var(--border)"></div>
+              <div style="display:flex;align-items:center;gap:12px;padding:14px 16px">
+                <div style="width:40px;height:40px;flex:0 0 auto;background:var(--muted);display:flex;align-items:center;justify-content:center;color:var(--fg)">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.319c0 3.102 .444 5.319 2.222 7.978c1.351 1.797 3.156 2.247 5.08 .988c.426 -.268 .97 -.268 1.397 0c1.923 1.26 3.728 .809 5.079 -.988c1.778 -2.66 2.222 -4.876 2.222 -7.977c0 -2.661 -1.99 -5.32 -4.444 -5.32c-1.267 0 -2.41 .693 -3.22 1.44a.5 .5 0 0 1 -.672 0c-.809 -.746 -1.953 -1.44 -3.22 -1.44c-2.454 0 -4.444 2.66 -4.444 5.319"></path><path d="M7 12c0 -1.47 .454 -2.34 1.5 -3"></path><path d="M12 7c0 -1.2 .867 -4 3 -4"></path></svg>
+                </div>
+                <div style="flex:1 1 auto;min-width:0">
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <span style="font-size:14px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase">Snacks</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg)"><path d="M9 6l6 6l-6 6"></path></svg>
+                  </div>
+                  <div style="font-size:13px;font-weight:600;margin-top:3px">614 kcal</div>
+                  <div style="font-size:12px;color:var(--muted-fg);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Skyr, Proteinriegel, Banane</div>
+                </div>
+                <button type="button" style="width:40px;height:40px;flex:0 0 auto;border:1px solid var(--border);background:transparent;color:var(--fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l0 14"></path><path d="M5 12l14 0"></path></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:390px">
+      <div style="font-family:'Geist Mono', ui-monospace, monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:10px">02 · Abschnitte verwalten</div>
+      <div data-screen-label="02 Abschnitte verwalten" style="width:390px;height:844px;overflow:hidden;background:var(--bg);border:1px solid var(--border);position:relative">
+
+        <div style="position:absolute;inset:0;padding:24px 16px;display:flex;flex-direction:column;gap:20px">
+          <div>
+            <h2 style="margin:0;font-size:24px;font-weight:700">Ernährung</h2>
+            <p style="margin:4px 0 0;font-size:14px;color:var(--muted-fg)">Kalorien und Makros pro Tag</p>
+          </div>
+          <div style="border:1px solid var(--border);background:var(--card);height:56px"></div>
+          <div style="border:1px solid var(--border);background:var(--card);height:180px"></div>
+          <div style="border:1px solid var(--border);background:var(--card);height:240px"></div>
+        </div>
+
+        <div style="position:absolute;inset:0;background:var(--scrim);backdrop-filter:blur(2px)"></div>
+
+        <div style="position:absolute;left:0;right:0;bottom:0;background:var(--popover);border-top:1px solid var(--border);display:flex;flex-direction:column;max-height:88%">
+          <div style="width:100px;height:6px;background:var(--muted);margin:16px auto 0"></div>
+          <div style="padding:16px;text-align:center">
+            <div style="font-size:18px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase">Abschnitte verwalten</div>
+            <div style="font-size:13px;color:var(--muted-fg);margin-top:4px">Umbenennen, sortieren, archivieren</div>
+          </div>
+
+          <div style="padding:0 16px 16px;display:flex;flex-direction:column;gap:16px">
+            <div style="border:1px solid var(--border)">
+              <div style="display:flex;align-items:center;gap:10px;padding:12px 12px">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg);flex:0 0 auto"><path d="M8 5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M8 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M8 19a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M14 5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M14 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M14 19a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path></svg>
+                <span style="flex:1 1 auto;font-size:14px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase">Frühstück</span>
+                <button type="button" style="width:36px;height:36px;border:0;background:transparent;color:var(--muted-fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"></path><path d="M13.5 6.5l4 4"></path></svg>
+                </button>
+                <button type="button" style="width:36px;height:36px;border:0;background:transparent;color:var(--muted-fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2"></path><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10"></path><path d="M10 12l4 0"></path></svg>
+                </button>
+              </div>
+              <div style="height:1px;background:var(--border)"></div>
+              <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--muted)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg);flex:0 0 auto"><path d="M8 5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M8 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M8 19a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M14 5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M14 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M14 19a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path></svg>
+                <div style="flex:1 1 auto">
+                  <input type="text" value="Mittagessen" style="width:100%;box-sizing:border-box;height:40px;padding:0;border:0;border-bottom:1px solid var(--fg);background:transparent;color:var(--fg);font-family:inherit;font-size:16px;outline:none">
+                </div>
+                <button type="button" style="width:36px;height:36px;border:0;background:transparent;color:var(--fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5l10 -10"></path></svg>
+                </button>
+                <button type="button" style="width:36px;height:36px;border:0;background:transparent;color:var(--muted-fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6l-12 12"></path><path d="M6 6l12 12"></path></svg>
+                </button>
+              </div>
+              <div style="height:1px;background:var(--border)"></div>
+              <div style="display:flex;align-items:center;gap:10px;padding:12px 12px">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg);flex:0 0 auto"><path d="M8 5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M8 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M8 19a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M14 5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M14 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M14 19a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path></svg>
+                <span style="flex:1 1 auto;font-size:14px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase">Abendessen</span>
+                <button type="button" style="width:36px;height:36px;border:0;background:transparent;color:var(--muted-fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"></path><path d="M13.5 6.5l4 4"></path></svg>
+                </button>
+                <button type="button" style="width:36px;height:36px;border:0;background:transparent;color:var(--muted-fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2"></path><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10"></path><path d="M10 12l4 0"></path></svg>
+                </button>
+              </div>
+              <div style="height:1px;background:var(--border)"></div>
+              <div style="display:flex;align-items:center;gap:10px;padding:12px 12px">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg);flex:0 0 auto"><path d="M8 5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M8 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M8 19a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M14 5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M14 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M14 19a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path></svg>
+                <span style="flex:1 1 auto;font-size:14px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase">Snacks</span>
+                <button type="button" style="width:36px;height:36px;border:0;background:transparent;color:var(--muted-fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"></path><path d="M13.5 6.5l4 4"></path></svg>
+                </button>
+                <button type="button" style="width:36px;height:36px;border:0;background:transparent;color:var(--muted-fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2"></path><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-10"></path><path d="M10 12l4 0"></path></svg>
+                </button>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="text" placeholder="Neuer Abschnitt" style="flex:1 1 auto;min-width:0;height:40px;padding:0;border:0;border-bottom:1px solid var(--input);background:transparent;color:var(--fg);font-family:inherit;font-size:16px;outline:none">
+              <button type="button" style="height:40px;padding:0 20px;display:flex;align-items:center;gap:8px;border:1px solid var(--border);background:transparent;color:var(--fg);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l0 14"></path><path d="M5 12l14 0"></path></svg>
+                Hinzufügen
+              </button>
+            </div>
+
+            <div>
+              <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:8px">Archiviert · 1</div>
+              <div style="border:1px solid var(--border);display:flex;align-items:center;gap:10px;padding:12px 12px">
+                <span style="flex:1 1 auto;font-size:14px;color:var(--muted-fg);letter-spacing:0.05em;text-transform:uppercase">Zweites Frühstück</span>
+                <button type="button" style="height:28px;padding:0 12px;border:1px solid var(--border);background:transparent;color:var(--fg);font-family:inherit;font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;cursor:pointer">Wiederherstellen</button>
+              </div>
+              <p style="margin:8px 0 0;font-size:12px;color:var(--muted-fg)">Archivierte Abschnitte bleiben in vergangenen Tagen sichtbar, erscheinen aber nicht mehr in der Tagesansicht.</p>
+            </div>
+
+            <button type="button" style="height:44px;width:100%;border:1px solid transparent;background:var(--primary);color:var(--primary-fg);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Fertig</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:390px">
+      <div style="font-family:'Geist Mono', ui-monospace, monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:10px">03 · Abschnitt · Einträge</div>
+      <div data-screen-label="03 Abschnitt" style="width:390px;height:844px;overflow:hidden;background:var(--bg);border:1px solid var(--border);position:relative;display:flex;flex-direction:column">
+
+        <div style="height:64px;flex:0 0 auto;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 8px;position:relative">
+          <button type="button" style="width:48px;height:48px;border:0;background:transparent;color:var(--fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l14 0"></path><path d="M5 12l6 6"></path><path d="M5 12l6 -6"></path></svg>
+          </button>
+          <div style="position:absolute;left:50%;transform:translateX(-50%);font-size:18px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase">Frühstück</div>
+          <button type="button" style="width:48px;height:48px;border:0;background:transparent;color:var(--muted-fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"></path><path d="M13.5 6.5l4 4"></path></svg>
+          </button>
+        </div>
+
+        <div style="flex:1 1 auto;overflow:hidden;padding:20px 16px 0;display:flex;flex-direction:column;gap:20px">
+
+          <div style="border:1px solid var(--border);background:var(--card);display:grid;grid-template-columns:1fr 1fr">
+            <div style="padding:16px;text-align:center;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">
+              <div style="font-size:20px;font-weight:700">486</div>
+              <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted-fg);margin-top:4px">kcal</div>
+            </div>
+            <div style="padding:16px;text-align:center;border-bottom:1px solid var(--border)">
+              <div style="font-size:20px;font-weight:700">53,0 g</div>
+              <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted-fg);margin-top:4px">Kohlenhydrate</div>
+            </div>
+            <div style="padding:16px;text-align:center;border-right:1px solid var(--border)">
+              <div style="font-size:20px;font-weight:700">19,7 g</div>
+              <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted-fg);margin-top:4px">Protein</div>
+            </div>
+            <div style="padding:16px;text-align:center">
+              <div style="font-size:20px;font-weight:700">19,8 g</div>
+              <div style="font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted-fg);margin-top:4px">Fett</div>
+            </div>
+          </div>
+
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0 0 8px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg)">Mahlzeit</span>
+                <span style="font-size:14px;font-weight:600">Overnight Oats</span>
+              </div>
+              <span style="font-size:13px;font-weight:600">312 kcal</span>
+            </div>
+            <div style="border:1px solid var(--border);background:var(--card);border-left:2px solid var(--fg)">
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 14px">
+                <div style="flex:1 1 auto;min-width:0">
+                  <div style="font-size:14px">Haferflocken</div>
+                  <div style="font-size:12px;color:var(--muted-fg);margin-top:2px">1 Portion (40 g)</div>
+                </div>
+                <div style="text-align:right">
+                  <div style="font-size:13px;font-weight:600">149 kcal</div>
+                  <div style="font-size:11px;color:var(--muted-fg);margin-top:2px">24 KH · 5 P · 3 F</div>
+                </div>
+              </div>
+              <div style="height:1px;background:var(--border)"></div>
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 14px">
+                <div style="flex:1 1 auto;min-width:0">
+                  <div style="font-size:14px">Fettarme Kuhmilch 1,5 %</div>
+                  <div style="font-size:12px;color:var(--muted-fg);margin-top:2px">1 Glas (200 ml)</div>
+                </div>
+                <div style="text-align:right">
+                  <div style="font-size:13px;font-weight:600">96 kcal</div>
+                  <div style="font-size:11px;color:var(--muted-fg);margin-top:2px">10 KH · 7 P · 3 F</div>
+                </div>
+              </div>
+              <div style="height:1px;background:var(--border)"></div>
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 14px">
+                <div style="flex:1 1 auto;min-width:0">
+                  <div style="font-size:14px">Skyr natur</div>
+                  <div style="font-size:12px;color:var(--muted-fg);margin-top:2px">150 g</div>
+                </div>
+                <div style="text-align:right">
+                  <div style="font-size:13px;font-weight:600">67 kcal</div>
+                  <div style="font-size:11px;color:var(--muted-fg);margin-top:2px">6 KH · 11 P · 0 F</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:8px">Einzeleinträge</div>
+            <div style="border:1px solid var(--border);background:var(--card)">
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 14px">
+                <div style="flex:1 1 auto;min-width:0">
+                  <div style="font-size:14px">Apfel (mit Schale)</div>
+                  <div style="font-size:12px;color:var(--muted-fg);margin-top:2px">1 Stück (130 g)</div>
+                </div>
+                <div style="text-align:right">
+                  <div style="font-size:13px;font-weight:600">85 kcal</div>
+                  <div style="font-size:11px;color:var(--muted-fg);margin-top:2px">19 KH · 0 P · 0 F</div>
+                </div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg);flex:0 0 auto"><path d="M9 6l6 6l-6 6"></path></svg>
+              </div>
+              <div style="height:1px;background:var(--border)"></div>
+              <sc-if value="{{ swipeRevealed }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex;align-items:stretch;background:var(--destructive)">
+                  <div style="flex:1 1 auto;min-width:0;background:var(--card);display:flex;align-items:center;gap:12px;padding:12px 14px;transform:translateX(-92px)">
+                    <div style="flex:1 1 auto;min-width:0">
+                      <div style="font-size:14px">Butter</div>
+                      <div style="font-size:12px;color:var(--muted-fg);margin-top:2px">1 Aufstrich (10 g)</div>
+                    </div>
+                    <div style="text-align:right">
+                      <div style="font-size:13px;font-weight:600">74 kcal</div>
+                      <div style="font-size:11px;color:var(--muted-fg);margin-top:2px">0 KH · 0 P · 8 F</div>
+                    </div>
+                  </div>
+                  <div style="width:92px;flex:0 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:oklch(0.985 0 0)">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7l16 0"></path><path d="M10 11l0 6"></path><path d="M14 11l0 6"></path><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"></path><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"></path></svg>
+                    <span style="font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase">Löschen</span>
+                  </div>
+                </div>
+              </sc-if>
+              <sc-if value="{{ notSwipeRevealed }}">
+                <div style="display:flex;align-items:center;gap:12px;padding:12px 14px">
+                  <div style="flex:1 1 auto;min-width:0">
+                    <div style="font-size:14px">Butter</div>
+                    <div style="font-size:12px;color:var(--muted-fg);margin-top:2px">1 Aufstrich (10 g)</div>
+                  </div>
+                  <div style="text-align:right">
+                    <div style="font-size:13px;font-weight:600">74 kcal</div>
+                    <div style="font-size:11px;color:var(--muted-fg);margin-top:2px">0 KH · 0 P · 8 F</div>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg);flex:0 0 auto"><path d="M9 6l6 6l-6 6"></path></svg>
+                </div>
+              </sc-if>
+              <div style="height:1px;background:var(--border)"></div>
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 14px">
+                <div style="flex:1 1 auto;min-width:0">
+                  <div style="font-size:14px">Hühnerei, gekocht</div>
+                  <div style="font-size:12px;color:var(--muted-fg);margin-top:2px">1 Stück (60 g)</div>
+                </div>
+                <div style="text-align:right">
+                  <div style="font-size:13px;font-weight:600">82 kcal</div>
+                  <div style="font-size:11px;color:var(--muted-fg);margin-top:2px">0 KH · 7 P · 6 F</div>
+                </div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg);flex:0 0 auto"><path d="M9 6l6 6l-6 6"></path></svg>
+              </div>
+            </div>
+            <p style="margin:8px 0 0;font-size:12px;color:var(--muted-fg)">Tippen bearbeitet die Menge · Nach links wischen löscht</p>
+          </div>
+        </div>
+
+        <div style="flex:0 0 auto;padding:16px;border-top:1px solid var(--border);display:flex;gap:8px;background:var(--bg)">
+          <button type="button" style="flex:1 1 auto;height:44px;display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;background:var(--primary);color:var(--primary-fg);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l0 14"></path><path d="M5 12l14 0"></path></svg>
+            Hinzufügen
+          </button>
+          <button type="button" style="flex:0 0 auto;height:44px;padding:0 16px;display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--border);background:transparent;color:var(--fg);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8a2 2 0 0 1 2 -2h16a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-16a2 2 0 0 1 -2 -2l0 -8"></path><path d="M6 10l0 .01"></path><path d="M10 10l0 .01"></path><path d="M14 10l0 .01"></path><path d="M18 10l0 .01"></path><path d="M6 14l0 .01"></path><path d="M18 14l0 .01"></path><path d="M10 14l4 .01"></path></svg>
+            Schnelleintrag
+          </button>
+        </div>
+
+        <sc-if value="{{ showUndoToast }}" hint-placeholder-val="{{ true }}">
+          <div style="position:absolute;top:76px;left:16px;right:16px;background:var(--popover);border:1px solid var(--border);border-radius:8px;box-shadow:0 10px 30px oklch(0 0 0 / 35%);padding:12px 14px;display:flex;align-items:center;gap:12px">
+            <div style="flex:1 1 auto;min-width:0">
+              <div style="font-size:14px;font-weight:500">Eintrag gelöscht</div>
+              <div style="font-size:12px;color:var(--muted-fg);margin-top:2px">Butter · 74 kcal</div>
+            </div>
+            <button type="button" style="height:32px;padding:0 12px;display:flex;align-items:center;gap:6px;border:1px solid transparent;background:var(--primary);color:var(--primary-fg);font-family:inherit;font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14l-4 -4l4 -4"></path><path d="M5 10h11a4 4 0 1 1 0 8h-1"></path></svg>
+              Widerrufen
+            </button>
+            <button type="button" style="width:28px;height:28px;border:1px solid var(--border);background:var(--popover);color:var(--fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6l-12 12"></path><path d="M6 6l12 12"></path></svg>
+            </button>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+
+    <div style="width:390px">
+      <div style="font-family:'Geist Mono', ui-monospace, monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:10px">04 · Auswahl-Drawer</div>
+      <div data-screen-label="04 Auswahl-Drawer" style="width:390px;height:844px;overflow:hidden;background:var(--bg);border:1px solid var(--border);position:relative">
+
+        <div style="position:absolute;inset:0;padding:20px 16px;display:flex;flex-direction:column;gap:16px">
+          <div style="border:1px solid var(--border);background:var(--card);height:120px"></div>
+          <div style="border:1px solid var(--border);background:var(--card);height:200px"></div>
+        </div>
+        <div style="position:absolute;inset:0;background:var(--scrim);backdrop-filter:blur(2px)"></div>
+
+        <div style="position:absolute;left:0;right:0;bottom:0;top:56px;background:var(--popover);border-top:1px solid var(--border);display:flex;flex-direction:column">
+          <div style="width:100px;height:6px;background:var(--muted);margin:16px auto 0;flex:0 0 auto"></div>
+
+          <div style="flex:0 0 auto;padding:14px 16px 0">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div style="font-size:18px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase">Hinzufügen</div>
+              <div style="font-size:12px;color:var(--muted-fg)">Frühstück</div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:8px;margin-top:12px">
+              <div style="flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--fg);height:40px">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg);flex:0 0 auto"><path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"></path><path d="M21 21l-6 -6"></path></svg>
+                <input type="text" value="hafer" style="flex:1 1 auto;min-width:0;height:38px;padding:0;border:0;background:transparent;color:var(--fg);font-family:inherit;font-size:16px;outline:none">
+              </div>
+              <button type="button" style="width:40px;height:40px;flex:0 0 auto;border:1px solid var(--border);background:transparent;color:var(--fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7v-1a2 2 0 0 1 2 -2h2"></path><path d="M4 17v1a2 2 0 0 0 2 2h2"></path><path d="M16 4h2a2 2 0 0 1 2 2v1"></path><path d="M16 20h2a2 2 0 0 0 2 -2v-1"></path><path d="M5 11h1v2h-1l0 -2"></path><path d="M10 11l0 2"></path><path d="M14 11h1v2h-1l0 -2"></path><path d="M19 11l0 2"></path></svg>
+              </button>
+            </div>
+
+            <div style="display:flex;gap:4px;border-bottom:1px solid var(--border);margin-top:16px">
+              <div style="position:relative;padding:8px 16px;font-size:12px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:var(--fg)">
+                Alle
+                <div style="position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--fg)"></div>
+              </div>
+              <div style="padding:8px 16px;font-size:12px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:var(--muted-fg)">Favoriten</div>
+              <div style="padding:8px 16px;font-size:12px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:var(--muted-fg)">Zuletzt</div>
+            </div>
+          </div>
+
+          <div style="flex:1 1 auto;overflow:hidden;padding:0 16px">
+            <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--border)">
+              <div style="flex:1 1 auto;min-width:0">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:14px;font-weight:500">Haferflocken</span>
+                  <span style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg)">Lebensmittel</span>
+                </div>
+                <div style="font-size:12px;color:var(--muted-fg);margin-top:2px">1 Portion (40 g) · 149 kcal</div>
+              </div>
+              <button type="button" style="width:32px;height:32px;border:0;background:transparent;color:var(--fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8.243 7.34l-6.38 .925l-.113 .023a1 1 0 0 0 -.44 1.684l4.622 4.499l-1.09 6.355l-.013 .11a1 1 0 0 0 1.464 .944l5.706 -3l5.693 3l.1 .046a1 1 0 0 0 1.352 -1.1l-1.091 -6.355l4.624 -4.5l.078 -.085a1 1 0 0 0 -.633 -1.62l-6.38 -.926l-2.852 -5.78a1 1 0 0 0 -1.794 0l-2.853 5.78z"></path></svg>
+              </button>
+              <button type="button" style="width:32px;height:32px;border:1px solid var(--border);background:transparent;color:var(--fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l0 14"></path><path d="M5 12l14 0"></path></svg>
+              </button>
+            </div>
+
+            <div style="background:var(--muted);margin:0 -16px;padding:14px 16px;border-bottom:1px solid var(--border)">
+              <div style="display:flex;align-items:center;gap:12px">
+                <div style="flex:1 1 auto;min-width:0">
+                  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <span style="font-size:14px;font-weight:500">Overnight Oats</span>
+                    <span style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--fg)">Mahlzeit</span>
+                    <span style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg)">· Meine</span>
+                  </div>
+                  <div style="font-size:12px;color:var(--muted-fg);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Haferflocken, Kuhmilch, Skyr · 3 Zutaten · 312 kcal</div>
+                </div>
+                <button type="button" style="width:32px;height:32px;border:0;background:transparent;color:var(--muted-fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17.75l-6.172 3.245l1.179 -6.873l-5 -4.867l6.9 -1l3.086 -6.253l3.086 6.253l6.9 1l-5 4.867l1.179 6.873l-6.158 -3.245"></path></svg>
+                </button>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:8px;margin-top:14px">
+                <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg);width:64px;flex:0 0 auto">Menge</div>
+                <div style="display:flex;align-items:center;border:1px solid var(--border);background:var(--popover)">
+                  <button type="button" style="width:36px;height:36px;border:0;background:transparent;color:var(--fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l14 0"></path></svg>
+                  </button>
+                  <div style="min-width:76px;text-align:center;font-size:14px;font-weight:600">1 Portion</div>
+                  <button type="button" style="width:36px;height:36px;border:0;background:transparent;color:var(--fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l0 14"></path><path d="M5 12l14 0"></path></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+                <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg);width:64px;flex:0 0 auto">Faktor</div>
+                <div style="display:flex;border:1px solid var(--border);background:var(--popover)">
+                  <div style="padding:0 14px;height:36px;display:flex;align-items:center;font-size:12px;font-weight:600;letter-spacing:0.08em;color:var(--muted-fg);border-right:1px solid var(--border)">0,5×</div>
+                  <div style="padding:0 14px;height:36px;display:flex;align-items:center;font-size:12px;font-weight:600;letter-spacing:0.08em;background:var(--muted);color:var(--fg);border-right:1px solid var(--border)">1×</div>
+                  <div style="padding:0 14px;height:36px;display:flex;align-items:center;font-size:12px;font-weight:600;letter-spacing:0.08em;color:var(--muted-fg);border-right:1px solid var(--border)">1,5×</div>
+                  <div style="padding:0 14px;height:36px;display:flex;align-items:center;font-size:12px;font-weight:600;letter-spacing:0.08em;color:var(--muted-fg)">2×</div>
+                </div>
+              </div>
+
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px">
+                <div style="font-size:12px;color:var(--muted-fg)">312 kcal · 40 KH · 23 P · 6 F</div>
+                <button type="button" style="height:36px;padding:0 20px;border:1px solid transparent;background:var(--primary);color:var(--primary-fg);font-family:inherit;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer">Übernehmen</button>
+              </div>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--border)">
+              <div style="flex:1 1 auto;min-width:0">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:14px;font-weight:500">Haferdrink ungesüßt</span>
+                  <span style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg)">Lebensmittel</span>
+                </div>
+                <div style="font-size:12px;color:var(--muted-fg);margin-top:2px">1 Glas (200 ml) · 78 kcal</div>
+              </div>
+              <button type="button" style="width:32px;height:32px;border:0;background:transparent;color:var(--muted-fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17.75l-6.172 3.245l1.179 -6.873l-5 -4.867l6.9 -1l3.086 -6.253l3.086 6.253l6.9 1l-5 4.867l1.179 6.873l-6.158 -3.245"></path></svg>
+              </button>
+              <button type="button" style="width:32px;height:32px;border:1px solid var(--border);background:transparent;color:var(--fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l0 14"></path><path d="M5 12l14 0"></path></svg>
+              </button>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--border)">
+              <div style="flex:1 1 auto;min-width:0">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <span style="font-size:14px;font-weight:500">Haferbrei mit Beeren</span>
+                  <span style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--fg)">Mahlzeit</span>
+                </div>
+                <div style="font-size:12px;color:var(--muted-fg);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Haferflocken, Wasser, Heidelbeeren · 3 Zutaten · 268 kcal</div>
+              </div>
+              <button type="button" style="width:32px;height:32px;border:0;background:transparent;color:var(--muted-fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17.75l-6.172 3.245l1.179 -6.873l-5 -4.867l6.9 -1l3.086 -6.253l3.086 6.253l6.9 1l-5 4.867l1.179 6.873l-6.158 -3.245"></path></svg>
+              </button>
+              <button type="button" style="width:32px;height:32px;border:1px solid var(--border);background:transparent;color:var(--fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l0 14"></path><path d="M5 12l14 0"></path></svg>
+              </button>
+            </div>
+          </div>
+
+          <div style="flex:0 0 auto;padding:16px;border-top:1px solid var(--border);display:flex;gap:8px">
+            <button type="button" style="flex:1 1 auto;height:44px;border:1px solid transparent;background:var(--primary);color:var(--primary-fg);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">3 Einträge übernehmen</button>
+            <button type="button" style="flex:0 0 auto;height:44px;padding:0 18px;border:1px solid var(--border);background:transparent;color:var(--fg);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Abbrechen</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:390px">
+      <div style="font-family:'Geist Mono', ui-monospace, monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:10px">05 · Schnelleintrag</div>
+      <div data-screen-label="05 Schnelleintrag" style="width:390px;height:844px;overflow:hidden;background:var(--bg);border:1px solid var(--border);position:relative;display:flex;flex-direction:column">
+
+        <div style="height:64px;flex:0 0 auto;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 8px;position:relative">
+          <button type="button" style="width:48px;height:48px;border:0;background:transparent;color:var(--fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6l-12 12"></path><path d="M6 6l12 12"></path></svg>
+          </button>
+          <div style="position:absolute;left:50%;transform:translateX(-50%);font-size:18px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase">Schnelleintrag</div>
+          <div style="width:48px"></div>
+        </div>
+
+        <div style="flex:1 1 auto;overflow:hidden;padding:24px 16px;display:flex;flex-direction:column;gap:24px">
+          <p style="margin:0;font-size:13px;color:var(--muted-fg)">Nur für diesen Tag. Wird nicht als Lebensmittel gespeichert, solange du es nicht möchtest.</p>
+
+          <div style="display:flex;flex-direction:column;gap:20px">
+            <div>
+              <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg)">Bezeichnung</div>
+              <input type="text" value="Kantine · Gemüsepfanne" style="width:100%;box-sizing:border-box;height:40px;padding:0;border:0;border-bottom:1px solid var(--input);background:transparent;color:var(--fg);font-family:inherit;font-size:16px;outline:none">
+            </div>
+
+            <div>
+              <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg)">Kalorien</div>
+              <div style="display:flex;align-items:baseline;gap:8px;border-bottom:1px solid var(--fg)">
+                <input type="text" value="540" style="flex:1 1 auto;min-width:0;height:40px;padding:0;border:0;background:transparent;color:var(--fg);font-family:inherit;font-size:24px;font-weight:700;outline:none">
+                <span style="font-size:13px;color:var(--muted-fg)">kcal</span>
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(3, minmax(0,1fr));gap:12px">
+              <div>
+                <div style="font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted-fg)">Kohlenh.</div>
+                <div style="display:flex;align-items:baseline;gap:4px;border-bottom:1px solid var(--input)">
+                  <input type="text" value="48" style="flex:1 1 auto;min-width:0;height:40px;padding:0;border:0;background:transparent;color:var(--fg);font-family:inherit;font-size:16px;outline:none">
+                  <span style="font-size:12px;color:var(--muted-fg)">g</span>
+                </div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted-fg)">Protein</div>
+                <div style="display:flex;align-items:baseline;gap:4px;border-bottom:1px solid var(--input)">
+                  <input type="text" value="22" style="flex:1 1 auto;min-width:0;height:40px;padding:0;border:0;background:transparent;color:var(--fg);font-family:inherit;font-size:16px;outline:none">
+                  <span style="font-size:12px;color:var(--muted-fg)">g</span>
+                </div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted-fg)">Fett</div>
+                <div style="display:flex;align-items:baseline;gap:4px;border-bottom:1px solid var(--input)">
+                  <input type="text" value="24" style="flex:1 1 auto;min-width:0;height:40px;padding:0;border:0;background:transparent;color:var(--fg);font-family:inherit;font-size:16px;outline:none">
+                  <span style="font-size:12px;color:var(--muted-fg)">g</span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:8px">Abschnitt</div>
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                <button type="button" style="height:36px;padding:0 16px;border:1px solid var(--border);background:transparent;color:var(--fg);font-family:inherit;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer">Frühstück</button>
+                <button type="button" style="height:36px;padding:0 16px;border:1px solid transparent;background:var(--primary);color:var(--primary-fg);font-family:inherit;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer">Mittagessen</button>
+                <button type="button" style="height:36px;padding:0 16px;border:1px solid var(--border);background:transparent;color:var(--fg);font-family:inherit;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer">Abendessen</button>
+                <button type="button" style="height:36px;padding:0 16px;border:1px solid var(--border);background:transparent;color:var(--fg);font-family:inherit;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer">Snacks</button>
+              </div>
+            </div>
+
+            <div style="border:1px solid var(--border);background:var(--card);padding:14px 16px;display:flex;align-items:center;gap:12px">
+              <div style="flex:1 1 auto;min-width:0">
+                <div style="font-size:14px;font-weight:500">Als Lebensmittel speichern</div>
+                <div style="font-size:12px;color:var(--muted-fg);margin-top:2px">Erscheint danach in Vorlagen › Lebensmittel</div>
+              </div>
+              <div style="width:44px;height:24px;flex:0 0 auto;background:var(--muted);border:1px solid var(--border);display:flex;align-items:center;padding:2px">
+                <div style="width:18px;height:18px;background:var(--muted-fg)"></div>
+              </div>
+            </div>
+
+            <div style="border:1px solid var(--border);padding:14px 16px;display:flex;gap:10px;align-items:flex-start">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg);flex:0 0 auto;margin-top:1px"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"></path><path d="M12 9h.01"></path><path d="M11 12h1v4h1"></path></svg>
+              <div style="font-size:12px;color:var(--muted-fg)">Makros ergeben 508 kcal. Differenz zu 540 kcal wird übernommen wie eingegeben.</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="flex:0 0 auto;padding:16px;border-top:1px solid var(--border);display:flex;gap:8px">
+          <button type="button" style="flex:1 1 auto;height:44px;border:1px solid transparent;background:var(--primary);color:var(--primary-fg);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Speichern</button>
+          <button type="button" style="flex:0 0 auto;height:44px;padding:0 18px;border:1px solid var(--border);background:transparent;color:var(--fg);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Abbrechen</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:390px">
+      <div style="font-family:'Geist Mono', ui-monospace, monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:10px">06 · Barcode-Scanner · Treffer</div>
+      <div data-screen-label="06 Scanner Treffer" style="width:390px;height:844px;overflow:hidden;background:oklch(0.141 0.005 285.823);border:1px solid var(--border);position:relative;display:flex;flex-direction:column">
+
+        <div style="height:64px;flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:0 8px;position:relative;color:oklch(0.985 0 0)">
+          <button type="button" style="width:48px;height:48px;border:0;background:transparent;color:inherit;display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6l-12 12"></path><path d="M6 6l12 12"></path></svg>
+          </button>
+          <div style="position:absolute;left:50%;transform:translateX(-50%);font-size:18px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase">Barcode</div>
+          <div style="width:48px"></div>
+        </div>
+
+        <div style="flex:1 1 auto;position:relative;background:oklch(0.24 0.004 285.9);overflow:hidden">
+          <div style="position:absolute;inset:0;background:repeating-linear-gradient(115deg, oklch(0.28 0.004 285.9) 0 18px, oklch(0.245 0.004 285.9) 18px 36px)"></div>
+          <div style="position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);width:250px;height:160px">
+            <div style="position:absolute;left:0;top:0;width:32px;height:32px;border-left:2px solid oklch(0.985 0 0);border-top:2px solid oklch(0.985 0 0)"></div>
+            <div style="position:absolute;right:0;top:0;width:32px;height:32px;border-right:2px solid oklch(0.985 0 0);border-top:2px solid oklch(0.985 0 0)"></div>
+            <div style="position:absolute;left:0;bottom:0;width:32px;height:32px;border-left:2px solid oklch(0.985 0 0);border-bottom:2px solid oklch(0.985 0 0)"></div>
+            <div style="position:absolute;right:0;bottom:0;width:32px;height:32px;border-right:2px solid oklch(0.985 0 0);border-bottom:2px solid oklch(0.985 0 0)"></div>
+            <div style="position:absolute;left:8px;right:8px;top:50%;height:2px;background:oklch(0.985 0 0)"></div>
+          </div>
+          <div style="position:absolute;left:0;right:0;top:calc(44% + 110px);text-align:center;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:oklch(0.75 0.01 286)">EAN im Rahmen halten</div>
+
+          <div style="position:absolute;left:16px;right:16px;bottom:16px">
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:oklch(0.75 0.01 286)">EAN manuell eingeben</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+              <input type="text" placeholder="13-stellige Nummer" style="flex:1 1 auto;min-width:0;height:40px;padding:0;border:0;border-bottom:1px solid oklch(1 0 0 / 30%);background:transparent;color:oklch(0.985 0 0);font-family:inherit;font-size:16px;outline:none">
+              <button type="button" style="height:40px;padding:0 18px;border:1px solid oklch(1 0 0 / 30%);background:transparent;color:oklch(0.985 0 0);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Suchen</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="flex:0 0 auto;background:var(--popover);border-top:1px solid var(--border);color:var(--fg)">
+          <div style="width:100px;height:6px;background:var(--muted);margin:12px auto 0"></div>
+          <div style="padding:14px 16px 16px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5l10 -10"></path></svg>
+              <span style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase">Treffer · Eigenes Lebensmittel</span>
+            </div>
+            <div style="font-size:18px;font-weight:600;margin-top:10px">Skyr natur 0,2 %</div>
+            <div style="font-size:12px;color:var(--muted-fg);margin-top:2px;font-family:'Geist Mono', ui-monospace, monospace">EAN 4062800011225</div>
+
+            <div style="display:grid;grid-template-columns:repeat(4, minmax(0,1fr));border:1px solid var(--border);margin-top:14px">
+              <div style="padding:10px 6px;text-align:center;border-right:1px solid var(--border)">
+                <div style="font-size:15px;font-weight:700">67</div>
+                <div style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted-fg);margin-top:2px">kcal</div>
+              </div>
+              <div style="padding:10px 6px;text-align:center;border-right:1px solid var(--border)">
+                <div style="font-size:15px;font-weight:700">4,0</div>
+                <div style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted-fg);margin-top:2px">KH g</div>
+              </div>
+              <div style="padding:10px 6px;text-align:center;border-right:1px solid var(--border)">
+                <div style="font-size:15px;font-weight:700">11,0</div>
+                <div style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted-fg);margin-top:2px">Prot. g</div>
+              </div>
+              <div style="padding:10px 6px;text-align:center">
+                <div style="font-size:15px;font-weight:700">0,2</div>
+                <div style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted-fg);margin-top:2px">Fett g</div>
+              </div>
+            </div>
+            <div style="font-size:11px;color:var(--muted-fg);margin-top:6px">Werte je 100 g</div>
+
+            <div style="display:flex;align-items:center;gap:8px;margin-top:14px">
+              <div style="display:flex;align-items:center;border:1px solid var(--border)">
+                <button type="button" style="width:36px;height:40px;border:0;background:transparent;color:var(--fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l14 0"></path></svg>
+                </button>
+                <div style="min-width:72px;text-align:center;font-size:14px;font-weight:600">150 g</div>
+                <button type="button" style="width:36px;height:40px;border:0;background:transparent;color:var(--fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l0 14"></path><path d="M5 12l14 0"></path></svg>
+                </button>
+              </div>
+              <button type="button" style="flex:1 1 auto;height:40px;border:1px solid transparent;background:var(--primary);color:var(--primary-fg);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Zu Frühstück</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:390px">
+      <div style="font-family:'Geist Mono', ui-monospace, monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:10px">06b · Scanner · weitere Zustände</div>
+      <div data-screen-label="06b Scanner Zustände" style="width:390px;height:844px;overflow:hidden;background:var(--bg);border:1px solid var(--border);padding:20px 16px;display:flex;flex-direction:column;gap:18px;box-sizing:border-box">
+
+        <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg)">Ergebnis-Sheet · Varianten</div>
+
+        <div style="border:1px solid var(--border);background:var(--popover);padding:16px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6"></path><path d="M11 13l9 -9"></path><path d="M15 4h5v5"></path></svg>
+            <span style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase">Treffer · Open Food Facts</span>
+          </div>
+          <div style="font-size:16px;font-weight:600;margin-top:10px">Haferdrink Barista ungesüßt</div>
+          <div style="font-size:12px;color:var(--muted-fg);margin-top:2px;font-family:'Geist Mono', ui-monospace, monospace">EAN 4013200104108</div>
+          <div style="font-size:12px;color:var(--muted-fg);margin-top:10px">59 kcal · 6,5 g KH · 1,0 g Protein · 3,0 g Fett je 100 ml</div>
+          <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px;font-size:11px;color:var(--muted-fg)">Daten aus Open Food Facts (ODbL). Werte können unvollständig sein — vor dem Speichern prüfen.</div>
+          <div style="display:flex;gap:8px;margin-top:14px">
+            <button type="button" style="flex:1 1 auto;height:40px;border:1px solid transparent;background:var(--primary);color:var(--primary-fg);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Übernehmen</button>
+            <button type="button" style="flex:0 0 auto;height:40px;padding:0 16px;border:1px solid var(--border);background:transparent;color:var(--fg);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Prüfen</button>
+          </div>
+        </div>
+
+        <div style="border:1px solid var(--border);background:var(--popover);padding:16px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg)"><path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"></path><path d="M21 21l-6 -6"></path></svg>
+            <span style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg)">Kein Treffer</span>
+          </div>
+          <div style="font-size:14px;margin-top:10px">Zu <span style="font-family:'Geist Mono', ui-monospace, monospace">4311501234567</span> gibt es weder ein eigenes Lebensmittel noch einen Open-Food-Facts-Eintrag.</div>
+          <div style="display:flex;gap:8px;margin-top:14px">
+            <button type="button" style="flex:1 1 auto;height:40px;border:1px solid transparent;background:var(--primary);color:var(--primary-fg);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Lebensmittel anlegen</button>
+            <button type="button" style="flex:0 0 auto;height:40px;padding:0 16px;border:1px solid var(--border);background:transparent;color:var(--fg);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Erneut</button>
+          </div>
+        </div>
+
+        <div style="border:1px solid var(--border);background:var(--popover);padding:16px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--destructive)"><path d="M8.297 4.289a.997 .997 0 0 1 .703 -.289h6a1 1 0 0 1 1 1a2 2 0 0 0 2 2h1a2 2 0 0 1 2 2v8m-1.187 2.828c-.249 .11 -.524 .172 -.813 .172h-14a2 2 0 0 1 -2 -2v-9a2 2 0 0 1 2 -2h1c.298 0 .58 -.065 .834 -.181"></path><path d="M10.422 10.448a3 3 0 1 0 4.15 4.098"></path><path d="M3 3l18 18"></path></svg>
+            <span style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--destructive)">Keine Kamera</span>
+          </div>
+          <div style="font-size:14px;margin-top:10px">Kamerazugriff ist nicht erlaubt oder nicht verfügbar. Du kannst die EAN eingeben.</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:14px">
+            <input type="text" placeholder="EAN" style="flex:1 1 auto;min-width:0;height:40px;padding:0;border:0;border-bottom:1px solid var(--input);background:transparent;color:var(--fg);font-family:inherit;font-size:16px;outline:none">
+            <button type="button" style="flex:0 0 auto;height:40px;padding:0 18px;border:1px solid transparent;background:var(--primary);color:var(--primary-fg);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Suchen</button>
+          </div>
+          <div style="font-size:11px;color:var(--muted-fg);margin-top:10px">Zugriff in den Browser-Einstellungen erlauben und erneut versuchen.</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:390px">
+      <div style="font-family:'Geist Mono', ui-monospace, monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:10px">07 · Vorlagen › Lebensmittel</div>
+      <div data-screen-label="07 Vorlagen Lebensmittel" style="width:390px;height:844px;overflow:hidden;background:var(--bg);border:1px solid var(--border);position:relative;display:flex;flex-direction:column">
+
+        <div style="height:64px;flex:0 0 auto;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 8px;position:relative">
+          <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l16 0"></path><path d="M4 12l16 0"></path><path d="M4 18l16 0"></path></svg>
+          </div>
+          <div style="position:absolute;left:50%;transform:translateX(-50%);font-size:18px;font-weight:600">Workout Tracker</div>
+          <div style="width:40px;height:40px;border-radius:9999px;background:var(--muted);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600">N</div>
+        </div>
+
+        <div style="flex:1 1 auto;overflow:hidden;padding:24px 16px;display:flex;flex-direction:column;gap:20px">
+          <div>
+            <h2 style="margin:0;font-size:24px;font-weight:700">Vorlagen</h2>
+            <p style="margin:4px 0 0;font-size:14px;color:var(--muted-fg)">Verwalte Übungen, Workouts und Ernährung</p>
+          </div>
+
+          <div style="display:flex;gap:4px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none">
+            <div style="padding:8px 12px;font-size:12px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:var(--muted-fg);white-space:nowrap">Übungen</div>
+            <div style="padding:8px 12px;font-size:12px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:var(--muted-fg);white-space:nowrap">Workouts</div>
+            <div style="position:relative;padding:8px 12px;font-size:12px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:var(--fg);white-space:nowrap">
+              Lebensmittel
+              <div style="position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--fg)"></div>
+            </div>
+            <div style="padding:8px 12px;font-size:12px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:var(--muted-fg);white-space:nowrap">Mahlzeiten</div>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <p style="margin:0;font-size:13px;color:var(--muted-fg)">128 Lebensmittel · 12 eigene</p>
+            <button type="button" style="height:36px;padding:0 14px;display:flex;align-items:center;gap:6px;border:1px solid transparent;background:var(--primary);color:var(--primary-fg);font-family:inherit;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l0 14"></path><path d="M5 12l14 0"></path></svg>
+              Neu
+            </button>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--input);height:40px">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg);flex:0 0 auto"><path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"></path><path d="M21 21l-6 -6"></path></svg>
+            <input type="text" placeholder="Lebensmittel suchen..." style="flex:1 1 auto;min-width:0;height:38px;padding:0;border:0;background:transparent;color:var(--fg);font-family:inherit;font-size:16px;outline:none">
+          </div>
+
+          <div style="border:1px solid var(--border);background:var(--card)">
+            <div style="display:flex;align-items:center;gap:12px;padding:13px 14px">
+              <div style="flex:1 1 auto;min-width:0">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:14px;font-weight:500">Haferflocken</span>
+                  <span style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg)">Eigenes</span>
+                </div>
+                <div style="font-size:12px;color:var(--muted-fg);margin-top:2px">372 kcal / 100 g · 1 Portion = 40 g</div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg);flex:0 0 auto"><path d="M9 6l6 6l-6 6"></path></svg>
+            </div>
+            <div style="height:1px;background:var(--border)"></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:13px 14px">
+              <div style="flex:1 1 auto;min-width:0">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:14px;font-weight:500">Skyr natur 0,2 %</span>
+                  <span style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg)">Eigenes</span>
+                </div>
+                <div style="font-size:12px;color:var(--muted-fg);margin-top:2px">67 kcal / 100 g · 1 Becher = 150 g</div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg);flex:0 0 auto"><path d="M9 6l6 6l-6 6"></path></svg>
+            </div>
+            <div style="height:1px;background:var(--border)"></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:13px 14px">
+              <div style="flex:1 1 auto;min-width:0">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:14px;font-weight:500">Hähnchenbrust, rohes Filet</span>
+                  <span style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg)">System</span>
+                </div>
+                <div style="font-size:12px;color:var(--muted-fg);margin-top:2px">106 kcal / 100 g</div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg);flex:0 0 auto"><path d="M9 6l6 6l-6 6"></path></svg>
+            </div>
+            <div style="height:1px;background:var(--border)"></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:13px 14px">
+              <div style="flex:1 1 auto;min-width:0">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:14px;font-weight:500">Haferdrink Barista ungesüßt</span>
+                  <span style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg)">Open Food Facts</span>
+                </div>
+                <div style="font-size:12px;color:var(--muted-fg);margin-top:2px">59 kcal / 100 ml · 1 Glas = 200 ml</div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg);flex:0 0 auto"><path d="M9 6l6 6l-6 6"></path></svg>
+            </div>
+            <div style="height:1px;background:var(--border)"></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:13px 14px">
+              <div style="flex:1 1 auto;min-width:0">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <span style="font-size:14px;font-weight:500">Butter</span>
+                  <span style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg)">System</span>
+                </div>
+                <div style="font-size:12px;color:var(--muted-fg);margin-top:2px">741 kcal / 100 g · 1 Aufstrich = 10 g</div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg);flex:0 0 auto"><path d="M9 6l6 6l-6 6"></path></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:390px">
+      <div style="font-family:'Geist Mono', ui-monospace, monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:10px">07b · Lebensmittel-Editor</div>
+      <div data-screen-label="07b Lebensmittel-Editor" style="width:390px;height:844px;overflow:hidden;background:var(--bg);border:1px solid var(--border);position:relative;display:flex;flex-direction:column">
+
+        <div style="height:64px;flex:0 0 auto;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 8px;position:relative">
+          <button type="button" style="width:48px;height:48px;border:0;background:transparent;color:var(--fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l14 0"></path><path d="M5 12l6 6"></path><path d="M5 12l6 -6"></path></svg>
+          </button>
+          <div style="position:absolute;left:50%;transform:translateX(-50%);font-size:18px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase">Lebensmittel</div>
+          <button type="button" style="width:48px;height:48px;border:0;background:transparent;color:var(--destructive);display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7l16 0"></path><path d="M10 11l0 6"></path><path d="M14 11l0 6"></path><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"></path><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"></path></svg>
+          </button>
+        </div>
+
+        <div style="flex:1 1 auto;overflow:hidden;padding:24px 16px;display:flex;flex-direction:column;gap:22px">
+          <div>
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg)">Name</div>
+            <input type="text" value="Haferflocken" style="width:100%;box-sizing:border-box;height:40px;padding:0;border:0;border-bottom:1px solid var(--input);background:transparent;color:var(--fg);font-family:inherit;font-size:16px;outline:none">
+          </div>
+
+          <div>
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg)">EAN <span style="color:var(--muted-fg);letter-spacing:0.05em;text-transform:none;font-weight:400">(optional)</span></div>
+            <div style="display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--input)">
+              <input type="text" value="4008713700086" style="flex:1 1 auto;min-width:0;height:40px;padding:0;border:0;background:transparent;color:var(--fg);font-family:'Geist Mono', ui-monospace, monospace;font-size:15px;outline:none">
+              <button type="button" style="width:32px;height:32px;border:0;background:transparent;color:var(--fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7v-1a2 2 0 0 1 2 -2h2"></path><path d="M4 17v1a2 2 0 0 0 2 2h2"></path><path d="M16 4h2a2 2 0 0 1 2 2v1"></path><path d="M16 20h2a2 2 0 0 0 2 -2v-1"></path><path d="M5 11h1v2h-1l0 -2"></path><path d="M10 11l0 2"></path><path d="M14 11h1v2h-1l0 -2"></path><path d="M19 11l0 2"></path></svg>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:10px">Nährwerte je 100 g</div>
+            <div style="display:grid;grid-template-columns:repeat(2, minmax(0,1fr));gap:14px 16px">
+              <div>
+                <div style="font-size:11px;color:var(--muted-fg)">Kalorien</div>
+                <div style="display:flex;align-items:baseline;gap:4px;border-bottom:1px solid var(--input)">
+                  <input type="text" value="372" style="flex:1 1 auto;min-width:0;height:40px;padding:0;border:0;background:transparent;color:var(--fg);font-family:inherit;font-size:16px;outline:none">
+                  <span style="font-size:12px;color:var(--muted-fg)">kcal</span>
+                </div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--muted-fg)">Kohlenhydrate</div>
+                <div style="display:flex;align-items:baseline;gap:4px;border-bottom:1px solid var(--input)">
+                  <input type="text" value="58,7" style="flex:1 1 auto;min-width:0;height:40px;padding:0;border:0;background:transparent;color:var(--fg);font-family:inherit;font-size:16px;outline:none">
+                  <span style="font-size:12px;color:var(--muted-fg)">g</span>
+                </div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--muted-fg)">Protein</div>
+                <div style="display:flex;align-items:baseline;gap:4px;border-bottom:1px solid var(--input)">
+                  <input type="text" value="13,5" style="flex:1 1 auto;min-width:0;height:40px;padding:0;border:0;background:transparent;color:var(--fg);font-family:inherit;font-size:16px;outline:none">
+                  <span style="font-size:12px;color:var(--muted-fg)">g</span>
+                </div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--muted-fg)">Fett</div>
+                <div style="display:flex;align-items:baseline;gap:4px;border-bottom:1px solid var(--input)">
+                  <input type="text" value="7,0" style="flex:1 1 auto;min-width:0;height:40px;padding:0;border:0;background:transparent;color:var(--fg);font-family:inherit;font-size:16px;outline:none">
+                  <span style="font-size:12px;color:var(--muted-fg)">g</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg)">Portionsgrößen</div>
+              <button type="button" style="height:28px;padding:0 12px;display:flex;align-items:center;gap:6px;border:1px solid var(--border);background:transparent;color:var(--fg);font-family:inherit;font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;cursor:pointer">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l0 14"></path><path d="M5 12l14 0"></path></svg>
+                Größe
+              </button>
+            </div>
+            <div style="border:1px solid var(--border);background:var(--card)">
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 14px">
+                <span style="flex:1 1 auto;font-size:14px">1 Portion</span>
+                <span style="font-size:13px;font-weight:600">40 g</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg)"><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"></path><path d="M13.5 6.5l4 4"></path></svg>
+              </div>
+              <div style="height:1px;background:var(--border)"></div>
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 14px">
+                <span style="flex:1 1 auto;font-size:14px">1 Esslöffel</span>
+                <span style="font-size:13px;font-weight:600">12 g</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg)"><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"></path><path d="M13.5 6.5l4 4"></path></svg>
+              </div>
+              <div style="height:1px;background:var(--border)"></div>
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 14px">
+                <span style="flex:1 1 auto;font-size:14px;color:var(--muted-fg)">Standard</span>
+                <span style="font-size:13px;font-weight:600">1 Portion</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg)"><path d="M6 9l6 6l6 -6"></path></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="flex:0 0 auto;padding:16px;border-top:1px solid var(--border);display:flex;gap:8px">
+          <button type="button" style="flex:1 1 auto;height:44px;border:1px solid transparent;background:var(--primary);color:var(--primary-fg);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Speichern</button>
+          <button type="button" style="flex:0 0 auto;height:44px;padding:0 18px;border:1px solid var(--border);background:transparent;color:var(--fg);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Abbrechen</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:390px">
+      <div style="font-family:'Geist Mono', ui-monospace, monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:10px">07c · Lebensmittel · schreibgeschützt</div>
+      <div data-screen-label="07c Lebensmittel readonly" style="width:390px;height:844px;overflow:hidden;background:var(--bg);border:1px solid var(--border);position:relative;display:flex;flex-direction:column">
+
+        <div style="height:64px;flex:0 0 auto;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 8px;position:relative">
+          <button type="button" style="width:48px;height:48px;border:0;background:transparent;color:var(--fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l14 0"></path><path d="M5 12l6 6"></path><path d="M5 12l6 -6"></path></svg>
+          </button>
+          <div style="position:absolute;left:50%;transform:translateX(-50%);font-size:18px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase">Lebensmittel</div>
+          <div style="width:48px"></div>
+        </div>
+
+        <div style="flex:1 1 auto;overflow:hidden;padding:24px 16px;display:flex;flex-direction:column;gap:20px">
+          <div>
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg)">Open Food Facts</div>
+            <h3 style="margin:6px 0 0;font-size:20px;font-weight:600">Haferdrink Barista ungesüßt</h3>
+            <div style="font-size:12px;color:var(--muted-fg);margin-top:4px;font-family:'Geist Mono', ui-monospace, monospace">EAN 4013200104108</div>
+          </div>
+
+          <div style="border:1px solid var(--border);background:var(--card);display:grid;grid-template-columns:1fr 1fr">
+            <div style="padding:14px 16px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)">
+              <div style="font-size:11px;color:var(--muted-fg)">Kalorien</div>
+              <div style="font-size:17px;font-weight:600;margin-top:4px">59 kcal</div>
+            </div>
+            <div style="padding:14px 16px;border-bottom:1px solid var(--border)">
+              <div style="font-size:11px;color:var(--muted-fg)">Kohlenhydrate</div>
+              <div style="font-size:17px;font-weight:600;margin-top:4px">6,5 g</div>
+            </div>
+            <div style="padding:14px 16px;border-right:1px solid var(--border)">
+              <div style="font-size:11px;color:var(--muted-fg)">Protein</div>
+              <div style="font-size:17px;font-weight:600;margin-top:4px">1,0 g</div>
+            </div>
+            <div style="padding:14px 16px">
+              <div style="font-size:11px;color:var(--muted-fg)">Fett</div>
+              <div style="font-size:17px;font-weight:600;margin-top:4px">3,0 g</div>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--muted-fg);margin-top:-12px">Werte je 100 ml</div>
+
+          <div style="border:1px solid var(--border);padding:14px 16px;display:flex;gap:10px;align-items:flex-start">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg);flex:0 0 auto;margin-top:1px"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"></path><path d="M12 9h.01"></path><path d="M11 12h1v4h1"></path></svg>
+            <div>
+              <div style="font-size:13px">Importierte Einträge sind schreibgeschützt.</div>
+              <div style="font-size:12px;color:var(--muted-fg);margin-top:4px">Daten von Open Food Facts, Lizenz ODbL. Zum Anpassen eine eigene Kopie anlegen.</div>
+            </div>
+          </div>
+
+          <div>
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:8px">Ähnliche eigene Einträge</div>
+            <div style="border:1px solid var(--border);background:var(--card)">
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 14px">
+                <div style="flex:1 1 auto;min-width:0">
+                  <div style="font-size:14px">Haferdrink ungesüßt</div>
+                  <div style="font-size:12px;color:var(--muted-fg);margin-top:2px">39 kcal / 100 ml · 24× genutzt</div>
+                </div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg)"><path d="M9 6l6 6l-6 6"></path></svg>
+              </div>
+              <div style="height:1px;background:var(--border)"></div>
+              <div style="display:flex;align-items:center;gap:12px;padding:12px 14px">
+                <div style="flex:1 1 auto;min-width:0">
+                  <div style="font-size:14px">Haferdrink Barista</div>
+                  <div style="font-size:12px;color:var(--muted-fg);margin-top:2px">57 kcal / 100 ml · 3× genutzt</div>
+                </div>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg)"><path d="M9 6l6 6l-6 6"></path></svg>
+              </div>
+            </div>
+            <p style="margin:8px 0 0;font-size:12px;color:var(--muted-fg)">Doppelte Einträge vermeiden: prüfe, ob einer davon passt.</p>
+          </div>
+        </div>
+
+        <div style="flex:0 0 auto;padding:16px;border-top:1px solid var(--border);display:flex;gap:8px">
+          <button type="button" style="flex:1 1 auto;height:44px;border:1px solid var(--border);background:transparent;color:var(--fg);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Eigene Kopie anlegen</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:390px">
+      <div style="font-family:'Geist Mono', ui-monospace, monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:10px">08 · Vorlagen › Mahlzeiten</div>
+      <div data-screen-label="08 Mahlzeiten" style="width:390px;height:844px;overflow:hidden;background:var(--bg);border:1px solid var(--border);position:relative;display:flex;flex-direction:column">
+
+        <div style="height:64px;flex:0 0 auto;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 8px;position:relative">
+          <div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l16 0"></path><path d="M4 12l16 0"></path><path d="M4 18l16 0"></path></svg>
+          </div>
+          <div style="position:absolute;left:50%;transform:translateX(-50%);font-size:18px;font-weight:600">Workout Tracker</div>
+          <div style="width:40px;height:40px;border-radius:9999px;background:var(--muted);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600">N</div>
+        </div>
+
+        <div style="flex:1 1 auto;overflow:hidden;padding:24px 16px;display:flex;flex-direction:column;gap:20px">
+          <div>
+            <h2 style="margin:0;font-size:24px;font-weight:700">Vorlagen</h2>
+            <p style="margin:4px 0 0;font-size:14px;color:var(--muted-fg)">Verwalte Übungen, Workouts und Ernährung</p>
+          </div>
+
+          <div style="display:flex;justify-content:flex-end;gap:4px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none">
+            <div style="padding:8px 12px;font-size:12px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:var(--muted-fg);white-space:nowrap">Übungen</div>
+            <div style="padding:8px 12px;font-size:12px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:var(--muted-fg);white-space:nowrap">Workouts</div>
+            <div style="padding:8px 12px;font-size:12px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:var(--muted-fg);white-space:nowrap">Lebensmittel</div>
+            <div style="position:relative;padding:8px 12px;font-size:12px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:var(--fg);white-space:nowrap">
+              Mahlzeiten
+              <div style="position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--fg)"></div>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <p style="margin:0;font-size:13px;color:var(--muted-fg)">7 eigene Mahlzeiten</p>
+            <button type="button" style="height:36px;padding:0 14px;display:flex;align-items:center;gap:6px;border:1px solid transparent;background:var(--primary);color:var(--primary-fg);font-family:inherit;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5l0 14"></path><path d="M5 12l14 0"></path></svg>
+              Neu
+            </button>
+          </div>
+
+          <div style="border:1px solid var(--border);background:var(--card)">
+            <div style="display:flex;align-items:center;gap:12px;padding:14px">
+              <div style="flex:1 1 auto;min-width:0">
+                <div style="font-size:14px;font-weight:500">Overnight Oats</div>
+                <div style="font-size:12px;color:var(--muted-fg);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Haferflocken, Kuhmilch, Skyr</div>
+                <div style="font-size:12px;margin-top:4px">312 kcal · 40 KH · 23 P · 6 F</div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg);flex:0 0 auto"><path d="M9 6l6 6l-6 6"></path></svg>
+            </div>
+            <div style="height:1px;background:var(--border)"></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:14px">
+              <div style="flex:1 1 auto;min-width:0">
+                <div style="font-size:14px;font-weight:500">Reis mit Hähnchen</div>
+                <div style="font-size:12px;color:var(--muted-fg);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Reis, Hähnchenbrust, Brokkoli, Olivenöl</div>
+                <div style="font-size:12px;margin-top:4px">742 kcal · 88 KH · 62 P · 14 F</div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg);flex:0 0 auto"><path d="M9 6l6 6l-6 6"></path></svg>
+            </div>
+            <div style="height:1px;background:var(--border)"></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:14px">
+              <div style="flex:1 1 auto;min-width:0">
+                <div style="font-size:14px;font-weight:500">Quark-Snack</div>
+                <div style="font-size:12px;color:var(--muted-fg);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Magerquark, Honig, Walnüsse</div>
+                <div style="font-size:12px;margin-top:4px">286 kcal · 18 KH · 32 P · 9 F</div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg);flex:0 0 auto"><path d="M9 6l6 6l-6 6"></path></svg>
+            </div>
+            <div style="height:1px;background:var(--border)"></div>
+            <div style="display:flex;align-items:center;gap:12px;padding:14px">
+              <div style="flex:1 1 auto;min-width:0">
+                <div style="font-size:14px;font-weight:500">Haferbrei mit Beeren</div>
+                <div style="font-size:12px;color:var(--muted-fg);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Haferflocken, Wasser, Heidelbeeren</div>
+                <div style="font-size:12px;margin-top:4px">268 kcal · 44 KH · 10 P · 5 F</div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg);flex:0 0 auto"><path d="M9 6l6 6l-6 6"></path></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:390px">
+      <div style="font-family:'Geist Mono', ui-monospace, monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:10px">08b · Mahlzeit-Editor</div>
+      <div data-screen-label="08b Mahlzeit-Editor" style="width:390px;height:844px;overflow:hidden;background:var(--bg);border:1px solid var(--border);position:relative;display:flex;flex-direction:column">
+
+        <div style="height:64px;flex:0 0 auto;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 8px;position:relative">
+          <button type="button" style="width:48px;height:48px;border:0;background:transparent;color:var(--fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l14 0"></path><path d="M5 12l6 6"></path><path d="M5 12l6 -6"></path></svg>
+          </button>
+          <div style="position:absolute;left:50%;transform:translateX(-50%);font-size:18px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase">Mahlzeit</div>
+          <button type="button" style="width:48px;height:48px;border:0;background:transparent;color:var(--destructive);display:flex;align-items:center;justify-content:center;cursor:pointer">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7l16 0"></path><path d="M10 11l0 6"></path><path d="M14 11l0 6"></path><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"></path><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"></path></svg>
+          </button>
+        </div>
+
+        <div style="flex:1 1 auto;overflow:hidden;padding:24px 16px;display:flex;flex-direction:column;gap:22px">
+          <div>
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg)">Name</div>
+            <input type="text" value="Overnight Oats" style="width:100%;box-sizing:border-box;height:40px;padding:0;border:0;border-bottom:1px solid var(--input);background:transparent;color:var(--fg);font-family:inherit;font-size:16px;outline:none">
+          </div>
+
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg)">Zutaten · 3</div>
+              <button type="button" style="height:28px;padding:0 12px;display:flex;align-items:center;gap:6px;border:1px solid var(--border);background:transparent;color:var(--fg);font-family:inherit;font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;cursor:pointer">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"></path><path d="M21 21l-6 -6"></path></svg>
+                Zutat
+              </button>
+            </div>
+            <div style="border:1px solid var(--border);background:var(--card)">
+              <div style="display:flex;align-items:center;gap:10px;padding:12px 12px">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg);flex:0 0 auto"><path d="M8 5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M8 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M8 19a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M14 5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M14 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M14 19a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path></svg>
+                <div style="flex:1 1 auto;min-width:0">
+                  <div style="font-size:14px">Haferflocken</div>
+                  <div style="font-size:12px;color:var(--muted-fg);margin-top:2px">1 Portion (40 g) · 149 kcal</div>
+                </div>
+                <button type="button" style="width:32px;height:32px;border:0;background:transparent;color:var(--muted-fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6l-12 12"></path><path d="M6 6l12 12"></path></svg>
+                </button>
+              </div>
+              <div style="height:1px;background:var(--border)"></div>
+              <div style="display:flex;align-items:center;gap:10px;padding:12px 12px">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg);flex:0 0 auto"><path d="M8 5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M8 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M8 19a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M14 5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M14 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M14 19a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path></svg>
+                <div style="flex:1 1 auto;min-width:0">
+                  <div style="font-size:14px">Fettarme Kuhmilch 1,5 %</div>
+                  <div style="font-size:12px;color:var(--muted-fg);margin-top:2px">1 Glas (200 ml) · 96 kcal</div>
+                </div>
+                <button type="button" style="width:32px;height:32px;border:0;background:transparent;color:var(--muted-fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6l-12 12"></path><path d="M6 6l12 12"></path></svg>
+                </button>
+              </div>
+              <div style="height:1px;background:var(--border)"></div>
+              <div style="display:flex;align-items:center;gap:10px;padding:12px 12px">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted-fg);flex:0 0 auto"><path d="M8 5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M8 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M8 19a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M14 5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M14 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path><path d="M14 19a1 1 0 1 0 2 0a1 1 0 1 0 -2 0"></path></svg>
+                <div style="flex:1 1 auto;min-width:0">
+                  <div style="font-size:14px">Skyr natur 0,2 %</div>
+                  <div style="font-size:12px;color:var(--muted-fg);margin-top:2px">150 g · 67 kcal</div>
+                </div>
+                <button type="button" style="width:32px;height:32px;border:0;background:transparent;color:var(--muted-fg);display:flex;align-items:center;justify-content:center;cursor:pointer">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6l-12 12"></path><path d="M6 6l12 12"></path></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div style="border:1px solid var(--border);background:var(--card);padding:16px">
+            <div style="font-size:10px;font-weight:600;letter-spacing:0.15em;text-transform:uppercase;color:var(--muted-fg)">Summe der Mahlzeit</div>
+            <div style="display:flex;align-items:baseline;gap:6px;margin-top:8px">
+              <span style="font-size:26px;font-weight:700;line-height:1">312</span>
+              <span style="font-size:13px;color:var(--muted-fg)">kcal</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3, minmax(0,1fr));gap:12px;margin-top:14px">
+              <div>
+                <div style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted-fg)">Kohlenh.</div>
+                <div style="font-size:14px;font-weight:600;margin-top:4px">40,2 g</div>
+              </div>
+              <div>
+                <div style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted-fg)">Protein</div>
+                <div style="font-size:14px;font-weight:600;margin-top:4px">23,4 g</div>
+              </div>
+              <div>
+                <div style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted-fg)">Fett</div>
+                <div style="font-size:14px;font-weight:600;margin-top:4px">6,1 g</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="flex:0 0 auto;padding:16px;border-top:1px solid var(--border);display:flex;gap:8px">
+          <button type="button" style="flex:1 1 auto;height:44px;border:1px solid transparent;background:var(--primary);color:var(--primary-fg);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Speichern</button>
+          <button type="button" style="flex:0 0 auto;height:44px;padding:0 18px;border:1px solid var(--border);background:transparent;color:var(--fg);font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer">Abbrechen</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:390px">
+      <div style="font-family:'Geist Mono', ui-monospace, monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:10px">09 · Profil › Tagesziele</div>
+      <div data-screen-label="09 Tagesziele" style="width:390px;height:844px;overflow:hidden;background:var(--bg);border:1px solid var(--border);padding:24px 16px;display:flex;flex-direction:column;gap:20px;box-sizing:border-box">
+
+        <h1 style="margin:0;font-size:28px;font-weight:700;display:flex;align-items:center;gap:12px">
+          <span style="width:32px;height:32px;border-radius:9999px;background:var(--muted);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">N</span>
+          Mein Profil
+        </h1>
+
+        <div style="border:1px solid var(--border);background:var(--card);padding:20px 20px 24px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+            <div style="font-size:18px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase">Tagesziele</div>
+            <button type="button" style="height:36px;padding:0 14px;display:flex;align-items:center;gap:6px;border:1px solid var(--border);background:transparent;color:var(--fg);font-family:inherit;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4"></path><path d="M13.5 6.5l4 4"></path></svg>
+              Bearbeiten
+            </button>
+          </div>
+
+          <div style="margin-top:20px;display:flex;flex-direction:column;gap:18px">
+            <div>
+              <div style="font-size:11px;color:var(--muted-fg)">Kalorien</div>
+              <div style="display:flex;align-items:baseline;gap:6px;border-bottom:1px solid var(--input);padding:8px 0">
+                <span style="font-size:22px;font-weight:700">2.400</span>
+                <span style="font-size:13px;color:var(--muted-fg)">kcal / Tag</span>
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:repeat(3, minmax(0,1fr));gap:12px">
+              <div>
+                <div style="font-size:11px;color:var(--muted-fg)">Kohlenh.</div>
+                <div style="display:flex;align-items:baseline;gap:4px;border-bottom:1px solid var(--input);padding:8px 0">
+                  <span style="font-size:16px;font-weight:600">260</span>
+                  <span style="font-size:12px;color:var(--muted-fg)">g</span>
+                </div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--muted-fg)">Protein</div>
+                <div style="display:flex;align-items:baseline;gap:4px;border-bottom:1px solid var(--input);padding:8px 0">
+                  <span style="font-size:16px;font-weight:600">150</span>
+                  <span style="font-size:12px;color:var(--muted-fg)">g</span>
+                </div>
+              </div>
+              <div>
+                <div style="font-size:11px;color:var(--muted-fg)">Fett</div>
+                <div style="display:flex;align-items:baseline;gap:4px;border-bottom:1px solid var(--input);padding:8px 0">
+                  <span style="font-size:16px;font-weight:600">80</span>
+                  <span style="font-size:12px;color:var(--muted-fg)">g</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="border-top:1px solid var(--border);padding-top:14px">
+              <div style="display:flex;align-items:center;justify-content:space-between">
+                <span style="font-size:12px;color:var(--muted-fg)">Makros ergeben</span>
+                <span style="font-size:13px;font-weight:600">2.360 kcal</span>
+              </div>
+              <div style="height:2px;background:var(--muted);margin-top:10px">
+                <div style="width:98%;height:2px;background:var(--fg)"></div>
+              </div>
+              <p style="margin:10px 0 0;font-size:12px;color:var(--muted-fg)">40 kcal unter dem Kalorienziel. Die Tagesansicht rechnet immer mit den erfassten Einträgen.</p>
+            </div>
+          </div>
+        </div>
+
+        <div style="border:1px solid var(--border);background:var(--card);padding:20px">
+          <div style="font-size:18px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase">Profildaten</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px">
+            <div>
+              <div style="font-size:11px;color:var(--muted-fg)">Größe</div>
+              <div style="font-size:14px;padding:6px 0">183 cm</div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--muted-fg)">Gewicht</div>
+              <div style="font-size:14px;padding:6px 0">84,5 kg</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:390px">
+      <div style="font-family:'Geist Mono', ui-monospace, monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:10px">10 · Dashboard-Karte</div>
+      <div data-screen-label="10 Dashboard" style="width:390px;height:844px;overflow:hidden;background:var(--bg);border:1px solid var(--border);padding:24px 16px;display:flex;flex-direction:column;gap:24px;box-sizing:border-box">
+
+        <div style="border:1px solid var(--border);background:var(--card);padding:24px">
+          <div style="font-size:14px;font-weight:500;color:var(--muted-fg);margin-bottom:4px">Workouts (letzte 7 Tage)</div>
+          <div style="font-size:30px;font-weight:700">4</div>
+        </div>
+
+        <div style="border:1px solid var(--border);background:var(--card);padding:24px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+            <div style="font-size:14px;font-weight:500;color:var(--muted-fg)">Ernährung heute</div>
+            <div style="display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;color:var(--fg)">
+              Details
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6l-6 6"></path></svg>
+            </div>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:8px;margin-top:6px">
+            <span style="font-size:30px;font-weight:700;line-height:1">1.842</span>
+            <span style="font-size:14px;color:var(--muted-fg)">/ 2.400 kcal</span>
+          </div>
+          <div style="height:2px;background:var(--muted);margin-top:16px">
+            <div style="width:77%;height:2px;background:var(--fg)"></div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px">
+            <div style="font-size:12px;color:var(--muted-fg)">186 g KH · 118 g Protein · 61 g Fett</div>
+            <div style="font-size:12px;font-weight:600">558 übrig</div>
+          </div>
+        </div>
+
+        <div style="border:1px solid var(--border);background:var(--card);padding:24px">
+          <div style="font-size:14px;font-weight:500;color:var(--muted-fg);margin-bottom:4px">Volumen (letzte 7 Tage)</div>
+          <div style="display:flex;align-items:baseline;gap:6px">
+            <span style="font-size:30px;font-weight:700">34.820</span>
+            <span style="font-size:18px;color:var(--muted-fg)">kg</span>
+          </div>
+        </div>
+
+        <div style="border:1px solid var(--border);background:var(--card);padding:24px">
+          <div style="font-size:14px;font-weight:500;color:var(--muted-fg);margin-bottom:4px">Ø Dauer (letzte 7 Tage)</div>
+          <div style="display:flex;align-items:baseline;gap:6px">
+            <span style="font-size:30px;font-weight:700">68</span>
+            <span style="font-size:18px;color:var(--muted-fg)">min</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:390px">
+      <div style="font-family:'Geist Mono', ui-monospace, monospace;font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted-fg);margin-bottom:10px">11 · Analytics · Ernährung</div>
+      <div data-screen-label="11 Analytics" style="width:390px;height:844px;overflow:hidden;background:var(--bg);border:1px solid var(--border);padding:24px 16px;display:flex;flex-direction:column;gap:20px;box-sizing:border-box">
+
+        <div>
+          <h2 style="margin:0;font-size:24px;font-weight:700">Analytics</h2>
+          <p style="margin:4px 0 0;font-size:14px;color:var(--muted-fg)">Trainings- und Ernährungsverlauf</p>
+        </div>
+
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:24px">
+          <h3 style="margin:0 0 16px;font-size:18px;font-weight:600">Ernährung</h3>
+
+          <div style="display:flex;border:1px solid var(--border);width:fit-content;margin-bottom:20px">
+            <div style="height:36px;padding:0 14px;display:flex;align-items:center;font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;background:var(--muted);color:var(--fg);border-right:1px solid var(--border)">kcal</div>
+            <div style="height:36px;padding:0 14px;display:flex;align-items:center;font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted-fg);border-right:1px solid var(--border)">KH</div>
+            <div style="height:36px;padding:0 14px;display:flex;align-items:center;font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted-fg);border-right:1px solid var(--border)">Protein</div>
+            <div style="height:36px;padding:0 14px;display:flex;align-items:center;font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted-fg)">Fett</div>
+          </div>
+
+          <svg viewBox="0 0 340 196" style="width:100%;height:auto;overflow:visible;font-family:Oxanium, system-ui, sans-serif">
+            <g stroke="var(--border)" stroke-dasharray="3 3" stroke-width="1">
+              <line x1="44" y1="20" x2="330" y2="20"></line>
+              <line x1="44" y1="70" x2="330" y2="70"></line>
+              <line x1="44" y1="120" x2="330" y2="120"></line>
+              <line x1="44" y1="170" x2="330" y2="170"></line>
+            </g>
+            <g fill="var(--muted-fg)" font-size="10">
+              <text x="0" y="23">2.800</text>
+              <text x="0" y="73">2.400</text>
+              <text x="0" y="123">2.000</text>
+              <text x="0" y="173">1.600</text>
+            </g>
+            <line x1="44" y1="70" x2="330" y2="70" stroke="var(--muted-fg)" stroke-width="1" stroke-dasharray="6 4"></line>
+            <text x="330" y="64" fill="var(--muted-fg)" font-size="9" text-anchor="end" letter-spacing="1">ZIEL 2.400</text>
+            <polyline points="44,72.5 91.7,122.5 139.3,63.8 187,93.8 234.7,42.5 282.3,113.8 330,139.8" fill="none" stroke="var(--fg)" stroke-width="2"></polyline>
+            <g fill="var(--fg)">
+              <circle cx="44" cy="72.5" r="3"></circle>
+              <circle cx="91.7" cy="122.5" r="3"></circle>
+              <circle cx="139.3" cy="63.8" r="3"></circle>
+              <circle cx="187" cy="93.8" r="3"></circle>
+              <circle cx="234.7" cy="42.5" r="3"></circle>
+              <circle cx="282.3" cy="113.8" r="3"></circle>
+              <circle cx="330" cy="139.8" r="4"></circle>
+            </g>
+            <g fill="var(--muted-fg)" font-size="10" text-anchor="middle">
+              <text x="44" y="188">Di</text>
+              <text x="91.7" y="188">Mi</text>
+              <text x="139.3" y="188">Do</text>
+              <text x="187" y="188">Fr</text>
+              <text x="234.7" y="188">Sa</text>
+              <text x="282.3" y="188">So</text>
+              <text x="330" y="188">Mo</text>
+            </g>
+          </svg>
+
+          <div style="display:flex;align-items:center;gap:8px;margin-top:16px">
+            <span style="width:14px;height:2px;background:var(--fg);flex:0 0 auto"></span>
+            <span style="font-size:11px;color:var(--muted-fg)">kcal pro Tag · letzte 7 Tage</span>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;border-top:1px solid var(--border);margin-top:18px;padding-top:16px">
+            <div>
+              <div style="font-size:11px;color:var(--muted-fg)">Ø pro Tag</div>
+              <div style="font-size:17px;font-weight:600;margin-top:4px">2.219 kcal</div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--muted-fg)">Ziel erreicht</div>
+              <div style="font-size:17px;font-weight:600;margin-top:4px">3 von 7 Tagen</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dark&quot;,&quot;light&quot;],&quot;default&quot;:&quot;dark&quot;,&quot;tsType&quot;:&quot;'dark' | 'light'&quot;},&quot;swipeRevealed&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Zustände&quot;},&quot;showUndoToast&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Zustände&quot;}}">
+class Component extends DCLogic {
+  state = { theme: null };
+  renderVals() {
+    const theme = this.state.theme ?? this.props.theme ?? 'dark';
+    return {
+      theme,
+      swipeRevealed: this.props.swipeRevealed ?? true,
+      notSwipeRevealed: !(this.props.swipeRevealed ?? true),
+      showUndoToast: this.props.showUndoToast ?? true,
+      setDark: () => this.setState({ theme: 'dark' }),
+      setLight: () => this.setState({ theme: 'light' }),
+    };
+  }
+}
+</script>
+</body>
+</html>
