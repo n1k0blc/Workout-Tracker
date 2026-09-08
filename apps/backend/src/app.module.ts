@@ -16,6 +16,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { HealthModule } from './health/health.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { SecurityModule } from './security/security.module';
+import { NutritionModule } from './nutrition/nutrition.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { SecurityModule } from './security/security.module';
     HealthModule,
     DashboardModule,
     SecurityModule,
+    NutritionModule,
   ],
   controllers: [],
   providers: [

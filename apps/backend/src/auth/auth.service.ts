@@ -12,6 +12,7 @@ import { UserDto } from '../users/dto';
 import { PasswordService } from './password.service';
 import { BreachedPasswordService } from './breached-password.service';
 import { RefreshTokenService, IssuedRefreshToken } from './refresh-token.service';
+import { defaultMealSlotCreateData } from '../nutrition/meal-slots.service';
 
 const BREACHED_PASSWORD_MESSAGE =
   'This password has appeared in a known data breach. Please choose a different password.';
@@ -79,6 +80,13 @@ export class AuthService {
             create: homeGyms.map((gym) => ({
               name: gym.name,
             })),
+          },
+          // Four default Abschnitte, created with the user so a new account opens the
+          // Ernährung section already divided into Frühstück / Mittagessen / Abendessen /
+          // Snacks. Same shared definition the existing-user backfill migration uses, so the
+          // 1-based contiguous `order` invariant holds identically on both paths.
+          mealSlots: {
+            create: defaultMealSlotCreateData(),
           },
         },
         select: USER_SELECT,

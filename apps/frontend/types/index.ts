@@ -683,3 +683,60 @@ export interface CurrentCycleWorkouts {
   cycleName: string;
   workoutDays: CycleWorkoutDay[];
 }
+
+// Nutrition Types (#141)
+
+export interface MacroTotals {
+  kcal: number;
+  carbs: number;
+  protein: number;
+  fat: number;
+}
+
+/**
+ * One logged Eintrag. Its nutrients are a snapshot taken at log time -- a quantity edit
+ * rescales them proportionally, they are never recomputed. `foodId` / `mealId` are always
+ * null in this ticket (a Schnelleintrag); later tickets attach foods and meals.
+ */
+export interface DiaryEntry {
+  id: string;
+  mealSlotId: string;
+  localDate: string;
+  foodId: string | null;
+  mealId: string | null;
+  name: string;
+  quantity: number;
+  quantityLabel: string | null;
+  kcal: number;
+  carbs: number;
+  protein: number;
+  fat: number;
+}
+
+export interface NutritionDaySlot {
+  id: string;
+  name: string;
+  order: number;
+  /** True for an archived Abschnitt; only returned on days that already have entries in it. */
+  archived: boolean;
+  totals: MacroTotals;
+  entries: DiaryEntry[];
+}
+
+export interface NutritionDay {
+  date: string;
+  totals: MacroTotals;
+  slots: NutritionDaySlot[];
+}
+
+export interface CreateDiaryEntryInput {
+  mealSlotId: string;
+  localDate: string;
+  name: string;
+  kcal: number;
+  carbs: number;
+  protein: number;
+  fat: number;
+  quantity?: number;
+  quantityLabel?: string;
+}

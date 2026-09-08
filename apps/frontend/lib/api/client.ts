@@ -33,6 +33,9 @@ import {
   CurrentCycleWorkouts,
   WorkoutExerciseInput,
   LastPerformance,
+  NutritionDay,
+  DiaryEntry,
+  CreateDiaryEntryInput,
 } from '@/types';
 import { clientTimeZone } from '@/lib/local-date';
 
@@ -534,6 +537,35 @@ class ApiClient {
     await this.request(`/workout-templates/${id}`, {
       method: 'DELETE',
     });
+  }
+
+  // Nutrition Methods (#141)
+
+  // `date` is a YYYY-MM-DD calendar day; omitted, the server uses the client's "today" from
+  // the X-Timezone header, exactly like the workout recommendation.
+  async getNutritionDay(date?: string): Promise<NutritionDay> {
+    const query = date ? `?date=${encodeURIComponent(date)}` : '';
+    return this.request<NutritionDay>(`/nutrition/day${query}`);
+  }
+
+  async createDiaryEntry(data: CreateDiaryEntryInput): Promise<DiaryEntry> {
+    return this.request<DiaryEntry>('/nutrition/entries', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Quantity is the only editable field: the server rescales the kcal/macro snapshot by
+  // newQuantity / oldQuantity.
+  async updateDiaryEntryQuantity(id: string, quantity: number): Promise<DiaryEntry> {
+    return this.request<DiaryEntry>(`/nutrition/entries/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ quantity }),
+    });
+  }
+
+  async deleteDiaryEntry(id: string): Promise<void> {
+    await this.request(`/nutrition/entries/${id}`, { method: 'DELETE' });
   }
 }
 

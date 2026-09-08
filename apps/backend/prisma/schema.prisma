@@ -23,6 +23,8 @@ model User {
   workouts      Workout[]
   workoutCycles WorkoutCycle[]
   refreshTokens RefreshToken[]
+  mealSlots     MealSlot[]
+  diaryEntries  DiaryEntry[]
 }
 
 // PR1 auth overhaul: DB-backed rotating refresh tokens (httpOnly cookie).
@@ -197,6 +199,63 @@ model Exercise {
   tricepsPercent    Int               @default(0)
   user              User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
   workoutExercises  WorkoutExercise[]
+}
+
+// A named division of a user's eating day (Abschnitt): Frühstück, Mittagessen, Abendessen,
+// Snacks by default. `order` is 1-based and contiguous within a user -- the same invariant the
+// workout tree enforces (array position is authoritative, never a persisted 0-based value).
+// `archivedAt` drops a slot from new days while keeping it visible on past days that already
+// carry entries in it (#142 manages archiving; this ticket only creates the four defaults).
+model MealSlot {
+  id         String       @id @default(uuid())
+  userId     String
+  name       String
+  order      Int
+  archivedAt DateTime?
+  createdAt  DateTime     @default(now())
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entries    DiaryEntry[]
+
+  @@unique([userId, order])
+  @@index([userId])
+}
+
+// One logged item in a MealSlot on one calendar day (Eintrag). Its nutrients are a snapshot
+// taken at log time: a quantity edit rescales the stored kcal/carbs/protein/fat
+// proportionally (newQuantity / oldQuantity), never recomputes them from a Food. `foodId` and
+// `mealId` are nullable and unused here -- a Schnelleintrag is the null-`foodId` case -- but
+// exist from the start so later tickets (#144, #147) attach foods and meals without a data
+// migration.
+model DiaryEntry {
+  id            String   @id @default(uuid())
+  userId        String
+  // The calendar day this was eaten on, in the user's own timezone, `YYYY-MM-DD`. A plain
+  // string for the same reason as Workout.localDate -- a date column would come back as a UTC
+  // midnight instant. Client-stamped; the `X-Timezone` header decides "today". A CHECK
+  // constraint in the migration SQL makes it effectively NOT NULL.
+  localDate     String
+  mealSlotId    String
+  // Nullable FKs to Food / Meal, added by later tickets. No relation yet -- those models do
+  // not exist. Present now so #144/#147 do not have to migrate existing rows.
+  foodId        String?
+  mealId        String?
+  name          String
+  // How much was eaten, in the entry's own unit. 1 for a bare Schnelleintrag; the quantity
+  // editor multiplies the nutrient snapshot by newQuantity / oldQuantity.
+  quantity      Float    @default(1)
+  // Human-readable amount ("130 g", "1 Portion (40 g)"); null for a bare Schnelleintrag.
+  quantityLabel String?
+  kcal          Float
+  carbs         Float
+  protein       Float
+  fat           Float
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mealSlot      MealSlot @relation(fields: [mealSlotId], references: [id], onDelete: Cascade)
+
+  @@index([userId, localDate])
+  @@index([mealSlotId])
 }
 
 enum Equipment {
