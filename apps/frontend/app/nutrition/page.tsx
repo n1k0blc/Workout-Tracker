@@ -47,8 +47,8 @@ export default function NutritionPage() {
 
   return (
     <ProtectedRoute>
-      <main className="mx-auto max-w-md px-4 py-6">
-        <div className="space-y-6">
+      <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col px-4 py-6">
+        <div className="flex-1 space-y-6">
           <div>
             <h2 className="text-2xl font-bold text-foreground">Ernährung</h2>
             <p className="mt-1 text-sm text-muted-foreground">Kalorien und Makros pro Tag</p>

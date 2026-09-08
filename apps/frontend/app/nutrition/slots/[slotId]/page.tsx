@@ -111,7 +111,7 @@ export default function AbschnittPage() {
 
   return (
     <ProtectedRoute>
-      <div className="mx-auto flex min-h-screen max-w-md flex-col">
+      <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col">
         <header className="relative flex h-16 items-center justify-between border-b px-2">
           <Button variant="ghost" size="icon" asChild aria-label="Zurück">
             <Link href={`/nutrition?date=${date}`}>
