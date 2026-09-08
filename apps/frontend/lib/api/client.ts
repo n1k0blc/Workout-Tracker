@@ -36,6 +36,8 @@ import {
   NutritionDay,
   DiaryEntry,
   CreateDiaryEntryInput,
+  MealSlot,
+  MealSlotList,
 } from '@/types';
 import { clientTimeZone } from '@/lib/local-date';
 
@@ -566,6 +568,41 @@ class ApiClient {
 
   async deleteDiaryEntry(id: string): Promise<void> {
     await this.request(`/nutrition/entries/${id}`, { method: 'DELETE' });
+  }
+
+  // Abschnitte management (#142)
+
+  async getMealSlots(): Promise<MealSlotList> {
+    return this.request<MealSlotList>('/nutrition/slots');
+  }
+
+  async createMealSlot(name: string): Promise<MealSlot> {
+    return this.request<MealSlot>('/nutrition/slots', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+  }
+
+  async renameMealSlot(id: string, name: string): Promise<MealSlot> {
+    return this.request<MealSlot>(`/nutrition/slots/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+    });
+  }
+
+  async setMealSlotArchived(id: string, archived: boolean): Promise<MealSlot> {
+    return this.request<MealSlot>(`/nutrition/slots/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ archived }),
+    });
+  }
+
+  // `slots` is the full active list, each order restating its array position (1-based).
+  async reorderMealSlots(slots: { id: string; order: number }[]): Promise<MealSlotList> {
+    return this.request<MealSlotList>('/nutrition/slots/order', {
+      method: 'PATCH',
+      body: JSON.stringify({ slots }),
+    });
   }
 }
 

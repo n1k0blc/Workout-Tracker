@@ -10,7 +10,8 @@ import { SlotIcon } from './slot-icon';
 /**
  * One Abschnitt row on the Tagesansicht. The body links through to the Abschnitt page for the
  * day in view; the "+" is a shortcut that logs straight into this slot (a Schnelleintrag
- * until the picker lands in #144).
+ * until the picker lands in #144). An archived Abschnitt only appears here on a past day that
+ * has entries in it, and renders read-only -- no "+", muted label (#142).
  */
 export function MealSlotRow({
   slot,
@@ -36,7 +37,13 @@ export function MealSlotRow({
         className="min-w-0 flex-1"
       >
         <div className="flex items-center gap-1.5">
-          <span className="text-sm font-semibold uppercase tracking-wide">{slot.name}</span>
+          <span
+            className={`text-sm font-semibold uppercase tracking-wide ${
+              slot.archived ? 'text-muted-foreground' : ''
+            }`}
+          >
+            {slot.name}
+          </span>
           <IconChevronRight className="size-3.5 text-muted-foreground" />
           {slot.archived && (
             <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -50,14 +57,16 @@ export function MealSlotRow({
         <div className="mt-0.5 truncate text-xs text-muted-foreground">{subtitle}</div>
       </Link>
 
-      <Button
-        variant="outline"
-        size="icon"
-        aria-label={`Schnelleintrag zu ${slot.name}`}
-        onClick={onQuickAdd}
-      >
-        <IconPlus />
-      </Button>
+      {!slot.archived && (
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label={`Schnelleintrag zu ${slot.name}`}
+          onClick={onQuickAdd}
+        >
+          <IconPlus />
+        </Button>
+      )}
     </div>
   );
 }

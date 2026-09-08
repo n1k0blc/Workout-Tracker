@@ -18,17 +18,26 @@ import { ClientToday } from '../common/decorators/client-today.decorator';
 import { Today } from '../common/utils/today.util';
 import { isLocalDate } from '../common/utils/local-date.util';
 import { DiaryEntriesService } from './diary-entries.service';
+import { MealSlotsService } from './meal-slots.service';
 import {
   CreateDiaryEntryDto,
   UpdateDiaryEntryDto,
   DiaryEntryDto,
   NutritionDayDto,
+  CreateMealSlotDto,
+  UpdateMealSlotDto,
+  ReorderMealSlotsDto,
+  MealSlotDto,
+  MealSlotListDto,
 } from './dto';
 
 @Controller('nutrition')
 @UseGuards(JwtAuthGuard)
 export class NutritionController {
-  constructor(private readonly diaryEntries: DiaryEntriesService) {}
+  constructor(
+    private readonly diaryEntries: DiaryEntriesService,
+    private readonly mealSlots: MealSlotsService,
+  ) {}
 
   /**
    * The Tagesansicht for one day. `date` is optional -- absent, it resolves to the client's
@@ -46,6 +55,51 @@ export class NutritionController {
     }
     return this.diaryEntries.getDay(user.id, localDate);
   }
+
+  // --- Abschnitte (#142) --------------------------------------------------------------------
+
+  @Get('slots')
+  async listSlots(@CurrentUser() user: { id: string }): Promise<MealSlotListDto> {
+    return this.mealSlots.list(user.id);
+  }
+
+  @Post('slots')
+  async createSlot(
+    @CurrentUser() user: { id: string },
+    @Body() dto: CreateMealSlotDto,
+  ): Promise<MealSlotDto> {
+    return this.mealSlots.create(user.id, dto.name);
+  }
+
+  // Declared before `slots/:id` so the literal segment is not captured as an id.
+  @Patch('slots/order')
+  async reorderSlots(
+    @CurrentUser() user: { id: string },
+    @Body() dto: ReorderMealSlotsDto,
+  ): Promise<MealSlotListDto> {
+    return this.mealSlots.reorder(user.id, dto.slots);
+  }
+
+  @Patch('slots/:id')
+  async updateSlot(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @Body() dto: UpdateMealSlotDto,
+  ): Promise<MealSlotDto> {
+    let slot: MealSlotDto | undefined;
+    if (dto.name !== undefined) {
+      slot = await this.mealSlots.rename(user.id, id, dto.name);
+    }
+    if (dto.archived !== undefined) {
+      slot = await this.mealSlots.setArchived(user.id, id, dto.archived);
+    }
+    if (!slot) {
+      throw new BadRequestException('name oder archived muss angegeben werden');
+    }
+    return slot;
+  }
+
+  // --- Einträge ---------------------------------------------------------------------------
 
   @Post('entries')
   async createEntry(

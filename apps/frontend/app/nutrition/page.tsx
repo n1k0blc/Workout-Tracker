@@ -13,6 +13,7 @@ import { NutritionDayBar } from '@/components/nutrition/nutrition-day-bar';
 import { NutritionTotalsCard } from '@/components/nutrition/nutrition-totals-card';
 import { MealSlotRow } from '@/components/nutrition/meal-slot-row';
 import { QuickEntrySheet } from '@/components/nutrition/quick-entry-sheet';
+import { ManageSlotsSheet } from '@/components/nutrition/manage-slots-sheet';
 
 export default function NutritionPage() {
   const today = useMemo(() => toLocalDateString(new Date()), []);
@@ -22,6 +23,7 @@ export default function NutritionPage() {
 
   const [quickOpen, setQuickOpen] = useState(false);
   const [quickSlotId, setQuickSlotId] = useState<string | null>(null);
+  const [manageOpen, setManageOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -39,10 +41,11 @@ export default function NutritionPage() {
   }, [load]);
 
   // Horizontal swipe moves between days, the same gesture the design calls for. Suspended
-  // while the Schnelleintrag sheet is open so a swipe inside it doesn't change the day behind.
+  // while a sheet is open so a swipe (or a slot drag) inside it doesn't change the day behind.
+  const sheetOpen = quickOpen || manageOpen;
   useSwipe({
-    onSwipeLeft: quickOpen ? undefined : () => setDate((d) => addDays(d, 1)),
-    onSwipeRight: quickOpen ? undefined : () => setDate((d) => addDays(d, -1)),
+    onSwipeLeft: sheetOpen ? undefined : () => setDate((d) => addDays(d, 1)),
+    onSwipeRight: sheetOpen ? undefined : () => setDate((d) => addDays(d, -1)),
   });
 
   return (
@@ -65,8 +68,11 @@ export default function NutritionPage() {
                   <div className="text-lg font-semibold uppercase tracking-[0.05em]">
                     Abschnitte
                   </div>
-                  {/* Managing Abschnitte (rename / reorder / archive) is #142. */}
-                  <Button variant="outline" size="xs" disabled>
+                  <Button
+                    variant="outline"
+                    size="xs"
+                    onClick={() => setManageOpen(true)}
+                  >
                     <IconAdjustmentsHorizontal data-icon="inline-start" />
                     Verwalten
                   </Button>
@@ -98,10 +104,18 @@ export default function NutritionPage() {
       <QuickEntrySheet
         open={quickOpen}
         onOpenChange={setQuickOpen}
-        slots={(day?.slots ?? []).map((slot) => ({ id: slot.id, name: slot.name }))}
+        slots={(day?.slots ?? [])
+          .filter((slot) => !slot.archived)
+          .map((slot) => ({ id: slot.id, name: slot.name }))}
         defaultSlotId={quickSlotId}
         date={date}
         onCreated={load}
+      />
+
+      <ManageSlotsSheet
+        open={manageOpen}
+        onOpenChange={setManageOpen}
+        onChanged={load}
       />
     </ProtectedRoute>
   );

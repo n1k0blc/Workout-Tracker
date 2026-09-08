@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateDiaryEntryDto,
@@ -117,10 +117,15 @@ export class DiaryEntriesService {
   async createEntry(userId: string, dto: CreateDiaryEntryDto): Promise<DiaryEntryDto> {
     const slot = await this.prisma.mealSlot.findFirst({
       where: { id: dto.mealSlotId, userId },
-      select: { id: true },
+      select: { id: true, archivedAt: true },
     });
     if (!slot) {
       throw new NotFoundException('Abschnitt nicht gefunden');
+    }
+    // An archived Abschnitt is read-only: it still shows on past days that already have
+    // entries in it, but nothing new can be logged into it (#142).
+    if (slot.archivedAt) {
+      throw new ConflictException('Abschnitt ist archiviert');
     }
 
     const entry = (await this.prisma.diaryEntry.create({

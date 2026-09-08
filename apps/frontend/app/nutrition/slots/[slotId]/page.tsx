@@ -181,15 +181,24 @@ export default function AbschnittPage() {
               </div>
             </div>
 
-            <div className="sticky bottom-0 flex gap-2 border-t bg-background p-4">
-              {/* TODO(#144): "Hinzufügen" opens the food / meal picker; both open Schnelleintrag for now. */}
-              <Button className="flex-1" onClick={() => setQuickOpen(true)}>
-                <IconPlus data-icon="inline-start" />
-                Hinzufügen
-              </Button>
-              <Button variant="outline" onClick={() => setQuickOpen(true)}>
-                Schnelleintrag
-              </Button>
+            <div className="sticky bottom-0 border-t bg-background p-4">
+              {slot.archived ? (
+                <p className="text-center text-xs text-muted-foreground">
+                  Dieser Abschnitt ist archiviert · nur die vorhandenen Einträge lassen sich
+                  noch bearbeiten.
+                </p>
+              ) : (
+                <div className="flex gap-2">
+                  {/* TODO(#144): "Hinzufügen" opens the food / meal picker; both open Schnelleintrag for now. */}
+                  <Button className="flex-1" onClick={() => setQuickOpen(true)}>
+                    <IconPlus data-icon="inline-start" />
+                    Hinzufügen
+                  </Button>
+                  <Button variant="outline" onClick={() => setQuickOpen(true)}>
+                    Schnelleintrag
+                  </Button>
+                </div>
+              )}
             </div>
           </>
         ) : (
@@ -209,7 +218,9 @@ export default function AbschnittPage() {
       <QuickEntrySheet
         open={quickOpen}
         onOpenChange={setQuickOpen}
-        slots={(day?.slots ?? []).map((s) => ({ id: s.id, name: s.name }))}
+        slots={(day?.slots ?? [])
+          .filter((s) => !s.archived)
+          .map((s) => ({ id: s.id, name: s.name }))}
         defaultSlotId={slotId}
         date={date}
         onCreated={load}

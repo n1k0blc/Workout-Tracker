@@ -723,6 +723,19 @@ export interface NutritionDaySlot {
   entries: DiaryEntry[];
 }
 
+export interface MealSlot {
+  id: string;
+  name: string;
+  order: number;
+  archived: boolean;
+}
+
+export interface MealSlotList {
+  /** Active Abschnitte in display order (1-based, contiguous). */
+  active: MealSlot[];
+  archived: MealSlot[];
+}
+
 export interface NutritionDay {
   date: string;
   totals: MacroTotals;

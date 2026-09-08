@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, ConflictException } from '@nestjs/common';
 import { DiaryEntriesService } from './diary-entries.service';
 import { CreateDiaryEntryDto } from './dto';
 
@@ -117,8 +117,19 @@ describe('DiaryEntriesService.createEntry — snapshot on create', () => {
 
     expect(prisma.mealSlot.findFirst).toHaveBeenCalledWith({
       where: { id: 'someone-elses-slot', userId: 'user-1' },
-      select: { id: true },
+      select: { id: true, archivedAt: true },
     });
+    expect(prisma.diaryEntry.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects logging into an archived Abschnitt (read-only) with a 409', async () => {
+    const { service, prisma } = makeService({
+      slot: { id: 'slot-1', archivedAt: new Date('2026-01-01') },
+    });
+
+    await expect(service.createEntry('user-1', baseCreateDto())).rejects.toBeInstanceOf(
+      ConflictException,
+    );
     expect(prisma.diaryEntry.create).not.toHaveBeenCalled();
   });
 });
