@@ -26,7 +26,8 @@
     "migrate:exercise-flags": "ts-node update-exercise-flags.ts",
     "migrate:update-exercises": "ts-node prisma/update-exercises.ts",
     "migrate:assign-csv-ids": "ts-node prisma/assign-csv-ids.ts",
-    "import:workout-templates": "ts-node prisma/import-workout-templates.ts"
+    "import:workout-templates": "ts-node prisma/import-workout-templates.ts",
+    "import:off": "ts-node prisma/import-off-products.ts"
   },
   "keywords": [
     "workout",
