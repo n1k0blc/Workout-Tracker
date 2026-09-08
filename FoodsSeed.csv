@@ -1,0 +1,290 @@
+key;name;category;isLiquid;kcal;carbs;protein;fat;portions;source
+apfel-mit-schale;Apfel, mit Schale;Obst;false;52;11.4;0.3;0.2;1 Stück=130;USDA FDC 171688
+banane;Banane;Obst;false;89;20.2;1.1;0.3;1 Stück=120;USDA FDC 173944
+birne;Birne;Obst;false;57;12.1;0.4;0.1;1 Stück=150;USDA FDC 169118
+orange;Orange;Obst;false;47;9.4;0.9;0.1;1 Stück=150;USDA FDC 169097
+mandarine;Mandarine;Obst;false;53;11.5;0.8;0.3;1 Stück=70;USDA FDC 169105
+erdbeeren;Erdbeeren;Obst;false;32;5.7;0.7;0.3;;USDA FDC 167762
+himbeeren;Himbeeren;Obst;false;52;5.4;1.2;0.7;;USDA FDC 167755
+heidelbeeren;Heidelbeeren;Obst;false;57;12.1;0.7;0.3;;USDA FDC 171711
+brombeeren;Brombeeren;Obst;false;43;4.3;1.4;0.5;;USDA FDC 173946
+johannisbeeren-rot;Johannisbeeren, rot;Obst;false;56;9.5;1.4;0.2;;USDA FDC 173964
+stachelbeeren;Stachelbeeren;Obst;false;44;5.9;0.9;0.6;;USDA FDC 173030
+weintrauben;Weintrauben;Obst;false;69;17.2;0.7;0.2;;USDA FDC 174683
+kirschen-suess;Kirschen, süß;Obst;false;63;13.9;1.1;0.2;;USDA FDC 171719
+pflaume;Pflaume;Obst;false;46;10.0;0.7;0.3;1 Stück=65;USDA FDC 169949
+pfirsich;Pfirsich;Obst;false;39;8.0;0.9;0.3;1 Stück=140;USDA FDC 169928
+nektarine;Nektarine;Obst;false;44;8.9;1.1;0.3;1 Stück=140;USDA FDC 169914
+aprikose;Aprikose;Obst;false;48;9.1;1.4;0.4;1 Stück=35;USDA FDC 171697
+wassermelone;Wassermelone;Obst;false;30;7.2;0.6;0.2;;USDA FDC 167765
+honigmelone;Honigmelone;Obst;false;36;8.3;0.5;0.1;;USDA FDC 169911
+ananas;Ananas;Obst;false;50;11.7;0.5;0.1;;USDA FDC 169124
+mango;Mango;Obst;false;60;13.4;0.8;0.4;;USDA FDC 169910
+kiwi;Kiwi;Obst;false;61;11.7;1.1;0.5;1 Stück=70;USDA FDC 168153
+zitrone-ohne-schale;Zitrone, ohne Schale;Obst;false;29;6.5;1.1;0.3;1 Stück=60;USDA FDC 167746
+grapefruit;Grapefruit;Obst;false;42;9.1;0.8;0.1;1 halbe Frucht=123;USDA FDC 174673
+avocado;Avocado;Obst;false;160;1.8;2.0;14.7;1 halbe Frucht=100;USDA FDC 171705
+rosinen;Rosinen;Obst;false;299;74.8;3.3;0.3;1 Esslöffel=10;USDA FDC 168165
+datteln-getrocknet;Datteln, getrocknet;Obst;false;282;67.0;2.5;0.4;1 Stück=7;USDA FDC 171726
+aprikosen-getrocknet;Aprikosen, getrocknet;Obst;false;241;55.3;3.4;0.5;1 Stück=8;USDA FDC 173941
+tomate;Tomate;Gemüse;false;18;2.7;0.9;0.2;1 Stück=120;USDA FDC 170457
+gurke-mit-schale;Gurke, mit Schale;Gemüse;false;15;3.1;0.7;0.1;;USDA FDC 168409
+paprika-rot;Paprika, rot;Gemüse;false;26;3.9;1.0;0.3;1 Stück=150;USDA FDC 170108
+paprika-gruen;Paprika, grün;Gemüse;false;20;2.9;0.9;0.2;1 Stück=150;USDA FDC 170427
+zwiebel;Zwiebel;Gemüse;false;40;7.6;1.1;0.1;1 Stück=80;USDA FDC 170000
+fruehlingszwiebel;Frühlingszwiebel;Gemüse;false;32;4.7;1.8;0.2;;USDA FDC 170005
+knoblauch;Knoblauch;Gemüse;false;149;31.0;6.4;0.5;1 Zehe=3;USDA FDC 169230
+ingwer-roh;Ingwer, roh;Gemüse;false;80;15.8;1.8;0.8;;USDA FDC 169231
+karotte-roh;Karotte, roh;Gemüse;false;41;6.8;0.9;0.2;1 Stück=80;USDA FDC 170393
+karotte-gekocht;Karotte, gekocht;Gemüse;false;35;5.2;0.8;0.2;;USDA FDC 170394
+brokkoli-roh;Brokkoli, roh;Gemüse;false;34;4.0;2.8;0.4;;USDA FDC 170379
+brokkoli-gekocht;Brokkoli, gekocht;Gemüse;false;35;3.9;2.4;0.4;;USDA FDC 169967
+blumenkohl-roh;Blumenkohl, roh;Gemüse;false;25;3.0;1.9;0.3;;USDA FDC 169986
+spinat-roh;Spinat, roh;Gemüse;false;23;1.4;2.9;0.4;;USDA FDC 168462
+spinat-gekocht;Spinat, gekocht;Gemüse;false;23;1.4;3.0;0.3;;USDA FDC 168463
+zucchini-roh;Zucchini, roh;Gemüse;false;17;2.1;1.2;0.3;;USDA FDC 169291
+aubergine-roh;Aubergine, roh;Gemüse;false;25;2.9;1.0;0.2;;USDA FDC 169228
+champignons-roh;Champignons, roh;Gemüse;false;22;2.3;3.1;0.3;;USDA FDC 169251
+kopfsalat;Kopfsalat;Gemüse;false;13;1.1;1.4;0.2;;USDA FDC 168429
+eisbergsalat;Eisbergsalat;Gemüse;false;14;1.8;0.9;0.1;;USDA FDC 169248
+rucola;Rucola;Gemüse;false;25;2.1;2.6;0.7;;USDA FDC 169387
+weisskohl-roh;Weißkohl, roh;Gemüse;false;25;3.3;1.3;0.1;;USDA FDC 169975
+rotkohl-roh;Rotkohl, roh;Gemüse;false;31;5.3;1.4;0.2;;USDA FDC 169977
+wirsing-roh;Wirsing, roh;Gemüse;false;27;3.0;2.0;0.1;;USDA FDC 170388
+gruenkohl-roh;Grünkohl, roh;Gemüse;false;35;0.3;2.9;1.5;;USDA FDC 168421
+rosenkohl-roh;Rosenkohl, roh;Gemüse;false;43;5.2;3.4;0.3;;USDA FDC 170383
+lauch-roh;Lauch, roh;Gemüse;false;61;12.4;1.5;0.3;;USDA FDC 169246
+knollensellerie-roh;Knollensellerie, roh;Gemüse;false;42;7.4;1.5;0.3;;USDA FDC 170400
+kohlrabi-roh;Kohlrabi, roh;Gemüse;false;27;2.6;1.7;0.1;1 Stück=250;USDA FDC 168424
+rote-bete-roh;Rote Bete, roh;Gemüse;false;43;6.8;1.6;0.2;;USDA FDC 169145
+radieschen;Radieschen;Gemüse;false;16;1.8;0.7;0.1;1 Stück=5;USDA FDC 169276
+spargel-gruen-roh;Spargel, grün, roh;Gemüse;false;20;1.8;2.2;0.1;;USDA FDC 168389
+kuerbis-roh;Kürbis, roh;Gemüse;false;26;6.0;1.0;0.1;;USDA FDC 168448
+gruene-bohnen-roh;Grüne Bohnen, roh;Gemüse;false;31;4.3;1.8;0.2;;USDA FDC 169961
+erbsen-tk;Erbsen, tiefgekühlt;Gemüse;false;77;9.1;5.2;0.4;;USDA FDC 170016
+mais-dose-abgetropft;Mais, Dose, abgetropft;Gemüse;false;67;12.3;2.3;1.2;;USDA FDC 169214
+sauerkraut;Sauerkraut;Gemüse;false;19;1.4;0.9;0.1;;USDA FDC 169279
+gewuerzgurken;Gewürzgurken;Gemüse;false;12;1.4;0.5;0.3;1 Stück=35;USDA FDC 168558
+oliven-schwarz;Oliven, schwarz;Gemüse;false;116;4.4;0.8;10.9;1 Stück=4;USDA FDC 169094
+reis-weiss-roh;Reis, weiß, roh;Getreide & Beilagen;false;365;78.7;7.1;0.7;;USDA FDC 169756
+reis-weiss-gekocht;Reis, weiß, gekocht;Getreide & Beilagen;false;130;27.8;2.7;0.3;;USDA FDC 169757
+naturreis-roh;Naturreis, roh;Getreide & Beilagen;false;367;72.7;7.5;3.2;;USDA FDC 169703
+naturreis-gekocht;Naturreis, gekocht;Getreide & Beilagen;false;123;24.0;2.7;1.0;;USDA FDC 169704
+nudeln-roh;Nudeln, roh;Getreide & Beilagen;false;371;71.5;13.0;1.5;;USDA FDC 168927
+nudeln-gekocht;Nudeln, gekocht;Getreide & Beilagen;false;158;29.1;5.8;0.9;;USDA FDC 168928
+vollkornnudeln-roh;Vollkornnudeln, roh;Getreide & Beilagen;false;352;64.2;13.9;2.9;;USDA FDC 169738
+vollkornnudeln-gekocht;Vollkornnudeln, gekocht;Getreide & Beilagen;false;149;26.2;6.0;1.7;;USDA FDC 168910
+spaetzle-gekocht;Spätzle, gekocht;Getreide & Beilagen;false;146;24.2;6.7;2.3;;Swiss FCDB 14180
+haferflocken;Haferflocken;Getreide & Beilagen;false;379;57.6;13.2;6.5;1 Esslöffel=10|1 Portion=50;USDA FDC 173904
+couscous-roh;Couscous, roh;Getreide & Beilagen;false;376;72.4;12.8;0.6;;USDA FDC 169699
+couscous-gekocht;Couscous, gekocht;Getreide & Beilagen;false;112;21.8;3.8;0.2;;USDA FDC 169700
+bulgur-roh;Bulgur, roh;Getreide & Beilagen;false;342;63.4;12.3;1.3;;USDA FDC 170688
+bulgur-gekocht;Bulgur, gekocht;Getreide & Beilagen;false;83;14.1;3.1;0.2;;USDA FDC 170287
+quinoa-roh;Quinoa, roh;Getreide & Beilagen;false;368;57.2;14.1;6.1;;USDA FDC 168874
+quinoa-gekocht;Quinoa, gekocht;Getreide & Beilagen;false;120;18.5;4.4;1.9;;USDA FDC 168917
+hirse-roh;Hirse, roh;Getreide & Beilagen;false;378;64.4;11.0;4.2;;USDA FDC 169702
+hirse-gekocht;Hirse, gekocht;Getreide & Beilagen;false;119;22.4;3.5;1.0;;USDA FDC 168871
+polenta-maisgriess-roh;Polenta / Maisgrieß, roh;Getreide & Beilagen;false;350;73.8;8.8;1.1;;Swiss FCDB 425
+cornflakes;Cornflakes;Getreide & Beilagen;false;376;81.5;7.6;1.2;1 Portion=30;Swiss FCDB 940
+muesli-ungesuesst;Müsli, ungesüßt;Getreide & Beilagen;false;372;57.4;11.3;8.3;1 Portion=50;Swiss FCDB 943
+kartoffel-roh;Kartoffel, roh;Getreide & Beilagen;false;77;15.4;2.1;0.1;1 Stück=100;USDA FDC 170026
+kartoffel-gekocht-mit-schale;Kartoffel, gekocht, mit Schale;Getreide & Beilagen;false;87;18.3;1.9;0.1;1 Stück=100;USDA FDC 170438
+kartoffel-gekocht-ohne-schale;Kartoffel, gekocht, ohne Schale;Getreide & Beilagen;false;86;18.2;1.7;0.1;1 Stück=100;USDA FDC 170440
+suesskartoffel-roh;Süßkartoffel, roh;Getreide & Beilagen;false;86;17.1;1.6;0.1;;USDA FDC 168482
+suesskartoffel-gekocht;Süßkartoffel, gekocht;Getreide & Beilagen;false;76;15.2;1.4;0.1;;USDA FDC 168484
+pommes-frites-ofen;Pommes frites, Ofen;Getreide & Beilagen;false;213;32.6;3.8;6.6;1 Portion=150;Swiss FCDB 10450
+reiswaffel;Reiswaffel;Getreide & Beilagen;false;390;81.5;7.7;2.8;1 Stück=9;Swiss FCDB 802
+weizenbroetchen;Weizenbrötchen;Brot & Backwaren;false;245;48.5;9.2;0.9;1 Stück=55;Swiss FCDB 1463
+laugenbroetchen;Laugenbrötchen;Brot & Backwaren;false;285;48.9;9.3;5.3;1 Stück=80;Swiss FCDB 832
+weissbrot;Weißbrot;Brot & Backwaren;false;242;48.9;8.5;0.8;1 Scheibe=30;Swiss FCDB 823
+toastbrot;Toastbrot;Brot & Backwaren;false;267;49.2;8.7;3.3;1 Scheibe=25;Swiss FCDB 826
+vollkorntoast;Vollkorntoast;Brot & Backwaren;false;271;43.7;9.3;4.9;1 Scheibe=25;Swiss FCDB 825
+baguette;Baguette;Brot & Backwaren;false;255;51.2;9.0;0.9;1 Stück=50;Swiss FCDB 845
+weizenvollkornbrot;Weizenvollkornbrot;Brot & Backwaren;false;213;38.3;8.6;1.3;1 Scheibe=45;Swiss FCDB 821
+mischbrot;Mischbrot;Brot & Backwaren;false;242;44.3;9.2;2.0;1 Scheibe=45;Swiss FCDB 1268
+roggenbrot-sauerteig;Roggenbrot, Sauerteig;Brot & Backwaren;false;210;39.0;6.5;0.9;1 Scheibe=45;Swiss FCDB 830
+roggenvollkornbrot;Roggenvollkornbrot;Brot & Backwaren;false;225;40.0;7.7;1.1;1 Scheibe=45;Swiss FCDB 846
+pumpernickel;Pumpernickel;Brot & Backwaren;false;250;41.0;8.7;3.1;1 Scheibe=40;USDA FDC 174918
+knaeckebrot-vollkorn;Knäckebrot, Vollkorn;Brot & Backwaren;false;325;57.9;12.0;1.7;1 Scheibe=10;Swiss FCDB 918
+croissant-butter;Croissant, Butter;Brot & Backwaren;false;406;43.2;8.2;21.0;1 Stück=60;USDA FDC 174987
+weizentortilla-wrap;Weizentortilla / Wrap;Brot & Backwaren;false;325;52.3;8.7;7.1;1 Stück=60;USDA FDC 173242
+pita-fladenbrot;Pita / Fladenbrot;Brot & Backwaren;false;275;53.5;9.1;1.2;1 Stück=60;USDA FDC 174915
+vollmilch-3-5;Vollmilch 3,5 %;Milchprodukte;true;65;5.0;3.2;3.5;1 Glas=200;Swiss FCDB 14126
+fettarme-milch-1-5;Fettarme Milch 1,5 %;Milchprodukte;true;46;4.8;3.2;1.5;1 Glas=200;Swiss FCDB 13399
+magermilch;Magermilch;Milchprodukte;true;33;4.7;3.3;0.1;1 Glas=200;Swiss FCDB 64
+buttermilch;Buttermilch;Milchprodukte;true;34;4.0;3.4;0.5;1 Glas=200;Swiss FCDB 529
+kondensmilch-ungezuckert;Kondensmilch, ungezuckert;Milchprodukte;true;131;9.3;6.4;7.6;1 Esslöffel=15;Swiss FCDB 527
+joghurt-natur-3-5;Joghurt, natur, 3,5 %;Milchprodukte;false;66;4.5;3.9;3.6;1 Becher=150;Swiss FCDB 52
+joghurt-natur-fettarm;Joghurt, natur, fettarm;Milchprodukte;false;42;5.5;4.7;0.1;1 Becher=150;Swiss FCDB 587
+fruchtjoghurt-gezuckert;Fruchtjoghurt, gezuckert;Milchprodukte;false;105;14.7;3.7;3.4;1 Becher=150;Swiss FCDB 1192
+joghurt-griechisch-0;Joghurt, griechisch, 0 % Fett;Milchprodukte;false;59;3.6;10.2;0.4;1 Portion=150;USDA FDC 170894
+joghurt-griechisch-5;Joghurt, griechisch, 5 % Fett;Milchprodukte;false;97;4.0;9.0;5.0;1 Portion=150;USDA FDC 171304
+magerquark;Magerquark;Milchprodukte;false;61;4.2;10.6;0.2;1 Portion=250;Swiss FCDB 71
+speisequark-20;Speisequark 20 % Fett i. Tr.;Milchprodukte;false;99;4.1;9.4;5.0;1 Portion=250;Swiss FCDB 571
+sahnequark;Sahnequark;Milchprodukte;false;183;3.7;6.9;15.6;1 Portion=250;Swiss FCDB 70
+fruchtquark-gezuckert;Fruchtquark, gezuckert;Milchprodukte;false;112;14.1;8.4;2.4;1 Becher=150;Swiss FCDB 13501
+huettenkaese;Hüttenkäse;Milchprodukte;false;100;2.4;12.4;4.5;1 Portion=200;Swiss FCDB 505
+frischkaese-doppelrahm;Frischkäse, Doppelrahmstufe;Milchprodukte;false;350;5.5;6.2;34.4;1 Esslöffel=20;USDA FDC 173418
+schlagsahne;Schlagsahne;Milchprodukte;true;292;3.0;2.2;30.9;1 Esslöffel=15;USDA FDC 170858
+saure-sahne;Saure Sahne;Milchprodukte;false;135;4.3;2.9;12.0;1 Esslöffel=15;USDA FDC 171256
+schmand;Schmand;Milchprodukte;false;198;4.6;2.4;19.4;1 Esslöffel=15;USDA FDC 171257
+creme-fraiche;Crème fraîche;Milchprodukte;false;336;2.8;2.4;35.0;1 Esslöffel=15;Swiss FCDB 574
+gouda;Gouda;Milchprodukte;false;356;2.2;24.9;27.4;1 Scheibe=30;USDA FDC 171241
+edamer;Edamer;Milchprodukte;false;357;1.4;25.0;28.6;1 Scheibe=30;USDA FDC 173419
+emmentaler;Emmentaler;Milchprodukte;false;407;0.0;28.4;32.6;1 Scheibe=30;Swiss FCDB 555
+cheddar;Cheddar;Milchprodukte;false;403;3.4;22.9;33.3;1 Scheibe=30;USDA FDC 173414
+camembert;Camembert;Milchprodukte;false;300;0.5;19.8;24.3;1 Stück=30;USDA FDC 172178
+blauschimmelkaese;Blauschimmelkäse;Milchprodukte;false;353;2.3;21.4;28.7;;USDA FDC 172175
+mozzarella;Mozzarella;Milchprodukte;false;299;2.4;22.2;22.1;1 Kugel=125;USDA FDC 170845
+feta;Feta;Milchprodukte;false;265;3.9;14.2;21.5;;USDA FDC 173420
+ziegenfrischkaese;Ziegenfrischkäse;Milchprodukte;false;264;0.0;18.5;21.1;;USDA FDC 173435
+parmesan;Parmesan;Milchprodukte;false;392;3.2;35.8;25.0;1 Esslöffel=10;USDA FDC 170848
+ricotta;Ricotta;Milchprodukte;false;150;7.3;7.5;10.2;;USDA FDC 170851
+haferdrink-ungesuesst;Haferdrink, ungesüßt;Pflanzendrinks;true;47;7.8;0.5;1.5;1 Glas=200;Swiss FCDB 14114
+sojadrink-ungesuesst;Sojadrink, ungesüßt;Pflanzendrinks;true;40;1.5;3.6;2.1;1 Glas=200;Swiss FCDB 72
+mandeldrink-ungesuesst;Mandeldrink, ungesüßt;Pflanzendrinks;true;33;1.3;1.1;2.6;1 Glas=200;Swiss FCDB 14113
+reisdrink;Reisdrink;Pflanzendrinks;true;54;10.3;0.2;1.3;1 Glas=200;Swiss FCDB 13450
+kokosdrink;Kokosdrink;Pflanzendrinks;true;22;2.8;0.4;1.0;1 Glas=200;Swiss FCDB 14124
+sojajoghurt-natur;Sojajoghurt, natur;Pflanzendrinks;false;43;2.1;4.1;1.9;1 Becher=150;Swiss FCDB 13451
+huehnerei-roh;Hühnerei, roh;Eier;false;143;0.7;12.6;9.5;1 Stück (Gr. M)=58;USDA FDC 171287
+huehnerei-gekocht;Hühnerei, gekocht;Eier;false;155;1.1;12.6;10.6;1 Stück (Gr. M)=58;USDA FDC 173424
+eiweiss-roh;Eiweiß (Eiklar), roh;Eier;false;52;0.7;10.9;0.2;1 Stück=33;USDA FDC 172183
+eigelb-roh;Eigelb, roh;Eier;false;322;3.6;15.9;26.5;1 Stück=17;USDA FDC 172184
+haehnchenbrust-roh;Hähnchenbrust, roh;Fleisch & Wurst;false;120;0.0;22.5;2.6;;USDA FDC 171077
+haehnchenbrust-gebraten;Hähnchenbrust, gebraten;Fleisch & Wurst;false;151;0.0;30.5;3.2;;USDA FDC 171534
+haehnchenschenkel-mit-haut-roh;Hähnchenschenkel, mit Haut, roh;Fleisch & Wurst;false;163;0.0;17.9;10.2;;Swiss FCDB 24
+haehnchenschenkel-mit-haut-gebraten;Hähnchenschenkel, mit Haut, gebraten;Fleisch & Wurst;false;187;0.0;23.9;10.2;;Swiss FCDB 13310
+putenbrust-roh;Putenbrust, roh;Fleisch & Wurst;false;109;0.0;24.0;1.5;;Swiss FCDB 713
+putenbrust-gebraten;Putenbrust, gebraten;Fleisch & Wurst;false;141;0.0;31.8;1.5;;Swiss FCDB 13275
+putenbrust-aufschnitt;Putenbrust, Aufschnitt;Fleisch & Wurst;false;100;0.0;20.9;1.7;1 Scheibe=20;Swiss FCDB 14291
+rinderhackfleisch-roh;Rinderhackfleisch, roh;Fleisch & Wurst;false;215;0.0;18.6;15.0;;USDA FDC 171796
+rinderhackfleisch-gebraten;Rinderhackfleisch, gebraten;Fleisch & Wurst;false;232;0.0;24.6;14.0;;USDA FDC 174033
+rinderfilet-roh;Rinderfilet, roh;Fleisch & Wurst;false;123;0.0;21.9;4.0;;Swiss FCDB 639
+rindersteak-entrecote-roh;Rindersteak (Entrecôte), roh;Fleisch & Wurst;false;133;0.0;23.2;4.5;;Swiss FCDB 30
+rindersteak-entrecote-gebraten;Rindersteak (Entrecôte), gebraten;Fleisch & Wurst;false;162;0.0;30.2;4.6;;Swiss FCDB 13258
+schweinehackfleisch-roh;Schweinehackfleisch, roh;Fleisch & Wurst;false;263;0.0;16.9;21.2;;USDA FDC 167902
+schweinefilet-roh;Schweinefilet, roh;Fleisch & Wurst;false;121;0.0;22.2;3.6;;Swiss FCDB 677
+schweinefilet-gebraten;Schweinefilet, gebraten;Fleisch & Wurst;false;153;0.0;29.3;4.0;;Swiss FCDB 13269
+schweineschnitzel-roh;Schweineschnitzel (Oberschale), roh;Fleisch & Wurst;false;120;0.0;21.8;2.9;;USDA FDC 167816
+schweinekotelett-roh;Schweinekotelett, roh;Fleisch & Wurst;false;179;0.0;21.4;10.4;;Swiss FCDB 8
+schweinebauch-roh;Schweinebauch, roh;Fleisch & Wurst;false;518;0.0;9.3;53.0;;USDA FDC 167812
+fruehstuecksspeck-roh;Frühstücksspeck (Bacon), roh;Fleisch & Wurst;false;393;0.0;13.7;37.1;1 Scheibe=15;USDA FDC 168277
+kochschinken;Kochschinken;Fleisch & Wurst;false;104;0.7;20.2;2.3;1 Scheibe=25;Swiss FCDB 691
+salami;Salami;Fleisch & Wurst;false;367;0.0;24.1;30.1;1 Scheibe=8;Swiss FCDB 1091
+bratwurst-gebraten;Bratwurst (Schwein), gebraten;Fleisch & Wurst;false;333;2.9;13.7;29.2;1 Stück=100;USDA FDC 171620
+wiener-wuerstchen;Wiener Würstchen;Fleisch & Wurst;false;242;0.6;13.9;20.4;1 Stück=50;Swiss FCDB 1082
+leberwurst;Leberwurst;Fleisch & Wurst;false;326;2.2;14.1;28.5;1 Esslöffel=20;USDA FDC 173870
+fleischwurst-lyoner;Fleischwurst (Lyoner);Fleisch & Wurst;false;244;0.5;11.5;21.8;1 Scheibe=25;Swiss FCDB 1083
+leberkaese;Leberkäse / Fleischkäse;Fleisch & Wurst;false;256;1.4;12.5;22.3;1 Scheibe=100;Swiss FCDB 1084
+lammkotelett-roh;Lammkotelett, roh;Fleisch & Wurst;false;179;0.0;20.2;10.9;;Swiss FCDB 5
+lachs-zucht-roh;Lachs, Zucht, roh;Fisch;false;208;0.0;20.4;13.4;;USDA FDC 175167
+lachs-zucht-gebraten;Lachs, Zucht, gebraten;Fisch;false;206;0.0;22.1;12.4;;USDA FDC 175168
+raeucherlachs;Räucherlachs;Fisch;false;173;0.0;23.2;8.9;1 Scheibe=25;Swiss FCDB 193
+thunfisch-dose-wasser;Thunfisch, Dose, in Wasser, abgetropft;Fisch;false;86;0.0;19.4;1.0;1 Dose=140;USDA FDC 173709
+thunfisch-dose-oel;Thunfisch, Dose, in Öl, abgetropft;Fisch;false;198;0.0;29.1;8.2;1 Dose=140;USDA FDC 173708
+forelle-roh;Forelle, roh;Fisch;false;141;0.0;19.9;6.2;;USDA FDC 173717
+forelle-geraeuchert;Forelle, geräuchert;Fisch;false;177;0.0;23.4;9.3;;Swiss FCDB 13976
+kabeljau-roh;Kabeljau, roh;Fisch;false;82;0.0;17.8;0.7;;USDA FDC 171955
+kabeljau-gegart;Kabeljau, gegart;Fisch;false;105;0.0;22.8;0.9;;USDA FDC 171956
+seelachs-roh;Seelachs, roh;Fisch;false;92;0.0;19.4;1.0;;USDA FDC 175129
+scholle-roh;Scholle, roh;Fisch;false;85;0.0;17.1;1.9;;Swiss FCDB 415
+zander-roh;Zander, roh;Fisch;false;93;0.0;19.1;1.2;;USDA FDC 175128
+hering-roh;Hering, roh;Fisch;false;158;0.0;18.0;9.0;;USDA FDC 175116
+rollmops;Rollmops;Fisch;false;191;3.0;13.7;13.8;1 Stück=60;Swiss FCDB 805
+makrele-roh;Makrele, roh;Fisch;false;205;0.0;18.6;13.9;;USDA FDC 175119
+sardinen-dose-oel;Sardinen, Dose, in Öl, abgetropft;Fisch;false;208;0.0;24.6;11.5;1 Dose=90;USDA FDC 175139
+garnelen-roh;Garnelen, roh;Fisch;false;85;0.0;20.1;0.5;;USDA FDC 175179
+miesmuscheln-roh;Miesmuscheln, roh;Fisch;false;86;3.7;11.9;2.2;;USDA FDC 174216
+fischstaebchen-zubereitet;Fischstäbchen, zubereitet;Fisch;false;277;20.2;11.0;16.2;1 Stück=28;USDA FDC 174195
+linsen-braun-roh;Linsen, braun, roh;Hülsenfrüchte;false;352;52.7;24.6;1.1;;USDA FDC 172420
+linsen-braun-gekocht;Linsen, braun, gekocht;Hülsenfrüchte;false;116;12.2;9.0;0.4;;USDA FDC 172421
+linsen-rot-roh;Linsen, rot, roh;Hülsenfrüchte;false;358;52.3;23.9;2.2;;USDA FDC 174284
+kichererbsen-roh;Kichererbsen, roh;Hülsenfrüchte;false;378;50.8;20.5;6.0;;USDA FDC 173756
+kichererbsen-gekocht;Kichererbsen, gekocht;Hülsenfrüchte;false;164;19.8;8.9;2.6;;USDA FDC 173757
+kichererbsen-dose-abgetropft;Kichererbsen, Dose, abgetropft;Hülsenfrüchte;false;139;16.1;7.1;2.8;;USDA FDC 173800
+kidneybohnen-roh;Kidneybohnen, roh;Hülsenfrüchte;false;337;46.1;22.5;1.1;;USDA FDC 173744
+kidneybohnen-gekocht;Kidneybohnen, gekocht;Hülsenfrüchte;false;127;15.4;8.7;0.5;;USDA FDC 175194
+kidneybohnen-dose-abgetropft;Kidneybohnen, Dose, abgetropft;Hülsenfrüchte;false;124;16.0;8.0;1.1;;USDA FDC 174285
+weisse-bohnen-roh;Weiße Bohnen, roh;Hülsenfrüchte;false;333;45.1;23.4;0.9;;USDA FDC 175202
+weisse-bohnen-gekocht;Weiße Bohnen, gekocht;Hülsenfrüchte;false;139;18.8;9.7;0.4;;USDA FDC 175203
+edamame-tk;Edamame, tiefgekühlt;Hülsenfrüchte;false;109;2.8;11.2;4.7;;USDA FDC 168410
+tofu-fest;Tofu, fest;Hülsenfrüchte;false;148;2.9;14.7;8.5;;Swiss FCDB 13437
+tofu-geraeuchert;Tofu, geräuchert;Hülsenfrüchte;false;164;2.9;16.4;9.5;;Swiss FCDB 14090
+seidentofu;Seidentofu;Hülsenfrüchte;false;53;1.5;5.0;2.9;;Swiss FCDB 13438
+tempeh;Tempeh;Hülsenfrüchte;false;157;7.9;17.6;4.7;;Swiss FCDB 14251
+mandeln;Mandeln;Nüsse & Samen;false;579;9.1;21.2;49.9;1 Handvoll=30;USDA FDC 170567
+walnuesse;Walnüsse;Nüsse & Samen;false;654;7.0;15.2;65.2;1 Handvoll=30;USDA FDC 170187
+haselnuesse;Haselnüsse;Nüsse & Samen;false;628;7.0;15.0;60.8;1 Handvoll=30;USDA FDC 170581
+cashewkerne;Cashewkerne;Nüsse & Samen;false;619;23.2;21.5;48.1;1 Handvoll=30;Swiss FCDB 275
+erdnuesse-geroestet-gesalzen;Erdnüsse, geröstet, gesalzen;Nüsse & Samen;false;587;12.9;24.4;49.7;1 Handvoll=30;USDA FDC 174262
+pistazien-geroestet-gesalzen;Pistazien, geröstet, gesalzen;Nüsse & Samen;false;569;17.3;21.1;45.8;1 Handvoll=30;USDA FDC 169426
+paranuesse;Paranüsse;Nüsse & Samen;false;659;4.2;14.3;67.1;1 Stück=5;USDA FDC 170569
+macadamianuesse;Macadamianüsse;Nüsse & Samen;false;718;5.2;7.9;75.8;1 Handvoll=30;USDA FDC 170178
+pinienkerne;Pinienkerne;Nüsse & Samen;false;673;9.4;13.7;68.4;1 Esslöffel=10;USDA FDC 170591
+sonnenblumenkerne;Sonnenblumenkerne;Nüsse & Samen;false;584;11.4;20.8;51.5;1 Esslöffel=10;USDA FDC 170562
+kuerbiskerne;Kürbiskerne;Nüsse & Samen;false;559;4.7;30.2;49.1;1 Esslöffel=10;USDA FDC 170556
+leinsamen;Leinsamen;Nüsse & Samen;false;534;1.6;18.3;42.2;1 Esslöffel=10;USDA FDC 169414
+chiasamen;Chiasamen;Nüsse & Samen;false;486;7.7;16.5;30.7;1 Esslöffel=10;USDA FDC 170554
+sesam;Sesam;Nüsse & Samen;false;573;11.7;17.7;49.7;1 Esslöffel=9;USDA FDC 170150
+erdnussbutter;Erdnussbutter;Nüsse & Samen;false;598;17.3;22.2;51.4;1 Esslöffel=16;USDA FDC 174266
+mandelmus;Mandelmus;Nüsse & Samen;false;614;8.5;21.0;55.5;1 Esslöffel=16;USDA FDC 168588
+olivenoel;Olivenöl;Fette & Öle;false;884;0.0;0.0;100.0;1 Esslöffel=10|1 Teelöffel=5;USDA FDC 171413
+rapsoel;Rapsöl;Fette & Öle;false;884;0.0;0.0;100.0;1 Esslöffel=10|1 Teelöffel=5;USDA FDC 172336
+sonnenblumenoel;Sonnenblumenöl;Fette & Öle;false;884;0.0;0.0;100.0;1 Esslöffel=10|1 Teelöffel=5;USDA FDC 171025
+kokosoel;Kokosöl;Fette & Öle;false;892;0.0;0.0;99.1;1 Esslöffel=10|1 Teelöffel=5;USDA FDC 171412
+leinoel;Leinöl;Fette & Öle;false;884;0.0;0.1;100.0;1 Esslöffel=10|1 Teelöffel=5;USDA FDC 167702
+butter;Butter;Fette & Öle;false;717;0.1;0.9;81.1;1 Teelöffel=5|1 Esslöffel=10;USDA FDC 173430
+margarine;Margarine;Fette & Öle;false;717;0.7;0.2;80.7;1 Teelöffel=5|1 Esslöffel=10;USDA FDC 172346
+vollmilchschokolade;Vollmilchschokolade;Süßes & Snacks;false;535;56.0;7.7;29.7;1 Riegel=17|1 Tafel=100;USDA FDC 167587
+zartbitterschokolade-70;Zartbitterschokolade 70 %;Süßes & Snacks;false;598;35.0;7.8;42.6;1 Riegel=17|1 Tafel=100;USDA FDC 170273
+nuss-nougat-creme;Nuss-Nougat-Creme;Süßes & Snacks;false;539;57.0;5.4;29.7;1 Esslöffel=20;USDA FDC 168000
+konfituere;Konfitüre;Süßes & Snacks;false;246;58.7;0.5;0.5;1 Teelöffel=10|1 Esslöffel=20;Swiss FCDB 696
+fruchtgummi;Fruchtgummi;Süßes & Snacks;false;341;78.6;6.6;0.0;1 Stück=2.5;Swiss FCDB 951
+kartoffelchips;Kartoffelchips;Süßes & Snacks;false;532;50.7;6.4;34.0;1 Portion=30;USDA FDC 169677
+salzstangen;Salzstangen;Süßes & Snacks;false;384;77.0;10.0;2.9;1 Stück=1;USDA FDC 167555
+butterkekse;Butterkekse;Süßes & Snacks;false;431;70.2;8.7;12.4;1 Stück=8;Swiss FCDB 14074
+vanilleeis;Vanilleeis;Süßes & Snacks;false;207;22.9;3.5;11.0;1 Kugel=50;USDA FDC 167575
+muesliriegel;Müsliriegel;Süßes & Snacks;false;471;59.1;10.1;19.8;1 Riegel=25;USDA FDC 167542
+popcorn-ohne-fett;Popcorn, ohne Fett;Süßes & Snacks;false;387;63.3;12.9;4.5;1 Portion=30;USDA FDC 167959
+marzipan;Marzipan;Süßes & Snacks;false;472;65.2;9.1;18.5;1 Stück=25;Swiss FCDB 14288
+lebkuchen;Lebkuchen;Süßes & Snacks;false;326;68.7;7.0;1.3;1 Stück=30;Swiss FCDB 14287
+pudding-vanille;Pudding, Vanille;Süßes & Snacks;false;102;18.0;2.8;2.1;1 Becher=125;Swiss FCDB 809
+mineralwasser;Mineralwasser;Getränke;true;0;0.0;0.0;0.0;1 Glas=250;USDA FDC 174158
+apfelsaft;Apfelsaft;Getränke;true;46;11.1;0.1;0.1;1 Glas=200;USDA FDC 173933
+orangensaft;Orangensaft;Getränke;true;45;10.2;0.7;0.2;1 Glas=200;USDA FDC 169098
+saftschorle;Saftschorle (60 % Saft);Getränke;true;28;6.5;0.3;0.1;1 Glas=250;Swiss FCDB 1131
+cola;Cola;Getränke;true;42;10.4;0.0;0.3;1 Glas=250|1 Dose=330;USDA FDC 174852
+cola-zuckerfrei;Cola, zuckerfrei;Getränke;true;1;0.1;0.1;0.0;1 Glas=250|1 Dose=330;USDA FDC 174850
+limonade;Limonade;Getränke;true;37;9.1;0.0;0.0;1 Glas=250|1 Dose=330;Swiss FCDB 595
+eistee-gezuckert;Eistee, gezuckert;Getränke;true;30;7.5;0.0;0.0;1 Glas=250;Swiss FCDB 804
+energydrink;Energydrink;Getränke;true;42;10.4;0.0;0.0;1 Dose=250;Swiss FCDB 13465
+kaffee-schwarz;Kaffee, schwarz;Getränke;true;1;0.0;0.1;0.0;1 Tasse=200;USDA FDC 171890
+tee-schwarz-ungesuesst;Tee, schwarz, ungesüßt;Getränke;true;1;0.3;0.0;0.0;1 Tasse=200;USDA FDC 173227
+bier-hell;Bier, hell (Pils/Lager);Getränke;true;42;3.1;0.5;0.0;1 Glas=300|1 Flasche=500;Swiss FCDB 816
+bier-alkoholfrei;Bier, alkoholfrei;Getränke;true;23;4.9;0.4;0.0;1 Glas=300|1 Flasche=500;Swiss FCDB 13420
+radler;Radler;Getränke;true;38;7.1;0.2;0.0;1 Glas=300|1 Flasche=500;Swiss FCDB 1183
+weisswein;Weißwein;Getränke;true;72;0.1;0.2;0.0;1 Glas=150;Swiss FCDB 511
+rotwein;Rotwein;Getränke;true;70;0.3;0.2;0.0;1 Glas=150;Swiss FCDB 509
+sekt;Sekt;Getränke;true;71;1.5;0.2;0.0;1 Glas=100;Swiss FCDB 551
+wodka;Wodka (40 %);Getränke;true;231;0.0;0.0;0.0;1 Shot=20;USDA FDC 174815
+zucker;Zucker;Grundzutaten;false;387;100.0;0.0;0.0;1 Teelöffel=4|1 Esslöffel=12;USDA FDC 169655
+honig;Honig;Grundzutaten;false;304;82.2;0.3;0.0;1 Teelöffel=7|1 Esslöffel=20;USDA FDC 169640
+ahornsirup;Ahornsirup;Grundzutaten;false;260;67.0;0.0;0.1;1 Esslöffel=20;USDA FDC 169661
+weizenmehl-405;Weizenmehl Type 405;Grundzutaten;false;346;71.0;11.5;1.1;1 Esslöffel=10;Swiss FCDB 205
+weizenvollkornmehl;Weizenvollkornmehl;Grundzutaten;false;338;61.0;13.5;2.0;1 Esslöffel=10;Swiss FCDB 206
+dinkelmehl-630;Dinkelmehl Type 630;Grundzutaten;false;348;68.2;13.3;1.6;1 Esslöffel=10;Swiss FCDB 1043
+speisestaerke;Speisestärke;Grundzutaten;false;381;90.4;0.3;0.1;1 Esslöffel=10;USDA FDC 169698
+salz;Salz;Grundzutaten;false;0;0.0;0.0;0.0;1 Teelöffel=6;USDA FDC 173468
+tomatenmark;Tomatenmark;Grundzutaten;false;82;14.8;4.3;0.5;1 Esslöffel=16;USDA FDC 170459
+tomaten-passiert;Tomaten, passiert;Grundzutaten;false;38;7.1;1.7;0.2;;USDA FDC 170460
+tomaten-gehackt-dose;Tomaten, gehackt, Dose;Grundzutaten;false;16;1.6;0.8;0.3;1 Dose=400;USDA FDC 170051
+ketchup;Ketchup;Grundzutaten;false;101;27.1;1.0;0.1;1 Esslöffel=17;USDA FDC 168556
+senf;Senf;Grundzutaten;false;124;3.8;7.1;7.7;1 Teelöffel=5;Swiss FCDB 13464
+mayonnaise;Mayonnaise;Grundzutaten;false;693;2.6;1.4;75.2;1 Esslöffel=15;Swiss FCDB 771
+sojasauce;Sojasauce;Grundzutaten;true;53;4.1;8.1;0.6;1 Esslöffel=15;USDA FDC 174277
+weinessig;Weinessig;Grundzutaten;true;19;0.3;0.0;0.0;1 Esslöffel=15;USDA FDC 172240
+balsamico;Balsamico-Essig;Grundzutaten;true;88;17.0;0.5;0.0;1 Esslöffel=15;USDA FDC 172241
+kakaopulver-ungesuesst;Kakaopulver, ungesüßt;Grundzutaten;false;228;20.9;19.6;13.7;1 Esslöffel=6;USDA FDC 169593
+kokosmilch;Kokosmilch;Grundzutaten;true;214;3.1;2.4;21.3;1 Dose=400;Swiss FCDB 13458
+gemuesebruehe-zubereitet;Gemüsebrühe, zubereitet;Grundzutaten;true;6;0.4;0.3;0.4;1 Tasse=250;Swiss FCDB 664
+whey-proteinpulver;Whey-Proteinpulver;Grundzutaten;false;352;3.2;78.1;1.6;1 Messlöffel=30;USDA FDC 173180
