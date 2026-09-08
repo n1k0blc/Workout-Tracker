@@ -42,3 +42,5 @@ next-env.d.ts
 
 # Barcode scanner wasm, copied from the installed zxing-wasm by `predev` / `prebuild` (#149)
 /public/zxing_reader.wasm
+
+certificates
