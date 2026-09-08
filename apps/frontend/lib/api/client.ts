@@ -38,6 +38,9 @@ import {
   CreateDiaryEntryInput,
   MealSlot,
   MealSlotList,
+  Food,
+  FoodInput,
+  SimilarFood,
 } from '@/types';
 import { clientTimeZone } from '@/lib/local-date';
 
@@ -603,6 +606,38 @@ class ApiClient {
       method: 'PATCH',
       body: JSON.stringify({ slots }),
     });
+  }
+
+  // Lebensmittel library (#143)
+
+  async getFoods(search?: string): Promise<Food[]> {
+    const query = search ? `?search=${encodeURIComponent(search)}` : '';
+    return this.request<Food[]>(`/foods${query}`);
+  }
+
+  // The current user's own foods whose name matches -- for the duplicate-avoidance hint.
+  async getSimilarFoods(name: string): Promise<SimilarFood[]> {
+    return this.request<SimilarFood[]>(`/foods/similar?name=${encodeURIComponent(name)}`);
+  }
+
+  // Resolves even a soft-deleted food.
+  async getFood(id: string): Promise<Food> {
+    return this.request<Food>(`/foods/${id}`);
+  }
+
+  async createFood(data: FoodInput): Promise<Food> {
+    return this.request<Food>('/foods', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateFood(id: string, data: FoodInput): Promise<Food> {
+    return this.request<Food>(`/foods/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteFood(id: string): Promise<void> {
+    await this.request(`/foods/${id}`, { method: 'DELETE' });
   }
 }
 

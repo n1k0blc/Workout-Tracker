@@ -28,10 +28,18 @@ say.
   or Mahlzeit behind it. Not a separate type: it is a `DiaryEntry` with `foodId` and `mealId`
   null. For restaurant or canteen food you do not want in the shared library.
 
-- **Lebensmittel** (food) and **Mahlzeit** (meal, a saved combination of foods) — the shared
-  library an Eintrag can be logged from. Introduced in later tickets (#143, #144, #147); a
-  Mahlzeit is a *live* reference in its editor but expands into snapshotted entries when
-  logged. Listed here because Schnelleintrag is defined by their absence.
+- **Lebensmittel** — a food in the shared library, with nutrients per 100 g (or 100 ml when
+  `isLiquid`) and zero or more named **Portionsgrößen** (`FoodPortion`: label + grams, one
+  marked default). `source` is `SEED`, `OPEN_FOOD_FACTS` or `USER`. **Every Lebensmittel is
+  visible to every user** regardless of creator — a deliberate divergence from custom
+  exercises (see [ADR-0003](docs/adr/0003-user-created-foods-and-meals-are-shared.md)). Only
+  the creator edits a `USER` food; `SEED` / `OPEN_FOOD_FACTS` are read-only for everyone.
+  Deletion is soft; the `barcode` is a product's global identity. Creator names are never
+  shown. Code: `Food` / `FoodPortion`.
+
+- **Mahlzeit** (meal, a saved combination of foods) — the other shared library an Eintrag can
+  be logged from. Added by #147; a Mahlzeit is a *live* reference in its editor but expands
+  into snapshotted entries when logged. Same sharing rules as Lebensmittel.
 
 ### Tracked nutrients
 

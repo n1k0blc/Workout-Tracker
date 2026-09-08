@@ -17,6 +17,7 @@ import { HealthModule } from './health/health.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { SecurityModule } from './security/security.module';
 import { NutritionModule } from './nutrition/nutrition.module';
+import { FoodsModule } from './foods/foods.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { NutritionModule } from './nutrition/nutrition.module';
     DashboardModule,
     SecurityModule,
     NutritionModule,
+    FoodsModule,
   ],
   controllers: [],
   providers: [

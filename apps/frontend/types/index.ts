@@ -753,3 +753,63 @@ export interface CreateDiaryEntryInput {
   quantity?: number;
   quantityLabel?: string;
 }
+
+// Lebensmittel library (#143)
+
+export type FoodSource = 'SEED' | 'OPEN_FOOD_FACTS' | 'USER';
+
+export interface FoodPortion {
+  id: string;
+  label: string;
+  /** Grams, or millilitres when the food is a liquid. */
+  grams: number;
+  order: number;
+  isDefault: boolean;
+}
+
+export interface Food {
+  id: string;
+  name: string;
+  brand: string | null;
+  barcode: string | null;
+  isLiquid: boolean;
+  /** Per 100 g / 100 ml. */
+  kcal: number;
+  carbs: number;
+  protein: number;
+  fat: number;
+  source: FoodSource;
+  createdById: string | null;
+  /** Soft-deleted: gone from search, still resolves by id. */
+  deleted: boolean;
+  /** The current user's own, non-deleted USER food -- the only case the editor is writable. */
+  editable: boolean;
+  portions: FoodPortion[];
+}
+
+export interface FoodPortionInput {
+  label: string;
+  grams: number;
+  isDefault?: boolean;
+}
+
+export interface FoodInput {
+  name: string;
+  brand?: string;
+  barcode?: string;
+  isLiquid?: boolean;
+  kcal: number;
+  carbs: number;
+  protein: number;
+  fat: number;
+  portions?: FoodPortionInput[];
+}
+
+export interface SimilarFood {
+  id: string;
+  name: string;
+  kcal: number;
+  isLiquid: boolean;
+  /** How many of the current user's diary entries reference this food. */
+  usageCount: number;
+}

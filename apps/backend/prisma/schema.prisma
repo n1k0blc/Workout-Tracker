@@ -25,6 +25,7 @@ model User {
   refreshTokens RefreshToken[]
   mealSlots     MealSlot[]
   diaryEntries  DiaryEntry[]
+  createdFoods  Food[]         @relation("FoodCreatedBy")
 }
 
 // PR1 auth overhaul: DB-backed rotating refresh tokens (httpOnly cookie).
@@ -256,6 +257,63 @@ model DiaryEntry {
 
   @@index([userId, localDate])
   @@index([mealSlotId])
+}
+
+// A shared Lebensmittel: nutrients per 100 g (or 100 ml when `isLiquid`). Every Food is
+// visible to every user regardless of `createdById` (deliberate divergence from Exercise --
+// see docs/adr/0003-user-created-foods-and-meals-are-shared.md). Only the creator can edit or
+// delete a `source = USER` food; `SEED` and `OPEN_FOOD_FACTS` foods are read-only for
+// everyone. Deletion is soft (`deletedAt`) so DiaryEntry / Meal references keep resolving; a
+// soft-deleted row still owns its `barcode` (a later rescan undeletes it rather than
+// inserting a duplicate).
+model Food {
+  id           String        @id @default(uuid())
+  name         String
+  brand        String?
+  // EAN/UPC. Globally unique across all foods including soft-deleted ones.
+  barcode      String?       @unique
+  isLiquid     Boolean       @default(false)
+  // Per 100 g / 100 ml.
+  kcal         Float
+  carbs        Float
+  protein      Float
+  fat          Float
+  source       FoodSource    @default(USER)
+  // Null for SEED and OPEN_FOOD_FACTS rows; set for USER rows (the only creator that can edit).
+  createdById  String?
+  // OPEN_FOOD_FACTS only: when this row was last refreshed from the weekly sync (#150).
+  lastSyncedAt DateTime?
+  deletedAt    DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  createdBy    User?         @relation("FoodCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  portions     FoodPortion[]
+
+  @@index([createdById])
+  @@index([deletedAt])
+}
+
+// A named amount of a Food ("1 Portion" = 40 g, "1 Esslöffel" = 12 g). `grams` is grams or
+// millilitres to match the parent's `isLiquid`. Exactly one portion per food carries
+// `isDefault` when a food has any; `order` is 1-based and contiguous, written from array
+// position on every save (the client never sends it), like the workout tree.
+model FoodPortion {
+  id        String  @id @default(uuid())
+  foodId    String
+  label     String
+  grams     Float
+  order     Int
+  isDefault Boolean @default(false)
+  food      Food    @relation(fields: [foodId], references: [id], onDelete: Cascade)
+
+  @@unique([foodId, order])
+  @@index([foodId])
+}
+
+enum FoodSource {
+  SEED
+  OPEN_FOOD_FACTS
+  USER
 }
 
 enum Equipment {
