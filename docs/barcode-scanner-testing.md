@@ -15,33 +15,61 @@ latter would send someone hunting through settings for a switch that does not ex
 `pnpm run dev:mobile` serves plain HTTP over the LAN, so **the camera will not work there**.
 The manual EAN field is the intended path in that setup, and it reaches the identical lookup.
 
-## Testing on a phone, in order of preference
+## Testing on a phone
 
-**1. Against the Pi.** The deployed app is behind the Cloudflare tunnel on
-`https://workout.nikobjelic.com`, which is a proper secure context. This is also the only
-setup that exercises the real Open Food Facts lookup from the Pi's own network. Deploy, then
-open it on the phone.
+### iPhone / Safari — `pnpm run dev:https`
 
-**2. A local HTTPS dev server.** Next can serve a self-signed certificate:
+This is the setup for iOS, and iOS is the one that matters most: it is the only platform that
+exercises the zxing WebAssembly fallback.
 
 ```bash
-pnpm --filter frontend exec next dev --experimental-https -H 0.0.0.0
+pnpm --filter frontend run dev:https
 ```
 
-The phone will warn about the certificate; accept it once. `NEXT_PUBLIC_API_URL` still has to
-point at a reachable backend, and that backend must be HTTPS too or the browser blocks the
-request as mixed content — so in practice this tests decoding, not the full miss chain.
+It serves the dev server over HTTPS (Next generates a certificate via mkcert) and sets
+`NEXT_PUBLIC_API_URL=/api`, so the browser makes **no cross-origin call at all** — the
+dev-only rewrite in `next.config.ts` proxies `/api/*` to the backend on :3001.
 
-**3. Chrome on Android over USB.** With the phone attached and USB debugging on:
+That proxy is not a convenience; without it the page cannot work over HTTPS at all:
+
+- an `https://` page calling `http://localhost:3001` is blocked as **mixed content**, and
+- `main.ts`'s CORS allowlist only permits `http://` local origins, so the request would be
+  **rejected by CORS** even if it were allowed to leave.
+
+Proxying also gives dev the same first-party cookie semantics production has. The auth cookies
+are `SameSite=lax`; across two dev origins they survive only because cookies ignore the port.
+
+Then, on the phone (same Wi-Fi), open `https://<your-mac-lan-ip>:3000`. Safari warns about the
+certificate — tap **Show Details → visit this website**. If the viewfinder comes up, done.
+
+**If the camera still does not start after accepting the warning**, Safari is refusing to
+treat an untrusted certificate as a secure context, and the CA has to be trusted on the phone:
+
+```bash
+mkcert -CAROOT
+```
+
+AirDrop the `rootCA.pem` in that directory to the iPhone, then **Settings → Profile
+Downloaded → Install**, then **Settings → General → About → Certificate Trust Settings** and
+enable full trust for it. Reload; the warning and the camera problem both go away.
+
+### Android / Chrome over USB
+
+Simplest of all, and needs no certificates. With the phone attached and USB debugging on:
 
 ```bash
 adb reverse tcp:3000 tcp:3000 && adb reverse tcp:3001 tcp:3001
 ```
 
-The phone then reaches the dev server at `http://localhost:3000`, which *is* a secure context.
-This is the best option for iterating on the decoder itself, and it needs no certificates.
+Run the ordinary `pnpm run dev` and open **`http://localhost:3000`** on the phone. Chrome
+treats `http://localhost` as a secure context, so the camera works, and nothing is HTTPS so
+there is no mixed content to block.
 
-iOS has no equivalent — use option 1 or 2 there.
+### Against the Pi
+
+The deployed app is behind the Cloudflare tunnel on `https://workout.nikobjelic.com`, a proper
+secure context with a real certificate. The slowest loop, but the only one that exercises the
+Open Food Facts lookup from the Pi's own network rather than from your Mac.
 
 ## What to check on each engine
 
