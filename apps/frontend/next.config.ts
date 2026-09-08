@@ -1,4 +1,6 @@
 import type { NextConfig } from "next";
+import { execFileSync } from "node:child_process";
+import { networkInterfaces } from "node:os";
 
 // Security response headers that carry no risk of breaking the running app.
 // Content-Security-Policy is deliberately excluded here — it needs a per-request
@@ -25,10 +27,39 @@ import type { NextConfig } from "next";
 // Guarded to development so it can never double-proxy in front of Cloudflare.
 const BACKEND_ORIGIN = process.env.DEV_API_PROXY_ORIGIN ?? "http://localhost:3001";
 
+// Hosts allowed to load /_next/* dev resources (#149).
+//
+// Next serves those only to localhost by default, and answers 403 to anything else. A phone
+// reaches the dev server by LAN address or Bonjour name, so the HTML renders and every client
+// chunk 403s: React never hydrates, forms fall back to native submission, and no fetch is ever
+// made -- which looks exactly like a broken login against a healthy backend.
+//
+// Computed rather than hard-coded so a DHCP lease change does not silently reintroduce that.
+// Dev-only by definition: Next ignores this outside `next dev`.
+function devOrigins(): string[] {
+  if (process.env.NODE_ENV === "production") return [];
+  const addresses = Object.values(networkInterfaces())
+    .flat()
+    .filter((i) => i && i.family === "IPv4" && !i.internal)
+    .map((i) => i!.address);
+  let bonjour: string[] = [];
+  try {
+    // macOS publishes this name over mDNS; `os.hostname()` is the router-assigned one.
+    const name = execFileSync("scutil", ["--get", "LocalHostName"], { stdio: "pipe" })
+      .toString()
+      .trim();
+    if (name) bonjour = [`${name}.local`, `${name.toLowerCase()}.local`];
+  } catch {
+    // Not macOS, or scutil unavailable -- the addresses above still cover it.
+  }
+  return [...new Set([...addresses, ...bonjour])];
+}
+
 const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
   poweredByHeader: false,
+  allowedDevOrigins: devOrigins(),
   async rewrites() {
     if (process.env.NODE_ENV === "production") return [];
     return [{ source: "/api/:path*", destination: `${BACKEND_ORIGIN}/api/:path*` }];
