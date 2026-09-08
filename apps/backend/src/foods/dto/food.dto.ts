@@ -37,3 +37,16 @@ export class SimilarFoodDto {
   /** How many of the current user's diary entries reference this food (0 until #144). */
   usageCount: number;
 }
+
+/**
+ * One capped page of the library plus the totals behind it. The Open Food Facts import (#146)
+ * puts ~180k foods in the library, so the page a caller receives says nothing about how many
+ * foods match -- the counts have to travel with it.
+ */
+export class FoodListDto {
+  items: FoodDto[];
+  /** Foods matching the search, ignoring the page cap. */
+  total: number;
+  /** How many of `total` are the caller's own editable foods. */
+  ownTotal: number;
+}

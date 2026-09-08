@@ -90,7 +90,7 @@ export function FoodPickerSheet({
       setLoading(true);
       try {
         const data = await apiClient.getFoods(search.trim() || undefined);
-        if (!cancelled) setFoods(data);
+        if (!cancelled) setFoods(data.items);
       } catch {
         if (!cancelled) toast.error('Lebensmittel konnten nicht geladen werden');
       } finally {

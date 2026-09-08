@@ -41,6 +41,7 @@ import {
   MealSlotList,
   Food,
   FoodInput,
+  FoodList,
   SimilarFood,
 } from '@/types';
 import { clientTimeZone } from '@/lib/local-date';
@@ -627,9 +628,11 @@ class ApiClient {
 
   // Lebensmittel library (#143)
 
-  async getFoods(search?: string): Promise<Food[]> {
+  // One capped page plus the totals behind it -- the library holds ~180k imported foods
+  // (#146), so the page length is not the number of matches.
+  async getFoods(search?: string): Promise<FoodList> {
     const query = search ? `?search=${encodeURIComponent(search)}` : '';
-    return this.request<Food[]>(`/foods${query}`);
+    return this.request<FoodList>(`/foods${query}`);
   }
 
   // The current user's own foods whose name matches -- for the duplicate-avoidance hint.

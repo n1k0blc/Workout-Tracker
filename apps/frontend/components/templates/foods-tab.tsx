@@ -18,6 +18,8 @@ function subtitle(food: Food): string {
 
 export default function FoodsTab() {
   const [foods, setFoods] = useState<Food[]>([]);
+  // Totals for the whole library, not the capped page the list renders (#146).
+  const [totals, setTotals] = useState({ total: 0, ownTotal: 0 });
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   // 'create' | Food | null
@@ -29,7 +31,10 @@ export default function FoodsTab() {
       setLoading(true);
       try {
         const data = await apiClient.getFoods(search.trim() || undefined);
-        if (!cancelled) setFoods(data);
+        if (!cancelled) {
+          setFoods(data.items);
+          setTotals({ total: data.total, ownTotal: data.ownTotal });
+        }
       } catch (error) {
         console.error('Failed to load foods:', error);
       } finally {
@@ -44,19 +49,21 @@ export default function FoodsTab() {
 
   const reload = async () => {
     try {
-      setFoods(await apiClient.getFoods(search.trim() || undefined));
+      const data = await apiClient.getFoods(search.trim() || undefined);
+      setFoods(data.items);
+      setTotals({ total: data.total, ownTotal: data.ownTotal });
     } catch (error) {
       console.error('Failed to reload foods:', error);
     }
   };
 
-  const ownCount = foods.filter((f) => f.editable).length;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          {foods.length} Lebensmittel · {ownCount} eigene
+          {totals.total.toLocaleString('de-DE')} Lebensmittel · {totals.ownTotal} eigene
+          {totals.total > foods.length && ` · ${foods.length} angezeigt`}
         </p>
         <Button size="sm" onClick={() => setEditing('create')}>
           <IconPlus data-icon="inline-start" />

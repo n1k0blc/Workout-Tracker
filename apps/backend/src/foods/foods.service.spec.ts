@@ -30,7 +30,13 @@ const OWN_FOOD = {
   portions: [{ id: 'p1', label: '1 Portion', grams: 40, order: 1, isDefault: true }],
 };
 
-const OTHER_USER_FOOD = { ...OWN_FOOD, id: 'food-other', name: 'Skyr', createdById: 'user-2', barcode: null };
+const OTHER_USER_FOOD = {
+  ...OWN_FOOD,
+  id: 'food-other',
+  name: 'Skyr',
+  createdById: 'user-2',
+  barcode: null,
+};
 const SEED_FOOD = {
   ...OWN_FOOD,
   id: 'food-seed',
@@ -48,15 +54,24 @@ const OFF_FOOD = {
   barcode: null,
 };
 
-function makeService(overrides: {
-  findMany?: unknown[];
-  findUnique?: unknown;
-  createImpl?: (args: { data: Record<string, unknown> }) => unknown;
-  updateImpl?: (args: { data: Record<string, unknown> }) => unknown;
-  diaryEntries?: unknown[];
-} = {}) {
+function makeService(
+  overrides: {
+    findMany?: unknown[];
+    findUnique?: unknown;
+    createImpl?: (args: { data: Record<string, unknown> }) => unknown;
+    updateImpl?: (args: { data: Record<string, unknown> }) => unknown;
+    diaryEntries?: unknown[];
+  } = {},
+) {
   const prisma = {
     food: {
+      // Counts ignore the page cap; "own" narrows to the caller's editable foods.
+      count: jest.fn(async ({ where }: { where: Record<string, unknown> }) => {
+        const rows = (overrides.findMany ?? []) as { createdById?: string; source?: string }[];
+        if (!where.createdById) return rows.length;
+        return rows.filter((f) => f.createdById === where.createdById && f.source === 'USER')
+          .length;
+      }),
       findMany: jest.fn().mockResolvedValue(overrides.findMany ?? []),
       findUnique: jest
         .fn()
@@ -115,15 +130,20 @@ describe('FoodsService.findAll — visibility', () => {
         },
       }),
     );
-    expect(result.map((f) => f.id)).toEqual(['food-own', 'food-other', 'food-seed', 'food-off']);
+    expect(result.items.map((f) => f.id)).toEqual([
+      'food-own',
+      'food-other',
+      'food-seed',
+      'food-off',
+    ]);
   });
 
-  it('marks editable only for the current user\'s own non-deleted USER food', async () => {
+  it("marks editable only for the current user's own non-deleted USER food", async () => {
     const { service } = makeService({
       findMany: [OWN_FOOD, OTHER_USER_FOOD, SEED_FOOD, OFF_FOOD],
     });
 
-    const byId = Object.fromEntries((await service.findAll('user-1')).map((f) => [f.id, f]));
+    const byId = Object.fromEntries((await service.findAll('user-1')).items.map((f) => [f.id, f]));
 
     expect(byId['food-own'].editable).toBe(true);
     expect(byId['food-other'].editable).toBe(false); // someone else's
@@ -132,8 +152,25 @@ describe('FoodsService.findAll — visibility', () => {
   });
 });
 
+describe('FoodsService.findAll - totals are not the page size', () => {
+  it("reports how many foods match and how many are the caller's own, beyond the page cap", async () => {
+    // The library holds ~180k imported foods (#146) but a page is capped, so the totals have
+    // to be counted separately -- otherwise the tab reports the page size as the library size.
+    const { service, prisma } = makeService({
+      findMany: [OWN_FOOD, OTHER_USER_FOOD, SEED_FOOD, OFF_FOOD],
+    });
+    prisma.food.count = jest.fn().mockResolvedValueOnce(180983).mockResolvedValueOnce(9);
+
+    const result = await service.findAll('user-1');
+
+    expect(result.total).toBe(180983);
+    expect(result.ownTotal).toBe(9);
+    expect(result.items).toHaveLength(4);
+  });
+});
+
 describe('FoodsService.findAll - search matches brand too', () => {
-  it("finds an imported product by its brand, not just its name", async () => {
+  it('finds an imported product by its brand, not just its name', async () => {
     // The Open Food Facts import (#146) fills the library with branded products, so a
     // search for the brand has to reach them.
     const { service, prisma } = makeService({ findMany: [OFF_FOOD] });
@@ -235,7 +272,12 @@ describe('FoodsService.create', () => {
     await expect(
       service.create(
         'user-1',
-        baseCreateDto({ portions: [{ label: 'a', grams: 1 }, { label: 'b', grams: 2 }] }),
+        baseCreateDto({
+          portions: [
+            { label: 'a', grams: 1 },
+            { label: 'b', grams: 2 },
+          ],
+        }),
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
 
@@ -254,12 +296,12 @@ describe('FoodsService.create', () => {
 });
 
 describe('FoodsService.update / softDelete — creator-only, read-only globals', () => {
-  it("403s when a USER food is edited by someone other than its creator", async () => {
+  it('403s when a USER food is edited by someone other than its creator', async () => {
     const { service, prisma } = makeService({ findUnique: { ...OTHER_USER_FOOD } });
 
-    await expect(
-      service.update('user-1', 'food-other', baseCreateDto()),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.update('user-1', 'food-other', baseCreateDto())).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
     expect(prisma.food.update).not.toHaveBeenCalled();
   });
 
@@ -272,9 +314,9 @@ describe('FoodsService.update / softDelete — creator-only, read-only globals',
 
   it('403s on an OPEN_FOOD_FACTS food for everyone', async () => {
     const { service } = makeService({ findUnique: { ...OFF_FOOD } });
-    await expect(
-      service.softDelete('user-1', 'food-off'),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.softDelete('user-1', 'food-off')).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
   });
 
   it('lets the creator update their own food and maps a barcode clash to 409', async () => {
@@ -317,7 +359,7 @@ describe('FoodsService.update / softDelete — creator-only, read-only globals',
 });
 
 describe('FoodsService.findSimilar', () => {
-  it('returns the user\'s own matching foods with a per-user usage count', async () => {
+  it("returns the user's own matching foods with a per-user usage count", async () => {
     const { service, prisma } = makeService({
       findMany: [
         { ...OWN_FOOD, id: 'f1', name: 'Haferdrink ungesüßt' },

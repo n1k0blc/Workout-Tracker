@@ -11,6 +11,7 @@ import {
   UpdateFoodDto,
   FoodPortionInputDto,
   FoodDto,
+  FoodListDto,
   SimilarFoodDto,
 } from './dto';
 
@@ -54,8 +55,7 @@ function toDto(food: FoodRow, userId: string): FoodDto {
     source: food.source,
     createdById: food.createdById ?? null,
     deleted: food.deletedAt !== null,
-    editable:
-      food.source === 'USER' && food.createdById === userId && food.deletedAt === null,
+    editable: food.source === 'USER' && food.createdById === userId && food.deletedAt === null,
     portions: (food.portions ?? []).map((p) => ({
       id: p.id,
       label: p.label,
@@ -90,7 +90,12 @@ export class FoodsService {
   constructor(private prisma: PrismaService) {}
 
   /** Every non-deleted food, from every user. Optional case-insensitive name search. */
-  async findAll(userId: string, search?: string): Promise<FoodDto[]> {
+  /**
+   * One capped page of matching foods, plus the totals behind it. The page cap exists because
+   * the Open Food Facts import (#146) puts ~180k foods in the library; without the totals the
+   * caller can only report the page size, which is not the library size.
+   */
+  async findAll(userId: string, search?: string): Promise<FoodListDto> {
     const where: Record<string, unknown> = { deletedAt: null };
     if (search && search.trim()) {
       // Brand as well as name: the Open Food Facts import (#146) fills the library with
@@ -102,14 +107,18 @@ export class FoodsService {
       ];
     }
 
-    const foods = (await this.prisma.food.findMany({
-      where,
-      include: WITH_PORTIONS,
-      orderBy: { name: 'asc' },
-      take: 200,
-    })) as FoodRow[];
+    const [foods, total, ownTotal] = await Promise.all([
+      this.prisma.food.findMany({
+        where,
+        include: WITH_PORTIONS,
+        orderBy: { name: 'asc' },
+        take: 200,
+      }) as Promise<FoodRow[]>,
+      this.prisma.food.count({ where }),
+      this.prisma.food.count({ where: { ...where, source: 'USER', createdById: userId } }),
+    ]);
 
-    return foods.map((f) => toDto(f, userId));
+    return { items: foods.map((f) => toDto(f, userId)), total, ownTotal };
   }
 
   /** Resolves a food by id even when it is soft-deleted -- old entries must keep rendering. */
@@ -234,9 +243,7 @@ export class FoodsService {
   /** SEED / OPEN_FOOD_FACTS are read-only for everyone; a USER food only for its creator. */
   private assertEditable(food: FoodRow, userId: string): void {
     if (food.source !== 'USER') {
-      throw new ForbiddenException(
-        'Seed- und Open-Food-Facts-Einträge sind schreibgeschützt',
-      );
+      throw new ForbiddenException('Seed- und Open-Food-Facts-Einträge sind schreibgeschützt');
     }
     if (food.createdById !== userId) {
       throw new ForbiddenException('Nur der Ersteller kann dieses Lebensmittel ändern');
@@ -252,17 +259,13 @@ export class FoodsService {
       );
     }
     if (portions.filter((p) => p.isDefault).length !== 1) {
-      throw new BadRequestException(
-        'Genau eine Portionsgröße muss als Standard markiert sein',
-      );
+      throw new BadRequestException('Genau eine Portionsgröße muss als Standard markiert sein');
     }
   }
 
   private barcodeConflictOrRethrow(error: unknown): Error {
     if (isUniqueViolation(error)) {
-      return new ConflictException(
-        'Ein Lebensmittel mit diesem Barcode existiert bereits',
-      );
+      return new ConflictException('Ein Lebensmittel mit diesem Barcode existiert bereits');
     }
     return error as Error;
   }

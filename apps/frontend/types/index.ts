@@ -802,6 +802,19 @@ export interface Food {
   portions: FoodPortion[];
 }
 
+/**
+ * One capped page of the library plus the totals behind it. The Open Food Facts import (#146)
+ * puts ~180k foods in the library, so `items.length` is the page size, never the number of
+ * matches -- render the totals, not the page.
+ */
+export interface FoodList {
+  items: Food[];
+  /** Foods matching the search, ignoring the page cap. */
+  total: number;
+  /** How many of `total` are the current user's own editable foods. */
+  ownTotal: number;
+}
+
 export interface FoodPortionInput {
   label: string;
   grams: number;
