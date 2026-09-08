@@ -18,6 +18,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { SecurityModule } from './security/security.module';
 import { NutritionModule } from './nutrition/nutrition.module';
 import { FoodsModule } from './foods/foods.module';
+import { MealsModule } from './meals/meals.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { FoodsModule } from './foods/foods.module';
     SecurityModule,
     NutritionModule,
     FoodsModule,
+    MealsModule,
   ],
   controllers: [],
   providers: [

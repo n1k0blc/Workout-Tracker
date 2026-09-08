@@ -39,8 +39,20 @@ say.
   as `seedKey`, the stable identity `prisma db seed` upserts on. Code: `Food` / `FoodPortion`.
 
 - **Mahlzeit** (meal, a saved combination of foods) — the other shared library an Eintrag can
-  be logged from. Added by #147; a Mahlzeit is a *live* reference in its editor but expands
-  into snapshotted entries when logged. Same sharing rules as Lebensmittel.
+  be logged from, built in the "Mahlzeiten" tab of Vorlagen. A Mahlzeit has a name and an
+  ordered list of **Zutaten** (`MealItem`: a `Food` + a `quantity` in g/ml, `order` 1-based
+  and contiguous from array position). It is a *live* reference in its editor and in the
+  picker — the totals shown are recomputed from the referenced foods' current nutrients, so
+  editing a food changes a meal's displayed total. Logging it is the opposite: the picker
+  asks for a **Faktor** (0,5× / 1× / 1,5× / 2×) and the meal expands into one snapshotted
+  `DiaryEntry` per ingredient (ADR-0002), each carrying the meal's id as a grouping tag so
+  the Abschnitt page groups them under "MAHLZEIT &lt;name&gt;"; a single ingredient entry can
+  then be edited or removed on its own. Same sharing rules as Lebensmittel (ADR-0003): every
+  Mahlzeit is visible to every user, only the creator edits or deletes it (**403** otherwise),
+  `createdById` is nullable so the row outlives its creator's account, deletion is soft, and
+  the creator's name is never shown ("Meine" marker only). A Mahlzeit resolves and computes
+  even when one of its foods has been soft-deleted; it cannot contain another Mahlzeit;
+  duplicate names are allowed. Code: `Meal` / `MealItem`.
 
 ### Tracked nutrients
 

@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { apiClient } from '@/lib/api';
 import { DiaryEntry, NutritionDay, NutritionDaySlot } from '@/types';
 import { isLocalDate, toLocalDateString } from '@/lib/local-date';
-import { formatKcal } from '@/lib/nutrition';
+import { formatKcal, groupDiaryEntries } from '@/lib/nutrition';
 import { DiaryEntryRow } from '@/components/nutrition/diary-entry-row';
 import { QuickEntrySheet } from '@/components/nutrition/quick-entry-sheet';
 import { QuantityEditorSheet } from '@/components/nutrition/quantity-editor-sheet';
@@ -38,6 +38,70 @@ function TotalsCell({
       <div className="mt-1 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
         {label}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The Abschnitt's entries: a card per Mahlzeit (its ingredient entries grouped under a
+ * "MAHLZEIT <name>" header with a 2px left accent, #147), then the remaining single entries
+ * under "Einzeleinträge". Every row stays individually editable and swipe-to-delete.
+ */
+function SlotEntries({
+  entries,
+  onEdit,
+  onDelete,
+}: {
+  entries: DiaryEntry[];
+  onEdit: (entry: DiaryEntry) => void;
+  onDelete: (entry: DiaryEntry) => void;
+}) {
+  if (entries.length === 0) {
+    return (
+      <div className="border bg-card p-8 text-center text-sm text-muted-foreground">
+        Noch nichts erfasst
+      </div>
+    );
+  }
+
+  const { mealGroups, singles } = groupDiaryEntries(entries);
+  const renderRow = (entry: DiaryEntry) => (
+    <DiaryEntryRow
+      key={entry.id}
+      entry={entry}
+      onEdit={() => onEdit(entry)}
+      onDelete={() => onDelete(entry)}
+    />
+  );
+
+  return (
+    <div className="space-y-5">
+      {mealGroups.map((group) => (
+        <div key={group.mealId} className="border border-l-2 border-l-foreground bg-card">
+          <div className="flex items-center justify-between gap-2 px-3.5 py-2.5">
+            <span className="truncate text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+              Mahlzeit {group.mealName}
+            </span>
+            <span className="shrink-0 text-[13px] font-semibold">
+              {formatKcal(group.kcal)} kcal
+            </span>
+          </div>
+          <div className="divide-y border-t">{group.entries.map(renderRow)}</div>
+        </div>
+      ))}
+
+      {singles.length > 0 && (
+        <div>
+          <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+            Einzeleinträge
+          </div>
+          <div className="divide-y border bg-card">{singles.map(renderRow)}</div>
+        </div>
+      )}
+
+      <p className="text-xs text-muted-foreground">
+        Tippen bearbeitet die Menge · Nach links wischen löscht
+      </p>
     </div>
   );
 }
@@ -151,36 +215,14 @@ export default function AbschnittPage() {
                 <TotalsCell value={formatGrams(slot.totals.fat)} label="Fett" border="" />
               </div>
 
-              <div>
-                <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                  Einzeleinträge
-                </div>
-                {slot.entries.length > 0 ? (
-                  <>
-                    {/* TODO(#147): entries sharing a mealId group under the meal's name. */}
-                    <div className="divide-y border bg-card">
-                      {slot.entries.map((entry) => (
-                        <DiaryEntryRow
-                          key={entry.id}
-                          entry={entry}
-                          onEdit={() => {
-                            setEditEntry(entry);
-                            setEditOpen(true);
-                          }}
-                          onDelete={() => handleDelete(entry)}
-                        />
-                      ))}
-                    </div>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Tippen bearbeitet die Menge · Nach links wischen löscht
-                    </p>
-                  </>
-                ) : (
-                  <div className="border bg-card p-8 text-center text-sm text-muted-foreground">
-                    Noch nichts erfasst
-                  </div>
-                )}
-              </div>
+              <SlotEntries
+                entries={slot.entries}
+                onEdit={(entry) => {
+                  setEditEntry(entry);
+                  setEditOpen(true);
+                }}
+                onDelete={handleDelete}
+              />
             </div>
 
             <div className="sticky bottom-0 border-t bg-background p-4">

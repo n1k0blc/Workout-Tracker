@@ -22,6 +22,7 @@ import { MealSlotsService } from './meal-slots.service';
 import {
   CreateDiaryEntryDto,
   CreateDiaryEntriesBatchDto,
+  CreateDiaryEntriesFromMealDto,
   UpdateDiaryEntryDto,
   DiaryEntryDto,
   NutritionDayDto,
@@ -117,6 +118,15 @@ export class NutritionController {
     @Body() dto: CreateDiaryEntriesBatchDto,
   ): Promise<{ count: number }> {
     return this.diaryEntries.createFromFoodBatch(user.id, dto);
+  }
+
+  // Logs a Mahlzeit: expands it into one entry per ingredient, scaled by the Faktor (#147).
+  @Post('entries/meal')
+  async createEntriesFromMeal(
+    @CurrentUser() user: { id: string },
+    @Body() dto: CreateDiaryEntriesFromMealDto,
+  ): Promise<{ count: number }> {
+    return this.diaryEntries.createFromMeal(user.id, dto);
   }
 
   @Patch('entries/:id')

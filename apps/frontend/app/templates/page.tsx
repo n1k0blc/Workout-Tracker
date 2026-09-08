@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ExercisesTab from '@/components/templates/exercises-tab';
 import WorkoutTemplatesTab from '@/components/templates/workout-templates-tab';
 import FoodsTab from '@/components/templates/foods-tab';
+import MealsTab from '@/components/templates/meals-tab';
 
 export default function TemplatesPage() {
   return (
@@ -53,10 +54,7 @@ export default function TemplatesPage() {
               </TabsContent>
 
               <TabsContent value="meals" className="mt-0">
-                {/* The Mahlzeiten tab's content lands in #147. */}
-                <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">
-                  Mahlzeiten folgen in Kürze.
-                </div>
+                <MealsTab />
               </TabsContent>
             </Tabs>
           </div>

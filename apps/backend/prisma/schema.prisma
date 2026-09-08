@@ -26,6 +26,7 @@ model User {
   mealSlots     MealSlot[]
   diaryEntries  DiaryEntry[]
   createdFoods  Food[]         @relation("FoodCreatedBy")
+  createdMeals  Meal[]         @relation("MealCreatedBy")
 }
 
 // PR1 auth overhaul: DB-backed rotating refresh tokens (httpOnly cookie).
@@ -239,8 +240,16 @@ model DiaryEntry {
   // Nullable FKs to Food / Meal, added by later tickets. No relation yet -- those models do
   // not exist. Present now so #144/#147 do not have to migrate existing rows.
   foodId        String?
+  // Set when this entry came from expanding a Mahlzeit (#147): every ingredient entry carries
+  // the same `mealId` as a grouping tag, so the Abschnitt page can group them under the
+  // meal's name. It is only a link -- the nutrients stay the snapshot taken at log time
+  // (ADR-0002), and the meal is soft-deleted, so this FK keeps resolving.
   mealId        String?
   name          String
+  // The meal's name at expansion time, snapshotted alongside `name` -- so the Abschnitt
+  // page's "MAHLZEIT <name>" group header is a fact about the day (ADR-0002), not a live
+  // read that a later meal rename would rewrite. Null unless `mealId` is set.
+  mealName      String?
   // How much was eaten, in the entry's own unit. 1 for a bare Schnelleintrag; the quantity
   // editor multiplies the nutrient snapshot by newQuantity / oldQuantity.
   quantity      Float    @default(1)
@@ -254,6 +263,7 @@ model DiaryEntry {
   updatedAt     DateTime @updatedAt
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   mealSlot      MealSlot @relation(fields: [mealSlotId], references: [id], onDelete: Cascade)
+  meal          Meal?    @relation(fields: [mealId], references: [id], onDelete: SetNull)
 
   @@index([userId, localDate])
   @@index([mealSlotId])
@@ -291,6 +301,7 @@ model Food {
   updatedAt    DateTime      @updatedAt
   createdBy    User?         @relation("FoodCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   portions     FoodPortion[]
+  mealItems    MealItem[]
 
   @@index([createdById])
   @@index([deletedAt])
@@ -317,6 +328,51 @@ enum FoodSource {
   SEED
   OPEN_FOOD_FACTS
   USER
+}
+
+// A shared Mahlzeit: a named combination of foods with quantities (#147). Same sharing rules
+// as Food (docs/adr/0003-user-created-foods-and-meals-are-shared.md): every Meal is visible
+// to every user, only its `createdById` can edit or delete it (API answers 403 otherwise),
+// and deletion is soft (`deletedAt`) so logged entries keep grouping under its name.
+// `createdById` is nullable with `onDelete: SetNull` for the same reason a Food's is -- the
+// shared row outlives the account that made it, becoming editable by nobody.
+//
+// A Meal is a *live* reference in its editor: its displayed totals are recomputed from the
+// current nutrients of the foods it points at. Logging it is the opposite -- it expands into
+// one snapshotted DiaryEntry per ingredient (ADR-0002). Meals cannot contain meals;
+// duplicate names are allowed.
+model Meal {
+  id          String       @id @default(uuid())
+  name        String
+  createdById String?
+  deletedAt   DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  createdBy   User?        @relation("MealCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  items       MealItem[]
+  entries     DiaryEntry[]
+
+  @@index([createdById])
+  @@index([deletedAt])
+}
+
+// One ingredient line of a Meal: a Food and how much of it, in grams or millilitres (the
+// same normalised unit a DiaryEntry's `quantity` uses). `order` is 1-based and contiguous,
+// written from array position on every save (the client never sends it), like FoodPortion
+// and the workout tree. The Food reference has no cascade -- a food is soft-deleted, so the
+// row stays and the meal keeps resolving and computing.
+model MealItem {
+  id       String @id @default(uuid())
+  mealId   String
+  foodId   String
+  quantity Float
+  order    Int
+  meal     Meal   @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  food     Food   @relation(fields: [foodId], references: [id])
+
+  @@unique([mealId, order])
+  @@index([mealId])
+  @@index([foodId])
 }
 
 enum Equipment {

@@ -19,6 +19,7 @@ const ENTRY = {
   localDate: '2026-09-07',
   foodId: null as string | null,
   mealId: null as string | null,
+  mealName: null as string | null,
   name: 'Kantine · Gemüsepfanne',
   quantity: 1,
   quantityLabel: null as string | null,
@@ -48,6 +49,8 @@ function makeService(overrides: {
   entries?: unknown[];
   deleteCount?: number;
   foods?: unknown[];
+  // What the injected MealsService.findById resolves to (the expandable meal). `null` -> 404.
+  mealDetail?: unknown;
 } = {}) {
   const foodCreate = jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
     id: 'food-new',
@@ -89,7 +92,22 @@ function makeService(overrides: {
       cb({ food: { create: foodCreate }, diaryEntry: { create: diaryCreate } }),
     ),
   };
-  return { service: new DiaryEntriesService(prisma as never), prisma };
+  const meals = {
+    findById: jest.fn(async () => {
+      if ('mealDetail' in overrides) {
+        if (overrides.mealDetail == null) {
+          throw new NotFoundException('Mahlzeit nicht gefunden');
+        }
+        return overrides.mealDetail;
+      }
+      return { ...MEAL_DETAIL };
+    }),
+  };
+  return {
+    service: new DiaryEntriesService(prisma as never, meals as never),
+    prisma,
+    meals,
+  };
 }
 
 describe('DiaryEntriesService.createEntry — snapshot on create', () => {
@@ -301,6 +319,26 @@ describe('DiaryEntriesService.getDay — day read model', () => {
     expect(day.slots.map((s) => s.id)).toEqual(['slot-1', 'slot-2']);
     expect(day.totals).toEqual({ kcal: 0, carbs: 0, protein: 0, fat: 0 });
   });
+
+  it('passes the snapshotted mealName straight through (no live Meal read)', async () => {
+    const entries = [
+      { ...ENTRY, id: 'm1', mealSlotId: 'slot-1', mealId: 'meal-1', mealName: 'Overnight Oats' },
+      { ...ENTRY, id: 'm2', mealSlotId: 'slot-1', mealId: 'meal-1', mealName: 'Overnight Oats' },
+      { ...ENTRY, id: 's1', mealSlotId: 'slot-1', mealId: null, mealName: null },
+    ];
+    const { service, prisma } = makeService({ slots, entries });
+
+    const day = await service.getDay('user-1', '2026-09-07');
+
+    // The day is built from entries and slots only (ADR-0002) -- no join to Meal.
+    expect(prisma).not.toHaveProperty('meal');
+    const fruehstueck = day.slots.find((s) => s.id === 'slot-1')!;
+    expect(fruehstueck.entries.map((e) => e.mealName)).toEqual([
+      'Overnight Oats',
+      'Overnight Oats',
+      null,
+    ]);
+  });
 });
 
 const FOOD = {
@@ -325,6 +363,135 @@ const OAT_DRINK = {
 function batchDto(items: { foodId: string; grams: number; quantityLabel?: string }[]) {
   return { mealSlotId: 'slot-1', localDate: '2026-09-07', items };
 }
+
+// What the injected MealsService.findById returns: a resolved meal, per 1x, with each
+// ingredient's live per-100 values. `createFromMeal` scales these by `quantity * factor`.
+const MEAL_DETAIL = {
+  id: 'meal-1',
+  name: 'Overnight Oats',
+  createdById: 'user-2',
+  editable: false,
+  deleted: false,
+  totals: { kcal: 245, carbs: 25.1, protein: 6.4, fat: 3.8 },
+  items: [
+    {
+      id: 'mi-1',
+      foodId: 'food-oats',
+      order: 1,
+      quantity: 40,
+      foodName: 'Haferflocken',
+      isLiquid: false,
+      deleted: false,
+      per100: { kcal: 372, carbs: 58.7, protein: 13.5, fat: 7 },
+      portions: [{ label: '1 Portion', grams: 40, order: 1, isDefault: true }],
+    },
+    {
+      id: 'mi-2',
+      foodId: 'food-oatdrink',
+      order: 2,
+      quantity: 200,
+      foodName: 'Haferdrink',
+      isLiquid: true,
+      deleted: true,
+      per100: { kcal: 59, carbs: 6.5, protein: 1, fat: 3 },
+      portions: [],
+    },
+  ],
+};
+
+function mealDto(overrides: Partial<{ factor: number; mealSlotId: string }> = {}) {
+  return {
+    mealSlotId: overrides.mealSlotId ?? 'slot-1',
+    localDate: '2026-09-07',
+    mealId: 'meal-1',
+    factor: overrides.factor ?? 1,
+  };
+}
+
+describe('DiaryEntriesService.createFromMeal — expansion', () => {
+  it('writes one entry per ingredient, each carrying the meal id as a grouping tag', async () => {
+    const { service, prisma } = makeService();
+
+    const result = await service.createFromMeal('user-1', mealDto());
+
+    expect(prisma.diaryEntry.createMany).toHaveBeenCalledTimes(1);
+    const rows = prisma.diaryEntry.createMany.mock.calls[0][0].data as Record<string, unknown>[];
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => r.mealId === 'meal-1')).toBe(true);
+    // The meal name is snapshotted onto every ingredient entry (ADR-0002).
+    expect(rows.every((r) => r.mealName === 'Overnight Oats')).toBe(true);
+    expect(rows.map((r) => r.name)).toEqual(['Haferflocken', 'Haferdrink']);
+    expect(rows.map((r) => r.foodId)).toEqual(['food-oats', 'food-oatdrink']);
+    expect(result).toEqual({ count: 2 });
+  });
+
+  it('snapshots each ingredient from its live per-100 values, scaled by quantity (factor 1)', async () => {
+    const { service, prisma } = makeService();
+
+    await service.createFromMeal('user-1', mealDto({ factor: 1 }));
+
+    const [oats, drink] = prisma.diaryEntry.createMany.mock.calls[0][0].data;
+    expect(oats).toMatchObject({ quantity: 40, quantityLabel: '40 g' });
+    expect(oats.kcal).toBeCloseTo(148.8, 6); // 372 * 40 / 100
+    expect(oats.carbs).toBeCloseTo(23.48, 6);
+    expect(drink).toMatchObject({ quantity: 200, quantityLabel: '200 ml' });
+    expect(drink.kcal).toBeCloseTo(118, 6); // 59 * 200 / 100
+  });
+
+  it('multiplies every ingredient amount and nutrient by the Faktor (1.5x)', async () => {
+    const { service, prisma } = makeService();
+
+    await service.createFromMeal('user-1', mealDto({ factor: 1.5 }));
+
+    const [oats, drink] = prisma.diaryEntry.createMany.mock.calls[0][0].data;
+    expect(oats).toMatchObject({ quantity: 60, quantityLabel: '60 g' }); // 40 * 1.5
+    expect(oats.kcal).toBeCloseTo(223.2, 6); // 372 * 60 / 100
+    expect(drink).toMatchObject({ quantity: 300, quantityLabel: '300 ml' }); // 200 * 1.5
+    expect(drink.kcal).toBeCloseTo(177, 6);
+  });
+
+  it('still expands an ingredient whose food was soft-deleted', async () => {
+    const { service, prisma } = makeService();
+
+    await service.createFromMeal('user-1', mealDto());
+
+    // The second ingredient (deleted food) is present and computed like any other.
+    const rows = prisma.diaryEntry.createMany.mock.calls[0][0].data;
+    expect(rows[1]).toMatchObject({ foodId: 'food-oatdrink', name: 'Haferdrink' });
+    expect(rows[1].kcal).toBeCloseTo(118, 6);
+  });
+
+  it('404s (and writes nothing) when the meal does not exist', async () => {
+    const { service, prisma } = makeService({ mealDetail: null });
+
+    await expect(service.createFromMeal('user-1', mealDto())).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(prisma.diaryEntry.createMany).not.toHaveBeenCalled();
+  });
+
+  it('404s when the meal has been soft-deleted', async () => {
+    const { service, prisma } = makeService({
+      mealDetail: { ...MEAL_DETAIL, deleted: true },
+    });
+
+    await expect(service.createFromMeal('user-1', mealDto())).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(prisma.diaryEntry.createMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects logging a meal into an archived Abschnitt with a 409', async () => {
+    const { service, prisma } = makeService({
+      slot: { id: 'slot-1', archivedAt: new Date('2026-01-01') },
+    });
+
+    await expect(service.createFromMeal('user-1', mealDto())).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    expect(prisma.diaryEntry.createMany).not.toHaveBeenCalled();
+  });
+});
 
 describe('DiaryEntriesService.createFromFoodBatch — snapshot math', () => {
   it('scales the food\'s per-100 values by grams / 100 (grams case)', async () => {

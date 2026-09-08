@@ -703,7 +703,10 @@ export interface DiaryEntry {
   mealSlotId: string;
   localDate: string;
   foodId: string | null;
+  /** Set on entries expanded from a Mahlzeit (#147); they group under `mealName`. */
   mealId: string | null;
+  /** The meal's name, snapshotted at expansion time (ADR-0002). Null unless `mealId` is set. */
+  mealName: string | null;
   name: string;
   quantity: number;
   quantityLabel: string | null;
@@ -840,4 +843,73 @@ export interface SimilarFood {
   isLiquid: boolean;
   /** How many of the current user's diary entries reference this food. */
   usageCount: number;
+}
+
+// Mahlzeiten (#147)
+
+/** One ingredient of a Mahlzeit, with the live per-100 values needed to recompute its share. */
+export interface MealItem {
+  id: string;
+  foodId: string;
+  order: number;
+  /** Grams or millilitres, matching the food's `isLiquid`. */
+  quantity: number;
+  foodName: string;
+  isLiquid: boolean;
+  /** The referenced food has been soft-deleted -- it still resolves and still computes. */
+  deleted: boolean;
+  per100: MacroTotals;
+  portions: FoodPortion[];
+}
+
+/** A Mahlzeit with its ingredients resolved and totals computed live, per 1x. Editor payload. */
+export interface MealDetail {
+  id: string;
+  name: string;
+  /**
+   * The caller's own, non-deleted meal -- the only case the editor writes. The sole
+   * creator-derived fact exposed; no creator id or name (ADR-0003).
+   */
+  editable: boolean;
+  deleted: boolean;
+  items: MealItem[];
+  totals: MacroTotals;
+}
+
+/** A row in the Mahlzeiten tab / picker list. */
+export interface MealListItem {
+  id: string;
+  name: string;
+  editable: boolean;
+  itemCount: number;
+  /** Ingredient names in item order, for the "Reis, Hähnchen, Paprika +3" preview. */
+  ingredientNames: string[];
+  totals: MacroTotals;
+}
+
+export interface MealList {
+  items: MealListItem[];
+  /** Meals matching the filter. */
+  total: number;
+  /** How many of `total` the current user created. */
+  mineTotal: number;
+}
+
+export interface MealItemInput {
+  foodId: string;
+  /** Grams or millilitres. */
+  quantity: number;
+}
+
+export interface MealInput {
+  name: string;
+  items: MealItemInput[];
+}
+
+/** Logs a Mahlzeit: the server expands it into one entry per ingredient, scaled by `factor`. */
+export interface DiaryEntriesFromMealInput {
+  mealSlotId: string;
+  localDate: string;
+  mealId: string;
+  factor: number;
 }

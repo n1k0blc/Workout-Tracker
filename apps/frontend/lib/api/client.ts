@@ -43,6 +43,10 @@ import {
   FoodInput,
   FoodList,
   SimilarFood,
+  MealList,
+  MealDetail,
+  MealInput,
+  DiaryEntriesFromMealInput,
 } from '@/types';
 import { clientTimeZone } from '@/lib/local-date';
 
@@ -572,6 +576,17 @@ class ApiClient {
     });
   }
 
+  // Logs a Mahlzeit: the server expands it into one snapshotted entry per ingredient,
+  // scaled by `factor`, each carrying the meal id as a grouping tag (#147).
+  async createDiaryEntriesFromMeal(
+    data: DiaryEntriesFromMealInput,
+  ): Promise<{ count: number }> {
+    return this.request<{ count: number }>('/nutrition/entries/meal', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   // The server rescales the kcal/macro snapshot by newQuantity / oldQuantity. A food-backed
   // editor also passes the refreshed display label ("2 Portionen (80 g)").
   async updateDiaryEntryQuantity(
@@ -658,6 +673,36 @@ class ApiClient {
 
   async deleteFood(id: string): Promise<void> {
     await this.request(`/foods/${id}`, { method: 'DELETE' });
+  }
+
+  // Mahlzeiten (#147) -- a shared library like foods (ADR-0003).
+
+  // `mineOnly` narrows to the caller's own meals (the tab's "Nur meine" filter).
+  async getMeals(mineOnly?: boolean): Promise<MealList> {
+    return this.request<MealList>(`/meals${mineOnly ? '?mine=1' : ''}`);
+  }
+
+  // Ingredients resolved, totals computed live from the current food nutrients.
+  async getMeal(id: string): Promise<MealDetail> {
+    return this.request<MealDetail>(`/meals/${id}`);
+  }
+
+  async createMeal(data: MealInput): Promise<MealDetail> {
+    return this.request<MealDetail>('/meals', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateMeal(id: string, data: MealInput): Promise<MealDetail> {
+    return this.request<MealDetail>(`/meals/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteMeal(id: string): Promise<void> {
+    await this.request(`/meals/${id}`, { method: 'DELETE' });
   }
 }
 

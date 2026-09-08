@@ -13,16 +13,16 @@ import { Button } from '@/components/ui/button';
 import { DiaryEntry, FoodPortion } from '@/types';
 import { apiClient } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { formatKcal, formatQuantityLabel } from '@/lib/nutrition';
+import {
+  formatFactor,
+  formatKcal,
+  formatQuantityLabel,
+  QUANTITY_FACTORS,
+} from '@/lib/nutrition';
 import { QuantityStepper } from './quantity-stepper';
 
 const STEP = 0.5;
 const MIN = 0.5;
-const QUICK_FACTORS = [0.5, 1, 1.5, 2];
-
-function formatFactor(n: number): string {
-  return `${n.toLocaleString('de-DE')}×`;
-}
 
 interface FoodInfo {
   portions: FoodPortion[];
@@ -185,7 +185,7 @@ export function QuantityEditorSheet({
               </div>
 
               <div className="flex flex-wrap gap-2">
-                {QUICK_FACTORS.map((factor) => (
+                {QUANTITY_FACTORS.map((factor) => (
                   <button
                     key={factor}
                     type="button"

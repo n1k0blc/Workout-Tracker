@@ -10,10 +10,13 @@ export class DiaryEntryDto {
   id: string;
   mealSlotId: string;
   localDate: string;
-  // Null in this ticket (a Schnelleintrag). Carried so later tickets can render meal grouping
-  // and food links without a shape change.
   foodId: string | null;
+  // Set on every entry that came from expanding a Mahlzeit (#147); the entries sharing one
+  // `mealId` group under `mealName` on the Abschnitt page.
   mealId: string | null;
+  // The meal's name, snapshotted at expansion time (ADR-0002) -- never re-read from the
+  // Meal, so a later rename does not rewrite past days. Null unless `mealId` is set.
+  mealName: string | null;
   name: string;
   quantity: number;
   quantityLabel: string | null;

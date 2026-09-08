@@ -150,6 +150,61 @@ export function formatKcal(kcal: number): string {
   return Math.round(kcal).toLocaleString('de-DE');
 }
 
+/** A quantity multiplier the German way: `0.5` -> `"0,5×"`, `1` -> `"1×"`. */
+export function formatFactor(n: number): string {
+  return `${n.toLocaleString('de-DE')}×`;
+}
+
+/**
+ * The quick multipliers offered wherever a whole item is scaled by a factor rather than a
+ * gram amount: the Schnelleintrag quantity chips and the picker's Mahlzeit "Faktor" control.
+ */
+export const QUANTITY_FACTORS = [0.5, 1, 1.5, 2] as const;
+
+/** A macro block multiplied by a plain factor (a Faktor pick, a quantity ratio). */
+export function scaleMacros(m: Per100, factor: number): Per100 {
+  return {
+    kcal: m.kcal * factor,
+    carbs: m.carbs * factor,
+    protein: m.protein * factor,
+    fat: m.fat * factor,
+  };
+}
+
+/**
+ * The live totals of a Mahlzeit, per 1x: every ingredient's per-100 values scaled by its
+ * `quantity / 100` and summed. Matches what the backend computes for the meal's displayed
+ * total -- editing a food changes this, entries already logged do not.
+ */
+export function computeMealTotals(
+  items: { per100: Per100; quantity: number }[],
+): Per100 {
+  return items.reduce<Per100>(
+    (sum, item) => {
+      const part = scalePer100(item.per100, item.quantity);
+      return {
+        kcal: sum.kcal + part.kcal,
+        carbs: sum.carbs + part.carbs,
+        protein: sum.protein + part.protein,
+        fat: sum.fat + part.fat,
+      };
+    },
+    { kcal: 0, carbs: 0, protein: 0, fat: 0 },
+  );
+}
+
+/**
+ * The ingredient preview shown on a meal row: the first `maxNames` names joined with commas,
+ * then `" +N"` for however many are left. `"Reis, Hähnchen, Paprika +3"`. Empty for a meal
+ * with no ingredients.
+ */
+export function mealIngredientPreview(names: string[], maxNames = 3): string {
+  if (names.length === 0) return '';
+  const shown = names.slice(0, maxNames).join(', ');
+  const rest = names.length - maxNames;
+  return rest > 0 ? `${shown} +${rest}` : shown;
+}
+
 /**
  * Parses a number typed into one of the nutrition inputs. Accepts a German decimal comma,
  * trims blanks, and returns `null` for anything empty, non-numeric or negative -- so a caller
@@ -160,6 +215,46 @@ export function parseAmount(input: string): number | null {
   if (normalized === '') return null;
   const value = Number(normalized);
   return Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+export interface DiaryEntryGrouping<T> {
+  /** One group per referenced meal, in the order each meal first appears. */
+  mealGroups: { mealId: string; mealName: string; entries: T[]; kcal: number }[];
+  /** Everything else -- Schnelleinträge and single food entries -- in original order. */
+  singles: T[];
+}
+
+/**
+ * Splits an Abschnitt's entries for the Abschnitt page: every entry carrying a `mealId` (and
+ * its snapshotted `mealName`) joins that meal's group, rendered as a card under a
+ * "MAHLZEIT <name>" header; everything else falls through to the "Einzeleinträge" list. The
+ * grouping is by `mealId` alone, not entry position, so it does not depend on the order
+ * `getDay` returns rows in -- logging the same meal twice into one Abschnitt on one day
+ * yields a single combined group.
+ */
+export function groupDiaryEntries<
+  T extends { mealId: string | null; mealName: string | null; kcal: number },
+>(entries: T[]): DiaryEntryGrouping<T> {
+  const mealGroups: DiaryEntryGrouping<T>['mealGroups'] = [];
+  const byMealId = new Map<string, DiaryEntryGrouping<T>['mealGroups'][number]>();
+  const singles: T[] = [];
+
+  for (const entry of entries) {
+    if (entry.mealId && entry.mealName) {
+      let group = byMealId.get(entry.mealId);
+      if (!group) {
+        group = { mealId: entry.mealId, mealName: entry.mealName, entries: [], kcal: 0 };
+        byMealId.set(entry.mealId, group);
+        mealGroups.push(group);
+      }
+      group.entries.push(entry);
+      group.kcal += entry.kcal;
+    } else {
+      singles.push(entry);
+    }
+  }
+
+  return { mealGroups, singles };
 }
 
 /**

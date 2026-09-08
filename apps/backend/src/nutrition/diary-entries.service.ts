@@ -1,8 +1,11 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { scalePer100 } from '../common/utils/nutrition.util';
+import { MealsService } from '../meals/meals.service';
 import {
   CreateDiaryEntryDto,
   CreateDiaryEntriesBatchDto,
+  CreateDiaryEntriesFromMealDto,
   DiaryEntryDto,
   MacroTotals,
   NutritionDayDto,
@@ -16,6 +19,7 @@ type DiaryEntryRow = {
   localDate: string;
   foodId: string | null;
   mealId: string | null;
+  mealName: string | null;
   name: string;
   quantity: number;
   quantityLabel: string | null;
@@ -55,13 +59,7 @@ function addNutrients(a: MacroTotals, e: DiaryEntryRow | DiaryEntryDto): MacroTo
 
 /** The nutrients of `grams` (or ml) of a food, scaled from its per-100 values. */
 function scaleFromFood(food: FoodRow, grams: number) {
-  const factor = grams / 100;
-  return {
-    kcal: food.kcal * factor,
-    carbs: food.carbs * factor,
-    protein: food.protein * factor,
-    fat: food.fat * factor,
-  };
+  return scalePer100(food, grams);
 }
 
 function toEntryDto(row: DiaryEntryRow): DiaryEntryDto {
@@ -71,6 +69,7 @@ function toEntryDto(row: DiaryEntryRow): DiaryEntryDto {
     localDate: row.localDate,
     foodId: row.foodId,
     mealId: row.mealId,
+    mealName: row.mealName,
     name: row.name,
     quantity: row.quantity,
     quantityLabel: row.quantityLabel,
@@ -83,7 +82,10 @@ function toEntryDto(row: DiaryEntryRow): DiaryEntryDto {
 
 @Injectable()
 export class DiaryEntriesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private meals: MealsService,
+  ) {}
 
   /**
    * The Tagesansicht read model for one calendar day: every Abschnitt the user has, each with
@@ -147,6 +149,7 @@ export class DiaryEntriesService {
       localDate: dto.localDate,
       name: dto.name,
       mealId: null,
+      mealName: null,
       quantity: dto.quantity ?? 1,
       quantityLabel: dto.quantityLabel ?? null,
       kcal: dto.kcal,
@@ -222,10 +225,50 @@ export class DiaryEntriesService {
         localDate: dto.localDate,
         foodId: food.id,
         mealId: null,
+        mealName: null,
         name: food.name,
         quantity: item.grams,
         quantityLabel: item.quantityLabel ?? `${Math.round(item.grams)} ${unit}`,
         ...scaleFromFood(food, item.grams),
+      };
+    });
+
+    return this.prisma.diaryEntry.createMany({ data });
+  }
+
+  /**
+   * Logs a Mahlzeit (#147): expands it into one Eintrag per ingredient in the given Abschnitt
+   * on the given day, in a single write. Each ingredient's amount is `quantity * factor` and
+   * its kcal/Kohlenhydrate/Protein/Fett are scaled from the food's *current* per-100 values
+   * and frozen -- a later edit to the food or the meal never changes these entries (ADR-0002).
+   * Every entry carries the meal's id as a grouping tag, so the Abschnitt page can group them
+   * under the meal's name. A soft-deleted ingredient food still expands and computes.
+   */
+  async createFromMeal(
+    userId: string,
+    dto: CreateDiaryEntriesFromMealDto,
+  ): Promise<{ count: number }> {
+    await this.assertWritableSlot(userId, dto.mealSlotId);
+
+    const meal = await this.meals.findById(dto.mealId, userId);
+    if (meal.deleted) {
+      throw new NotFoundException('Mahlzeit nicht gefunden');
+    }
+
+    const data = meal.items.map((item) => {
+      const amount = item.quantity * dto.factor;
+      const unit = item.isLiquid ? 'ml' : 'g';
+      return {
+        userId,
+        mealSlotId: dto.mealSlotId,
+        localDate: dto.localDate,
+        foodId: item.foodId,
+        mealId: meal.id,
+        mealName: meal.name,
+        name: item.foodName,
+        quantity: amount,
+        quantityLabel: `${Math.round(amount)} ${unit}`,
+        ...scalePer100(item.per100, amount),
       };
     });
 

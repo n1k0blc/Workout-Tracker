@@ -13,14 +13,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { apiClient } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { Food } from '@/types';
+import { Food, MealListItem } from '@/types';
 import {
   buildQuantityStops,
   defaultQuantityStopIndex,
   foodSourceLabel,
+  formatFactor,
   formatKcal,
   formatQuantityLabel,
+  mealIngredientPreview,
+  scaleMacros,
   scalePer100,
+  QUANTITY_FACTORS,
 } from '@/lib/nutrition';
 import { QuantityStepper } from './quantity-stepper';
 
@@ -31,16 +35,30 @@ const TABS = [
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
 
-interface BasketItem {
+interface FoodBasketItem {
   key: string;
+  kind: 'food';
+  title: string;
   foodId: string;
   grams: number;
   label: string;
 }
+interface MealBasketItem {
+  key: string;
+  kind: 'meal';
+  title: string;
+  mealId: string;
+  factor: number;
+}
+type BasketItem = FoodBasketItem | MealBasketItem;
+
+type PickerRow =
+  | { kind: 'food'; key: string; name: string; food: Food }
+  | { kind: 'meal'; key: string; name: string; meal: MealListItem };
 
 let basketSeq = 0;
 
-function rowSubtitle(food: Food): string {
+function foodRowSubtitle(food: Food): string {
   const unit = food.isLiquid ? 'ml' : 'g';
   const def = food.portions.find((p) => p.isDefault);
   if (def) {
@@ -48,6 +66,13 @@ function rowSubtitle(food: Food): string {
     return `${formatQuantityLabel(def.label, def.grams, food.isLiquid)} · ${kcal} kcal`;
   }
   return `100 ${unit} · ${Math.round(food.kcal)} kcal`;
+}
+
+function mealRowSubtitle(meal: MealListItem): string {
+  const zutaten = `${meal.itemCount} ${meal.itemCount === 1 ? 'Zutat' : 'Zutaten'}`;
+  return `${mealIngredientPreview(meal.ingredientNames)} · ${zutaten} · ${formatKcal(
+    meal.totals.kcal,
+  )} kcal`;
 }
 
 export function FoodPickerSheet({
@@ -68,8 +93,9 @@ export function FoodPickerSheet({
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState<TabId>('alle');
   const [foods, setFoods] = useState<Food[]>([]);
+  const [meals, setMeals] = useState<MealListItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [basket, setBasket] = useState<BasketItem[]>([]);
   const [committing, setCommitting] = useState(false);
 
@@ -77,10 +103,23 @@ export function FoodPickerSheet({
     if (open) {
       setSearch('');
       setTab('alle');
-      setExpandedId(null);
+      setExpandedKey(null);
       setBasket([]);
       setCommitting(false);
     }
+  }, [open]);
+
+  // Meals are a short list -- load them once per open and filter client-side.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    apiClient
+      .getMeals()
+      .then((data) => !cancelled && setMeals(data.items))
+      .catch(() => !cancelled && setMeals([]));
+    return () => {
+      cancelled = true;
+    };
   }, [open]);
 
   useEffect(() => {
@@ -103,24 +142,78 @@ export function FoodPickerSheet({
     };
   }, [open, tab, search]);
 
-  function addToBasket(foodId: string, grams: number, label: string) {
-    setBasket((prev) => [...prev, { key: `b${++basketSeq}`, foodId, grams, label }]);
-    setExpandedId(null);
+  // Foods and meals in one name-sorted list -- meals carry a "Mahlzeit" badge (#147).
+  const rows: PickerRow[] = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const foodRows: PickerRow[] = foods.map((f) => ({
+      kind: 'food',
+      key: `food:${f.id}`,
+      name: f.name,
+      food: f,
+    }));
+    const mealRows: PickerRow[] = meals
+      .filter(
+        (m) =>
+          !term ||
+          m.name.toLowerCase().includes(term) ||
+          m.ingredientNames.some((n) => n.toLowerCase().includes(term)),
+      )
+      .map((m) => ({ kind: 'meal', key: `meal:${m.id}`, name: m.name, meal: m }));
+    return [...foodRows, ...mealRows].sort((a, b) => a.name.localeCompare(b.name, 'de'));
+  }, [foods, meals, search]);
+
+  function addFood(food: Food, grams: number, label: string) {
+    setBasket((prev) => [
+      ...prev,
+      { key: `b${++basketSeq}`, kind: 'food', title: food.name, foodId: food.id, grams, label },
+    ]);
+    setExpandedKey(null);
+  }
+
+  function addMeal(meal: MealListItem, factor: number) {
+    setBasket((prev) => [
+      ...prev,
+      {
+        key: `b${++basketSeq}`,
+        kind: 'meal',
+        title: meal.name,
+        mealId: meal.id,
+        factor,
+      },
+    ]);
+    setExpandedKey(null);
   }
 
   async function commit() {
     if (basket.length === 0 || committing || !slotId) return;
     setCommitting(true);
     try {
-      await apiClient.createDiaryEntriesBatch({
-        mealSlotId: slotId,
-        localDate: date,
-        items: basket.map((b) => ({
-          foodId: b.foodId,
-          grams: b.grams,
-          quantityLabel: b.label,
-        })),
-      });
+      const foodItems = basket.filter((b): b is FoodBasketItem => b.kind === 'food');
+      const mealItems = basket.filter((b): b is MealBasketItem => b.kind === 'meal');
+      // Foods go in one batch request; each meal expands server-side in its own request.
+      await Promise.all([
+        ...(foodItems.length > 0
+          ? [
+              apiClient.createDiaryEntriesBatch({
+                mealSlotId: slotId,
+                localDate: date,
+                items: foodItems.map((b) => ({
+                  foodId: b.foodId,
+                  grams: b.grams,
+                  quantityLabel: b.label,
+                })),
+              }),
+            ]
+          : []),
+        ...mealItems.map((m) =>
+          apiClient.createDiaryEntriesFromMeal({
+            mealSlotId: slotId,
+            localDate: date,
+            mealId: m.mealId,
+            factor: m.factor,
+          }),
+        ),
+      ]);
       onOpenChange(false);
       onCommitted();
     } catch {
@@ -143,7 +236,7 @@ export function FoodPickerSheet({
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Lebensmittel suchen..."
+              placeholder="Lebensmittel oder Mahlzeit suchen..."
               className="border-b-0"
             />
             {/* Scanner is #149 -- icon only. */}
@@ -175,26 +268,43 @@ export function FoodPickerSheet({
             <p className="py-10 text-center text-sm text-muted-foreground">
               {tab === 'favoriten' ? 'Favoriten' : 'Zuletzt'} folgen in Kürze.
             </p>
-          ) : loading && foods.length === 0 ? (
+          ) : loading && rows.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted-foreground">Lädt …</p>
-          ) : foods.length === 0 ? (
+          ) : rows.length === 0 ? (
             <p className="py-10 text-center text-sm text-muted-foreground">
               {search.trim() ? 'Nichts gefunden.' : 'Die Bibliothek ist noch leer.'}
             </p>
           ) : (
             <div className="divide-y rounded-lg border">
-              {foods.map((food) => (
-                <PickerRow
-                  key={food.id}
-                  food={food}
-                  expanded={expandedId === food.id}
-                  basketCount={basket.filter((b) => b.foodId === food.id).length}
-                  onToggle={() =>
-                    setExpandedId((id) => (id === food.id ? null : food.id))
-                  }
-                  onAdd={(grams, label) => addToBasket(food.id, grams, label)}
-                />
-              ))}
+              {rows.map((row) =>
+                row.kind === 'food' ? (
+                  <FoodPickerRow
+                    key={row.key}
+                    food={row.food}
+                    expanded={expandedKey === row.key}
+                    basketCount={
+                      basket.filter((b) => b.kind === 'food' && b.foodId === row.food.id).length
+                    }
+                    onToggle={() =>
+                      setExpandedKey((k) => (k === row.key ? null : row.key))
+                    }
+                    onAdd={(grams, label) => addFood(row.food, grams, label)}
+                  />
+                ) : (
+                  <MealPickerRow
+                    key={row.key}
+                    meal={row.meal}
+                    expanded={expandedKey === row.key}
+                    basketCount={
+                      basket.filter((b) => b.kind === 'meal' && b.mealId === row.meal.id).length
+                    }
+                    onToggle={() =>
+                      setExpandedKey((k) => (k === row.key ? null : row.key))
+                    }
+                    onAdd={(factor) => addMeal(row.meal, factor)}
+                  />
+                ),
+              )}
             </div>
           )}
         </div>
@@ -214,7 +324,7 @@ export function FoodPickerSheet({
   );
 }
 
-function PickerRow({
+function FoodPickerRow({
   food,
   expanded,
   basketCount,
@@ -245,7 +355,7 @@ function PickerRow({
               </span>
             )}
           </div>
-          <div className="mt-0.5 text-xs text-muted-foreground">{rowSubtitle(food)}</div>
+          <div className="mt-0.5 text-xs text-muted-foreground">{foodRowSubtitle(food)}</div>
         </div>
         {/* Favorites are #148 -- star is inert. */}
         <IconStar className="size-4 shrink-0 text-muted-foreground/40" />
@@ -259,12 +369,12 @@ function PickerRow({
         </Button>
       </div>
 
-      {expanded && <ExpandedRow food={food} onAdd={onAdd} />}
+      {expanded && <ExpandedFoodRow food={food} onAdd={onAdd} />}
     </div>
   );
 }
 
-function ExpandedRow({
+function ExpandedFoodRow({
   food,
   onAdd,
 }: {
@@ -302,6 +412,98 @@ function ExpandedRow({
           Übernehmen
         </Button>
       </div>
+    </div>
+  );
+}
+
+function MealPickerRow({
+  meal,
+  expanded,
+  basketCount,
+  onToggle,
+  onAdd,
+}: {
+  meal: MealListItem;
+  expanded: boolean;
+  basketCount: number;
+  onToggle: () => void;
+  onAdd: (factor: number) => void;
+}) {
+  const [factor, setFactor] = useState(1);
+
+  const scaled = scaleMacros(meal.totals, factor);
+
+  return (
+    <div className={cn(expanded && 'bg-muted/50')}>
+      <div className="flex items-center gap-3 px-3.5 py-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span className="text-sm font-medium">{meal.name}</span>
+            <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-foreground">
+              Mahlzeit
+            </span>
+            {meal.editable && (
+              <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                · Meine
+              </span>
+            )}
+            {basketCount > 0 && (
+              <span className="text-[10px] font-semibold text-foreground">
+                {basketCount}× im Korb
+              </span>
+            )}
+          </div>
+          <div className="mt-0.5 truncate text-xs text-muted-foreground">
+            {mealRowSubtitle(meal)}
+          </div>
+        </div>
+        <IconStar className="size-4 shrink-0 text-muted-foreground/40" />
+        <Button
+          variant="outline"
+          size="icon-sm"
+          aria-label={expanded ? 'Schließen' : `${meal.name} hinzufügen`}
+          onClick={onToggle}
+        >
+          {expanded ? <IconMinus /> : <IconPlus />}
+        </Button>
+      </div>
+
+      {expanded && (
+        <div className="space-y-3 px-3.5 pb-4">
+          <div className="flex items-center gap-3">
+            <span className="w-14 shrink-0 text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+              Faktor
+            </span>
+            <div className="flex border">
+              {QUANTITY_FACTORS.map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setFactor(f)}
+                  className={cn(
+                    'h-9 px-3.5 text-xs font-semibold tracking-[0.08em]',
+                    f === factor
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-transparent text-muted-foreground',
+                  )}
+                >
+                  {formatFactor(f)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">
+              {formatKcal(scaled.kcal)} kcal · {Math.round(scaled.carbs)} KH ·{' '}
+              {Math.round(scaled.protein)} P · {Math.round(scaled.fat)} F
+            </span>
+            <Button size="sm" onClick={() => onAdd(factor)}>
+              Übernehmen
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

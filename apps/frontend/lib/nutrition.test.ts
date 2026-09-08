@@ -12,6 +12,11 @@ import {
   foodSourceLabel,
   buildQuantityStops,
   defaultQuantityStopIndex,
+  formatFactor,
+  scaleMacros,
+  computeMealTotals,
+  mealIngredientPreview,
+  groupDiaryEntries,
 } from './nutrition';
 
 const originalTz = process.env.TZ;
@@ -212,6 +217,144 @@ describe('defaultQuantityStopIndex', () => {
   it('falls back to the stop nearest 100 with no default', () => {
     // stops: 40, 12, 25, 50, 100, 150, 200, 250, 300 -> "100" is index 4
     expect(defaultQuantityStopIndex(stops, null)).toBe(4);
+  });
+});
+
+describe('formatFactor', () => {
+  it('formats a multiplier the German way', () => {
+    expect(formatFactor(0.5)).toBe('0,5×');
+    expect(formatFactor(1)).toBe('1×');
+    expect(formatFactor(1.5)).toBe('1,5×');
+    expect(formatFactor(2)).toBe('2×');
+  });
+});
+
+describe('scaleMacros', () => {
+  it('multiplies every macro by the factor', () => {
+    expect(scaleMacros({ kcal: 312, carbs: 40, protein: 23, fat: 6 }, 1.5)).toEqual({
+      kcal: 468,
+      carbs: 60,
+      protein: 34.5,
+      fat: 9,
+    });
+  });
+
+  it('is identity at 1 and zero at 0', () => {
+    const m = { kcal: 100, carbs: 10, protein: 5, fat: 2 };
+    expect(scaleMacros(m, 1)).toEqual(m);
+    expect(scaleMacros(m, 0)).toEqual({ kcal: 0, carbs: 0, protein: 0, fat: 0 });
+  });
+});
+
+describe('computeMealTotals', () => {
+  const oats = { per100: { kcal: 372, carbs: 58.7, protein: 13.5, fat: 7 }, quantity: 40 };
+  const skyr = { per100: { kcal: 63, carbs: 4, protein: 11, fat: 0.2 }, quantity: 150 };
+
+  it('sums each ingredient scaled by quantity / 100 (per 1x)', () => {
+    const t = computeMealTotals([oats, skyr]);
+    expect(t.kcal).toBeCloseTo(243.3, 6); // 372*0.4 + 63*1.5
+    expect(t.carbs).toBeCloseTo(29.48, 6); // 58.7*0.4 + 4*1.5
+    expect(t.protein).toBeCloseTo(21.9, 6); // 13.5*0.4 + 11*1.5
+    expect(t.fat).toBeCloseTo(3.1, 6); // 7*0.4 + 0.2*1.5
+  });
+
+  it('is all zero for a meal with no ingredients', () => {
+    expect(computeMealTotals([])).toEqual({ kcal: 0, carbs: 0, protein: 0, fat: 0 });
+  });
+
+  it('treats a liquid ingredient (ml) the same way', () => {
+    const drink = { per100: { kcal: 59, carbs: 6.5, protein: 1, fat: 3 }, quantity: 200 };
+    expect(computeMealTotals([drink]).kcal).toBeCloseTo(118, 6);
+  });
+});
+
+describe('mealIngredientPreview', () => {
+  it('lists the first names and appends " +N" for the rest', () => {
+    expect(
+      mealIngredientPreview(['Reis', 'Hähnchen', 'Paprika', 'Zwiebel', 'Öl', 'Salz']),
+    ).toBe('Reis, Hähnchen, Paprika +3');
+  });
+
+  it('shows every name when there are no more than the cap', () => {
+    expect(mealIngredientPreview(['Haferflocken', 'Kuhmilch', 'Skyr'])).toBe(
+      'Haferflocken, Kuhmilch, Skyr',
+    );
+    expect(mealIngredientPreview(['Reis', 'Hähnchen'])).toBe('Reis, Hähnchen');
+  });
+
+  it('respects a custom cap', () => {
+    expect(mealIngredientPreview(['a', 'b', 'c', 'd'], 2)).toBe('a, b +2');
+  });
+
+  it('is empty for a meal with no ingredients', () => {
+    expect(mealIngredientPreview([])).toBe('');
+  });
+});
+
+describe('groupDiaryEntries', () => {
+  const e = (
+    id: string,
+    over: Partial<{ mealId: string | null; mealName: string | null; kcal: number }> = {},
+  ) => ({ id, mealId: null, mealName: null, kcal: 100, ...over });
+
+  it('groups one meal\'s ingredient entries and sums its kcal', () => {
+    const entries = [
+      e('a', { mealId: 'm1', mealName: 'Overnight Oats', kcal: 149 }),
+      e('b', { mealId: 'm1', mealName: 'Overnight Oats', kcal: 96 }),
+      e('c', { mealId: 'm1', mealName: 'Overnight Oats', kcal: 67 }),
+      e('d', { kcal: 85 }),
+    ];
+
+    const { mealGroups, singles } = groupDiaryEntries(entries);
+
+    expect(mealGroups).toHaveLength(1);
+    expect(mealGroups[0]).toMatchObject({ mealId: 'm1', mealName: 'Overnight Oats', kcal: 312 });
+    expect(mealGroups[0].entries.map((x) => x.id)).toEqual(['a', 'b', 'c']);
+    expect(singles.map((x) => x.id)).toEqual(['d']);
+  });
+
+  it('groups by mealId regardless of position -- an interleaved single stays a single', () => {
+    const entries = [
+      e('a', { mealId: 'm1', mealName: 'Quark-Snack', kcal: 100 }),
+      e('b', { kcal: 50 }),
+      e('c', { mealId: 'm1', mealName: 'Quark-Snack', kcal: 100 }),
+    ];
+
+    const { mealGroups, singles } = groupDiaryEntries(entries);
+
+    expect(mealGroups).toHaveLength(1);
+    expect(mealGroups[0].entries.map((x) => x.id)).toEqual(['a', 'c']);
+    expect(mealGroups[0].kcal).toBe(200);
+    expect(singles.map((x) => x.id)).toEqual(['b']);
+  });
+
+  it('keeps two different meals as two groups, in first-seen order', () => {
+    const entries = [
+      e('a', { mealId: 'm2', mealName: 'Reis mit Hähnchen', kcal: 300 }),
+      e('b', { mealId: 'm1', mealName: 'Overnight Oats', kcal: 100 }),
+      e('c', { mealId: 'm2', mealName: 'Reis mit Hähnchen', kcal: 200 }),
+    ];
+
+    const { mealGroups } = groupDiaryEntries(entries);
+
+    expect(mealGroups.map((g) => g.mealId)).toEqual(['m2', 'm1']);
+    expect(mealGroups[0].kcal).toBe(500);
+  });
+
+  it('falls back to single rows when the meal name no longer resolves', () => {
+    const entries = [
+      e('a', { mealId: 'gone', mealName: null, kcal: 100 }),
+      e('b', { mealId: 'gone', mealName: null, kcal: 100 }),
+    ];
+
+    const { mealGroups, singles } = groupDiaryEntries(entries);
+
+    expect(mealGroups).toHaveLength(0);
+    expect(singles.map((x) => x.id)).toEqual(['a', 'b']);
+  });
+
+  it('handles a day with no entries', () => {
+    expect(groupDiaryEntries([])).toEqual({ mealGroups: [], singles: [] });
   });
 });
 
