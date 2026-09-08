@@ -39,19 +39,32 @@ That proxy is not a convenience; without it the page cannot work over HTTPS at a
 Proxying also gives dev the same first-party cookie semantics production has. The auth cookies
 are `SameSite=lax`; across two dev origins they survive only because cookies ignore the port.
 
-Then, on the phone (same Wi-Fi), open `https://<your-mac-lan-ip>:3000`. Safari warns about the
-certificate — tap **Show Details → visit this website**. If the viewfinder comes up, done.
+`predev:https` also reissues the certificate via `scripts/dev-cert.mjs`. Next's own
+`--experimental-https` covers `localhost` and `127.0.0.1` only; a phone reaches the dev server
+by LAN address, and that name mismatch is fatal in iOS Safari — it shows "Diese Verbindung ist
+nicht privat" and offers no way through. The script re-signs from the same mkcert CA with this
+machine's addresses and its Bonjour `.local` name added.
 
-**If the camera still does not start after accepting the warning**, Safari is refusing to
-treat an untrusted certificate as a secure context, and the CA has to be trusted on the phone:
+Then, on the phone (same Wi-Fi), open `https://<LocalHostName>.local:3000` — `scutil --get
+LocalHostName` prints the name. Prefer it over the raw IP: it survives a DHCP lease change.
+
+The CA is a local one, so Safari still warns the first time. Tap **Details einblenden → Diese
+Website besuchen**. If the camera then works, you are done.
+
+**If Safari refuses to offer that, or the camera still will not start**, trust the CA on the
+phone once:
 
 ```bash
-mkcert -CAROOT
+open -R ~/Library/Application\ Support/mkcert/rootCA.pem
 ```
 
-AirDrop the `rootCA.pem` in that directory to the iPhone, then **Settings → Profile
-Downloaded → Install**, then **Settings → General → About → Certificate Trust Settings** and
-enable full trust for it. Reload; the warning and the camera problem both go away.
+AirDrop that file to the iPhone (send `rootCA.pem` only — never `rootCA-key.pem`), then
+**Settings → Profil geladen → Installieren**, and finally **Settings → Allgemein → Info →
+Zertifikatsvertrauenseinstellungen** and enable full trust for the mkcert CA. Reload; the
+warning is gone and the origin is a proper secure context.
+
+Re-run `pnpm run dev:https` after changing networks — the script notices the new address and
+reissues; the CA stays trusted, so the phone needs nothing further.
 
 ### Android / Chrome over USB
 
