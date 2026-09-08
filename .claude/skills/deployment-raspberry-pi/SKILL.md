@@ -62,11 +62,17 @@ docker exec workout-tracker-db-prod psql -U workoutuser -d workout_tracker -c '\
 Schlägt die Migration fehl, startet das Backend nicht → Frontend (`depends_on: healthy`)
 ebenfalls nicht → sichtbarer Ausfall. Deshalb Backup vorher (siehe unten).
 
-*Fall 2 – Daten-Skript (`ts-node`, z. B. HomeGyms, Exercise-Updates): SSH-Tunnel Pflicht.*
+*Fall 2 – Daten-Skript (`ts-node`, z. B. HomeGyms, Exercise-Updates, Seeds): SSH-Tunnel Pflicht.*
 - Niemals direkt auf dem Production-Container mit `ts-node` ausführen
 - **SSH-Tunnel** vom Mac zur DB-Container-IP verwenden (Port 5433)
 - Dann lokal: `npx ts-node migrate-xxx.ts`
 - Nach Migration: Tunnel schließen (`lsof -ti:5433 | xargs kill -9`)
+- **Seeds (Übungen + Lebensmittel, #145)** laufen genauso: in `apps/backend` mit
+  `DATABASE_URL` auf den Tunnel `pnpm exec prisma db seed`. Idempotent (Upsert über `csvId`
+  bzw. `seedKey`), also gefahrlos wiederholbar. Reihenfolge: erst `deploy.sh` (bringt die
+  Schema-Migration `add_food_seed_key` mit), dann der Seed. Verifikation:
+  `SELECT count(*) FROM "Food" WHERE source = 'SEED';` muss der Zeilenzahl von
+  `FoodsSeed.csv` entsprechen.
 
 **Backup vor jeder Migration (Schema wie Daten):**
 `deploy.sh` macht **kein** Backup. Bei allem, was Zeilen anfasst, vorher:

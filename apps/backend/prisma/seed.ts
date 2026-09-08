@@ -2,6 +2,7 @@ import { createPrismaClient } from './create-prisma-client';
 import { config } from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
+import { parseFoodsCsv, seedFoods } from '../src/foods/foods-seed';
 
 // Load .env from backend directory
 config({ path: path.join(__dirname, '../.env') });
@@ -185,7 +186,24 @@ async function main() {
     console.log(`❌ Failed to process ${errorCount} exercises`);
   }
 
+  await seedFoodsFromCsv();
+
   console.log('✅ Seeding completed!');
+}
+
+// Generic Lebensmittel (#145): FoodsSeed.csv at the repo root, upserted on `seedKey`.
+// A malformed row aborts the whole seed (parseFoodsCsv throws with the line number).
+async function seedFoodsFromCsv() {
+  console.log('🌱 Seeding foods from FoodsSeed.csv...');
+  const csvPath = path.join(__dirname, '../../../FoodsSeed.csv');
+  if (!fs.existsSync(csvPath)) {
+    console.log('❌ FoodsSeed.csv not found at:', csvPath);
+    return;
+  }
+  const foods = parseFoodsCsv(fs.readFileSync(csvPath, 'utf-8'));
+  console.log(`📋 Parsed ${foods.length} foods from CSV`);
+  const { created, updated } = await seedFoods(prisma, foods);
+  console.log(`✅ Seeded ${created + updated} foods (${created} new, ${updated} updated)`);
 }
 
 main()

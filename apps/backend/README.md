@@ -30,11 +30,21 @@ npm run prisma:migrate
 
 ### 4. Seed Database (Optional)
 
-Nachdem du die Übungsliste in `prisma/seed.ts` hinzugefügt hast:
+Importiert `Exercises_premium.csv` (Übungen) und `FoodsSeed.csv` (generische Lebensmittel,
+`source = SEED`) aus dem Repo-Root. Beide Seeds sind idempotent: Übungen werden über
+`csvId`, Lebensmittel über `seedKey` (die `key`-Spalte der CSV) upgesertet, ein erneuter
+Lauf aktualisiert also statt zu duplizieren. Eine fehlerhafte CSV-Zeile bricht den Lauf mit
+Zeilennummer ab.
 
 ```bash
-npm run prisma:seed
+pnpm exec prisma db seed
 ```
+
+`prisma db seed` lädt `.env` und `.env.local` über `prisma.config.ts`; `pnpm run prisma:seed`
+(ts-node direkt) liest nur `.env`.
+
+Auf dem Pi ist das ein Daten-Skript (ts-node ist nicht im Production-Image): lokal über den
+SSH-Tunnel gegen die Pi-Datenbank ausführen, siehe `.claude/skills/deployment-raspberry-pi`.
 
 ### 5. Start Development Server
 

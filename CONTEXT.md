@@ -35,7 +35,8 @@ say.
   exercises (see [ADR-0003](docs/adr/0003-user-created-foods-and-meals-are-shared.md)). Only
   the creator edits a `USER` food; `SEED` / `OPEN_FOOD_FACTS` are read-only for everyone.
   Deletion is soft; the `barcode` is a product's global identity. Creator names are never
-  shown. Code: `Food` / `FoodPortion`.
+  shown. `SEED` foods come from `FoodsSeed.csv` at the repo root and carry the CSV's `key`
+  as `seedKey`, the stable identity `prisma db seed` upserts on. Code: `Food` / `FoodPortion`.
 
 - **Mahlzeit** (meal, a saved combination of foods) — the other shared library an Eintrag can
   be logged from. Added by #147; a Mahlzeit is a *live* reference in its editor but expands

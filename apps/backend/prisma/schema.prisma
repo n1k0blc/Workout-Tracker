@@ -272,6 +272,9 @@ model Food {
   brand        String?
   // EAN/UPC. Globally unique across all foods including soft-deleted ones.
   barcode      String?       @unique
+  // SEED only: the stable `key` from FoodsSeed.csv the seed script upserts on (#145).
+  // Never changes once shipped, even when the name is corrected.
+  seedKey      String?       @unique
   isLiquid     Boolean       @default(false)
   // Per 100 g / 100 ml.
   kcal         Float
