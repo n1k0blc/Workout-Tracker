@@ -1,11 +1,15 @@
-import { parseFoodsCsv, seedFoods, SeedFood, SeedFoodsClient } from './foods-seed';
+import {
+  FOODS_CSV_HEADER as HEADER,
+  parseFoodsCsv,
+  seedFoods,
+  SeedFood,
+  SeedFoodsClient,
+} from './foods-seed';
 
 /**
  * The generic-food seed (#145): FoodsSeed.csv at the repo root is parsed into SEED foods
  * and upserted by the stable `seedKey`, so re-running updates rows instead of duplicating.
  */
-
-const HEADER = 'key;name;category;isLiquid;kcal;carbs;protein;fat;portions;source';
 
 describe('parseFoodsCsv', () => {
   it('turns a row into a per-100 food with its portions, first portion default', () => {
@@ -73,6 +77,11 @@ describe('parseFoodsCsv — rejects malformed input', () => {
     [
       'portion without a weight',
       'banane;Banane;Obst;false;89;20.2;1.1;0.3;1 Stück;BLS',
+      /line 3.*portion/,
+    ],
+    [
+      'zero portion weight (the API rejects it too)',
+      'banane;Banane;Obst;false;89;20.2;1.1;0.3;1 Stück=0;BLS',
       /line 3.*portion/,
     ],
     [

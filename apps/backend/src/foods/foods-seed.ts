@@ -22,6 +22,7 @@ export type SeedFood = {
 export const FOODS_CSV_HEADER = 'key;name;category;isLiquid;kcal;carbs;protein;fat;portions;source';
 
 const KEY_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const COLUMN_COUNT = FOODS_CSV_HEADER.split(';').length;
 
 class CsvRowError extends Error {
   constructor(lineNo: number, message: string) {
@@ -45,11 +46,9 @@ function parsePortions(field: string, lineNo: number): SeedFoodPortion[] {
     if (!label || grams === undefined || rest.length > 0) {
       throw new CsvRowError(lineNo, `portion "${pair}" must be "Label=weight"`);
     }
-    return {
-      label,
-      grams: nonNegativeNumber('portion weight', grams, lineNo),
-      isDefault: index === 0,
-    };
+    const weight = nonNegativeNumber('portion weight', grams, lineNo);
+    if (weight === 0) throw new CsvRowError(lineNo, `portion "${pair}" must weigh more than 0`);
+    return { label, grams: weight, isDefault: index === 0 };
   });
 }
 
@@ -66,8 +65,8 @@ export function parseFoodsCsv(content: string): SeedFood[] {
     const lineNo = index + 1;
     if (lineNo === 1 || line.trim() === '') return;
     const cols = line.split(';');
-    if (cols.length !== 10) {
-      throw new CsvRowError(lineNo, `expected 10 columns, got ${cols.length}`);
+    if (cols.length !== COLUMN_COUNT) {
+      throw new CsvRowError(lineNo, `expected ${COLUMN_COUNT} columns, got ${cols.length}`);
     }
     const [key, name, , isLiquid, kcal, carbs, protein, fat, portions] = cols;
     if (!KEY_PATTERN.test(key))

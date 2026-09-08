@@ -40,8 +40,14 @@ Zeilennummer ab.
 pnpm exec prisma db seed
 ```
 
-`prisma db seed` lädt `.env` und `.env.local` über `prisma.config.ts`; `pnpm run prisma:seed`
-(ts-node direkt) liest nur `.env`.
+`prisma db seed` lädt `.env` und `.env.local` über `prisma.config.ts` (`.env.local`
+**überschreibt** dabei auch eine in der Shell gesetzte `DATABASE_URL`). `pnpm run prisma:seed`
+(ts-node direkt) liest nur `.env` und lässt eine Shell-Variable gewinnen – deshalb ist das
+der Befehl für eine fremde Datenbank:
+
+```bash
+DATABASE_URL="postgresql://…@localhost:5433/workout_tracker" pnpm run prisma:seed
+```
 
 Auf dem Pi ist das ein Daten-Skript (ts-node ist nicht im Production-Image): lokal über den
 SSH-Tunnel gegen die Pi-Datenbank ausführen, siehe `.claude/skills/deployment-raspberry-pi`.
