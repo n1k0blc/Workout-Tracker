@@ -66,6 +66,25 @@ say.
   whose Lebensmittel / Mahlzeit has since been soft-deleted. Code: `FoodFavorite` /
   `MealFavorite`, `FavoritesService`, `PickerService`.
 
+- **Barcode-Scan** — the camera (or the manual EAN field beside it) resolving a product to a
+  Lebensmittel, from the picker and from the Lebensmittel tab. The Lebensmittel editor's EAN
+  field scans too, but only to fill itself in — capturing a code and resolving one are separate
+  (`BarcodeCapture` / `BarcodeScannerSheet`). A code is only ever acted on in
+  its **canonical** form: EAN-13, EAN-8 and UPC-A are accepted, the check digit is verified,
+  and a UPC-A is widened to the EAN-13 it is — so one physical product cannot become two rows.
+  The **miss chain** is local library → live Open Food Facts → nothing: a local hit answers
+  with no network call, a miss is looked up live and **cached as a global `OPEN_FOOD_FACTS`
+  food** with `lastSyncedAt` (the same shape the bulk import writes), and a double miss opens
+  "Lebensmittel anlegen" with the barcode prefilled. A rescanned barcode whose food was
+  soft-deleted **undeletes that row** rather than creating a duplicate — the barcode is the
+  product's global identity and is unique across deleted rows too. The live lookup drops two of
+  the bulk import's rules on purpose: no Germany filter and no 13-digit-only rule, because the
+  user is physically holding the thing they scanned. Decoding uses the browser's own
+  `BarcodeDetector` where there is one and a zxing WebAssembly fallback where there is not
+  (Safari, so every iPhone); either way the camera needs HTTPS or `localhost`, see
+  [docs/barcode-scanner-testing.md](docs/barcode-scanner-testing.md). Code: `normalizeBarcode`,
+  `FoodsService.lookupByBarcode`, `OffLookupService`.
+
 ### Tracked nutrients
 
 Only **kcal**, **Kohlenhydrate** (carbs), **Protein** and **Fett** (fat). No micronutrients.

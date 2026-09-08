@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { FoodsController } from './foods.controller';
 import { FoodsService } from './foods.service';
+import { OffLookupService } from './off-lookup';
 import { FavoritesModule } from '../favorites/favorites.module';
 
 @Module({
   imports: [FavoritesModule],
   controllers: [FoodsController],
-  providers: [FoodsService],
+  providers: [FoodsService, OffLookupService],
   exports: [FoodsService],
 })
 export class FoodsModule {}

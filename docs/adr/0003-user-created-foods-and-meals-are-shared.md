@@ -62,6 +62,13 @@ user regardless of `createdById`.**
 - The similar-name hint on create, and "Ähnliche eigene Einträge" on the read-only view,
   both scope to the current user's own foods — the point is to stop *you* making a duplicate,
   not to browse the whole library inline.
+- **The rescan-undelete is deliberately *not* creator-gated**, unlike editing and deleting.
+  It follows from the barcode being the product's identity rather than the row's: whoever is
+  holding the package is holding that product, and the only alternatives are a 409 on a code
+  they physically scanned or a second row the unique index forbids. Since #149 implemented it
+  (`FoodsService.lookupByBarcode`), a scan can therefore resurrect a `USER` food that somebody
+  else soft-deleted. That is a restore, not an edit — the row comes back exactly as it was, and
+  its creator can delete it again — so the creator-only rule above is untouched.
 - `Meal` will follow the same rules when #147 adds it: shared, creator-only edit, no nested
   meals, creator name never shown.
 

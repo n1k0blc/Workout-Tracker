@@ -847,6 +847,23 @@ export interface SimilarFood {
   usageCount: number;
 }
 
+// Barcode-Scan (#149)
+
+/**
+ * Where a scanned barcode landed in the miss chain: `local` -- already in the shared library;
+ * `openFoodFacts` -- fetched live and cached as a global food; `notFound` -- neither, so the
+ * create form opens with the barcode prefilled.
+ */
+export type BarcodeLookupStatus = 'local' | 'openFoodFacts' | 'notFound';
+
+export interface BarcodeLookup {
+  status: BarcodeLookupStatus;
+  /** The code in its canonical form -- a scanned UPC-A comes back widened to an EAN-13. */
+  barcode: string;
+  /** The resolved food; null only when `status` is `notFound`. */
+  food: Food | null;
+}
+
 // Mahlzeiten (#147)
 
 /** One ingredient of a Mahlzeit, with the live per-100 values needed to recompute its share. */

@@ -8,6 +8,9 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { FavoritesService } from '../favorites/favorites.service';
 import { orderByIds } from '../common/utils/order-by-ids';
+import { normalizeBarcode } from './barcode';
+import { OffLookupService } from './off-lookup';
+import { MappedFood } from './off-mapping';
 import {
   CreateFoodDto,
   UpdateFoodDto,
@@ -15,6 +18,7 @@ import {
   FoodDto,
   FoodListDto,
   SimilarFoodDto,
+  BarcodeLookupDto,
 } from './dto';
 
 type PortionRow = {
@@ -93,6 +97,7 @@ export class FoodsService {
   constructor(
     private prisma: PrismaService,
     private favorites: FavoritesService,
+    private offLookup: OffLookupService,
   ) {}
 
   /** Every non-deleted food, from every user. Optional case-insensitive name search. */
@@ -200,6 +205,102 @@ export class FoodsService {
       isLiquid: f.isLiquid,
       usageCount: countByFood.get(f.id) ?? 0,
     }));
+  }
+
+  /**
+   * The barcode miss chain behind a scan or a manually typed EAN (#149):
+   *
+   *  1. **Local hit** -- a food in the library already claims this barcode. Answered from the
+   *     library, with no network call. A *soft-deleted* row counts as a hit and comes back:
+   *     the barcode is the product's global identity and is unique across deleted rows too, so
+   *     the alternative is a 409 on a code the user is physically holding.
+   *  2. **Open Food Facts** -- looked up live, cached as a global `OPEN_FOOD_FACTS` food with
+   *     `lastSyncedAt` so the weekly sync (#150) treats it like any imported row.
+   *  3. **Nothing** -- the caller opens "Lebensmittel anlegen" with the barcode prefilled.
+   */
+  async lookupByBarcode(userId: string, raw: string): Promise<BarcodeLookupDto> {
+    const barcode = normalizeBarcode(raw);
+    if (!barcode) {
+      throw new BadRequestException('Kein gültiger EAN- oder UPC-Code');
+    }
+
+    const existing = (await this.prisma.food.findFirst({
+      where: { barcode },
+      include: WITH_PORTIONS,
+    })) as FoodRow | null;
+    if (existing) {
+      const food = existing.deletedAt ? await this.undelete(existing.id) : existing;
+      return {
+        status: 'local',
+        barcode,
+        food: toDto(food, userId, await this.favorites.favoriteFoodIds(userId)),
+      };
+    }
+
+    const product = await this.offLookup.lookup(barcode);
+    if (!product) {
+      return { status: 'notFound', barcode, food: null };
+    }
+    return { status: 'openFoodFacts', barcode, food: await this.cacheOffProduct(userId, product) };
+  }
+
+  /** A rescanned barcode brings its row back rather than colliding with the unique index. */
+  private async undelete(id: string): Promise<FoodRow> {
+    return (await this.prisma.food.update({
+      where: { id },
+      data: { deletedAt: null },
+      include: WITH_PORTIONS,
+    })) as FoodRow;
+  }
+
+  /**
+   * Stores a live Open Food Facts hit as a global food, exactly as the bulk import writes one
+   * (`off-import.ts`): no creator, `lastSyncedAt` stamped, read-only for everyone.
+   *
+   * Two scans of the same new barcode can both miss locally and both reach this write -- the
+   * decode loop can fire twice before the first lookup returns. The loser of that race reads
+   * back the row the winner wrote instead of surfacing the unique-constraint error.
+   */
+  private async cacheOffProduct(userId: string, product: MappedFood): Promise<FoodDto> {
+    try {
+      return await this.writeOffProduct(userId, product);
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      const existing = (await this.prisma.food.findFirst({
+        where: { barcode: product.barcode },
+        include: WITH_PORTIONS,
+      })) as FoodRow | null;
+      if (!existing) throw error;
+      return toDto(existing, userId);
+    }
+  }
+
+  private async writeOffProduct(userId: string, product: MappedFood): Promise<FoodDto> {
+    const food = (await this.prisma.food.create({
+      data: {
+        name: product.name,
+        brand: product.brand,
+        barcode: product.barcode,
+        isLiquid: product.isLiquid,
+        kcal: product.kcal,
+        carbs: product.carbs,
+        protein: product.protein,
+        fat: product.fat,
+        source: 'OPEN_FOOD_FACTS',
+        createdById: null,
+        lastSyncedAt: new Date(),
+        portions: {
+          create: product.portions.map((p, index) => ({
+            label: p.label,
+            grams: p.grams,
+            order: index + 1,
+            isDefault: p.isDefault,
+          })),
+        },
+      },
+      include: WITH_PORTIONS,
+    })) as FoodRow;
+    return toDto(food, userId);
   }
 
   async create(userId: string, dto: CreateFoodDto): Promise<FoodDto> {

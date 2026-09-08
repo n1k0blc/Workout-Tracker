@@ -7,6 +7,7 @@
  * produces the `OffProduct` below; everything after that -- the quality filter and this
  * mapping -- is shared by the bulk import, the weekly sync (#150) and the live lookup (#149).
  */
+import { isValidEan13 } from './barcode';
 
 /** One product, normalized away from whichever raw shape it arrived in. Values are per 100. */
 export type OffProduct = {
@@ -89,31 +90,15 @@ export function mapOffProduct(product: OffProduct): MappedFood {
 }
 
 /**
- * EAN-13 with a valid check digit; a zero-padded UPC-A is an EAN-13 and passes. Shorter
- * codes are rejected on purpose: EAN-8 is legitimate on small packages, but in the Open
- * Food Facts export 8-digit codes are overwhelmingly internal and test entries, about 9% of
- * otherwise importable German rows.
+ * Why this product's name or nutrients are unusable, or null when they are fine. Split out
+ * from {@link rejectOffProduct} because the live barcode lookup (#149) needs this half only:
+ * it has already validated the code the user physically scanned, and that code may legitimately
+ * be an EAN-8 the bulk gate below turns away.
+ *
+ * The ±15% energy tolerance is the one the curated seed CSV uses (#145).
  */
-function isValidEan(barcode: string): boolean {
-  if (!/^\d{13}$/.test(barcode)) return false;
-  const digits = [...barcode].map(Number);
-  const check = digits.pop() as number;
-  const sum = digits
-    .reverse()
-    .reduce((total, digit, index) => total + digit * (index % 2 === 0 ? 3 : 1), 0);
-  return (10 - (sum % 10)) % 10 === check;
-}
-
-/**
- * Why this product must not be imported, or null when it may be. `en:germany` is
- * user-contributed and means only that somebody said the product is sold in Germany, so the
- * export carries animal feed, foreign products and internal codes -- this is what keeps them
- * out. The ±15% energy tolerance is the one the curated seed CSV uses (#145).
- */
-export function rejectOffProduct(product: OffProduct): string | null {
+export function rejectOffNutrition(product: OffProduct): string | null {
   if (!product.name.trim()) return 'no name';
-  if (!isValidEan(product.barcode))
-    return `barcode "${product.barcode}" is not 13 digits with a valid EAN check digit`;
   const macros = [product.kcal, product.carbs, product.protein, product.fat];
   if (macros.some((value) => !Number.isFinite(value))) return 'missing or non-numeric macro';
   if (macros.some((value) => value < 0)) return 'negative macro value';
@@ -129,6 +114,23 @@ export function rejectOffProduct(product: OffProduct): string | null {
     return `zero kcal stated but macros imply ${Math.round(fromMacros)} kcal`;
   }
   return null;
+}
+
+/**
+ * Why this product must not be imported in bulk, or null when it may be: the shared nutrition
+ * gate above plus a 13-digit EAN. It is the quality half of the import's filter -- keeping
+ * foreign products out is `isSoldInGermany`'s job, and the two stay separate.
+ *
+ * Shorter codes are rejected on purpose: EAN-8 is legitimate on small packages, but in the
+ * Open Food Facts export 8-digit codes are overwhelmingly internal and test entries, about 9%
+ * of otherwise importable German rows. A *scanned* EAN-8 goes through `rejectOffNutrition`
+ * instead and is kept -- see `off-lookup.ts`.
+ */
+export function rejectOffProduct(product: OffProduct): string | null {
+  if (!isValidEan13(product.barcode)) {
+    return `barcode "${product.barcode}" is not 13 digits with a valid EAN check digit`;
+  }
+  return rejectOffNutrition(product);
 }
 
 // --- source adapters -------------------------------------------------------------------

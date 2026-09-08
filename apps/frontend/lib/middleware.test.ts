@@ -58,6 +58,16 @@ describe("CSP middleware (issue #125, report-only phase)", () => {
     expect(csp).toMatch(/'nonce-[A-Za-z0-9+/=]+'/);
   });
 
+  it("allows WebAssembly in production, for the scanner's zxing fallback (#149)", () => {
+    const prev = process.env.NODE_ENV;
+    try {
+      (process.env as Record<string, string>).NODE_ENV = "production";
+      expect(buildCsp("n")).toMatch(/script-src [^;]*'wasm-unsafe-eval'/);
+    } finally {
+      (process.env as Record<string, string>).NODE_ENV = prev!;
+    }
+  });
+
   it("allows eval only outside production", () => {
     expect(buildCsp("n")).toContain("'unsafe-eval'"); // vitest runs with NODE_ENV=test
     const prev = process.env.NODE_ENV;

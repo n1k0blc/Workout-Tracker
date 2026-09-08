@@ -58,10 +58,12 @@ function makeService(
   overrides: {
     findMany?: unknown[];
     findUnique?: unknown;
+    findFirst?: unknown;
     createImpl?: (args: { data: Record<string, unknown> }) => unknown;
     updateImpl?: (args: { data: Record<string, unknown> }) => unknown;
     diaryEntries?: unknown[];
     favoriteFoodIds?: string[];
+    offProduct?: unknown;
   } = {},
 ) {
   const prisma = {
@@ -77,6 +79,7 @@ function makeService(
       findUnique: jest
         .fn()
         .mockResolvedValue('findUnique' in overrides ? overrides.findUnique : { ...OWN_FOOD }),
+      findFirst: jest.fn().mockResolvedValue(overrides.findFirst ?? null),
       create: jest.fn(
         overrides.createImpl ??
           (async ({ data }: { data: Record<string, unknown> }) => ({
@@ -101,10 +104,14 @@ function makeService(
   const favorites = {
     favoriteFoodIds: jest.fn().mockResolvedValue(new Set(overrides.favoriteFoodIds ?? [])),
   };
+  const offLookup = {
+    lookup: jest.fn().mockResolvedValue(overrides.offProduct ?? null),
+  };
   return {
-    service: new FoodsService(prisma as never, favorites as never),
+    service: new FoodsService(prisma as never, favorites as never, offLookup as never),
     prisma,
     favorites,
+    offLookup,
   };
 }
 
@@ -399,5 +406,141 @@ describe('FoodsService.findSimilar', () => {
     const { service, prisma } = makeService();
     expect(await service.findSimilar('user-1', 'h')).toEqual([]);
     expect(prisma.food.findMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The barcode miss chain (#149): local library, then a live Open Food Facts lookup cached as a
+ * global food, then nothing. A rescan of a soft-deleted barcode brings that row back rather
+ * than colliding with its unique barcode.
+ */
+describe('FoodsService.lookupByBarcode — the miss chain', () => {
+  const OFF_PRODUCT = {
+    barcode: '4013200104108',
+    name: 'Haferdrink Barista',
+    brand: 'Oatly',
+    isLiquid: true,
+    kcal: 59,
+    carbs: 6.5,
+    protein: 1,
+    fat: 3,
+    portions: [{ label: '1 Portion', grams: 200, isDefault: true }],
+  };
+
+  it('rejects a barcode that fails its check digit before touching the library', async () => {
+    const { service, prisma, offLookup } = makeService();
+
+    await expect(service.lookupByBarcode('user-1', '4025500287956')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(prisma.food.findFirst).not.toHaveBeenCalled();
+    expect(offLookup.lookup).not.toHaveBeenCalled();
+  });
+
+  it('answers from the library and never calls Open Food Facts on a local hit', async () => {
+    const { service, offLookup } = makeService({
+      findFirst: { ...OWN_FOOD, barcode: '4025500287955' },
+    });
+
+    const result = await service.lookupByBarcode('user-1', '4025500287955');
+
+    expect(result.status).toBe('local');
+    expect(result.food?.id).toBe('food-own');
+    expect(offLookup.lookup).not.toHaveBeenCalled();
+  });
+
+  it('looks the code up in its canonical form, so a UPC-A finds the EAN-13 row', async () => {
+    const { service, prisma } = makeService({ findFirst: { ...OWN_FOOD } });
+
+    await service.lookupByBarcode('user-1', '036000291452');
+
+    expect(prisma.food.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ barcode: '0036000291452' }) }),
+    );
+  });
+
+  it('undeletes a soft-deleted row instead of creating a duplicate barcode', async () => {
+    const { service, prisma, offLookup } = makeService({
+      findFirst: { ...OWN_FOOD, barcode: '4025500287955', deletedAt: new Date('2026-01-01') },
+    });
+
+    const result = await service.lookupByBarcode('user-1', '4025500287955');
+
+    expect(prisma.food.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'food-own' },
+        data: { deletedAt: null },
+      }),
+    );
+    expect(prisma.food.create).not.toHaveBeenCalled();
+    expect(result.status).toBe('local');
+    expect(result.food?.deleted).toBe(false);
+  });
+
+  it('caches an Open Food Facts hit as a global food carrying lastSyncedAt', async () => {
+    const { service, prisma } = makeService({ findFirst: null, offProduct: OFF_PRODUCT });
+
+    const result = await service.lookupByBarcode('user-1', '4013200104108');
+
+    expect(result.status).toBe('openFoodFacts');
+    const { data } = (prisma.food.create as jest.Mock).mock.calls[0][0] as {
+      data: Record<string, unknown>;
+    };
+    expect(data).toMatchObject({
+      barcode: '4013200104108',
+      name: 'Haferdrink Barista',
+      source: 'OPEN_FOOD_FACTS',
+      createdById: null,
+      isLiquid: true,
+    });
+    expect(data.lastSyncedAt).toBeInstanceOf(Date);
+    expect(data.portions).toEqual({
+      create: [{ label: '1 Portion', grams: 200, order: 1, isDefault: true }],
+    });
+  });
+
+  it('reports a double miss with the barcode, for the prefilled create form', async () => {
+    const { service, prisma } = makeService({ findFirst: null, offProduct: null });
+
+    const result = await service.lookupByBarcode('user-1', '4013200104108');
+
+    expect(result).toEqual({ status: 'notFound', barcode: '4013200104108', food: null });
+    expect(prisma.food.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('FoodsService.lookupByBarcode — two scans of the same new barcode', () => {
+  it('answers with the row the other scan wrote, rather than a unique-constraint 500', async () => {
+    // The scanner's decode loop can fire twice before the first lookup returns, so two
+    // requests reach the cache write with the same barcode. The loser re-reads.
+    const CACHED = {
+      id: 'food-cached',
+      name: 'Haferdrink Barista',
+      brand: 'Oatly',
+      barcode: '4013200104108',
+      isLiquid: true,
+      kcal: 59,
+      carbs: 6.5,
+      protein: 1,
+      fat: 3,
+      source: 'OPEN_FOOD_FACTS' as const,
+      createdById: null,
+      deletedAt: null,
+      portions: [],
+    };
+    const { service, prisma } = makeService({
+      findFirst: null,
+      offProduct: { ...CACHED, portions: [] },
+    });
+    prisma.food.create = jest.fn().mockRejectedValue({ code: 'P2002' });
+    prisma.food.findFirst = jest
+      .fn()
+      .mockResolvedValueOnce(null) // the initial local miss
+      .mockResolvedValueOnce(CACHED); // the row the winning scan wrote
+
+    const result = await service.lookupByBarcode('user-1', '4013200104108');
+
+    expect(result.status).toBe('openFoodFacts');
+    expect(result.food?.id).toBe('food-cached');
   });
 });

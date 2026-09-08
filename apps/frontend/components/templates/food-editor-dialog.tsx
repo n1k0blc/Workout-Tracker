@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input';
 import { apiClient } from '@/lib/api';
 import { parseAmount } from '@/lib/nutrition';
 import { Food, FoodInput, SimilarFood } from '@/types';
+import { BarcodeCapture } from '@/components/nutrition/barcode-capture';
 
 interface PortionRow {
   key: string;
@@ -97,11 +98,14 @@ export function FoodEditorDialog({
   open,
   onOpenChange,
   food,
+  initialBarcode,
   onChanged,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   food?: Food;
+  /** Prefills the EAN field when creating -- a scan that matched nothing anywhere (#149). */
+  initialBarcode?: string;
   onChanged: () => void;
 }) {
   const [forceForm, setForceForm] = useState(false); // "Eigene Kopie anlegen" from read-only
@@ -117,6 +121,7 @@ export function FoodEditorDialog({
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [similar, setSimilar] = useState<SimilarFood[]>([]);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const isReadOnly = !!food && !food.editable && !forceForm;
   const isEdit = !!food && food.editable && !forceForm;
@@ -128,15 +133,16 @@ export function FoodEditorDialog({
     setSaving(false);
     setConfirmDelete(false);
     setSimilar([]);
+    setScannerOpen(false);
     setName(food?.name ?? '');
-    setBarcode(food?.barcode ?? '');
+    setBarcode(food?.barcode ?? initialBarcode ?? '');
     setIsLiquid(food?.isLiquid ?? false);
     setKcal(food ? String(food.kcal) : '');
     setCarbs(food ? String(food.carbs) : '');
     setProtein(food ? String(food.protein) : '');
     setFat(food ? String(food.fat) : '');
     setPortions(toRows(food));
-  }, [open, food]);
+  }, [open, food, initialBarcode]);
 
   // Duplicate-avoidance hint: the current user's own foods matching what they're typing.
   // Only while creating (or copying) -- editing an existing food, matches are just noise.
@@ -331,8 +337,15 @@ export function FoodEditorDialog({
                   inputMode="numeric"
                   className="border-b-0 font-mono"
                 />
-                {/* Scanner is #149 -- icon only for now. */}
-                <IconBarcode className="size-4 shrink-0 text-muted-foreground/50" />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Barcode scannen"
+                  onClick={() => setScannerOpen(true)}
+                >
+                  <IconBarcode />
+                </Button>
               </div>
             </label>
 
@@ -469,6 +482,16 @@ export function FoodEditorDialog({
           )}
         </div>
       </DialogContent>
+
+      {/* The EAN field's scan button: the digits are the whole answer, so no lookup runs. */}
+      <BarcodeCapture
+        open={scannerOpen}
+        onOpenChange={setScannerOpen}
+        onBarcode={(scanned) => {
+          setBarcode(scanned);
+          setScannerOpen(false);
+        }}
+      />
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>

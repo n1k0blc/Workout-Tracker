@@ -52,3 +52,18 @@ export class FoodListDto {
   /** How many of `total` are the caller's own editable foods. */
   ownTotal: number;
 }
+
+/**
+ * Where a scanned barcode landed in the miss chain (#149): `local` -- already in the shared
+ * library (possibly just undeleted); `openFoodFacts` -- fetched live and cached as a global
+ * food; `notFound` -- neither, so the client opens the create form with the barcode prefilled.
+ */
+export type BarcodeLookupStatus = 'local' | 'openFoodFacts' | 'notFound';
+
+export class BarcodeLookupDto {
+  status: BarcodeLookupStatus;
+  /** The code in its canonical form -- a scanned UPC-A comes back widened to an EAN-13. */
+  barcode: string;
+  /** The resolved food; null only when `status` is `notFound`. */
+  food: FoodDto | null;
+}

@@ -39,6 +39,7 @@ import {
   DiaryEntriesBatchInput,
   MealSlot,
   MealSlotList,
+  BarcodeLookup,
   Food,
   FoodInput,
   FoodList,
@@ -674,6 +675,12 @@ class ApiClient {
 
   async deleteFood(id: string): Promise<void> {
     await this.request(`/foods/${id}`, { method: 'DELETE' });
+  }
+
+  // The scanner's miss chain (#149): the shared library, then a live Open Food Facts lookup
+  // cached as a global food, then `notFound`. 400 when the check digit does not hold.
+  async lookupBarcode(barcode: string): Promise<BarcodeLookup> {
+    return this.request<BarcodeLookup>(`/foods/barcode/${encodeURIComponent(barcode)}`);
   }
 
   // Mahlzeiten (#147) -- a shared library like foods (ADR-0003).

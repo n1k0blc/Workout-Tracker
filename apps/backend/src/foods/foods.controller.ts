@@ -14,7 +14,14 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { FoodsService } from './foods.service';
-import { CreateFoodDto, UpdateFoodDto, FoodDto, FoodListDto, SimilarFoodDto } from './dto';
+import {
+  CreateFoodDto,
+  UpdateFoodDto,
+  FoodDto,
+  FoodListDto,
+  SimilarFoodDto,
+  BarcodeLookupDto,
+} from './dto';
 
 @Controller('foods')
 @UseGuards(JwtAuthGuard)
@@ -36,6 +43,20 @@ export class FoodsController {
     @Query('name') name?: string,
   ): Promise<SimilarFoodDto[]> {
     return this.foods.findSimilar(user.id, name ?? '');
+  }
+
+  /**
+   * The barcode scanner's miss chain (#149). Declared before `:id` so a barcode is not read as
+   * an id. A GET with a side effect: a miss that Open Food Facts answers is cached, and a
+   * rescanned soft-deleted row is undeleted -- both are library upkeep the scan triggers, not
+   * a state change the caller asked for, so it stays a GET the client can retry freely.
+   */
+  @Get('barcode/:barcode')
+  async lookupByBarcode(
+    @CurrentUser() user: { id: string },
+    @Param('barcode') barcode: string,
+  ): Promise<BarcodeLookupDto> {
+    return this.foods.lookupByBarcode(user.id, barcode);
   }
 
   @Get(':id')

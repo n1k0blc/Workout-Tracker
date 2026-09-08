@@ -1,0 +1,87 @@
+# Testing the barcode scanner
+
+The scanner (#149) is the one feature in the app that cannot be tested from a desktop browser
+tab on `localhost` alone: it needs a rear camera, and a rear camera needs a **secure context**.
+This is what to do about that.
+
+## The HTTPS rule
+
+`navigator.mediaDevices` only exists on a secure context — HTTPS, or `localhost`. On plain
+HTTP the object is simply absent: there is no permission prompt, no error, and nothing for a
+user to "allow". That is why the scanner detects this case by name and says *"Die Kamera
+braucht HTTPS"* rather than the usual *"Zugriff in den Browser-Einstellungen erlauben"* — the
+latter would send someone hunting through settings for a switch that does not exist.
+
+`pnpm run dev:mobile` serves plain HTTP over the LAN, so **the camera will not work there**.
+The manual EAN field is the intended path in that setup, and it reaches the identical lookup.
+
+## Testing on a phone, in order of preference
+
+**1. Against the Pi.** The deployed app is behind the Cloudflare tunnel on
+`https://workout.nikobjelic.com`, which is a proper secure context. This is also the only
+setup that exercises the real Open Food Facts lookup from the Pi's own network. Deploy, then
+open it on the phone.
+
+**2. A local HTTPS dev server.** Next can serve a self-signed certificate:
+
+```bash
+pnpm --filter frontend exec next dev --experimental-https -H 0.0.0.0
+```
+
+The phone will warn about the certificate; accept it once. `NEXT_PUBLIC_API_URL` still has to
+point at a reachable backend, and that backend must be HTTPS too or the browser blocks the
+request as mixed content — so in practice this tests decoding, not the full miss chain.
+
+**3. Chrome on Android over USB.** With the phone attached and USB debugging on:
+
+```bash
+adb reverse tcp:3000 tcp:3000 && adb reverse tcp:3001 tcp:3001
+```
+
+The phone then reaches the dev server at `http://localhost:3000`, which *is* a secure context.
+This is the best option for iterating on the decoder itself, and it needs no certificates.
+
+iOS has no equivalent — use option 1 or 2 there.
+
+## What to check on each engine
+
+Two decoders are in play, and they take different code paths (`lib/barcode-detector.ts`):
+
+| Browser | Decoder | What to watch for |
+| --- | --- | --- |
+| Chrome / Android | native `BarcodeDetector` | no `zxing_reader.wasm` request in DevTools |
+| Safari / iOS | zxing WebAssembly fallback | `zxing_reader.wasm` is fetched from the app's own origin, ~1 MB, once |
+| Firefox | zxing WebAssembly fallback | as above |
+
+Test codes worth keeping around, one per symbology:
+
+- EAN-13 — `4025500287955`
+- EAN-8 — `96385074`
+- UPC-A — `036000291452` (comes back as `0036000291452`; a UPC-A *is* an EAN-13)
+
+Typing these into the manual field exercises everything after the decoder, so most of the
+scanner can be tested without a camera at all.
+
+## The wasm asset
+
+`public/zxing_reader.wasm` is **not** committed. `scripts/copy-zxing-wasm.mjs` copies it out of
+the installed `zxing-wasm` on `predev` and `prebuild`, so it can never drift from the glue code
+that loads it. If the fallback ever 404s on that file, a build step was skipped — run
+`node scripts/copy-zxing-wasm.mjs` from `apps/frontend`.
+
+It is served from our own origin rather than a CDN because the app's CSP is `connect-src
+'self'`, and because the Pi is often reached over a tunnel with no route out to jsDelivr.
+Compiling it needs `'wasm-unsafe-eval'` in `script-src`, which `middleware.ts` grants.
+
+## Things that are easy to get wrong
+
+- **A code that reads but does not resolve.** The decoder returns anything it sees, including
+  the checksum-failing misreads you get at a steep angle. `normalizeBarcode` throws those away
+  and the next frame tries again — so a code that "won't scan" is usually a framing problem,
+  not a broken decoder.
+- **The camera staying on.** The stream is torn down whenever the result sheet is up and when
+  the scanner closes. If the phone's camera indicator stays lit after closing, that is a bug.
+- **Rescanning something you deleted.** A soft-deleted food keeps its barcode (it is the
+  product's global identity, and unique across deleted rows). Rescanning it brings the row
+  back rather than failing on the unique index — worth checking after any change to
+  `FoodsService.lookupByBarcode`.

@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { IconChevronRight, IconPlus, IconSearch } from '@tabler/icons-react';
+import { IconBarcode, IconChevronRight, IconPlus, IconSearch } from '@tabler/icons-react';
 import { apiClient } from '@/lib/api';
 import { Food } from '@/types';
 import { foodSourceLabel } from '@/lib/nutrition';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FoodEditorDialog } from './food-editor-dialog';
+import { BarcodeScannerSheet } from '@/components/nutrition/barcode-scanner-sheet';
 
 function subtitle(food: Food): string {
   const unit = food.isLiquid ? 'ml' : 'g';
@@ -24,6 +25,9 @@ export default function FoodsTab() {
   const [search, setSearch] = useState('');
   // 'create' | Food | null
   const [editing, setEditing] = useState<Food | 'create' | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  // A scanned code that matched nothing: the create form opens with it prefilled (#149).
+  const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,6 +83,14 @@ export default function FoodsTab() {
           placeholder="Lebensmittel suchen..."
           className="border-b-0"
         />
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Barcode scannen"
+          onClick={() => setScannerOpen(true)}
+        >
+          <IconBarcode />
+        </Button>
       </div>
 
       {loading && foods.length === 0 ? (
@@ -132,10 +144,34 @@ export default function FoodsTab() {
         , Lizenz ODbL.
       </p>
 
+      {/* A hit opens the food rather than logging it -- this tab is library management. */}
+      <BarcodeScannerSheet
+        open={scannerOpen}
+        onOpenChange={setScannerOpen}
+        mode={{
+          kind: 'open',
+          onOpen: (food) => {
+            setScannerOpen(false);
+            setEditing(food);
+          },
+        }}
+        onCreateFood={(barcode) => {
+          setScannerOpen(false);
+          setScannedBarcode(barcode);
+          setEditing('create');
+        }}
+      />
+
       <FoodEditorDialog
         open={editing !== null}
-        onOpenChange={(open) => !open && setEditing(null)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditing(null);
+            setScannedBarcode(null);
+          }
+        }}
         food={editing === 'create' || editing === null ? undefined : editing}
+        initialBarcode={scannedBarcode ?? undefined}
         onChanged={reload}
       />
     </div>
