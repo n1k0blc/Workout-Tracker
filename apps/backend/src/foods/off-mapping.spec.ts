@@ -2,6 +2,7 @@ import {
   fromApiProduct,
   fromCsvRow,
   fromExportProduct,
+  isSoldInGermany,
   mapOffProduct,
   OffProduct,
   rejectOffProduct,
@@ -21,6 +22,7 @@ function offProduct(overrides: Partial<OffProduct> = {}): OffProduct {
     quantity: '500g',
     servingSize: '500 g',
     categoriesTags: ['en:dairies', 'en:beverages', 'en:kefir'],
+    countriesTags: ['en:germany'],
     kcal: 46,
     carbs: 4.1,
     protein: 3.4,
@@ -132,6 +134,7 @@ const CSV_ROW: Record<string, string> = {
   quantity: '500g',
   serving_size: '500 g',
   categories_tags: 'en:dairies,en:beverages,en:kefir',
+  countries_tags: 'en:germany,en:switzerland',
   'energy-kcal_100g': '46',
   carbohydrates_100g: '4.1',
   proteins_100g: '3.4',
@@ -145,6 +148,7 @@ const EXPORT_PRODUCT = {
   quantity: '500g',
   serving_size: '500 g',
   categories_tags: ['en:dairies', 'en:beverages', 'en:kefir'],
+  countries_tags: ['en:germany', 'en:switzerland'],
   nutriments: {},
   nutrition: {
     input_sets: [
@@ -181,6 +185,7 @@ const API_PRODUCT = {
   quantity: '500g',
   serving_size: '500 g',
   categories_tags: ['en:dairies', 'en:beverages', 'en:kefir'],
+  countries_tags: ['en:germany', 'en:switzerland'],
   nutriments: {
     'energy-kcal_100g': 46,
     carbohydrates_100g: 4.1,
@@ -191,15 +196,21 @@ const API_PRODUCT = {
 
 describe('source adapters', () => {
   it('reads a CSV export row', () => {
-    expect(fromCsvRow(CSV_ROW)).toEqual(offProduct());
+    expect(fromCsvRow(CSV_ROW)).toEqual(
+      offProduct({ countriesTags: ['en:germany', 'en:switzerland'] }),
+    );
   });
 
   it('reads an export/delta product, preferring packaging over the ingredient estimate', () => {
-    expect(fromExportProduct(EXPORT_PRODUCT)).toEqual(offProduct());
+    expect(fromExportProduct(EXPORT_PRODUCT)).toEqual(
+      offProduct({ countriesTags: ['en:germany', 'en:switzerland'] }),
+    );
   });
 
   it('reads an API product from the legacy nutriments block', () => {
-    expect(fromApiProduct(API_PRODUCT)).toEqual(offProduct());
+    expect(fromApiProduct(API_PRODUCT)).toEqual(
+      offProduct({ countriesTags: ['en:germany', 'en:switzerland'] }),
+    );
   });
 
   it('all three shapes of one product normalize identically', () => {
@@ -222,5 +233,25 @@ describe('source adapters', () => {
         },
       }),
     ).toBeNull();
+  });
+});
+
+describe('isSoldInGermany', () => {
+  it('accepts a product tagged as sold in Germany, among other countries', () => {
+    expect(isSoldInGermany(offProduct({ countriesTags: ['en:france', 'en:germany'] }))).toBe(true);
+  });
+
+  it('rejects a product not tagged for Germany', () => {
+    expect(isSoldInGermany(offProduct({ countriesTags: ['en:france'] }))).toBe(false);
+    expect(isSoldInGermany(offProduct({ countriesTags: [] }))).toBe(false);
+  });
+
+  it('is separate from the quality gate, so a live barcode scan can keep a foreign product', () => {
+    // #149 caches whatever the user physically scanned; only the import and the sync (#150)
+    // narrow the library to the German market.
+    const foreign = offProduct({ countriesTags: ['en:france'] });
+
+    expect(rejectOffProduct(foreign)).toBeNull();
+    expect(isSoldInGermany(foreign)).toBe(false);
   });
 });

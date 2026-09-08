@@ -17,7 +17,13 @@ import * as path from 'path';
 import * as readline from 'readline';
 import * as zlib from 'zlib';
 import { createPrismaClient } from './create-prisma-client';
-import { fromCsvRow, mapOffProduct, rejectOffProduct, MappedFood } from '../src/foods/off-mapping';
+import {
+  fromCsvRow,
+  isSoldInGermany,
+  mapOffProduct,
+  rejectOffProduct,
+  MappedFood,
+} from '../src/foods/off-mapping';
 import { importOffProducts } from '../src/foods/off-import';
 
 config({ path: path.join(__dirname, '../.env') });
@@ -34,7 +40,7 @@ const LIMIT = Number(arg('limit') ?? '0');
 const BATCH_SIZE = Number(arg('batch') ?? '500');
 
 const rejected: Record<string, number> = {};
-const counts = { rows: 0, german: 0, unmapped: 0, importable: 0 };
+const counts = { rows: 0, german: 0, unmapped: 0, notGerman: 0, importable: 0 };
 
 /** Streams the export and yields the products worth importing. */
 async function* readExport(file: string): AsyncGenerator<MappedFood> {
@@ -54,11 +60,17 @@ async function* readExport(file: string): AsyncGenerator<MappedFood> {
     header.forEach((name, i) => {
       row[name] = cols[i] ?? '';
     });
+    // Cheap string test before parsing the row: ~90% of the export is not German.
     if (!(row.countries_tags ?? '').includes('en:germany')) continue;
     counts.german++;
     const product = fromCsvRow(row);
     if (!product) {
       counts.unmapped++;
+      continue;
+    }
+    // Authoritative check on the parsed tag list; the string test above is only a prefilter.
+    if (!isSoldInGermany(product)) {
+      counts.notGerman++;
       continue;
     }
     const reason = rejectOffProduct(product);
@@ -98,6 +110,7 @@ async function main() {
     `\n📋 rows ${counts.rows.toLocaleString()}, German ${counts.german.toLocaleString()}`,
   );
   console.log(`   dropped, no usable macros: ${counts.unmapped.toLocaleString()}`);
+  console.log(`   dropped, not sold in Germany: ${counts.notGerman.toLocaleString()}`);
   for (const [reason, n] of Object.entries(rejected).sort((a, b) => b[1] - a[1])) {
     console.log(`   rejected, ${reason}: ${n.toLocaleString()}`);
   }

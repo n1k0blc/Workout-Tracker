@@ -16,6 +16,7 @@ export type OffProduct = {
   quantity: string | null;
   servingSize: string | null;
   categoriesTags: string[];
+  countriesTags: string[];
   kcal: number;
   carbs: number;
   protein: number;
@@ -33,6 +34,18 @@ export type MappedFood = {
   fat: number;
   portions: { label: string; grams: number; isDefault: boolean }[];
 };
+
+/**
+ * The market filter, deliberately separate from the quality gate below. The import (#146) and
+ * the weekly sync (#150) narrow the library to products sold in Germany; the live barcode
+ * lookup (#149) does not, because it caches whatever the user physically scanned.
+ *
+ * `en:germany` is user-contributed and means only that somebody said the product is sold
+ * here, so it scopes the import rather than vouching for quality.
+ */
+export function isSoldInGermany(product: OffProduct): boolean {
+  return product.countriesTags.includes('en:germany');
+}
 
 const LIQUID_CATEGORIES = ['en:beverages', 'en:drinks', 'en:waters', 'en:juices'];
 
@@ -139,6 +152,7 @@ function num(value: unknown): number | null {
 function assemble(
   raw: Record<string, unknown>,
   categoriesTags: string[],
+  countriesTags: string[],
   macros: { kcal: number | null; carbs: number | null; protein: number | null; fat: number | null },
 ): OffProduct | null {
   const { kcal, carbs, protein, fat } = macros;
@@ -150,6 +164,7 @@ function assemble(
     quantity: text(raw.quantity),
     servingSize: text(raw.serving_size),
     categoriesTags,
+    countriesTags,
     kcal,
     carbs,
     protein,
@@ -159,12 +174,17 @@ function assemble(
 
 /** CSV export: flat per-100 columns, `categories_tags` comma-joined. */
 export function fromCsvRow(row: Record<string, string>): OffProduct | null {
-  return assemble(row, (row.categories_tags ?? '').split(',').filter(Boolean), {
-    kcal: num(row['energy-kcal_100g']),
-    carbs: num(row.carbohydrates_100g),
-    protein: num(row.proteins_100g),
-    fat: num(row.fat_100g),
-  });
+  return assemble(
+    row,
+    (row.categories_tags ?? '').split(',').filter(Boolean),
+    (row.countries_tags ?? '').split(',').filter(Boolean),
+    {
+      kcal: num(row['energy-kcal_100g']),
+      carbs: num(row.carbohydrates_100g),
+      protein: num(row.proteins_100g),
+      fat: num(row.fat_100g),
+    },
+  );
 }
 
 /**
@@ -183,12 +203,17 @@ export function fromExportProduct(raw: Record<string, unknown>): OffProduct | nu
   for (const set of usable) {
     const nutrients = (set.nutrients ?? {}) as Record<string, { value?: unknown }>;
     const [kcal, carbs, protein, fat] = MACRO_KEYS.map((key) => num(nutrients[key]?.value));
-    const product = assemble(raw, (raw.categories_tags as string[]) ?? [], {
-      kcal,
-      carbs,
-      protein,
-      fat,
-    });
+    const product = assemble(
+      raw,
+      (raw.categories_tags as string[]) ?? [],
+      (raw.countries_tags as string[]) ?? [],
+      {
+        kcal,
+        carbs,
+        protein,
+        fat,
+      },
+    );
     if (product) return product;
   }
   return null;
@@ -197,10 +222,15 @@ export function fromExportProduct(raw: Record<string, unknown>): OffProduct | nu
 /** API v2: the legacy `nutriments` block, which the API still serves for compatibility. */
 export function fromApiProduct(raw: Record<string, unknown>): OffProduct | null {
   const nutriments = (raw.nutriments ?? {}) as Record<string, unknown>;
-  return assemble(raw, (raw.categories_tags as string[]) ?? [], {
-    kcal: num(nutriments['energy-kcal_100g']),
-    carbs: num(nutriments.carbohydrates_100g),
-    protein: num(nutriments.proteins_100g),
-    fat: num(nutriments.fat_100g),
-  });
+  return assemble(
+    raw,
+    (raw.categories_tags as string[]) ?? [],
+    (raw.countries_tags as string[]) ?? [],
+    {
+      kcal: num(nutriments['energy-kcal_100g']),
+      carbs: num(nutriments.carbohydrates_100g),
+      protein: num(nutriments.proteins_100g),
+      fat: num(nutriments.fat_100g),
+    },
+  );
 }
