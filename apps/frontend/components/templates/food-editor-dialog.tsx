@@ -31,6 +31,34 @@ interface PortionRow {
   isDefault: boolean;
 }
 
+/**
+ * Common portion names, offered as a combobox (`<datalist>`) on the label field. They only
+ * guide input -- any free text is still allowed, so oddball portions and the arbitrary
+ * serving strings from the Open Food Facts import (#146) keep working.
+ */
+const PORTION_LABEL_PRESETS = [
+  '1 Portion',
+  '1 Stück',
+  '1 Scheibe',
+  '1 Becher',
+  '1 Glas',
+  '1 Esslöffel',
+  '1 Teelöffel',
+  '1 Handvoll',
+  '1 Riegel',
+  '1 Aufstrich',
+  '1 Tasse',
+  '1 Packung',
+  '1 Dose',
+  '1 Flasche',
+  '1 Kugel',
+  '1 Teller',
+  '1 Kelle',
+  '1 Würfel',
+  '1 Zehe',
+  '1 Blatt',
+] as const;
+
 let portionKeySeq = 0;
 const newPortionKey = () => `p${++portionKeySeq}`;
 
@@ -150,6 +178,8 @@ export function FoodEditorDialog({
   function addPortion() {
     setPortions((prev) => [
       ...prev,
+      // Label left blank so the combobox suggestions drop down on focus -- a prefilled
+      // value hides them and has to be cleared first.
       { key: newPortionKey(), label: '', grams: '', isDefault: prev.length === 0 },
     ]);
   }
@@ -345,6 +375,11 @@ export function FoodEditorDialog({
             </div>
 
             <div>
+              <datalist id="food-portion-labels">
+                {PORTION_LABEL_PRESETS.map((v) => (
+                  <option key={v} value={v} />
+                ))}
+              </datalist>
               <div className="mb-2.5 flex items-center justify-between">
                 <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
                   Portionsgrößen
@@ -363,6 +398,7 @@ export function FoodEditorDialog({
                   {portions.map((p) => (
                     <div key={p.key} className="flex items-center gap-2 p-2">
                       <Input
+                        list="food-portion-labels"
                         value={p.label}
                         onChange={(e) =>
                           setPortions((prev) =>
@@ -371,7 +407,7 @@ export function FoodEditorDialog({
                             ),
                           )
                         }
-                        placeholder="z. B. 1 Portion"
+                        placeholder="Portion, Stück, Scheibe …"
                         className="h-9 flex-1"
                       />
                       <div className="flex w-24 items-baseline gap-1 border-b border-b-input">
