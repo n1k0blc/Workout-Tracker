@@ -63,6 +63,18 @@ AirDrop that file to the iPhone (send `rootCA.pem` only — never `rootCA-key.pe
 Zertifikatsvertrauenseinstellungen** and enable full trust for the mkcert CA. Reload; the
 warning is gone and the origin is a proper secure context.
 
+Two dev-server settings in `next.config.ts` exist purely so this works, and both are easy to
+forget when a phone suddenly "cannot log in":
+
+- **`allowedDevOrigins`** — Next serves `/_next/*` dev resources to localhost only, 403ing
+  every other host. Without this the page renders but no client chunk loads, React never
+  hydrates, forms fall back to native submission, and *no request ever reaches the backend* —
+  which looks like a broken login against a perfectly healthy API, with nothing in its log.
+- **the `/api/*` rewrite** — described above.
+
+Both are computed from the machine's current addresses, so a DHCP lease change cannot silently
+reintroduce either failure.
+
 Re-run `pnpm run dev:https` after changing networks — the script notices the new address and
 reissues; the CA stays trusted, so the phone needs nothing further.
 
