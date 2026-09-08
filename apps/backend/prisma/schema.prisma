@@ -27,6 +27,8 @@ model User {
   diaryEntries  DiaryEntry[]
   createdFoods  Food[]         @relation("FoodCreatedBy")
   createdMeals  Meal[]         @relation("MealCreatedBy")
+  foodFavorites FoodFavorite[]
+  mealFavorites MealFavorite[]
 }
 
 // PR1 auth overhaul: DB-backed rotating refresh tokens (httpOnly cookie).
@@ -302,6 +304,7 @@ model Food {
   createdBy    User?         @relation("FoodCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   portions     FoodPortion[]
   mealItems    MealItem[]
+  favorites    FoodFavorite[]
 
   @@index([createdById])
   @@index([deletedAt])
@@ -351,9 +354,39 @@ model Meal {
   createdBy   User?        @relation("MealCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   items       MealItem[]
   entries     DiaryEntry[]
+  favorites   MealFavorite[]
 
   @@index([createdById])
   @@index([deletedAt])
+}
+
+// A user's star on a shared Lebensmittel / Mahlzeit (#148). The row's mere existence is the
+// favorite; unstarring deletes it. `(userId, foodId)` / `(userId, mealId)` is unique so a
+// double-star is a no-op upsert. `createdAt` is only the tiebreaker in the Favoriten tab when
+// a favorite has never been logged and so has no last-use timestamp to sort by -- ordering is
+// otherwise "most recently logged first", derived from DiaryEntry, not from this table.
+model FoodFavorite {
+  id        String   @id @default(uuid())
+  userId    String
+  foodId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  food      Food     @relation(fields: [foodId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, foodId])
+  @@index([userId])
+}
+
+model MealFavorite {
+  id        String   @id @default(uuid())
+  userId    String
+  mealId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  meal      Meal     @relation(fields: [mealId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, mealId])
+  @@index([userId])
 }
 
 // One ingredient line of a Meal: a Food and how much of it, in grams or millilitres (the

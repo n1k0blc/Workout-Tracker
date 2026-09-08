@@ -57,6 +57,7 @@ function makeService(
     foodCount?: number;
     createImpl?: (args: { data: Record<string, unknown> }) => unknown;
     updateImpl?: (args: { data: Record<string, unknown> }) => unknown;
+    favoriteMealIds?: string[];
   } = {},
 ) {
   const prisma = {
@@ -87,7 +88,14 @@ function makeService(
       ),
     },
   };
-  return { service: new MealsService(prisma as never), prisma };
+  const favorites = {
+    favoriteMealIds: jest.fn().mockResolvedValue(new Set(overrides.favoriteMealIds ?? [])),
+  };
+  return {
+    service: new MealsService(prisma as never, favorites as never),
+    prisma,
+    favorites,
+  };
 }
 
 function baseCreateDto(overrides: Partial<CreateMealDto> = {}): CreateMealDto {

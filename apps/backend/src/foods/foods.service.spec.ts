@@ -61,6 +61,7 @@ function makeService(
     createImpl?: (args: { data: Record<string, unknown> }) => unknown;
     updateImpl?: (args: { data: Record<string, unknown> }) => unknown;
     diaryEntries?: unknown[];
+    favoriteFoodIds?: string[];
   } = {},
 ) {
   const prisma = {
@@ -97,7 +98,14 @@ function makeService(
       findMany: jest.fn().mockResolvedValue(overrides.diaryEntries ?? []),
     },
   };
-  return { service: new FoodsService(prisma as never), prisma };
+  const favorites = {
+    favoriteFoodIds: jest.fn().mockResolvedValue(new Set(overrides.favoriteFoodIds ?? [])),
+  };
+  return {
+    service: new FoodsService(prisma as never, favorites as never),
+    prisma,
+    favorites,
+  };
 }
 
 function baseCreateDto(overrides: Partial<CreateFoodDto> = {}): CreateFoodDto {

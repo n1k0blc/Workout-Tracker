@@ -25,6 +25,8 @@ export class FoodDto {
   deleted: boolean;
   /** True only for the current user's own, non-deleted USER food. Drives the read-only editor. */
   editable: boolean;
+  /** The current user has starred this food (#148). Floats it up the picker's "Alle" tab. */
+  isFavorite: boolean;
   portions: FoodPortionDto[];
 }
 

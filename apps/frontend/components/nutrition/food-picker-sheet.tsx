@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { IconBarcode, IconMinus, IconPlus, IconSearch, IconStar } from '@tabler/icons-react';
+import { IconBarcode, IconMinus, IconPlus, IconSearch } from '@tabler/icons-react';
 import {
   Drawer,
   DrawerContent,
@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { apiClient } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { Food, MealListItem } from '@/types';
+import { Food, MealListItem, PickerItem } from '@/types';
 import {
   buildQuantityStops,
   defaultQuantityStopIndex,
@@ -24,16 +24,20 @@ import {
   mealIngredientPreview,
   scaleMacros,
   scalePer100,
+  sortFavoritesFirst,
   QUANTITY_FACTORS,
 } from '@/lib/nutrition';
+import { usePickerLists } from '@/hooks/usePickerLists';
 import { QuantityStepper } from './quantity-stepper';
-
-const TABS = [
-  { id: 'alle', label: 'Alle' },
-  { id: 'favoriten', label: 'Favoriten' },
-  { id: 'zuletzt', label: 'Zuletzt' },
-] as const;
-type TabId = (typeof TABS)[number]['id'];
+import { FavoriteStar } from './favorite-star';
+import {
+  PickerTabBar,
+  PickerTabPlaceholder,
+  FAVORITEN_EMPTY,
+  ZULETZT_EMPTY,
+  PICKER_LOADING,
+  type PickerTabId,
+} from './picker-tabs';
 
 interface FoodBasketItem {
   key: string;
@@ -55,6 +59,13 @@ type BasketItem = FoodBasketItem | MealBasketItem;
 type PickerRow =
   | { kind: 'food'; key: string; name: string; food: Food }
   | { kind: 'meal'; key: string; name: string; meal: MealListItem };
+
+/** A Favoriten / Zuletzt list item in the same shape the "Alle" rows use. */
+function toPickerRow(item: PickerItem): PickerRow {
+  return item.kind === 'food'
+    ? { kind: 'food', key: `food:${item.food.id}`, name: item.food.name, food: item.food }
+    : { kind: 'meal', key: `meal:${item.meal.id}`, name: item.meal.name, meal: item.meal };
+}
 
 let basketSeq = 0;
 
@@ -91,13 +102,18 @@ export function FoodPickerSheet({
   onCommitted: () => void;
 }) {
   const [search, setSearch] = useState('');
-  const [tab, setTab] = useState<TabId>('alle');
+  const [tab, setTab] = useState<PickerTabId>('alle');
   const [foods, setFoods] = useState<Food[]>([]);
   const [meals, setMeals] = useState<MealListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [basket, setBasket] = useState<BasketItem[]>([]);
   const [committing, setCommitting] = useState(false);
+
+  const { favorites, recents, effectiveFavorite, toggleFavorite } = usePickerLists({
+    open,
+    tab,
+  });
 
   useEffect(() => {
     if (open) {
@@ -159,8 +175,33 @@ export function FoodPickerSheet({
           m.ingredientNames.some((n) => n.toLowerCase().includes(term)),
       )
       .map((m) => ({ kind: 'meal', key: `meal:${m.id}`, name: m.name, meal: m }));
-    return [...foodRows, ...mealRows].sort((a, b) => a.name.localeCompare(b.name, 'de'));
-  }, [foods, meals, search]);
+    const byName = [...foodRows, ...mealRows].sort((a, b) =>
+      a.name.localeCompare(b.name, 'de'),
+    );
+    // Starred rows float to the top of "Alle", otherwise name order (#148).
+    return sortFavoritesFirst(
+      byName.map((r) => ({
+        ...r,
+        isFavorite:
+          r.kind === 'food'
+            ? effectiveFavorite('food', r.food.id, r.food.isFavorite)
+            : effectiveFavorite('meal', r.meal.id, r.meal.isFavorite),
+      })),
+    );
+  }, [foods, meals, search, effectiveFavorite]);
+
+  const favoriteRows = useMemo(
+    () =>
+      (favorites ?? [])
+        .map(toPickerRow)
+        .filter((r) =>
+          r.kind === 'food'
+            ? effectiveFavorite('food', r.food.id, true)
+            : effectiveFavorite('meal', r.meal.id, true),
+        ),
+    [favorites, effectiveFavorite],
+  );
+  const recentRows = useMemo(() => (recents ?? []).map(toPickerRow), [recents]);
 
   function addFood(food: Food, grams: number, label: string) {
     setBasket((prev) => [
@@ -222,6 +263,58 @@ export function FoodPickerSheet({
     }
   }
 
+  function renderRows(list: PickerRow[]) {
+    return (
+      <div className="divide-y rounded-lg border">
+        {list.map((row) =>
+          row.kind === 'food' ? (
+            <FoodPickerRow
+              key={row.key}
+              food={row.food}
+              favorite={effectiveFavorite('food', row.food.id, row.food.isFavorite)}
+              onToggleFavorite={() =>
+                toggleFavorite(
+                  'food',
+                  row.food.id,
+                  effectiveFavorite('food', row.food.id, row.food.isFavorite),
+                )
+              }
+              expanded={expandedKey === row.key}
+              basketCount={
+                basket.filter((b) => b.kind === 'food' && b.foodId === row.food.id).length
+              }
+              onToggle={() => setExpandedKey((k) => (k === row.key ? null : row.key))}
+              onAdd={(grams, label) => addFood(row.food, grams, label)}
+            />
+          ) : (
+            <MealPickerRow
+              key={row.key}
+              meal={row.meal}
+              favorite={effectiveFavorite('meal', row.meal.id, row.meal.isFavorite)}
+              onToggleFavorite={() =>
+                toggleFavorite(
+                  'meal',
+                  row.meal.id,
+                  effectiveFavorite('meal', row.meal.id, row.meal.isFavorite),
+                )
+              }
+              expanded={expandedKey === row.key}
+              basketCount={
+                basket.filter((b) => b.kind === 'meal' && b.mealId === row.meal.id).length
+              }
+              onToggle={() => setExpandedKey((k) => (k === row.key ? null : row.key))}
+              onAdd={(factor) => addMeal(row.meal, factor)}
+            />
+          ),
+        )}
+      </div>
+    );
+  }
+
+  const placeholder = (message: string) => (
+    <PickerTabPlaceholder>{message}</PickerTabPlaceholder>
+  );
+
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="mx-auto flex h-[88vh] max-w-2xl flex-col">
@@ -243,70 +336,32 @@ export function FoodPickerSheet({
             <IconBarcode className="size-4 shrink-0 text-muted-foreground/50" />
           </div>
 
-          <div className="flex gap-1 border-b">
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTab(t.id)}
-                className={cn(
-                  'relative px-3 py-2 text-xs font-semibold uppercase tracking-[0.05em]',
-                  tab === t.id ? 'text-foreground' : 'text-muted-foreground',
-                )}
-              >
-                {t.label}
-                {tab === t.id && (
-                  <span className="absolute inset-x-0 -bottom-px h-0.5 bg-foreground" />
-                )}
-              </button>
-            ))}
-          </div>
+          <PickerTabBar tab={tab} onTab={setTab} />
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-3">
-          {tab !== 'alle' ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">
-              {tab === 'favoriten' ? 'Favoriten' : 'Zuletzt'} folgen in Kürze.
-            </p>
-          ) : loading && rows.length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">Lädt …</p>
-          ) : rows.length === 0 ? (
-            <p className="py-10 text-center text-sm text-muted-foreground">
-              {search.trim() ? 'Nichts gefunden.' : 'Die Bibliothek ist noch leer.'}
-            </p>
-          ) : (
-            <div className="divide-y rounded-lg border">
-              {rows.map((row) =>
-                row.kind === 'food' ? (
-                  <FoodPickerRow
-                    key={row.key}
-                    food={row.food}
-                    expanded={expandedKey === row.key}
-                    basketCount={
-                      basket.filter((b) => b.kind === 'food' && b.foodId === row.food.id).length
-                    }
-                    onToggle={() =>
-                      setExpandedKey((k) => (k === row.key ? null : row.key))
-                    }
-                    onAdd={(grams, label) => addFood(row.food, grams, label)}
-                  />
-                ) : (
-                  <MealPickerRow
-                    key={row.key}
-                    meal={row.meal}
-                    expanded={expandedKey === row.key}
-                    basketCount={
-                      basket.filter((b) => b.kind === 'meal' && b.mealId === row.meal.id).length
-                    }
-                    onToggle={() =>
-                      setExpandedKey((k) => (k === row.key ? null : row.key))
-                    }
-                    onAdd={(factor) => addMeal(row.meal, factor)}
-                  />
-                ),
-              )}
-            </div>
-          )}
+          {tab === 'alle' &&
+            (loading && rows.length === 0
+              ? placeholder(PICKER_LOADING)
+              : rows.length === 0
+                ? placeholder(
+                    search.trim() ? 'Nichts gefunden.' : 'Die Bibliothek ist noch leer.',
+                  )
+                : renderRows(rows))}
+
+          {tab === 'favoriten' &&
+            (favorites === null
+              ? placeholder(PICKER_LOADING)
+              : favoriteRows.length === 0
+                ? placeholder(FAVORITEN_EMPTY)
+                : renderRows(favoriteRows))}
+
+          {tab === 'zuletzt' &&
+            (recents === null
+              ? placeholder(PICKER_LOADING)
+              : recentRows.length === 0
+                ? placeholder(ZULETZT_EMPTY)
+                : renderRows(recentRows))}
         </div>
 
         <div className="mt-auto flex gap-2 border-t p-4">
@@ -326,12 +381,16 @@ export function FoodPickerSheet({
 
 function FoodPickerRow({
   food,
+  favorite,
+  onToggleFavorite,
   expanded,
   basketCount,
   onToggle,
   onAdd,
 }: {
   food: Food;
+  favorite: boolean;
+  onToggleFavorite: () => void;
   expanded: boolean;
   basketCount: number;
   onToggle: () => void;
@@ -357,8 +416,7 @@ function FoodPickerRow({
           </div>
           <div className="mt-0.5 text-xs text-muted-foreground">{foodRowSubtitle(food)}</div>
         </div>
-        {/* Favorites are #148 -- star is inert. */}
-        <IconStar className="size-4 shrink-0 text-muted-foreground/40" />
+        <FavoriteStar favorite={favorite} onToggle={onToggleFavorite} label={food.name} />
         <Button
           variant="outline"
           size="icon-sm"
@@ -418,12 +476,16 @@ function ExpandedFoodRow({
 
 function MealPickerRow({
   meal,
+  favorite,
+  onToggleFavorite,
   expanded,
   basketCount,
   onToggle,
   onAdd,
 }: {
   meal: MealListItem;
+  favorite: boolean;
+  onToggleFavorite: () => void;
   expanded: boolean;
   basketCount: number;
   onToggle: () => void;
@@ -457,7 +519,7 @@ function MealPickerRow({
             {mealRowSubtitle(meal)}
           </div>
         </div>
-        <IconStar className="size-4 shrink-0 text-muted-foreground/40" />
+        <FavoriteStar favorite={favorite} onToggle={onToggleFavorite} label={meal.name} />
         <Button
           variant="outline"
           size="icon-sm"

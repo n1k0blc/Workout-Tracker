@@ -47,6 +47,8 @@ export class MealDto {
    * returned (ADR-0003 -- a shared meal has no byline).
    */
   editable: boolean;
+  /** The current user has starred this meal (#148). */
+  isFavorite: boolean;
   deleted: boolean;
   items: MealItemDto[];
   /** Sum of every ingredient's live contribution, per 1x. */
@@ -58,6 +60,8 @@ export class MealListItemDto {
   id: string;
   name: string;
   editable: boolean;
+  /** The current user has starred this meal (#148). Floats it up the picker's "Alle" tab. */
+  isFavorite: boolean;
   itemCount: number;
   /** Ingredient names in item order, for the "Reis, Hähnchen, Paprika +3" preview. */
   ingredientNames: string[];

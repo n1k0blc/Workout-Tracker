@@ -258,6 +258,16 @@ export function groupDiaryEntries<
 }
 
 /**
+ * Floats the picker's starred rows to the top of the "Alle" tab without otherwise reordering
+ * (#148): favorites keep their incoming order, non-favorites keep theirs, favorites come
+ * first. A stable partition -- the incoming order is the name sort, which is the only
+ * "match quality" the food search exposes.
+ */
+export function sortFavoritesFirst<T extends { isFavorite: boolean }>(rows: T[]): T[] {
+  return [...rows.filter((r) => r.isFavorite), ...rows.filter((r) => !r.isFavorite)];
+}
+
+/**
  * How a day reads relative to the client's today: `"Heute"`, `"Gestern"`, `"Morgen"`, or the
  * full German weekday for anything further out.
  */

@@ -46,22 +46,25 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { apiClient } from '@/lib/api';
-import { cn } from '@/lib/utils';
-import { Food, FoodPortion, MealItem } from '@/types';
+import { Food, FoodPortion, MealItem, PickerItem } from '@/types';
 import {
   computeMealTotals,
   formatKcal,
   formatQuantityLabel,
   scalePer100,
+  sortFavoritesFirst,
 } from '@/lib/nutrition';
 import { QuantityStepper } from '@/components/nutrition/quantity-stepper';
-
-const SEARCH_TABS = [
-  { id: 'alle', label: 'Alle' },
-  { id: 'favoriten', label: 'Favoriten' },
-  { id: 'zuletzt', label: 'Zuletzt' },
-] as const;
-type SearchTabId = (typeof SEARCH_TABS)[number]['id'];
+import { FavoriteStar } from '@/components/nutrition/favorite-star';
+import {
+  PickerTabBar,
+  PickerTabPlaceholder,
+  FAVORITEN_EMPTY,
+  ZULETZT_EMPTY,
+  PICKER_LOADING,
+  type PickerTabId,
+} from '@/components/nutrition/picker-tabs';
+import { usePickerLists } from '@/hooks/usePickerLists';
 
 /** An ingredient being edited: the food's live nutrients plus the chosen amount. */
 interface EditorItem {
@@ -151,10 +154,13 @@ export function MealEditorSheet({
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const [searchOpen, setSearchOpen] = useState(false);
-  const [searchTab, setSearchTab] = useState<SearchTabId>('alle');
+  const [searchTab, setSearchTab] = useState<PickerTabId>('alle');
   const [search, setSearch] = useState('');
   const [results, setResults] = useState<Food[]>([]);
   const [searching, setSearching] = useState(false);
+
+  // Favoriten / Zuletzt for the Zutat search -- foods only, a meal cannot be an ingredient.
+  const fav = usePickerLists({ open: searchOpen, tab: searchTab, scope: 'food' });
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -200,8 +206,8 @@ export function MealEditorSheet({
     };
   }, [open, mealId]);
 
-  // Food search for the "Zutat" picker -- only the "Alle" tab queries (Favoriten / Zuletzt
-  // are #148, empty placeholders here as in the logging picker).
+  // Food search for the "Zutat" picker -- only the "Alle" tab queries; Favoriten / Zuletzt
+  // are served by usePickerLists (#148).
   useEffect(() => {
     if (!searchOpen || searchTab !== 'alle') return;
     let cancelled = false;
@@ -348,6 +354,7 @@ export function MealEditorSheet({
             addedFoodIds={new Set(items.map((i) => i.foodId))}
             onAdd={addFood}
             onDone={() => setSearchOpen(false)}
+            fav={fav}
           />
         ) : (
           <>
@@ -510,9 +517,10 @@ function FoodSearchView({
   addedFoodIds,
   onAdd,
   onDone,
+  fav,
 }: {
-  tab: SearchTabId;
-  onTab: (t: SearchTabId) => void;
+  tab: PickerTabId;
+  onTab: (t: PickerTabId) => void;
   search: string;
   onSearch: (v: string) => void;
   results: Food[];
@@ -520,7 +528,62 @@ function FoodSearchView({
   addedFoodIds: Set<string>;
   onAdd: (food: Food) => void;
   onDone: () => void;
+  fav: ReturnType<typeof usePickerLists>;
 }) {
+  const foodsOf = (items: PickerItem[] | null) =>
+    (items ?? []).flatMap((i) => (i.kind === 'food' ? [i.food] : []));
+
+  const alleFoods = sortFavoritesFirst(
+    results.map((f) => ({ ...f, isFavorite: fav.effectiveFavorite('food', f.id, f.isFavorite) })),
+  );
+  const favoriteFoods = foodsOf(fav.favorites).filter((f) =>
+    fav.effectiveFavorite('food', f.id, true),
+  );
+  const recentFoods = foodsOf(fav.recents);
+
+  const placeholder = (message: string) => (
+    <PickerTabPlaceholder>{message}</PickerTabPlaceholder>
+  );
+
+  const foodRows = (foods: Food[]) => (
+    <div className="divide-y rounded-lg border">
+      {foods.map((food) => (
+        <div key={food.id} className="flex items-center gap-3 px-3.5 py-3">
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-medium">{food.name}</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">
+              {Math.round(food.kcal)} kcal / 100 {food.isLiquid ? 'ml' : 'g'}
+            </div>
+          </div>
+          <FavoriteStar
+            favorite={fav.effectiveFavorite('food', food.id, food.isFavorite)}
+            onToggle={() =>
+              fav.toggleFavorite(
+                'food',
+                food.id,
+                fav.effectiveFavorite('food', food.id, food.isFavorite),
+              )
+            }
+            label={food.name}
+          />
+          <Button
+            variant="outline"
+            size="icon-sm"
+            aria-label={`${food.name} hinzufügen`}
+            onClick={() => onAdd(food)}
+          >
+            <IconPlus />
+          </Button>
+          {addedFoodIds.has(food.id) && (
+            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              drin
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <>
       <div className="flex flex-col gap-3 px-4">
@@ -534,67 +597,32 @@ function FoodSearchView({
             autoFocus
           />
         </div>
-        <div className="flex gap-1 border-b">
-          {SEARCH_TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => onTab(t.id)}
-              className={cn(
-                'relative px-3 py-2 text-xs font-semibold uppercase tracking-[0.05em]',
-                tab === t.id ? 'text-foreground' : 'text-muted-foreground',
-              )}
-            >
-              {t.label}
-              {tab === t.id && (
-                <span className="absolute inset-x-0 -bottom-px h-0.5 bg-foreground" />
-              )}
-            </button>
-          ))}
-        </div>
+        <PickerTabBar tab={tab} onTab={onTab} />
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-3">
-        {tab !== 'alle' ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">
-            {tab === 'favoriten' ? 'Favoriten' : 'Zuletzt'} folgen in Kürze.
-          </p>
-        ) : searching && results.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">Lädt …</p>
-        ) : results.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">
-            {search.trim() ? 'Nichts gefunden.' : 'Die Bibliothek ist noch leer.'}
-          </p>
-        ) : (
-          <div className="divide-y rounded-lg border">
-            {results.map((food) => {
-              const added = addedFoodIds.has(food.id);
-              return (
-                <div key={food.id} className="flex items-center gap-3 px-3.5 py-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">{food.name}</div>
-                    <div className="mt-0.5 text-xs text-muted-foreground">
-                      {Math.round(food.kcal)} kcal / 100 {food.isLiquid ? 'ml' : 'g'}
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="icon-sm"
-                    aria-label={`${food.name} hinzufügen`}
-                    onClick={() => onAdd(food)}
-                  >
-                    <IconPlus />
-                  </Button>
-                  {added && (
-                    <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      drin
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+        {tab === 'alle' &&
+          (searching && results.length === 0
+            ? placeholder(PICKER_LOADING)
+            : alleFoods.length === 0
+              ? placeholder(
+                  search.trim() ? 'Nichts gefunden.' : 'Die Bibliothek ist noch leer.',
+                )
+              : foodRows(alleFoods))}
+
+        {tab === 'favoriten' &&
+          (fav.favorites === null
+            ? placeholder(PICKER_LOADING)
+            : favoriteFoods.length === 0
+              ? placeholder(FAVORITEN_EMPTY)
+              : foodRows(favoriteFoods))}
+
+        {tab === 'zuletzt' &&
+          (fav.recents === null
+            ? placeholder(PICKER_LOADING)
+            : recentFoods.length === 0
+              ? placeholder(ZULETZT_EMPTY)
+              : foodRows(recentFoods))}
       </div>
 
       <div className="mt-auto border-t p-4">

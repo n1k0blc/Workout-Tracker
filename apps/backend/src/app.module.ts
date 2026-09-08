@@ -19,6 +19,7 @@ import { SecurityModule } from './security/security.module';
 import { NutritionModule } from './nutrition/nutrition.module';
 import { FoodsModule } from './foods/foods.module';
 import { MealsModule } from './meals/meals.module';
+import { FavoritesModule } from './favorites/favorites.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { MealsModule } from './meals/meals.module';
     NutritionModule,
     FoodsModule,
     MealsModule,
+    FavoritesModule,
   ],
   controllers: [],
   providers: [

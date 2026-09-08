@@ -4,13 +4,16 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { FavoritesService } from '../favorites/favorites.service';
 import { scalePer100 } from '../common/utils/nutrition.util';
+import { orderByIds } from '../common/utils/order-by-ids';
 import {
   CreateMealDto,
   UpdateMealDto,
   MealItemInputDto,
   MealDto,
   MealListDto,
+  MealListItemDto,
   MealMacroTotals,
 } from './dto';
 
@@ -81,7 +84,10 @@ function computeTotals(items: MealItemRow[]): MealMacroTotals {
 
 @Injectable()
 export class MealsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private favorites: FavoritesService,
+  ) {}
 
   /**
    * Every non-deleted Mahlzeit, from every user (ADR-0003 -- meals are a shared library like
@@ -94,22 +100,18 @@ export class MealsService {
     // library is hand-built and bounded (dozens per user), not the ~180k of the Open Food
     // Facts import. `total` / `mineTotal` always describe the whole library so the tab's
     // count line stays put when "Nur meine" filters the list below it.
-    const all = (await this.prisma.meal.findMany({
-      where: { deletedAt: null },
-      include: WITH_ITEMS,
-      orderBy: { name: 'asc' },
-    })) as MealRow[];
+    const [all, favoriteIds] = await Promise.all([
+      this.prisma.meal.findMany({
+        where: { deletedAt: null },
+        include: WITH_ITEMS,
+        orderBy: { name: 'asc' },
+      }) as Promise<MealRow[]>,
+      this.favorites.favoriteMealIds(userId),
+    ]);
     const mine = all.filter((m) => m.createdById === userId);
 
     return {
-      items: (mineOnly ? mine : all).map((meal) => ({
-        id: meal.id,
-        name: meal.name,
-        editable: this.isEditable(meal, userId),
-        itemCount: meal.items.length,
-        ingredientNames: meal.items.map((i) => i.food.name),
-        totals: computeTotals(meal.items),
-      })),
+      items: (mineOnly ? mine : all).map((meal) => this.toListItemDto(meal, userId, favoriteIds)),
       total: all.length,
       mineTotal: mine.length,
     };
@@ -117,14 +119,48 @@ export class MealsService {
 
   /** One Mahlzeit with its ingredients resolved and its totals computed live. */
   async findById(id: string, userId: string): Promise<MealDto> {
-    const meal = (await this.prisma.meal.findUnique({
-      where: { id },
-      include: WITH_ITEMS,
-    })) as MealRow | null;
+    const [meal, favoriteIds] = await Promise.all([
+      this.prisma.meal.findUnique({
+        where: { id },
+        include: WITH_ITEMS,
+      }) as Promise<MealRow | null>,
+      this.favorites.favoriteMealIds(userId),
+    ]);
     if (!meal) {
       throw new NotFoundException('Mahlzeit nicht gefunden');
     }
-    return this.toDto(meal, userId);
+    return this.toDto(meal, userId, favoriteIds);
+  }
+
+  /**
+   * Non-deleted meals for the given ids, as list-row DTOs, in the order the ids were passed --
+   * the nutrition picker's Favoriten / Zuletzt tabs decide the order and this preserves it. A
+   * soft-deleted or missing id drops out, so the result may be shorter than `ids`.
+   */
+  async listByIds(userId: string, ids: string[]): Promise<MealListItemDto[]> {
+    if (ids.length === 0) return [];
+    const [meals, favoriteIds] = await Promise.all([
+      this.prisma.meal.findMany({
+        where: { id: { in: ids }, deletedAt: null },
+        include: WITH_ITEMS,
+      }) as Promise<MealRow[]>,
+      this.favorites.favoriteMealIds(userId),
+    ]);
+    return orderByIds(ids, meals, (m) => m.id).map((m) =>
+      this.toListItemDto(m, userId, favoriteIds),
+    );
+  }
+
+  private toListItemDto(meal: MealRow, userId: string, favoriteIds: Set<string>): MealListItemDto {
+    return {
+      id: meal.id,
+      name: meal.name,
+      editable: this.isEditable(meal, userId),
+      isFavorite: favoriteIds.has(meal.id),
+      itemCount: meal.items.length,
+      ingredientNames: meal.items.map((i) => i.food.name),
+      totals: computeTotals(meal.items),
+    };
   }
 
   async create(userId: string, dto: CreateMealDto): Promise<MealDto> {
@@ -160,7 +196,7 @@ export class MealsService {
       },
       include: WITH_ITEMS,
     })) as MealRow;
-    return this.toDto(updated, userId);
+    return this.toDto(updated, userId, await this.favorites.favoriteMealIds(userId));
   }
 
   /** Soft delete: the meal leaves the list but `findById` still resolves it, and entries
@@ -176,11 +212,12 @@ export class MealsService {
     await this.prisma.meal.update({ where: { id }, data: { deletedAt: new Date() } });
   }
 
-  private toDto(meal: MealRow, userId: string): MealDto {
+  private toDto(meal: MealRow, userId: string, favoriteIds?: Set<string>): MealDto {
     return {
       id: meal.id,
       name: meal.name,
       editable: this.isEditable(meal, userId),
+      isFavorite: favoriteIds?.has(meal.id) ?? false,
       deleted: meal.deletedAt !== null,
       items: meal.items.map((item) => ({
         id: item.id,

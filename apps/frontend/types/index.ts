@@ -802,6 +802,8 @@ export interface Food {
   deleted: boolean;
   /** The current user's own, non-deleted USER food -- the only case the editor is writable. */
   editable: boolean;
+  /** The current user has starred this food (#148). Floats it up the picker's "Alle" tab. */
+  isFavorite: boolean;
   portions: FoodPortion[];
 }
 
@@ -871,6 +873,8 @@ export interface MealDetail {
    * creator-derived fact exposed; no creator id or name (ADR-0003).
    */
   editable: boolean;
+  /** The current user has starred this meal (#148). */
+  isFavorite: boolean;
   deleted: boolean;
   items: MealItem[];
   totals: MacroTotals;
@@ -881,6 +885,8 @@ export interface MealListItem {
   id: string;
   name: string;
   editable: boolean;
+  /** The current user has starred this meal (#148). Floats it up the picker's "Alle" tab. */
+  isFavorite: boolean;
   itemCount: number;
   /** Ingredient names in item order, for the "Reis, Hähnchen, Paprika +3" preview. */
   ingredientNames: string[];
@@ -912,4 +918,19 @@ export interface DiaryEntriesFromMealInput {
   localDate: string;
   mealId: string;
   factor: number;
+}
+
+// Favoriten & Zuletzt (#148)
+
+/**
+ * One row of the picker's Favoriten / Zuletzt tab: a Lebensmittel or a Mahlzeit, tagged so
+ * the client renders the right row. Foods and meals are interleaved in one ordered array so
+ * the tab's ordering (last use / most recent) survives.
+ */
+export type PickerItem =
+  | { kind: 'food'; food: Food }
+  | { kind: 'meal'; meal: MealListItem };
+
+export interface PickerList {
+  items: PickerItem[];
 }

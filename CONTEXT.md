@@ -54,6 +54,18 @@ say.
   even when one of its foods has been soft-deleted; it cannot contain another Mahlzeit;
   duplicate names are allowed. Code: `Meal` / `MealItem`.
 
+- **Favoriten / Zuletzt** — the two extra tabs the picker (and the Mahlzeit editor's Zutat
+  search) gain next to "Alle". A star on every picker row toggles a per-user favorite;
+  favoriting happens only where you log, never in the Vorlagen tabs. **Favoriten** lists the
+  starred Lebensmittel and Mahlzeiten ordered by when each was last logged (a never-logged
+  favorite sorts last, by when it was starred); unstarring removes the row. **Zuletzt** is
+  derived from the diary, no table: the last 20 *distinct* foods and meals the user logged,
+  most recent first — an Eintrag expanded from a Mahlzeit counts toward the meal, not its
+  ingredient foods. In "Alle", a starred row floats above non-favorites of equal name order.
+  The Zutat search is foods-only (a Mahlzeit can't be an ingredient). Both tabs drop an item
+  whose Lebensmittel / Mahlzeit has since been soft-deleted. Code: `FoodFavorite` /
+  `MealFavorite`, `FavoritesService`, `PickerService`.
+
 ### Tracked nutrients
 
 Only **kcal**, **Kohlenhydrate** (carbs), **Protein** and **Fett** (fat). No micronutrients.

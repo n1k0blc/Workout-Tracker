@@ -6,6 +6,8 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { FavoritesService } from '../favorites/favorites.service';
+import { orderByIds } from '../common/utils/order-by-ids';
 import {
   CreateFoodDto,
   UpdateFoodDto,
@@ -41,7 +43,7 @@ type FoodRow = {
 
 const WITH_PORTIONS = { portions: { orderBy: { order: 'asc' as const } } };
 
-function toDto(food: FoodRow, userId: string): FoodDto {
+function toDto(food: FoodRow, userId: string, favoriteIds?: Set<string>): FoodDto {
   return {
     id: food.id,
     name: food.name,
@@ -56,6 +58,7 @@ function toDto(food: FoodRow, userId: string): FoodDto {
     createdById: food.createdById ?? null,
     deleted: food.deletedAt !== null,
     editable: food.source === 'USER' && food.createdById === userId && food.deletedAt === null,
+    isFavorite: favoriteIds?.has(food.id) ?? false,
     portions: (food.portions ?? []).map((p) => ({
       id: p.id,
       label: p.label,
@@ -87,7 +90,10 @@ function isUniqueViolation(error: unknown): boolean {
 
 @Injectable()
 export class FoodsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private favorites: FavoritesService,
+  ) {}
 
   /** Every non-deleted food, from every user. Optional case-insensitive name search. */
   /**
@@ -107,7 +113,7 @@ export class FoodsService {
       ];
     }
 
-    const [foods, total, ownTotal] = await Promise.all([
+    const [foods, total, ownTotal, favoriteIds] = await Promise.all([
       this.prisma.food.findMany({
         where,
         include: WITH_PORTIONS,
@@ -116,21 +122,43 @@ export class FoodsService {
       }) as Promise<FoodRow[]>,
       this.prisma.food.count({ where }),
       this.prisma.food.count({ where: { ...where, source: 'USER', createdById: userId } }),
+      this.favorites.favoriteFoodIds(userId),
     ]);
 
-    return { items: foods.map((f) => toDto(f, userId)), total, ownTotal };
+    return { items: foods.map((f) => toDto(f, userId, favoriteIds)), total, ownTotal };
   }
 
   /** Resolves a food by id even when it is soft-deleted -- old entries must keep rendering. */
   async findById(id: string, userId: string): Promise<FoodDto> {
-    const food = (await this.prisma.food.findUnique({
-      where: { id },
-      include: WITH_PORTIONS,
-    })) as FoodRow | null;
+    const [food, favoriteIds] = await Promise.all([
+      this.prisma.food.findUnique({
+        where: { id },
+        include: WITH_PORTIONS,
+      }) as Promise<FoodRow | null>,
+      this.favorites.favoriteFoodIds(userId),
+    ]);
     if (!food) {
       throw new NotFoundException('Lebensmittel nicht gefunden');
     }
-    return toDto(food, userId);
+    return toDto(food, userId, favoriteIds);
+  }
+
+  /**
+   * Non-deleted foods for the given ids, as DTOs, returned in the order the ids were passed --
+   * the nutrition picker's Favoriten / Zuletzt tabs decide the order and this preserves it. A
+   * soft-deleted or missing id simply drops out (you cannot log it), so the result may be
+   * shorter than `ids`.
+   */
+  async listByIds(userId: string, ids: string[]): Promise<FoodDto[]> {
+    if (ids.length === 0) return [];
+    const [foods, favoriteIds] = await Promise.all([
+      this.prisma.food.findMany({
+        where: { id: { in: ids }, deletedAt: null },
+        include: WITH_PORTIONS,
+      }) as Promise<FoodRow[]>,
+      this.favorites.favoriteFoodIds(userId),
+    ]);
+    return orderByIds(ids, foods, (f) => f.id).map((f) => toDto(f, userId, favoriteIds));
   }
 
   /**
@@ -224,7 +252,7 @@ export class FoodsService {
         },
         include: WITH_PORTIONS,
       })) as FoodRow;
-      return toDto(updated, userId);
+      return toDto(updated, userId, await this.favorites.favoriteFoodIds(userId));
     } catch (error) {
       throw this.barcodeConflictOrRethrow(error);
     }

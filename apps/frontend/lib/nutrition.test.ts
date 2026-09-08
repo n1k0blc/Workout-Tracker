@@ -17,6 +17,7 @@ import {
   computeMealTotals,
   mealIngredientPreview,
   groupDiaryEntries,
+  sortFavoritesFirst,
 } from './nutrition';
 
 const originalTz = process.env.TZ;
@@ -355,6 +356,37 @@ describe('groupDiaryEntries', () => {
 
   it('handles a day with no entries', () => {
     expect(groupDiaryEntries([])).toEqual({ mealGroups: [], singles: [] });
+  });
+});
+
+describe('sortFavoritesFirst', () => {
+  const row = (name: string, isFavorite: boolean) => ({ name, isFavorite });
+
+  it('floats favorites above non-favorites, each keeping its incoming order', () => {
+    const rows = [
+      row('Apfel', false),
+      row('Banane', true),
+      row('Chiasamen', false),
+      row('Dattel', true),
+    ];
+
+    expect(sortFavoritesFirst(rows).map((r) => r.name)).toEqual([
+      'Banane',
+      'Dattel',
+      'Apfel',
+      'Chiasamen',
+    ]);
+  });
+
+  it('is a no-op when nothing is starred', () => {
+    const rows = [row('Apfel', false), row('Banane', false)];
+    expect(sortFavoritesFirst(rows)).toEqual(rows);
+  });
+
+  it('does not mutate its input', () => {
+    const rows = [row('Apfel', false), row('Banane', true)];
+    sortFavoritesFirst(rows);
+    expect(rows.map((r) => r.name)).toEqual(['Apfel', 'Banane']);
   });
 });
 

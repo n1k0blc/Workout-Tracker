@@ -47,6 +47,7 @@ import {
   MealDetail,
   MealInput,
   DiaryEntriesFromMealInput,
+  PickerList,
 } from '@/types';
 import { clientTimeZone } from '@/lib/local-date';
 
@@ -703,6 +704,29 @@ class ApiClient {
 
   async deleteMeal(id: string): Promise<void> {
     await this.request(`/meals/${id}`, { method: 'DELETE' });
+  }
+
+  // Favoriten & Zuletzt (#148)
+
+  // Star / unstar a Lebensmittel or Mahlzeit. Both verbs are idempotent server-side, so the
+  // optimistic caller never has to reconcile a conflict.
+  async setFoodFavorite(id: string, favorite: boolean): Promise<void> {
+    await this.request(`/favorites/foods/${id}`, { method: favorite ? 'POST' : 'DELETE' });
+  }
+
+  async setMealFavorite(id: string, favorite: boolean): Promise<void> {
+    await this.request(`/favorites/meals/${id}`, { method: favorite ? 'POST' : 'DELETE' });
+  }
+
+  // The picker's Favoriten tab: starred foods and meals ordered by last use. `scope='food'`
+  // narrows to foods only -- the Zutat search inside the Mahlzeit editor.
+  async getPickerFavorites(scope?: 'food'): Promise<PickerList> {
+    return this.request<PickerList>(`/nutrition/picker/favorites${scope ? `?scope=${scope}` : ''}`);
+  }
+
+  // The picker's Zuletzt tab: the last 20 distinct foods and meals from the diary.
+  async getPickerRecent(scope?: 'food'): Promise<PickerList> {
+    return this.request<PickerList>(`/nutrition/picker/recent${scope ? `?scope=${scope}` : ''}`);
   }
 }
 

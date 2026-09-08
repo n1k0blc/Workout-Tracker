@@ -19,6 +19,7 @@ import { Today } from '../common/utils/today.util';
 import { isLocalDate } from '../common/utils/local-date.util';
 import { DiaryEntriesService } from './diary-entries.service';
 import { MealSlotsService } from './meal-slots.service';
+import { PickerService, toPickerScope } from './picker.service';
 import {
   CreateDiaryEntryDto,
   CreateDiaryEntriesBatchDto,
@@ -31,6 +32,7 @@ import {
   ReorderMealSlotsDto,
   MealSlotDto,
   MealSlotListDto,
+  PickerListDto,
 } from './dto';
 
 @Controller('nutrition')
@@ -39,6 +41,7 @@ export class NutritionController {
   constructor(
     private readonly diaryEntries: DiaryEntriesService,
     private readonly mealSlots: MealSlotsService,
+    private readonly picker: PickerService,
   ) {}
 
   /**
@@ -56,6 +59,27 @@ export class NutritionController {
       throw new BadRequestException('date must be a calendar date in YYYY-MM-DD form');
     }
     return this.diaryEntries.getDay(user.id, localDate);
+  }
+
+  // --- Picker: Favoriten & Zuletzt (#148) --------------------------------------------------
+
+  // `scope=food` narrows to Lebensmittel only -- the Zutat search inside the Mahlzeit editor,
+  // where a meal cannot be an ingredient. Anything else means foods and meals (the logging
+  // picker).
+  @Get('picker/favorites')
+  async pickerFavorites(
+    @CurrentUser() user: { id: string },
+    @Query('scope') scope?: string,
+  ): Promise<PickerListDto> {
+    return this.picker.getFavorites(user.id, toPickerScope(scope));
+  }
+
+  @Get('picker/recent')
+  async pickerRecent(
+    @CurrentUser() user: { id: string },
+    @Query('scope') scope?: string,
+  ): Promise<PickerListDto> {
+    return this.picker.getRecent(user.id, toPickerScope(scope));
   }
 
   // --- Abschnitte (#142) --------------------------------------------------------------------
