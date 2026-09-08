@@ -9,6 +9,9 @@ import {
   parseAmount,
   scalePer100,
   formatQuantityLabel,
+  foodSourceLabel,
+  buildQuantityStops,
+  defaultQuantityStopIndex,
 } from './nutrition';
 
 const originalTz = process.env.TZ;
@@ -151,6 +154,64 @@ describe('formatQuantityLabel', () => {
 
   it('rounds the displayed amount', () => {
     expect(formatQuantityLabel(null, 149.6, false)).toBe('150 g');
+  });
+});
+
+describe('foodSourceLabel', () => {
+  it('marks the current user\'s own food', () => {
+    expect(foodSourceLabel({ editable: true, source: 'USER' })).toBe('Eigenes');
+  });
+
+  it('marks seeded and imported foods', () => {
+    expect(foodSourceLabel({ editable: false, source: 'SEED' })).toBe('System');
+    expect(foodSourceLabel({ editable: false, source: 'OPEN_FOOD_FACTS' })).toBe(
+      'Open Food Facts',
+    );
+  });
+
+  it('shows nothing for another user\'s food', () => {
+    expect(foodSourceLabel({ editable: false, source: 'USER' })).toBeNull();
+  });
+});
+
+describe('buildQuantityStops', () => {
+  it('lists portions in order, then gram presets that do not duplicate one', () => {
+    const stops = buildQuantityStops([
+      { label: '1 Esslöffel', grams: 12, order: 2 },
+      { label: '1 Portion', grams: 50, order: 1 },
+    ]);
+    expect(stops).toEqual([
+      { label: '1 Portion', grams: 50 },
+      { label: '1 Esslöffel', grams: 12 },
+      { label: null, grams: 25 },
+      { label: null, grams: 100 },
+      { label: null, grams: 150 },
+      { label: null, grams: 200 },
+      { label: null, grams: 250 },
+      { label: null, grams: 300 },
+    ]);
+  });
+
+  it('is just the gram presets when a food has no portions', () => {
+    expect(buildQuantityStops([]).map((s) => s.grams)).toEqual([
+      25, 50, 100, 150, 200, 250, 300,
+    ]);
+  });
+});
+
+describe('defaultQuantityStopIndex', () => {
+  const stops = buildQuantityStops([
+    { label: '1 Portion', grams: 40, order: 1 },
+    { label: '1 Esslöffel', grams: 12, order: 2 },
+  ]);
+
+  it('lands on the default portion when there is one', () => {
+    expect(defaultQuantityStopIndex(stops, '1 Portion')).toBe(0);
+  });
+
+  it('falls back to the stop nearest 100 with no default', () => {
+    // stops: 40, 12, 25, 50, 100, 150, 200, 250, 300 -> "100" is index 4
+    expect(defaultQuantityStopIndex(stops, null)).toBe(4);
   });
 });
 

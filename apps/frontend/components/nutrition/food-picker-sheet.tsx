@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { IconBarcode, IconMinus, IconPlus, IconSearch, IconStar } from '@tabler/icons-react';
 import {
@@ -14,20 +14,22 @@ import { Input } from '@/components/ui/input';
 import { apiClient } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Food } from '@/types';
-import { formatKcal, formatQuantityLabel, parseAmount, scalePer100 } from '@/lib/nutrition';
+import {
+  buildQuantityStops,
+  defaultQuantityStopIndex,
+  foodSourceLabel,
+  formatKcal,
+  formatQuantityLabel,
+  scalePer100,
+} from '@/lib/nutrition';
+import { QuantityStepper } from './quantity-stepper';
 
-const GRAM_PRESETS = [25, 50, 100, 150, 200, 250, 300];
 const TABS = [
   { id: 'alle', label: 'Alle' },
   { id: 'favoriten', label: 'Favoriten' },
   { id: 'zuletzt', label: 'Zuletzt' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
-
-interface Stop {
-  label: string | null;
-  grams: number;
-}
 
 interface BasketItem {
   key: string;
@@ -37,34 +39,6 @@ interface BasketItem {
 }
 
 let basketSeq = 0;
-
-function buildStops(food: Food): Stop[] {
-  const portionStops: Stop[] = [...food.portions]
-    .sort((a, b) => a.order - b.order)
-    .map((p) => ({ label: p.label, grams: p.grams }));
-  const gramStops: Stop[] = GRAM_PRESETS.filter(
-    (g) => !portionStops.some((s) => Math.round(s.grams) === g),
-  ).map((g) => ({ label: null, grams: g }));
-  return [...portionStops, ...gramStops];
-}
-
-function defaultStopIndex(food: Food, stops: Stop[]): number {
-  const def = food.portions.find((p) => p.isDefault);
-  if (def) {
-    const i = stops.findIndex((s) => s.label === def.label && s.grams === def.grams);
-    if (i >= 0) return i;
-  }
-  let best = 0;
-  let bestDist = Infinity;
-  stops.forEach((s, i) => {
-    const d = Math.abs(s.grams - 100);
-    if (d < bestDist) {
-      bestDist = d;
-      best = i;
-    }
-  });
-  return best;
-}
 
 function rowSubtitle(food: Food): string {
   const unit = food.isLiquid ? 'ml' : 'g';
@@ -253,14 +227,17 @@ function PickerRow({
   onToggle: () => void;
   onAdd: (grams: number, label: string) => void;
 }) {
+  const sourceLabel = foodSourceLabel(food);
+
   return (
     <div className={cn(expanded && 'bg-muted/50')}>
       <div className="flex items-center gap-3 px-3.5 py-3">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <span className="text-sm font-medium">{food.name}</span>
             <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
               Lebensmittel
+              {sourceLabel && ` · ${sourceLabel}`}
             </span>
             {basketCount > 0 && (
               <span className="text-[10px] font-semibold text-foreground">
@@ -294,69 +271,34 @@ function ExpandedRow({
   food: Food;
   onAdd: (grams: number, label: string) => void;
 }) {
-  const stops = buildStops(food);
-  const unit = food.isLiquid ? 'ml' : 'g';
-  const [stopIndex, setStopIndex] = useState(() => defaultStopIndex(food, stops));
-  const [freeGrams, setFreeGrams] = useState('');
+  const stops = useMemo(() => buildQuantityStops(food.portions), [food.portions]);
+  const [amount, setAmount] = useState(() => {
+    const i = defaultQuantityStopIndex(
+      stops,
+      food.portions.find((p) => p.isDefault)?.label ?? null,
+    );
+    return { grams: stops[i]?.grams ?? 100, portionLabel: stops[i]?.label ?? null };
+  });
 
-  const freeValue = parseAmount(freeGrams);
-  const usingFree = freeValue !== null && freeValue > 0;
-  const grams = usingFree ? freeValue : (stops[stopIndex]?.grams ?? 100);
-  const portionLabel = usingFree ? null : (stops[stopIndex]?.label ?? null);
-  const totals = scalePer100(food, grams);
-  const label = formatQuantityLabel(portionLabel, grams, food.isLiquid);
-
-  function step(delta: number) {
-    setFreeGrams('');
-    setStopIndex((i) => Math.max(0, Math.min(stops.length - 1, i + delta)));
-  }
+  const totals = scalePer100(food, amount.grams);
+  const label = formatQuantityLabel(amount.portionLabel, amount.grams, food.isLiquid);
 
   return (
     <div className="space-y-3 px-3.5 pb-4">
-      <div className="flex items-center gap-3">
-        <span className="w-14 shrink-0 text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-          Menge
-        </span>
-        <div className="flex items-center border">
-          <Button variant="ghost" size="icon-sm" aria-label="Weniger" onClick={() => step(-1)}>
-            <IconMinus />
-          </Button>
-          <span className="min-w-[110px] px-1 text-center text-sm font-semibold">
-            {usingFree
-              ? `${Math.round(grams)} ${unit}`
-              : (portionLabel ?? `${Math.round(grams)} ${unit}`)}
-          </span>
-          <Button variant="ghost" size="icon-sm" aria-label="Mehr" onClick={() => step(1)}>
-            <IconPlus />
-          </Button>
-        </div>
-        {portionLabel && !usingFree && (
-          <span className="text-xs text-muted-foreground">= {Math.round(grams)} {unit}</span>
-        )}
-      </div>
-
-      <div className="flex items-center gap-3">
-        <span className="w-14 shrink-0 text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-          Frei
-        </span>
-        <div className="flex w-24 items-baseline gap-1 border-b border-b-input">
-          <Input
-            inputMode="decimal"
-            value={freeGrams}
-            onChange={(e) => setFreeGrams(e.target.value)}
-            placeholder="0"
-            className="h-9 border-b-0"
-          />
-          <span className="text-xs text-muted-foreground">{unit}</span>
-        </div>
-      </div>
+      <QuantityStepper
+        portions={food.portions}
+        isLiquid={food.isLiquid}
+        grams={amount.grams}
+        portionLabel={amount.portionLabel}
+        onChange={(grams, portionLabel) => setAmount({ grams, portionLabel })}
+      />
 
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">
           {formatKcal(totals.kcal)} kcal · {Math.round(totals.carbs)} KH ·{' '}
           {Math.round(totals.protein)} P · {Math.round(totals.fat)} F
         </span>
-        <Button size="sm" onClick={() => onAdd(grams, label)}>
+        <Button size="sm" onClick={() => onAdd(amount.grams, label)}>
           Übernehmen
         </Button>
       </div>

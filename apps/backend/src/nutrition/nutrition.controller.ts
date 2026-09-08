@@ -125,7 +125,12 @@ export class NutritionController {
     @Param('id') id: string,
     @Body() dto: UpdateDiaryEntryDto,
   ): Promise<DiaryEntryDto> {
-    return this.diaryEntries.updateEntryQuantity(user.id, id, dto.quantity);
+    return this.diaryEntries.updateEntryQuantity(
+      user.id,
+      id,
+      dto.quantity,
+      dto.quantityLabel,
+    );
   }
 
   @Delete('entries/:id')

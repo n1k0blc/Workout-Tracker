@@ -242,6 +242,7 @@ export class DiaryEntriesService {
     userId: string,
     id: string,
     quantity: number,
+    quantityLabel?: string,
   ): Promise<DiaryEntryDto> {
     const entry = (await this.prisma.diaryEntry.findFirst({
       where: { id, userId },
@@ -259,6 +260,8 @@ export class DiaryEntriesService {
         carbs: entry.carbs * ratio,
         protein: entry.protein * ratio,
         fat: entry.fat * ratio,
+        // Only a food-backed editor sends this; a bare Schnelleintrag has no unit label.
+        ...(quantityLabel !== undefined ? { quantityLabel } : {}),
       },
     })) as DiaryEntryRow;
 

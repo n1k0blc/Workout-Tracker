@@ -209,6 +209,27 @@ describe('DiaryEntriesService.updateEntryQuantity — proportional rescale', () 
     });
     expect(prisma.diaryEntry.update).not.toHaveBeenCalled();
   });
+
+  it('persists a new quantityLabel when the food-backed editor sends one', async () => {
+    const { service, prisma } = makeService({
+      entry: { ...ENTRY, foodId: 'food-1', quantity: 40, quantityLabel: '1 Portion (40 g)' },
+    });
+
+    await service.updateEntryQuantity('user-1', 'entry-1', 80, '2 Portionen (80 g)');
+
+    expect(prisma.diaryEntry.update).toHaveBeenCalledWith({
+      where: { id: 'entry-1' },
+      data: expect.objectContaining({ quantity: 80, quantityLabel: '2 Portionen (80 g)' }),
+    });
+  });
+
+  it('leaves quantityLabel untouched when none is sent (bare Schnelleintrag)', async () => {
+    const { service, prisma } = makeService({ entry: { ...ENTRY, quantity: 1 } });
+
+    await service.updateEntryQuantity('user-1', 'entry-1', 2);
+
+    expect(prisma.diaryEntry.update.mock.calls[0][0].data).not.toHaveProperty('quantityLabel');
+  });
 });
 
 describe('DiaryEntriesService.deleteEntry — scoped hard delete', () => {

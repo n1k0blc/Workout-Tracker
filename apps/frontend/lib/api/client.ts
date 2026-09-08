@@ -571,12 +571,18 @@ class ApiClient {
     });
   }
 
-  // Quantity is the only editable field: the server rescales the kcal/macro snapshot by
-  // newQuantity / oldQuantity.
-  async updateDiaryEntryQuantity(id: string, quantity: number): Promise<DiaryEntry> {
+  // The server rescales the kcal/macro snapshot by newQuantity / oldQuantity. A food-backed
+  // editor also passes the refreshed display label ("2 Portionen (80 g)").
+  async updateDiaryEntryQuantity(
+    id: string,
+    quantity: number,
+    quantityLabel?: string,
+  ): Promise<DiaryEntry> {
     return this.request<DiaryEntry>(`/nutrition/entries/${id}`, {
       method: 'PATCH',
-      body: JSON.stringify({ quantity }),
+      body: JSON.stringify(
+        quantityLabel !== undefined ? { quantity, quantityLabel } : { quantity },
+      ),
     });
   }
 

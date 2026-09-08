@@ -4,16 +4,10 @@ import { useEffect, useState } from 'react';
 import { IconChevronRight, IconPlus, IconSearch } from '@tabler/icons-react';
 import { apiClient } from '@/lib/api';
 import { Food } from '@/types';
+import { foodSourceLabel } from '@/lib/nutrition';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FoodEditorDialog } from './food-editor-dialog';
-
-function sourceBadge(food: Food): string | null {
-  if (food.editable) return 'Eigenes';
-  if (food.source === 'SEED') return 'System';
-  if (food.source === 'OPEN_FOOD_FACTS') return 'Open Food Facts';
-  return null; // another user's food -- no byline
-}
 
 function subtitle(food: Food): string {
   const unit = food.isLiquid ? 'ml' : 'g';
@@ -91,7 +85,7 @@ export default function FoodsTab() {
       ) : (
         <div className="divide-y rounded-lg border bg-card">
           {foods.map((food) => {
-            const badge = sourceBadge(food);
+            const badge = foodSourceLabel(food);
             return (
               <button
                 key={food.id}
