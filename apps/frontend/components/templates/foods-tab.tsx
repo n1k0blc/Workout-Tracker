@@ -111,6 +111,20 @@ export default function FoodsTab() {
         </div>
       )}
 
+      {/* ODbL attribution for the imported products (#146). */}
+      <p className="text-xs text-muted-foreground">
+        Produktdaten teilweise aus{' '}
+        <a
+          href="https://world.openfoodfacts.org"
+          target="_blank"
+          rel="noreferrer noopener"
+          className="underline underline-offset-2"
+        >
+          Open Food Facts
+        </a>
+        , Lizenz ODbL.
+      </p>
+
       <FoodEditorDialog
         open={editing !== null}
         onOpenChange={(open) => !open && setEditing(null)}

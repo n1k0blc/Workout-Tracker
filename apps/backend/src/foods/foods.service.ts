@@ -93,7 +93,13 @@ export class FoodsService {
   async findAll(userId: string, search?: string): Promise<FoodDto[]> {
     const where: Record<string, unknown> = { deletedAt: null };
     if (search && search.trim()) {
-      where.name = { contains: search.trim(), mode: 'insensitive' };
+      // Brand as well as name: the Open Food Facts import (#146) fills the library with
+      // branded products a user is as likely to search for by brand.
+      const term = search.trim();
+      where.OR = [
+        { name: { contains: term, mode: 'insensitive' } },
+        { brand: { contains: term, mode: 'insensitive' } },
+      ];
     }
 
     const foods = (await this.prisma.food.findMany({

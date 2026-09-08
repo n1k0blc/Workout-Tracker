@@ -106,7 +106,13 @@ describe('FoodsService.findAll — visibility', () => {
 
     expect(prisma.food.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { deletedAt: null, name: { contains: 'hafer', mode: 'insensitive' } },
+        where: {
+          deletedAt: null,
+          OR: [
+            { name: { contains: 'hafer', mode: 'insensitive' } },
+            { brand: { contains: 'hafer', mode: 'insensitive' } },
+          ],
+        },
       }),
     );
     expect(result.map((f) => f.id)).toEqual(['food-own', 'food-other', 'food-seed', 'food-off']);
@@ -123,6 +129,28 @@ describe('FoodsService.findAll — visibility', () => {
     expect(byId['food-other'].editable).toBe(false); // someone else's
     expect(byId['food-seed'].editable).toBe(false); // seeded
     expect(byId['food-off'].editable).toBe(false); // imported
+  });
+});
+
+describe('FoodsService.findAll - search matches brand too', () => {
+  it("finds an imported product by its brand, not just its name", async () => {
+    // The Open Food Facts import (#146) fills the library with branded products, so a
+    // search for the brand has to reach them.
+    const { service, prisma } = makeService({ findMany: [OFF_FOOD] });
+
+    await service.findAll('user-1', 'Oatly');
+
+    expect(prisma.food.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          deletedAt: null,
+          OR: [
+            { name: { contains: 'Oatly', mode: 'insensitive' } },
+            { brand: { contains: 'Oatly', mode: 'insensitive' } },
+          ],
+        },
+      }),
+    );
   });
 });
 
