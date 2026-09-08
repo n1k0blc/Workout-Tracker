@@ -7,7 +7,7 @@ import { MealListItem } from '@/types';
 import { formatKcal, mealIngredientPreview } from '@/lib/nutrition';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { MealEditorDialog } from './meal-editor-dialog';
+import { MealEditorSheet } from './meal-editor-sheet';
 
 function totalsLine(meal: MealListItem): string {
   const { kcal, carbs, protein, fat } = meal.totals;
@@ -99,7 +99,7 @@ export default function MealsTab() {
         </div>
       )}
 
-      <MealEditorDialog
+      <MealEditorSheet
         open={editing !== null}
         onOpenChange={(open) => !open && setEditing(null)}
         mealId={editing && editing !== 'create' ? editing : undefined}

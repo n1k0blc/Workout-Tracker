@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import {
+  IconArrowLeft,
   IconGripVertical,
   IconPlus,
   IconSearch,
@@ -26,11 +28,11 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from '@/components/ui/drawer';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,6 +46,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { apiClient } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import { Food, FoodPortion, MealItem } from '@/types';
 import {
   computeMealTotals,
@@ -52,6 +55,13 @@ import {
   scalePer100,
 } from '@/lib/nutrition';
 import { QuantityStepper } from '@/components/nutrition/quantity-stepper';
+
+const SEARCH_TABS = [
+  { id: 'alle', label: 'Alle' },
+  { id: 'favoriten', label: 'Favoriten' },
+  { id: 'zuletzt', label: 'Zuletzt' },
+] as const;
+type SearchTabId = (typeof SEARCH_TABS)[number]['id'];
 
 /** An ingredient being edited: the food's live nutrients plus the chosen amount. */
 interface EditorItem {
@@ -118,7 +128,7 @@ function itemSubtitle(item: EditorItem): string {
  * meal later expands it into snapshotted entries. Only the creator can edit -- another
  * user's meal opens read-only.
  */
-export function MealEditorDialog({
+export function MealEditorSheet({
   open,
   onOpenChange,
   mealId,
@@ -141,6 +151,7 @@ export function MealEditorDialog({
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchTab, setSearchTab] = useState<SearchTabId>('alle');
   const [search, setSearch] = useState('');
   const [results, setResults] = useState<Food[]>([]);
   const [searching, setSearching] = useState(false);
@@ -157,6 +168,7 @@ export function MealEditorDialog({
     setConfirmDelete(false);
     setExpandedKey(null);
     setSearchOpen(false);
+    setSearchTab('alle');
     setSearch('');
     setResults([]);
 
@@ -188,9 +200,10 @@ export function MealEditorDialog({
     };
   }, [open, mealId]);
 
-  // Food search for the "Zutat" picker.
+  // Food search for the "Zutat" picker -- only the "Alle" tab queries (Favoriten / Zuletzt
+  // are #148, empty placeholders here as in the logging picker).
   useEffect(() => {
-    if (!searchOpen) return;
+    if (!searchOpen || searchTab !== 'alle') return;
     let cancelled = false;
     const id = setTimeout(async () => {
       setSearching(true);
@@ -207,17 +220,23 @@ export function MealEditorDialog({
       cancelled = true;
       clearTimeout(id);
     };
-  }, [searchOpen, search]);
+  }, [searchOpen, searchTab, search]);
 
   const totals = useMemo(
     () => computeMealTotals(items.map((i) => ({ per100: i.per100, quantity: i.quantity }))),
     [items],
   );
 
+  function openSearch() {
+    setSearchOpen(true);
+    setSearchTab('alle');
+    setSearch('');
+    setResults([]);
+  }
+
   function addFood(food: Food) {
     setItems((prev) => [...prev, fromFood(food)]);
-    setSearchOpen(false);
-    setSearch('');
+    toast.success(`${food.name} hinzugefügt`);
   }
 
   function removeItem(key: string) {
@@ -284,179 +303,167 @@ export function MealEditorDialog({
   const title = readOnly ? 'Mahlzeit' : isEdit ? 'Mahlzeit bearbeiten' : 'Neue Mahlzeit';
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
-        <DialogHeader className="flex-row items-center justify-between">
-          <DialogTitle>{title}</DialogTitle>
-          {isEdit && !readOnly && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="text-destructive"
-              aria-label="Mahlzeit löschen"
-              onClick={() => setConfirmDelete(true)}
-            >
-              <IconTrash />
-            </Button>
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent className="mx-auto flex h-[92vh] max-w-2xl flex-col">
+        <DrawerHeader className="flex-row items-center justify-between gap-2">
+          {searchOpen ? (
+            <>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label="Zurück"
+                onClick={() => setSearchOpen(false)}
+              >
+                <IconArrowLeft />
+              </Button>
+              <DrawerTitle>Zutat</DrawerTitle>
+              <span className="w-9" />
+            </>
+          ) : (
+            <>
+              <DrawerTitle className="truncate">{title}</DrawerTitle>
+              {isEdit && !readOnly && (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="text-destructive"
+                  aria-label="Mahlzeit löschen"
+                  onClick={() => setConfirmDelete(true)}
+                >
+                  <IconTrash />
+                </Button>
+              )}
+            </>
           )}
-        </DialogHeader>
+        </DrawerHeader>
 
-        {error && (
-          <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-            {error}
-          </div>
-        )}
-
-        {loading ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">Lädt …</p>
+        {searchOpen ? (
+          <FoodSearchView
+            tab={searchTab}
+            onTab={setSearchTab}
+            search={search}
+            onSearch={setSearch}
+            results={results}
+            searching={searching}
+            addedFoodIds={new Set(items.map((i) => i.foodId))}
+            onAdd={addFood}
+            onDone={() => setSearchOpen(false)}
+          />
         ) : (
-          <div className="space-y-5">
-            <label className="block">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                Name
-              </span>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                disabled={readOnly}
-                autoFocus={!isEdit}
-              />
-            </label>
-
-            <div>
-              <div className="mb-2.5 flex items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                  Zutaten · {items.length}
-                </span>
-                {!readOnly && (
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    onClick={() => setSearchOpen((v) => !v)}
-                  >
-                    <IconSearch data-icon="inline-start" />
-                    Zutat
-                  </Button>
-                )}
-              </div>
-
-              {searchOpen && !readOnly && (
-                <div className="mb-3 rounded-md border bg-muted/40 p-2">
-                  <div className="flex items-center gap-2 border-b border-b-input">
-                    <IconSearch className="size-4 shrink-0 text-muted-foreground" />
-                    <Input
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      placeholder="Lebensmittel suchen..."
-                      className="border-b-0"
-                      autoFocus
-                    />
-                  </div>
-                  <div className="mt-2 max-h-56 overflow-y-auto">
-                    {searching && results.length === 0 ? (
-                      <p className="py-4 text-center text-xs text-muted-foreground">Lädt …</p>
-                    ) : results.length === 0 ? (
-                      <p className="py-4 text-center text-xs text-muted-foreground">
-                        {search.trim() ? 'Nichts gefunden.' : 'Die Bibliothek ist leer.'}
-                      </p>
-                    ) : (
-                      <div className="divide-y">
-                        {results.map((food) => (
-                          <button
-                            key={food.id}
-                            type="button"
-                            onClick={() => addFood(food)}
-                            className="flex w-full items-center gap-3 py-2 text-left hover:bg-muted/60"
-                          >
-                            <div className="min-w-0 flex-1">
-                              <div className="truncate text-sm">{food.name}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {Math.round(food.kcal)} kcal / 100 {food.isLiquid ? 'ml' : 'g'}
-                              </div>
-                            </div>
-                            <IconPlus className="size-4 shrink-0 text-muted-foreground" />
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+          <>
+            <div className="flex-1 overflow-y-auto px-4 pb-2">
+              {error && (
+                <div className="mb-4 rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+                  {error}
                 </div>
               )}
 
-              {items.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  Noch keine Zutaten. Füge welche über „Zutat“ hinzu.
-                </p>
+              {loading ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">Lädt …</p>
               ) : (
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragEnd={onDragEnd}
-                >
-                  <SortableContext
-                    items={items.map((i) => i.key)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    <div className="divide-y rounded-md border">
-                      {items.map((item) => (
-                        <IngredientRow
-                          key={item.key}
-                          item={item}
-                          readOnly={readOnly}
-                          expanded={expandedKey === item.key}
-                          onToggle={() =>
-                            setExpandedKey((k) => (k === item.key ? null : item.key))
-                          }
-                          onRemove={() => removeItem(item.key)}
-                          onAmountChange={(g, label) => setItemAmount(item.key, g, label)}
-                        />
+                <div className="space-y-5 pt-1">
+                  <label className="block">
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                      Name
+                    </span>
+                    <Input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      disabled={readOnly}
+                      autoFocus={!isEdit}
+                    />
+                  </label>
+
+                  <div>
+                    <div className="mb-2.5 flex items-center justify-between">
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                        Zutaten · {items.length}
+                      </span>
+                      {!readOnly && (
+                        <Button variant="outline" size="xs" onClick={openSearch}>
+                          <IconSearch data-icon="inline-start" />
+                          Zutat
+                        </Button>
+                      )}
+                    </div>
+
+                    {items.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        Noch keine Zutaten. Füge welche über „Zutat“ hinzu.
+                      </p>
+                    ) : (
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={onDragEnd}
+                      >
+                        <SortableContext
+                          items={items.map((i) => i.key)}
+                          strategy={verticalListSortingStrategy}
+                        >
+                          <div className="divide-y rounded-md border">
+                            {items.map((item) => (
+                              <IngredientRow
+                                key={item.key}
+                                item={item}
+                                readOnly={readOnly}
+                                expanded={expandedKey === item.key}
+                                onToggle={() =>
+                                  setExpandedKey((k) => (k === item.key ? null : item.key))
+                                }
+                                onRemove={() => removeItem(item.key)}
+                                onAmountChange={(g, label) => setItemAmount(item.key, g, label)}
+                              />
+                            ))}
+                          </div>
+                        </SortableContext>
+                      </DndContext>
+                    )}
+                  </div>
+
+                  <div className="rounded-lg border bg-card p-4">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                      Summe der Mahlzeit
+                    </div>
+                    <div className="mt-2 flex items-baseline gap-1.5">
+                      <span className="text-2xl font-bold leading-none">
+                        {formatKcal(totals.kcal)}
+                      </span>
+                      <span className="text-xs text-muted-foreground">kcal</span>
+                    </div>
+                    <div className="mt-3.5 grid grid-cols-3 gap-3">
+                      {[
+                        { label: 'Kohlenh.', value: totals.carbs },
+                        { label: 'Protein', value: totals.protein },
+                        { label: 'Fett', value: totals.fat },
+                      ].map((m) => (
+                        <div key={m.label}>
+                          <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                            {m.label}
+                          </div>
+                          <div className="mt-1 text-sm font-semibold">
+                            {m.value.toLocaleString('de-DE', {
+                              minimumFractionDigits: 1,
+                              maximumFractionDigits: 1,
+                            })}{' '}
+                            g
+                          </div>
+                        </div>
                       ))}
                     </div>
-                  </SortableContext>
-                </DndContext>
+                  </div>
+                </div>
               )}
             </div>
 
-            <div className="rounded-lg border bg-card p-4">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                Summe der Mahlzeit
-              </div>
-              <div className="mt-2 flex items-baseline gap-1.5">
-                <span className="text-2xl font-bold leading-none">
-                  {formatKcal(totals.kcal)}
-                </span>
-                <span className="text-xs text-muted-foreground">kcal</span>
-              </div>
-              <div className="mt-3.5 grid grid-cols-3 gap-3">
-                {[
-                  { label: 'Kohlenh.', value: totals.carbs },
-                  { label: 'Protein', value: totals.protein },
-                  { label: 'Fett', value: totals.fat },
-                ].map((m) => (
-                  <div key={m.label}>
-                    <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                      {m.label}
-                    </div>
-                    <div className="mt-1 text-sm font-semibold">
-                      {m.value.toLocaleString('de-DE', {
-                        minimumFractionDigits: 1,
-                        maximumFractionDigits: 1,
-                      })}{' '}
-                      g
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex gap-2">
+            <div className="mt-auto flex gap-2 border-t p-4">
               {readOnly ? (
                 <Button className="flex-1" variant="outline" onClick={() => onOpenChange(false)}>
                   Schließen
                 </Button>
               ) : (
                 <>
-                  <Button className="flex-1" onClick={handleSave} disabled={saving}>
+                  <Button className="flex-1" onClick={handleSave} disabled={saving || loading}>
                     Speichern
                   </Button>
                   <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -465,9 +472,9 @@ export function MealEditorDialog({
                 </>
               )}
             </div>
-          </div>
+          </>
         )}
-      </DialogContent>
+      </DrawerContent>
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
@@ -489,7 +496,113 @@ export function MealEditorDialog({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Dialog>
+    </Drawer>
+  );
+}
+
+function FoodSearchView({
+  tab,
+  onTab,
+  search,
+  onSearch,
+  results,
+  searching,
+  addedFoodIds,
+  onAdd,
+  onDone,
+}: {
+  tab: SearchTabId;
+  onTab: (t: SearchTabId) => void;
+  search: string;
+  onSearch: (v: string) => void;
+  results: Food[];
+  searching: boolean;
+  addedFoodIds: Set<string>;
+  onAdd: (food: Food) => void;
+  onDone: () => void;
+}) {
+  return (
+    <>
+      <div className="flex flex-col gap-3 px-4">
+        <div className="flex items-center gap-2 border-b border-b-input">
+          <IconSearch className="size-4 shrink-0 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => onSearch(e.target.value)}
+            placeholder="Lebensmittel suchen..."
+            className="border-b-0"
+            autoFocus
+          />
+        </div>
+        <div className="flex gap-1 border-b">
+          {SEARCH_TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => onTab(t.id)}
+              className={cn(
+                'relative px-3 py-2 text-xs font-semibold uppercase tracking-[0.05em]',
+                tab === t.id ? 'text-foreground' : 'text-muted-foreground',
+              )}
+            >
+              {t.label}
+              {tab === t.id && (
+                <span className="absolute inset-x-0 -bottom-px h-0.5 bg-foreground" />
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 py-3">
+        {tab !== 'alle' ? (
+          <p className="py-10 text-center text-sm text-muted-foreground">
+            {tab === 'favoriten' ? 'Favoriten' : 'Zuletzt'} folgen in Kürze.
+          </p>
+        ) : searching && results.length === 0 ? (
+          <p className="py-10 text-center text-sm text-muted-foreground">Lädt …</p>
+        ) : results.length === 0 ? (
+          <p className="py-10 text-center text-sm text-muted-foreground">
+            {search.trim() ? 'Nichts gefunden.' : 'Die Bibliothek ist noch leer.'}
+          </p>
+        ) : (
+          <div className="divide-y rounded-lg border">
+            {results.map((food) => {
+              const added = addedFoodIds.has(food.id);
+              return (
+                <div key={food.id} className="flex items-center gap-3 px-3.5 py-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{food.name}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">
+                      {Math.round(food.kcal)} kcal / 100 {food.isLiquid ? 'ml' : 'g'}
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    aria-label={`${food.name} hinzufügen`}
+                    onClick={() => onAdd(food)}
+                  >
+                    <IconPlus />
+                  </Button>
+                  {added && (
+                    <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      drin
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-auto border-t p-4">
+        <Button className="w-full" onClick={onDone}>
+          Fertig
+        </Button>
+      </div>
+    </>
   );
 }
 
@@ -535,7 +648,7 @@ function IngredientRow({
           onClick={readOnly ? undefined : onToggle}
           className="min-w-0 flex-1 text-left"
         >
-          <div className="text-sm">
+          <div className="truncate text-sm">
             {item.foodName}
             {item.deleted && (
               <span className="ml-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
@@ -543,12 +656,15 @@ function IngredientRow({
               </span>
             )}
           </div>
-          <div className="mt-0.5 text-xs text-muted-foreground">{itemSubtitle(item)}</div>
+          <div className="mt-0.5 truncate text-xs text-muted-foreground">
+            {itemSubtitle(item)}
+          </div>
         </button>
         {!readOnly && (
           <Button
             variant="ghost"
             size="icon-sm"
+            className="shrink-0"
             aria-label={`${item.foodName} entfernen`}
             onClick={onRemove}
           >
