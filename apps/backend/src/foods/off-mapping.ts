@@ -75,9 +75,14 @@ export function mapOffProduct(product: OffProduct): MappedFood {
   };
 }
 
-/** EAN-8 / EAN-13 (a zero-padded UPC-A is an EAN-13) with a valid check digit. */
+/**
+ * EAN-13 with a valid check digit; a zero-padded UPC-A is an EAN-13 and passes. Shorter
+ * codes are rejected on purpose: EAN-8 is legitimate on small packages, but in the Open
+ * Food Facts export 8-digit codes are overwhelmingly internal and test entries, about 9% of
+ * otherwise importable German rows.
+ */
 function isValidEan(barcode: string): boolean {
-  if (!/^\d{8}$|^\d{13}$/.test(barcode)) return false;
+  if (!/^\d{13}$/.test(barcode)) return false;
   const digits = [...barcode].map(Number);
   const check = digits.pop() as number;
   const sum = digits
@@ -94,7 +99,8 @@ function isValidEan(barcode: string): boolean {
  */
 export function rejectOffProduct(product: OffProduct): string | null {
   if (!product.name.trim()) return 'no name';
-  if (!isValidEan(product.barcode)) return `barcode "${product.barcode}" is not a valid EAN`;
+  if (!isValidEan(product.barcode))
+    return `barcode "${product.barcode}" is not 13 digits with a valid EAN check digit`;
   const macros = [product.kcal, product.carbs, product.protein, product.fat];
   if (macros.some((value) => !Number.isFinite(value))) return 'missing or non-numeric macro';
   if (macros.some((value) => value < 0)) return 'negative macro value';

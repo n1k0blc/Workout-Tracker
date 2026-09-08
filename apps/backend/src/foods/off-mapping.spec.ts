@@ -95,6 +95,10 @@ describe('rejectOffProduct — the quality gate', () => {
     ['impossible macro', { carbs: 140 }, /per-100/],
     ['barcode that is not an EAN', { barcode: '00001001' }, /barcode/],
     ['barcode failing its checksum', { barcode: '4025500287956' }, /barcode/],
+    // 8-digit codes are a valid EAN-8 in principle, but in this dataset they are almost
+    // entirely internal and test codes ("Fit Piggy Snickers Twist"), ~9% of otherwise
+    // importable rows. A genuine short code is rare enough to lose.
+    ['a checksum-valid 8-digit code', { barcode: '00001014' }, /13 digits/],
   ])('rejects %s', (_label, overrides, reason) => {
     expect(rejectOffProduct(offProduct(overrides))).toMatch(reason);
   });
