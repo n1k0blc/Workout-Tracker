@@ -764,6 +764,28 @@ export interface NutritionDay {
   slots: NutritionDaySlot[];
 }
 
+/** The four metrics the Ernährungs-Analytics chart (#153) can toggle between. */
+export type NutritionMetric = 'kcal' | 'carbs' | 'protein' | 'fat';
+
+/** One day of the Ernährungs-Analytics series; a day with no entries has every total at 0. */
+export interface NutritionTrendDay {
+  date: string;
+  /** 0 = Sunday .. 6 = Saturday, for the weekday x-axis labels. */
+  weekday: number;
+  kcal: number;
+  carbs: number;
+  protein: number;
+  fat: number;
+}
+
+/** `GET /nutrition/analytics`: one row per calendar day in `[start, end]`, plus the Tagesziele. */
+export interface NutritionTrend {
+  start: string;
+  end: string;
+  days: NutritionTrendDay[];
+  targets: MacroTargets | null;
+}
+
 export interface CreateDiaryEntryInput {
   mealSlotId: string;
   localDate: string;

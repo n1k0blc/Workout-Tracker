@@ -22,7 +22,13 @@ import {
   mealIngredientPreview,
   groupDiaryEntries,
   sortFavoritesFirst,
+  metricTarget,
+  formatMetricValue,
+  nutritionDailyAverage,
+  nutritionTargetReached,
+  nutritionRangeLabel,
 } from './nutrition';
+import type { NutritionTrendDay } from '@/types';
 
 const originalTz = process.env.TZ;
 afterAll(() => {
@@ -467,5 +473,66 @@ describe('relativeDayLabel', () => {
   it('falls back to the weekday name further out', () => {
     process.env.TZ = 'Europe/Berlin';
     expect(relativeDayLabel('2026-09-04', '2026-09-07')).toBe('Freitag');
+  });
+});
+
+describe('Ernährungs-Analytics helpers (#153)', () => {
+  const day = (
+    date: string,
+    weekday: number,
+    kcal: number,
+    carbs = 0,
+    protein = 0,
+    fat = 0,
+  ): NutritionTrendDay => ({ date, weekday, kcal, carbs, protein, fat });
+
+  const series: NutritionTrendDay[] = [
+    day('2026-09-01', 2, 2000, 200, 120, 70),
+    day('2026-09-02', 3, 0, 0, 0, 0), // a day with nothing logged
+    day('2026-09-03', 4, 2600, 260, 160, 90),
+    day('2026-09-04', 5, 2400, 240, 150, 80),
+  ];
+
+  describe('metricTarget', () => {
+    it('reads the target for the metric, or null when targets are absent', () => {
+      expect(metricTarget({ kcal: 2400, carbs: null, protein: 150, fat: null }, 'kcal')).toBe(2400);
+      expect(metricTarget({ kcal: 2400, carbs: null, protein: 150, fat: null }, 'carbs')).toBeNull();
+      expect(metricTarget(null, 'protein')).toBeNull();
+    });
+  });
+
+  describe('formatMetricValue', () => {
+    it('reads kcal bare with a thousands separator and macros in grams', () => {
+      expect(formatMetricValue(2219, 'kcal')).toBe('2.219 kcal');
+      expect(formatMetricValue(149.6, 'protein')).toBe('150 g');
+    });
+  });
+
+  describe('nutritionDailyAverage', () => {
+    it('averages over every day in the range, zero days included', () => {
+      expect(nutritionDailyAverage(series, 'kcal')).toBe((2000 + 0 + 2600 + 2400) / 4);
+    });
+
+    it('is 0 for an empty series', () => {
+      expect(nutritionDailyAverage([], 'fat')).toBe(0);
+    });
+  });
+
+  describe('nutritionTargetReached', () => {
+    it('counts days at or above the target out of the whole range', () => {
+      expect(nutritionTargetReached(series, 'kcal', 2400)).toEqual({ hit: 2, total: 4 });
+    });
+
+    it('returns null when the metric has no positive target', () => {
+      expect(nutritionTargetReached(series, 'kcal', null)).toBeNull();
+      expect(nutritionTargetReached(series, 'kcal', 0)).toBeNull();
+    });
+  });
+
+  describe('nutritionRangeLabel', () => {
+    it('phrases the range for the legend line', () => {
+      expect(nutritionRangeLabel(7)).toBe('letzte 7 Tage');
+      expect(nutritionRangeLabel(30)).toBe('letzte 30 Tage');
+    });
   });
 });

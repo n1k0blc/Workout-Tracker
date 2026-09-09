@@ -113,6 +113,16 @@ say.
   entries as logged. Carried on the `GET /nutrition/day` payload as `targets` so the day
   view needs no second request.
 
+- **Ernährungs-Analytics** — the "Ernährung" card on the analytics page: a line of daily
+  kcal / Kohlenhydrate / Protein / Fett totals over the page's range selector, one metric at
+  a time, with a dashed "ZIEL" reference line when that metric has a Tagesziel and two stat
+  tiles ("Ø pro Tag", "Ziel erreicht · N von M Tagen" — days whose total is at or above the
+  target). `GET /nutrition/analytics?start&end` returns one row per calendar day in the
+  inclusive range, a day with no entries as zeros (never a gap), plus the same `targets`
+  object as the day payload. `start` / `end` are the client's own calendar days, so the
+  series is in the client's timezone; omitted, the window is the last 7 days up to the
+  client's "today". No weight correlation. Code: `NutritionAnalyticsService`.
+
 ### Tracked nutrients
 
 Only **kcal**, **Kohlenhydrate** (carbs), **Protein** and **Fett** (fat). No micronutrients.

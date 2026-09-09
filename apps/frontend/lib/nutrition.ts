@@ -1,4 +1,5 @@
 import { fromLocalDateString, toLocalDateString } from '@/lib/local-date';
+import type { MacroTargets, NutritionMetric, NutritionTrendDay } from '@/types';
 
 /** Energy density of the macronutrients: 4 kcal/g carbs, 4 kcal/g protein, 9 kcal/g fat. */
 export const KCAL_PER_GRAM = { carbs: 4, protein: 4, fat: 9 } as const;
@@ -330,4 +331,65 @@ export function relativeDayLabel(localDate: string, today: string): string {
   return new Intl.DateTimeFormat('de-DE', { weekday: 'long' }).format(
     fromLocalDateString(localDate),
   );
+}
+
+// --- Ernährungs-Analytics (#153) --------------------------------------------------------
+
+export interface NutritionMetricConfig {
+  key: NutritionMetric;
+  /** The segmented-toggle label. */
+  label: string;
+}
+
+/** The four metrics of the Ernährungs-Analytics chart, in toggle order (design screen 11). */
+export const NUTRITION_METRICS: NutritionMetricConfig[] = [
+  { key: 'kcal', label: 'kcal' },
+  { key: 'carbs', label: 'KH' },
+  { key: 'protein', label: 'Protein' },
+  { key: 'fat', label: 'Fett' },
+];
+
+/** The Tagesziel for one metric, or `null` when it is unset or no targets exist at all. */
+export function metricTarget(
+  targets: MacroTargets | null,
+  metric: NutritionMetric,
+): number | null {
+  return targets ? targets[metric] : null;
+}
+
+/** A metric value the way its tile and tooltip read it: `"2.219 kcal"`, `"150 g"`. */
+export function formatMetricValue(value: number, metric: NutritionMetric): string {
+  if (metric === 'kcal') return `${formatKcal(value)} kcal`;
+  return `${Math.round(value)} g`;
+}
+
+/** "Ø pro Tag": the mean of a metric across the whole range, days with no entries included. */
+export function nutritionDailyAverage(
+  days: NutritionTrendDay[],
+  metric: NutritionMetric,
+): number {
+  if (days.length === 0) return 0;
+  return days.reduce((sum, day) => sum + day[metric], 0) / days.length;
+}
+
+/**
+ * "Ziel erreicht · N von M Tagen": how many days in the range reached the metric's target
+ * (day total at or above it), out of every day in the range. `null` when the metric has no
+ * positive target, so the caller shows no tile.
+ */
+export function nutritionTargetReached(
+  days: NutritionTrendDay[],
+  metric: NutritionMetric,
+  target: number | null,
+): { hit: number; total: number } | null {
+  if (typeof target !== 'number' || !Number.isFinite(target) || target <= 0) return null;
+  return {
+    hit: days.filter((day) => day[metric] >= target).length,
+    total: days.length,
+  };
+}
+
+/** The legend's range phrase for a series `dayCount` days long: `"letzte 7 Tage"`. */
+export function nutritionRangeLabel(dayCount: number): string {
+  return `letzte ${dayCount} Tage`;
 }

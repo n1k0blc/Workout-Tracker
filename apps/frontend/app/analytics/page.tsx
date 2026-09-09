@@ -38,6 +38,7 @@ import ExerciseSelectionModal from '@/components/workout/exercise-selection-moda
 import SelectedExerciseCard from '@/components/analytics/selected-exercise-card';
 import ScrollableChart from '@/components/analytics/scrollable-chart';
 import AnalyticsChart from '@/components/analytics/AnalyticsChart';
+import NutritionTrendChart from '@/components/analytics/nutrition-trend-chart';
 import {
   CHART_ACCENT,
   getRIRBarFill,
@@ -49,6 +50,14 @@ import { formatNumber, formatDate, formatXAxisLabel, formatTooltipLabel } from '
 import { PersonalRecordCard } from '@/components/PersonalRecordCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { NutritionTrend } from '@/types';
+import { addDays } from '@/lib/nutrition';
+import { toLocalDateString } from '@/lib/local-date';
+
+// The range selector drives the nutrition chart's window. "Alle" has no natural start for a
+// daily series, so it maps to a year -- long enough for a trend, and the endpoint's own cap.
+const nutritionRangeDaysFor = (timeFilter: string) =>
+  timeFilter === 'all' ? 365 : Number(timeFilter);
 
 export default function AnalyticsPage() {
   // Data states
@@ -86,6 +95,11 @@ export default function AnalyticsPage() {
   // Filter states
   const [timeFilter, setTimeFilter] = useState('7');
   const [gymFilter, setGymFilter] = useState('alle');
+
+  // Ernährungs-Analytics (#153): its own fetch, keyed on the shared range selector.
+  const [nutritionTrend, setNutritionTrend] = useState<NutritionTrend | null>(null);
+  const [nutritionLoading, setNutritionLoading] = useState(true);
+  const nutritionRangeDays = nutritionRangeDaysFor(timeFilter);
   
   // Exercise filter state
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
@@ -98,6 +112,32 @@ export default function AnalyticsPage() {
   useEffect(() => {
     loadInitialData();
   }, []);
+
+  // Nutrition trend follows the range selector only -- it is independent of cycle mode and
+  // the workout filters. The previous chart stays visible while a new range loads.
+  useEffect(() => {
+    let cancelled = false;
+    const end = toLocalDateString(new Date());
+    const start = addDays(end, -(nutritionRangeDays - 1));
+    apiClient
+      .getNutritionAnalytics(start, end)
+      .then((trend) => {
+        if (!cancelled) {
+          setNutritionTrend(trend);
+          setNutritionLoading(false);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.error('Failed to load nutrition analytics:', error);
+          setNutritionTrend(null);
+          setNutritionLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [nutritionRangeDays]);
 
   // Reload analytics when filters change.
   // Also runs on initial mount (with default filter values) so the chart renders immediately
@@ -1818,6 +1858,13 @@ export default function AnalyticsPage() {
                     </CardContent>
                   </Card>
                 )}
+
+                {/* Ernährungs-Analytics (#153) -- reuses the range selector above */}
+                <NutritionTrendChart
+                  trend={nutritionTrend}
+                  rangeDays={nutritionRangeDays}
+                  loading={nutritionLoading}
+                />
               </div>
             )}
           </div>

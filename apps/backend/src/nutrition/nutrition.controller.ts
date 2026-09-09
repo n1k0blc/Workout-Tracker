@@ -18,6 +18,7 @@ import { ClientToday } from '../common/decorators/client-today.decorator';
 import { Today } from '../common/utils/today.util';
 import { isLocalDate } from '../common/utils/local-date.util';
 import { DiaryEntriesService } from './diary-entries.service';
+import { NutritionAnalyticsService } from './nutrition-analytics.service';
 import { MealSlotsService } from './meal-slots.service';
 import { PickerService, toPickerScope } from './picker.service';
 import {
@@ -36,6 +37,7 @@ import {
   MealSlotDto,
   MealSlotListDto,
   PickerListDto,
+  NutritionTrendDto,
 } from './dto';
 
 @Controller('nutrition')
@@ -43,6 +45,7 @@ import {
 export class NutritionController {
   constructor(
     private readonly diaryEntries: DiaryEntriesService,
+    private readonly nutritionAnalytics: NutritionAnalyticsService,
     private readonly mealSlots: MealSlotsService,
     private readonly picker: PickerService,
   ) {}
@@ -62,6 +65,30 @@ export class NutritionController {
       throw new BadRequestException('date must be a calendar date in YYYY-MM-DD form');
     }
     return this.diaryEntries.getDay(user.id, localDate);
+  }
+
+  /**
+   * The Ernährungs-Analytics daily series (#153). `start` and `end` are required `YYYY-MM-DD`
+   * calendar days -- the client sends its own range from the analytics range selector, so the
+   * series comes back in the client's timezone (`localDate` is client-stamped).
+   */
+  @Get('analytics')
+  async getAnalytics(
+    @CurrentUser() user: { id: string },
+    @Query('start') start?: string,
+    @Query('end') end?: string,
+  ): Promise<NutritionTrendDto> {
+    if (
+      typeof start !== 'string' ||
+      typeof end !== 'string' ||
+      !isLocalDate(start) ||
+      !isLocalDate(end)
+    ) {
+      throw new BadRequestException(
+        'start und end müssen Kalendertage in YYYY-MM-DD-Form sein',
+      );
+    }
+    return this.nutritionAnalytics.getTrend(user.id, start, end);
   }
 
   // --- Picker: Favoriten & Zuletzt (#148) --------------------------------------------------

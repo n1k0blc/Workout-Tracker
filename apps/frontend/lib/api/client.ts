@@ -34,6 +34,7 @@ import {
   WorkoutExerciseInput,
   LastPerformance,
   NutritionDay,
+  NutritionTrend,
   DiaryEntry,
   CreateDiaryEntryInput,
   DiaryEntriesBatchInput,
@@ -566,6 +567,13 @@ class ApiClient {
   async getNutritionDay(date?: string): Promise<NutritionDay> {
     const query = date ? `?date=${encodeURIComponent(date)}` : '';
     return this.request<NutritionDay>(`/nutrition/day${query}`);
+  }
+
+  // The Ernährungs-Analytics daily series (#153). `start` / `end` are the client's own
+  // YYYY-MM-DD calendar days, inclusive -- the server aggregates the stored localDate as-is.
+  async getNutritionAnalytics(start: string, end: string): Promise<NutritionTrend> {
+    const query = new URLSearchParams({ start, end });
+    return this.request<NutritionTrend>(`/nutrition/analytics?${query.toString()}`);
   }
 
   async createDiaryEntry(data: CreateDiaryEntryInput): Promise<DiaryEntry> {

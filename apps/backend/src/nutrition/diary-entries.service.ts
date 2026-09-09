@@ -9,13 +9,17 @@ import { scalePer100 } from '../common/utils/nutrition.util';
 import { MealsService } from '../meals/meals.service';
 import { MealSlotsService } from './meal-slots.service';
 import {
+  toMacroTargetsDto,
+  UserTargetsRow,
+  USER_TARGETS_SELECT,
+} from './nutrition-targets.util';
+import {
   CreateDiaryEntryDto,
   CreateDiaryEntriesBatchDto,
   CreateDiaryEntriesFromMealDto,
   CopyDiaryDayDto,
   CopyDiarySlotDto,
   DiaryEntryDto,
-  MacroTargetsDto,
   MacroTotals,
   NutritionDayDto,
   NutritionDaySlotDto,
@@ -48,13 +52,6 @@ type MealSlotRow = {
   archivedAt: Date | null;
 };
 
-type UserTargetsRow = {
-  targetKcal: number | null;
-  targetCarbs: number | null;
-  targetProtein: number | null;
-  targetFat: number | null;
-};
-
 type FoodRow = {
   id: string;
   name: string;
@@ -79,30 +76,6 @@ function addNutrients(a: MacroTotals, e: DiaryEntryRow | DiaryEntryDto): MacroTo
 /** The nutrients of `grams` (or ml) of a food, scaled from its per-100 values. */
 function scaleFromFood(food: FoodRow, grams: number) {
   return scalePer100(food, grams);
-}
-
-/**
- * The user's Tagesziele as the day payload carries them: `null` when not one of the four is
- * set (the Tagesansicht then shows plain totals), otherwise the whole object with each unset
- * target still `null`.
- */
-function toTargets(row: UserTargetsRow | null): MacroTargetsDto | null {
-  if (!row) return null;
-  const { targetKcal, targetCarbs, targetProtein, targetFat } = row;
-  if (
-    targetKcal === null &&
-    targetCarbs === null &&
-    targetProtein === null &&
-    targetFat === null
-  ) {
-    return null;
-  }
-  return {
-    kcal: targetKcal,
-    carbs: targetCarbs,
-    protein: targetProtein,
-    fat: targetFat,
-  };
 }
 
 function toEntryDto(row: DiaryEntryRow): DiaryEntryDto {
@@ -175,12 +148,7 @@ export class DiaryEntriesService {
       }) as Promise<DiaryEntryRow[]>,
       this.prisma.user.findUnique({
         where: { id: userId },
-        select: {
-          targetKcal: true,
-          targetCarbs: true,
-          targetProtein: true,
-          targetFat: true,
-        },
+        select: USER_TARGETS_SELECT,
       }) as Promise<UserTargetsRow | null>,
     ]);
 
@@ -208,7 +176,7 @@ export class DiaryEntriesService {
     return {
       date: localDate,
       totals: entries.reduce(addNutrients, { ...ZERO_TOTALS }),
-      targets: toTargets(targetsRow),
+      targets: toMacroTargetsDto(targetsRow),
       slots: slotDtos,
     };
   }
