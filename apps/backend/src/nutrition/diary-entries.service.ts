@@ -1,16 +1,27 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { scalePer100 } from '../common/utils/nutrition.util';
 import { MealsService } from '../meals/meals.service';
+import { MealSlotsService } from './meal-slots.service';
 import {
   CreateDiaryEntryDto,
   CreateDiaryEntriesBatchDto,
   CreateDiaryEntriesFromMealDto,
+  CopyDiaryDayDto,
+  CopyDiarySlotDto,
   DiaryEntryDto,
   MacroTotals,
   NutritionDayDto,
   NutritionDaySlotDto,
 } from './dto';
+
+/** The Abschnitt a whole-day copy drops entries into when their own slot has been archived. */
+const FALLBACK_SLOT_NAME = 'Sonstiges';
 
 type DiaryEntryRow = {
   id: string;
@@ -85,7 +96,32 @@ export class DiaryEntriesService {
   constructor(
     private prisma: PrismaService,
     private meals: MealsService,
+    private mealSlots: MealSlotsService,
   ) {}
+
+  /** A source entry, re-cast as a fresh snapshot for `localDate` / `mealSlotId` (#151, ADR-0002). */
+  private static copyOf(
+    entry: DiaryEntryRow,
+    userId: string,
+    localDate: string,
+    mealSlotId: string,
+  ) {
+    return {
+      userId,
+      mealSlotId,
+      localDate,
+      foodId: entry.foodId,
+      mealId: entry.mealId,
+      mealName: entry.mealName,
+      name: entry.name,
+      quantity: entry.quantity,
+      quantityLabel: entry.quantityLabel,
+      kcal: entry.kcal,
+      carbs: entry.carbs,
+      protein: entry.protein,
+      fat: entry.fat,
+    };
+  }
 
   /**
    * The Tagesansicht read model for one calendar day: every Abschnitt the user has, each with
@@ -273,6 +309,93 @@ export class DiaryEntriesService {
     });
 
     return this.prisma.diaryEntry.createMany({ data });
+  }
+
+  /**
+   * The calendar days the user has logged something on, most recent first. "Von einem
+   * anderen Tag kopieren" (#151) offers only these in its date picker, so there is never a
+   * copy from an empty day. `exclude` drops the day the picker was opened on.
+   */
+  async listCopySourceDates(userId: string, exclude?: string): Promise<string[]> {
+    const rows = (await this.prisma.diaryEntry.findMany({
+      where: { userId, ...(exclude ? { localDate: { not: exclude } } : {}) },
+      distinct: ['localDate'],
+      select: { localDate: true },
+      orderBy: { localDate: 'desc' },
+    })) as { localDate: string }[];
+    return rows.map((r) => r.localDate);
+  }
+
+  /**
+   * Copies one Abschnitt's entries from `fromDate` into the same Abschnitt on `toDate` (#151).
+   * Each copy is a fresh snapshot of the source entry -- name, quantity and kcal/macros
+   * carried over verbatim, `mealId` / `mealName` kept so a copied Mahlzeit stays grouped
+   * (ADR-0002). The target Abschnitt must be the user's and not archived.
+   */
+  async copySlot(userId: string, dto: CopyDiarySlotDto): Promise<{ count: number }> {
+    this.assertDistinctDays(dto.fromDate, dto.toDate);
+    await this.assertWritableSlot(userId, dto.mealSlotId);
+
+    const source = (await this.prisma.diaryEntry.findMany({
+      where: { userId, localDate: dto.fromDate, mealSlotId: dto.mealSlotId },
+      orderBy: { createdAt: 'asc' },
+    })) as DiaryEntryRow[];
+    if (source.length === 0) {
+      return { count: 0 };
+    }
+
+    return this.prisma.diaryEntry.createMany({
+      data: source.map((e) =>
+        DiaryEntriesService.copyOf(e, userId, dto.toDate, dto.mealSlotId),
+      ),
+    });
+  }
+
+  /**
+   * Copies every entry of `fromDate` onto `toDate` (#151), each staying in its own Abschnitt.
+   * An entry whose Abschnitt has since been archived would land in a read-only slot and
+   * disappear from the day, so those entries are redirected into a visible "Sonstiges"
+   * Abschnitt, created on demand. Copies are fresh snapshots, exactly as {@link copySlot}.
+   */
+  async copyDay(userId: string, dto: CopyDiaryDayDto): Promise<{ count: number }> {
+    this.assertDistinctDays(dto.fromDate, dto.toDate);
+
+    const [source, slots] = await Promise.all([
+      this.prisma.diaryEntry.findMany({
+        where: { userId, localDate: dto.fromDate },
+        orderBy: { createdAt: 'asc' },
+      }) as Promise<DiaryEntryRow[]>,
+      this.prisma.mealSlot.findMany({
+        where: { userId },
+        select: { id: true, archivedAt: true },
+      }) as Promise<{ id: string; archivedAt: Date | null }[]>,
+    ]);
+    if (source.length === 0) {
+      return { count: 0 };
+    }
+
+    const activeSlotIds = new Set(
+      slots.filter((s) => s.archivedAt === null).map((s) => s.id),
+    );
+    const needsFallback = source.some((e) => !activeSlotIds.has(e.mealSlotId));
+    const fallbackSlotId = needsFallback
+      ? (await this.mealSlots.ensureActiveSlot(userId, FALLBACK_SLOT_NAME)).id
+      : null;
+
+    return this.prisma.diaryEntry.createMany({
+      data: source.map((e) => {
+        const targetSlotId = activeSlotIds.has(e.mealSlotId)
+          ? e.mealSlotId
+          : fallbackSlotId!;
+        return DiaryEntriesService.copyOf(e, userId, dto.toDate, targetSlotId);
+      }),
+    });
+  }
+
+  private assertDistinctDays(fromDate: string, toDate: string): void {
+    if (fromDate === toDate) {
+      throw new BadRequestException('Quell- und Zieltag sind identisch');
+    }
   }
 
   /**

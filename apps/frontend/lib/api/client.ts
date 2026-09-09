@@ -48,6 +48,8 @@ import {
   MealDetail,
   MealInput,
   DiaryEntriesFromMealInput,
+  CopyDiaryDayInput,
+  CopyDiarySlotInput,
   PickerList,
 } from '@/types';
 import { clientTimeZone } from '@/lib/local-date';
@@ -606,6 +608,35 @@ class ApiClient {
 
   async deleteDiaryEntry(id: string): Promise<void> {
     await this.request(`/nutrition/entries/${id}`, { method: 'DELETE' });
+  }
+
+  // Von einem anderen Tag kopieren (#151)
+
+  // The calendar days the user has entries on -- the copy date picker offers only these.
+  // `excludeDate` drops the day the picker was opened on.
+  async getDiaryCopySourceDates(excludeDate?: string): Promise<string[]> {
+    const query = excludeDate ? `?exclude=${encodeURIComponent(excludeDate)}` : '';
+    const { dates } = await this.request<{ dates: string[] }>(
+      `/nutrition/copy/source-dates${query}`,
+    );
+    return dates;
+  }
+
+  // Copies one Abschnitt's entries from another day into the same Abschnitt on the target day.
+  async copyDiarySlot(input: CopyDiarySlotInput): Promise<{ count: number }> {
+    return this.request<{ count: number }>('/nutrition/entries/copy-slot', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  // Copies a whole previous day's entries onto the target day (archived Abschnitte fall back
+  // to a visible "Sonstiges").
+  async copyDiaryDay(input: CopyDiaryDayInput): Promise<{ count: number }> {
+    return this.request<{ count: number }>('/nutrition/entries/copy-day', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
   }
 
   // Abschnitte management (#142)

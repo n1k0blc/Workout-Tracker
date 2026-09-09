@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { IconArrowLeft, IconPencil, IconPlus } from '@tabler/icons-react';
+import { IconArrowLeft, IconCopy, IconPencil, IconPlus } from '@tabler/icons-react';
 import { ProtectedRoute } from '@/components/protected-route';
 import { Button } from '@/components/ui/button';
 import { apiClient } from '@/lib/api';
@@ -16,6 +16,7 @@ import { QuickEntrySheet } from '@/components/nutrition/quick-entry-sheet';
 import { QuantityEditorSheet } from '@/components/nutrition/quantity-editor-sheet';
 import { FoodPickerSheet } from '@/components/nutrition/food-picker-sheet';
 import { ScanToLog } from '@/components/nutrition/scan-to-log';
+import { CopyFromDaySheet } from '@/components/nutrition/copy-from-day-sheet';
 
 function formatGrams(value: number): string {
   return `${value.toLocaleString('de-DE', {
@@ -124,6 +125,7 @@ export default function AbschnittPage() {
   const [quickOpen, setQuickOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
+  const [copyOpen, setCopyOpen] = useState(false);
   const [editEntry, setEditEntry] = useState<DiaryEntry | null>(null);
   const [editOpen, setEditOpen] = useState(false);
 
@@ -189,10 +191,22 @@ export default function AbschnittPage() {
           <div className="absolute left-1/2 -translate-x-1/2 text-lg font-semibold uppercase tracking-[0.05em]">
             {slot?.name ?? 'Abschnitt'}
           </div>
-          {/* Renaming an Abschnitt is part of "Abschnitte verwalten" (#142). */}
-          <Button variant="ghost" size="icon" disabled aria-label="Abschnitt bearbeiten">
-            <IconPencil />
-          </Button>
+          <div className="flex items-center">
+            {slot && !slot.archived && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setCopyOpen(true)}
+                aria-label="Von einem anderen Tag kopieren"
+              >
+                <IconCopy />
+              </Button>
+            )}
+            {/* Renaming an Abschnitt is part of "Abschnitte verwalten" (#142). */}
+            <Button variant="ghost" size="icon" disabled aria-label="Abschnitt bearbeiten">
+              <IconPencil />
+            </Button>
+          </div>
         </header>
 
         {slot ? (
@@ -283,6 +297,16 @@ export default function AbschnittPage() {
           slotName={slot.name}
           date={date}
           onLogged={load}
+        />
+      )}
+      {slot && !slot.archived && (
+        <CopyFromDaySheet
+          open={copyOpen}
+          onOpenChange={setCopyOpen}
+          slotId={slot.id}
+          slotName={slot.name}
+          date={date}
+          onCopied={load}
         />
       )}
       <QuickEntrySheet

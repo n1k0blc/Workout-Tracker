@@ -1,4 +1,8 @@
-import { NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { DiaryEntriesService } from './diary-entries.service';
 import { CreateDiaryEntryDto } from './dto';
 
@@ -51,6 +55,8 @@ function makeService(overrides: {
   foods?: unknown[];
   // What the injected MealsService.findById resolves to (the expandable meal). `null` -> 404.
   mealDetail?: unknown;
+  // What the injected MealSlotsService.ensureActiveSlot resolves to (the "Sonstiges" fallback).
+  fallbackSlot?: { id: string; name: string; order: number; archived: boolean };
 } = {}) {
   const foodCreate = jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
     id: 'food-new',
@@ -103,10 +109,21 @@ function makeService(overrides: {
       return { ...MEAL_DETAIL };
     }),
   };
+  const mealSlots = {
+    ensureActiveSlot: jest.fn(async () =>
+      overrides.fallbackSlot ?? {
+        id: 'slot-sonstiges',
+        name: 'Sonstiges',
+        order: 5,
+        archived: false,
+      },
+    ),
+  };
   return {
-    service: new DiaryEntriesService(prisma as never, meals as never),
+    service: new DiaryEntriesService(prisma as never, meals as never, mealSlots as never),
     prisma,
     meals,
+    mealSlots,
   };
 }
 
@@ -415,7 +432,7 @@ describe('DiaryEntriesService.createFromMeal — expansion', () => {
     const result = await service.createFromMeal('user-1', mealDto());
 
     expect(prisma.diaryEntry.createMany).toHaveBeenCalledTimes(1);
-    const rows = prisma.diaryEntry.createMany.mock.calls[0][0].data as Record<string, unknown>[];
+    const rows = prisma.diaryEntry.createMany.mock.calls[0][0].data;
     expect(rows).toHaveLength(2);
     expect(rows.every((r) => r.mealId === 'meal-1')).toBe(true);
     // The meal name is snapshotted onto every ingredient entry (ADR-0002).
@@ -625,5 +642,240 @@ describe('DiaryEntriesService.createEntry — saveAsFood', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
     expect(prisma.food.create).not.toHaveBeenCalled();
     expect(result.foodId).toBeNull();
+  });
+});
+
+// "Von einem anderen Tag kopieren" (#151): a previous day's entries are re-snapshotted onto
+// the current day. Copies never re-read a Food -- the source entry's stored numbers are what
+// gets written (ADR-0002).
+
+const SRC_ENTRY = {
+  ...ENTRY,
+  localDate: '2026-09-01',
+  quantityLabel: '150 g',
+  foodId: 'food-7',
+};
+
+describe('DiaryEntriesService.listCopySourceDates', () => {
+  it('returns the distinct logged days, newest first, minus the excluded day', async () => {
+    const { service, prisma } = makeService({
+      entries: [{ localDate: '2026-09-06' }, { localDate: '2026-09-03' }],
+    });
+
+    const dates = await service.listCopySourceDates('user-1', '2026-09-07');
+
+    expect(prisma.diaryEntry.findMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1', localDate: { not: '2026-09-07' } },
+      distinct: ['localDate'],
+      select: { localDate: true },
+      orderBy: { localDate: 'desc' },
+    });
+    expect(dates).toEqual(['2026-09-06', '2026-09-03']);
+  });
+
+  it('omits the localDate filter when no day is excluded', async () => {
+    const { service, prisma } = makeService({ entries: [] });
+
+    await service.listCopySourceDates('user-1');
+
+    expect(prisma.diaryEntry.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: 'user-1' } }),
+    );
+  });
+});
+
+describe('DiaryEntriesService.copySlot — one Abschnitt from another day', () => {
+  it('re-snapshots every source entry into the same slot on the target day', async () => {
+    const { service, prisma } = makeService({
+      entries: [
+        { ...SRC_ENTRY, id: 's1', name: 'Porridge', kcal: 300, carbs: 40, protein: 10, fat: 6 },
+        { ...SRC_ENTRY, id: 's2', name: 'Kaffee', kcal: 8, carbs: 0, protein: 0, fat: 0 },
+      ],
+    });
+
+    const result = await service.copySlot('user-1', {
+      fromDate: '2026-09-01',
+      toDate: '2026-09-07',
+      mealSlotId: 'slot-1',
+    });
+
+    expect(prisma.diaryEntry.findMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1', localDate: '2026-09-01', mealSlotId: 'slot-1' },
+      orderBy: { createdAt: 'asc' },
+    });
+    const written = prisma.diaryEntry.createMany.mock.calls[0][0].data;
+    expect(written).toEqual([
+      expect.objectContaining({
+        userId: 'user-1',
+        mealSlotId: 'slot-1',
+        localDate: '2026-09-07',
+        name: 'Porridge',
+        quantity: 1,
+        quantityLabel: '150 g',
+        foodId: 'food-7',
+        kcal: 300,
+        carbs: 40,
+        protein: 10,
+        fat: 6,
+      }),
+      expect.objectContaining({ name: 'Kaffee', localDate: '2026-09-07' }),
+    ]);
+    expect(result).toEqual({ count: 2 });
+  });
+
+  it('keeps mealId / mealName so a copied Mahlzeit stays grouped', async () => {
+    const { service, prisma } = makeService({
+      entries: [
+        { ...SRC_ENTRY, id: 'm1', mealId: 'meal-9', mealName: 'Overnight Oats' },
+        { ...SRC_ENTRY, id: 'm2', mealId: 'meal-9', mealName: 'Overnight Oats' },
+      ],
+    });
+
+    await service.copySlot('user-1', {
+      fromDate: '2026-09-01',
+      toDate: '2026-09-07',
+      mealSlotId: 'slot-1',
+    });
+
+    const written = prisma.diaryEntry.createMany.mock.calls[0][0].data;
+    expect(written.map((e) => [e.mealId, e.mealName])).toEqual([
+      ['meal-9', 'Overnight Oats'],
+      ['meal-9', 'Overnight Oats'],
+    ]);
+  });
+
+  it('is a no-op (count 0) when that Abschnitt was empty on the source day', async () => {
+    const { service, prisma } = makeService({ entries: [] });
+
+    const result = await service.copySlot('user-1', {
+      fromDate: '2026-09-01',
+      toDate: '2026-09-07',
+      mealSlotId: 'slot-1',
+    });
+
+    expect(result).toEqual({ count: 0 });
+    expect(prisma.diaryEntry.createMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects a copy into an archived Abschnitt (read-only) and writes nothing', async () => {
+    const { service, prisma } = makeService({
+      slot: { id: 'slot-1', archivedAt: new Date('2026-01-01') },
+      entries: [{ ...SRC_ENTRY }],
+    });
+
+    await expect(
+      service.copySlot('user-1', {
+        fromDate: '2026-09-01',
+        toDate: '2026-09-07',
+        mealSlotId: 'slot-1',
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(prisma.diaryEntry.createMany).not.toHaveBeenCalled();
+  });
+
+  it("404s on another user's Abschnitt", async () => {
+    const { service } = makeService({ slot: null, entries: [{ ...SRC_ENTRY }] });
+
+    await expect(
+      service.copySlot('user-1', {
+        fromDate: '2026-09-01',
+        toDate: '2026-09-07',
+        mealSlotId: 'not-mine',
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('rejects copying a day onto itself', async () => {
+    const { service } = makeService();
+
+    await expect(
+      service.copySlot('user-1', {
+        fromDate: '2026-09-07',
+        toDate: '2026-09-07',
+        mealSlotId: 'slot-1',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe('DiaryEntriesService.copyDay — the whole day', () => {
+  const slots = [
+    { id: 'slot-1', archivedAt: null },
+    { id: 'slot-2', archivedAt: null },
+    { id: 'slot-archived', archivedAt: new Date('2026-01-01') },
+  ];
+
+  it('maps each entry to the current Abschnitt by slot id', async () => {
+    const { service, prisma, mealSlots } = makeService({
+      slots,
+      entries: [
+        { ...SRC_ENTRY, id: 'a', mealSlotId: 'slot-1' },
+        { ...SRC_ENTRY, id: 'b', mealSlotId: 'slot-2' },
+      ],
+    });
+
+    const result = await service.copyDay('user-1', {
+      fromDate: '2026-09-01',
+      toDate: '2026-09-07',
+    });
+
+    expect(mealSlots.ensureActiveSlot).not.toHaveBeenCalled();
+    const written = prisma.diaryEntry.createMany.mock.calls[0][0].data;
+    expect(written.map((e) => [e.mealSlotId, e.localDate])).toEqual([
+      ['slot-1', '2026-09-07'],
+      ['slot-2', '2026-09-07'],
+    ]);
+    expect(result).toEqual({ count: 2 });
+  });
+
+  it('redirects entries from an archived Abschnitt into a visible "Sonstiges"', async () => {
+    const { service, prisma, mealSlots } = makeService({
+      slots,
+      entries: [
+        { ...SRC_ENTRY, id: 'a', mealSlotId: 'slot-1' },
+        { ...SRC_ENTRY, id: 'c', mealSlotId: 'slot-archived' },
+      ],
+      fallbackSlot: { id: 'slot-sonstiges', name: 'Sonstiges', order: 3, archived: false },
+    });
+
+    await service.copyDay('user-1', { fromDate: '2026-09-01', toDate: '2026-09-07' });
+
+    expect(mealSlots.ensureActiveSlot).toHaveBeenCalledWith('user-1', 'Sonstiges');
+    const written = prisma.diaryEntry.createMany.mock.calls[0][0].data;
+    expect(written.map((e) => e.mealSlotId)).toEqual([
+      'slot-1',
+      'slot-sonstiges',
+    ]);
+  });
+
+  it('does not create "Sonstiges" when no entry needs it', async () => {
+    const { service, mealSlots } = makeService({
+      slots,
+      entries: [{ ...SRC_ENTRY, mealSlotId: 'slot-2' }],
+    });
+
+    await service.copyDay('user-1', { fromDate: '2026-09-01', toDate: '2026-09-07' });
+
+    expect(mealSlots.ensureActiveSlot).not.toHaveBeenCalled();
+  });
+
+  it('is a no-op (count 0) when the source day is empty', async () => {
+    const { service, prisma } = makeService({ slots, entries: [] });
+
+    const result = await service.copyDay('user-1', {
+      fromDate: '2026-09-01',
+      toDate: '2026-09-07',
+    });
+
+    expect(result).toEqual({ count: 0 });
+    expect(prisma.diaryEntry.createMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects copying a day onto itself', async () => {
+    const { service } = makeService({ slots });
+
+    await expect(
+      service.copyDay('user-1', { fromDate: '2026-09-07', toDate: '2026-09-07' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

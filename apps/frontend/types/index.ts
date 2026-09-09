@@ -937,6 +937,21 @@ export interface DiaryEntriesFromMealInput {
   factor: number;
 }
 
+// Von einem anderen Tag kopieren (#151)
+
+/** Copy a whole previous day's entries onto `toDate`, each staying in its own Abschnitt. */
+export interface CopyDiaryDayInput {
+  fromDate: string;
+  toDate: string;
+}
+
+/** Copy just one Abschnitt's entries from `fromDate` into the same Abschnitt on `toDate`. */
+export interface CopyDiarySlotInput {
+  fromDate: string;
+  toDate: string;
+  mealSlotId: string;
+}
+
 // Favoriten & Zuletzt (#148)
 
 /**

@@ -104,6 +104,22 @@ export class MealSlotsService {
     return { id: created.id, name: created.name, order: activeIds.length + 1, archived: false };
   }
 
+  /**
+   * The active Abschnitt named `name`, creating it if the user has none -- the landing place
+   * for a whole-day copy (#151) whose source Abschnitt has since been archived, so those
+   * entries stay visible rather than vanishing into a read-only slot.
+   */
+  async ensureActiveSlot(userId: string, name: string): Promise<MealSlotDto> {
+    const existing = (await this.prisma.mealSlot.findFirst({
+      where: { userId, name, archivedAt: null },
+      select: { id: true, name: true, order: true, archivedAt: true },
+    })) as MealSlotRow | null;
+    if (existing) {
+      return toDto(existing);
+    }
+    return this.create(userId, name);
+  }
+
   async rename(userId: string, id: string, name: string): Promise<MealSlotDto> {
     await this.findOwned(userId, id);
     const updated = (await this.prisma.mealSlot.update({

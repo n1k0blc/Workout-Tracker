@@ -24,6 +24,9 @@ import {
   CreateDiaryEntryDto,
   CreateDiaryEntriesBatchDto,
   CreateDiaryEntriesFromMealDto,
+  CopyDiaryDayDto,
+  CopyDiarySlotDto,
+  CopySourceDatesDto,
   UpdateDiaryEntryDto,
   DiaryEntryDto,
   NutritionDayDto,
@@ -151,6 +154,38 @@ export class NutritionController {
     @Body() dto: CreateDiaryEntriesFromMealDto,
   ): Promise<{ count: number }> {
     return this.diaryEntries.createFromMeal(user.id, dto);
+  }
+
+  // --- Von einem anderen Tag kopieren (#151) --------------------------------------------
+
+  // The days the user has entries on -- the copy date picker offers only these. `exclude`
+  // drops the day the picker was opened on.
+  @Get('copy/source-dates')
+  async copySourceDates(
+    @CurrentUser() user: { id: string },
+    @Query('exclude') exclude?: string,
+  ): Promise<CopySourceDatesDto> {
+    const cleanExclude = exclude && isLocalDate(exclude) ? exclude : undefined;
+    return { dates: await this.diaryEntries.listCopySourceDates(user.id, cleanExclude) };
+  }
+
+  // Copies one Abschnitt's entries from another day into the same Abschnitt on the target day.
+  @Post('entries/copy-slot')
+  async copySlot(
+    @CurrentUser() user: { id: string },
+    @Body() dto: CopyDiarySlotDto,
+  ): Promise<{ count: number }> {
+    return this.diaryEntries.copySlot(user.id, dto);
+  }
+
+  // Copies a whole day's entries onto the target day, each staying in its own Abschnitt
+  // (archived ones fall back to a visible "Sonstiges").
+  @Post('entries/copy-day')
+  async copyDay(
+    @CurrentUser() user: { id: string },
+    @Body() dto: CopyDiaryDayDto,
+  ): Promise<{ count: number }> {
+    return this.diaryEntries.copyDay(user.id, dto);
   }
 
   @Patch('entries/:id')

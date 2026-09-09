@@ -24,6 +24,7 @@ function makeStore(initial: Array<Partial<Row> & { id: string; name: string; ord
   const matches = (row: Row, where: Record<string, unknown> = {}): boolean => {
     if (where.id !== undefined && row.id !== where.id) return false;
     if (where.userId !== undefined && row.userId !== where.userId) return false;
+    if (where.name !== undefined && row.name !== where.name) return false;
     if (where.archivedAt === null && row.archivedAt !== null) return false;
     if (
       where.archivedAt &&
@@ -154,6 +155,48 @@ describe('assertContiguousOrder — the workout-tree order rule', () => {
       BadRequestException,
     );
     expect(() => assertContiguousOrder([{ order: 0 }])).toThrow(BadRequestException);
+  });
+});
+
+describe('MealSlotsService.ensureActiveSlot — the whole-day-copy fallback (#151)', () => {
+  it('returns the existing active slot of that name without creating one', async () => {
+    const { service, rows } = makeStore([
+      ...FOUR(),
+      { id: 'x', name: 'Sonstiges', order: 5 },
+    ]);
+
+    const slot = await service.ensureActiveSlot('user-1', 'Sonstiges');
+
+    expect(slot).toMatchObject({ id: 'x', name: 'Sonstiges', archived: false });
+    expect(snapshot(rows)).toHaveLength(5);
+  });
+
+  it('creates and appends the slot when the user has none by that name', async () => {
+    const { service, rows } = makeStore(FOUR());
+
+    const slot = await service.ensureActiveSlot('user-1', 'Sonstiges');
+
+    expect(slot).toMatchObject({ name: 'Sonstiges', order: 5, archived: false });
+    expect(snapshot(rows)).toEqual([
+      '1:Frühstück',
+      '2:Mittagessen',
+      '3:Abendessen',
+      '4:Snacks',
+      '5:Sonstiges',
+    ]);
+  });
+
+  it('does not reuse an archived slot of that name -- the fallback must be visible', async () => {
+    const { service, rows } = makeStore([
+      { id: 'f', name: 'Frühstück', order: 1 },
+      { id: 'z', name: 'Sonstiges', order: 2, archivedAt: new Date('2026-01-01') },
+    ]);
+
+    const slot = await service.ensureActiveSlot('user-1', 'Sonstiges');
+
+    expect(slot.archived).toBe(false);
+    expect(slot.id).not.toBe('z');
+    expect(snapshot(rows)).toEqual(['1:Frühstück', '2:Sonstiges', '3:Sonstiges(arch)']);
   });
 });
 
