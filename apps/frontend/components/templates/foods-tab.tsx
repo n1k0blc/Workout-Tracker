@@ -149,8 +149,11 @@ export default function FoodsTab() {
         open={scannerOpen}
         onOpenChange={setScannerOpen}
         mode={{
-          kind: 'open',
-          onOpen: (food) => {
+          kind: 'pick',
+          label: 'Öffnen',
+          // An imported food opens read-only, so "check it" is the honest word for it.
+          openFoodFactsLabel: 'Prüfen',
+          onPick: (food) => {
             setScannerOpen(false);
             setEditing(food);
           },

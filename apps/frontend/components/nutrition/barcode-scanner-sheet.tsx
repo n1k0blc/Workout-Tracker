@@ -27,8 +27,9 @@ import { QuantityStepper } from './quantity-stepper';
  * Open Food Facts hit (with its ODbL note), and no hit at all — which offers to create the
  * food with the barcode already filled in.
  *
- * Two callers, which `mode` distinguishes: the Abschnitt picker logs the hit into the day
- * after a quantity step, the Lebensmittel tab opens the food instead.
+ * `mode` decides what a hit is for: the Abschnitt picker logs it into the day after a quantity
+ * step, while the Lebensmittel tab and the Mahlzeit editor just take the food -- to open it,
+ * or to add it as a Zutat.
  */
 
 export type ScannerMode =
@@ -38,7 +39,19 @@ export type ScannerMode =
       slotName: string;
       onLog: (food: Food, grams: number, quantityLabel: string) => Promise<void>;
     }
-  | { kind: 'open'; onOpen: (food: Food) => void };
+  /**
+   * Hand the resolved food back and let the caller decide what it means -- the Lebensmittel
+   * tab opens it, the Mahlzeit editor adds it as a Zutat. No amount step: neither caller
+   * needs one, and a Zutat's amount is adjusted in its row afterwards.
+   */
+  | {
+      kind: 'pick';
+      /** Primary button label. */
+      label: string;
+      /** Overrides `label` for an Open Food Facts hit, where "check the values" may fit better. */
+      openFoodFactsLabel?: string;
+      onPick: (food: Food) => void;
+    };
 
 type Phase =
   | { step: 'scanning' }
@@ -310,8 +323,8 @@ function FoodResult({
         </div>
       ) : (
         <div className="mt-3.5 flex gap-2">
-          <Button className="flex-1" onClick={() => mode.onOpen(food)}>
-            {fromOpenFoodFacts ? 'Prüfen' : 'Öffnen'}
+          <Button className="flex-1" onClick={() => mode.onPick(food)}>
+            {(fromOpenFoodFacts && mode.openFoodFactsLabel) || mode.label}
           </Button>
           <Button variant="outline" onClick={onRescan}>
             Erneut

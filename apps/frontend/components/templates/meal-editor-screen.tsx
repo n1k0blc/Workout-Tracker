@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   IconArrowLeft,
+  IconBarcode,
   IconGripVertical,
   IconPlus,
   IconSearch,
@@ -61,6 +62,7 @@ import {
   type PickerTabId,
 } from '@/components/nutrition/picker-tabs';
 import { usePickerLists } from '@/hooks/usePickerLists';
+import { ScanFlow } from '@/components/nutrition/scan-flow';
 
 /** Where Speichern, Abbrechen and Löschen all return to. */
 const MEALS_TAB = '/templates?tab=meals';
@@ -165,6 +167,7 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
   const [search, setSearch] = useState('');
   const [results, setResults] = useState<Food[]>([]);
   const [searching, setSearching] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   // Favoriten / Zuletzt for the Zutat search -- foods only, a meal cannot be an ingredient.
   const fav = usePickerLists({ open: searchOpen, tab: searchTab, scope: 'food' });
@@ -370,6 +373,7 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
             addedFoodIds={new Set(items.map((i) => i.foodId))}
             onAdd={addFood}
             onDone={() => setSearchOpen(false)}
+            onScanRequest={() => setScannerOpen(true)}
             fav={fav}
           />
         ) : (
@@ -499,6 +503,22 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
         )}
       </div>
 
+      {/* Page level, so no drawer or dialog is ever above the scanner. A scanned Zutat takes
+          the same miss chain as logging: hit -> add, miss -> Open Food Facts -> add, double
+          miss -> create the Lebensmittel -> add. */}
+      <ScanFlow
+        open={scannerOpen}
+        onOpenChange={setScannerOpen}
+        mode={{
+          kind: 'pick',
+          label: 'Als Zutat',
+          onPick: (food) => {
+            addFood(food);
+            setScannerOpen(false);
+          },
+        }}
+      />
+
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -553,6 +573,7 @@ function FoodSearchView({
   addedFoodIds,
   onAdd,
   onDone,
+  onScanRequest,
   fav,
 }: {
   tab: PickerTabId;
@@ -564,6 +585,7 @@ function FoodSearchView({
   addedFoodIds: Set<string>;
   onAdd: (food: Food) => void;
   onDone: () => void;
+  onScanRequest: () => void;
   fav: ReturnType<typeof usePickerLists>;
 }) {
   const foodsOf = (items: PickerItem[] | null) =>
@@ -630,6 +652,14 @@ function FoodSearchView({
             className="border-b-0"
             autoFocus
           />
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Barcode scannen"
+            onClick={onScanRequest}
+          >
+            <IconBarcode />
+          </Button>
         </div>
         <PickerTabBar tab={tab} onTab={onTab} />
       </div>
