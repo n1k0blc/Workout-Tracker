@@ -13,6 +13,7 @@ import { NutritionDayBar } from '@/components/nutrition/nutrition-day-bar';
 import { NutritionTotalsCard } from '@/components/nutrition/nutrition-totals-card';
 import { MealSlotRow } from '@/components/nutrition/meal-slot-row';
 import { FoodPickerSheet } from '@/components/nutrition/food-picker-sheet';
+import { ScanToLog } from '@/components/nutrition/scan-to-log';
 import { ManageSlotsSheet } from '@/components/nutrition/manage-slots-sheet';
 
 export default function NutritionPage() {
@@ -26,6 +27,7 @@ export default function NutritionPage() {
   // left it briefly logging against no Abschnitt at all (a 400 from the batch endpoint).
   const [pickerSlot, setPickerSlot] = useState<{ id: string; name: string } | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -45,7 +47,7 @@ export default function NutritionPage() {
 
   // Horizontal swipe moves between days, the same gesture the design calls for. Suspended
   // while a sheet is open so a swipe (or a slot drag) inside it doesn't change the day behind.
-  const sheetOpen = pickerOpen || manageOpen;
+  const sheetOpen = pickerOpen || scanOpen || manageOpen;
   useSwipe({
     onSwipeLeft: sheetOpen ? undefined : () => setDate((d) => addDays(d, 1)),
     onSwipeRight: sheetOpen ? undefined : () => setDate((d) => addDays(d, -1)),
@@ -106,12 +108,27 @@ export default function NutritionPage() {
 
       {pickerSlot && (
         <FoodPickerSheet
+          onScanRequest={() => {
+            // The picker closes first: the scanner must not open under a modal drawer.
+            setPickerOpen(false);
+            setScanOpen(true);
+          }}
           open={pickerOpen}
           onOpenChange={setPickerOpen}
           slotId={pickerSlot.id}
           slotName={pickerSlot.name}
           date={date}
           onCommitted={load}
+        />
+      )}
+      {pickerSlot && (
+        <ScanToLog
+          open={scanOpen}
+          onOpenChange={setScanOpen}
+          slotId={pickerSlot.id}
+          slotName={pickerSlot.name}
+          date={date}
+          onLogged={load}
         />
       )}
 

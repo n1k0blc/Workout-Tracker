@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { apiClient } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { BarcodeLookup, Food, MealListItem, PickerItem } from '@/types';
+import { Food, MealListItem, PickerItem } from '@/types';
 import {
   buildQuantityStops,
   defaultQuantityStopIndex,
@@ -28,8 +28,6 @@ import {
   QUANTITY_FACTORS,
 } from '@/lib/nutrition';
 import { usePickerLists } from '@/hooks/usePickerLists';
-import { FoodEditorDialog } from '@/components/templates/food-editor-dialog';
-import { BarcodeScannerSheet } from './barcode-scanner-sheet';
 import { QuantityStepper } from './quantity-stepper';
 import { FavoriteStar } from './favorite-star';
 import {
@@ -95,6 +93,7 @@ export function FoodPickerSheet({
   slotName,
   date,
   onCommitted,
+  onScanRequest,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -102,6 +101,11 @@ export function FoodPickerSheet({
   slotName: string;
   date: string;
   onCommitted: () => void;
+  /**
+   * The scan button. The scanner itself belongs to the page, not in here -- see the comment on
+   * `ScanToLog`. This only reports the tap.
+   */
+  onScanRequest: () => void;
 }) {
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState<PickerTabId>('alle');
@@ -111,17 +115,6 @@ export function FoodPickerSheet({
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [basket, setBasket] = useState<BasketItem[]>([]);
   const [committing, setCommitting] = useState(false);
-  const [scannerOpen, setScannerOpen] = useState(false);
-  // A scanned barcode with no match anywhere: the create form opens with it prefilled (#149).
-  const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
-  // "Prüfen" on an Open Food Facts hit -- its read-only values, before logging them.
-  const [inspecting, setInspecting] = useState<Food | null>(null);
-  // A food just created from a double miss, handed back to the scanner so the amount step
-  // still happens. Scanning was a request to *log* something; creating the Lebensmittel is
-  // only half of it (#149).
-  const [createdFromScan, setCreatedFromScan] = useState<BarcodeLookup | null>(null);
-  // Bumped when a food is created from a scan, to pull it into the list behind the picker.
-  const [reloadKey, setReloadKey] = useState(0);
 
   const { favorites, recents, effectiveFavorite, toggleFavorite } = usePickerLists({
     open,
@@ -135,10 +128,6 @@ export function FoodPickerSheet({
       setExpandedKey(null);
       setBasket([]);
       setCommitting(false);
-      setScannerOpen(false);
-      setScannedBarcode(null);
-      setInspecting(null);
-      setCreatedFromScan(null);
     }
   }, [open]);
 
@@ -173,7 +162,7 @@ export function FoodPickerSheet({
       cancelled = true;
       clearTimeout(id);
     };
-  }, [open, tab, search, reloadKey]);
+  }, [open, tab, search]);
 
   // Foods and meals in one name-sorted list -- meals carry a "Mahlzeit" badge (#147).
   const rows: PickerRow[] = useMemo(() => {
@@ -332,27 +321,6 @@ export function FoodPickerSheet({
     <PickerTabPlaceholder>{message}</PickerTabPlaceholder>
   );
 
-  /**
-   * A scanned hit goes straight into the Abschnitt rather than into the basket: its result
-   * sheet's primary button reads "Zu <Abschnitt>", which is a commit, not a staging step.
-   *
-   * The picker stays open behind the scanner, and anything already staged stays staged -- the
-   * two flows commit independently, and closing the picker here would silently throw the
-   * basket away.
-   */
-  async function logScanned(food: Food, grams: number, quantityLabel: string) {
-    // Mirrors the guard in `commit()`: the day view keeps this sheet mounted with an empty
-    // slot id between openings, and logging into no Abschnitt is a 400, not a save.
-    if (!slotId) throw new Error('Kein Abschnitt ausgewählt');
-    await apiClient.createDiaryEntriesBatch({
-      mealSlotId: slotId,
-      localDate: date,
-      items: [{ foodId: food.id, grams, quantityLabel }],
-    });
-    toast.success(`${food.name} zu ${slotName} hinzugefügt`, { description: quantityLabel });
-    onCommitted();
-  }
-
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="mx-auto flex h-[88vh] max-w-2xl flex-col">
@@ -374,7 +342,7 @@ export function FoodPickerSheet({
               variant="ghost"
               size="icon-sm"
               aria-label="Barcode scannen"
-              onClick={() => setScannerOpen(true)}
+              onClick={onScanRequest}
             >
               <IconBarcode />
             </Button>
@@ -420,49 +388,6 @@ export function FoodPickerSheet({
         </div>
       </DrawerContent>
 
-      <BarcodeScannerSheet
-        // Remounted when a created food arrives, so it opens on that result rather than the
-        // viewfinder -- `initialResult` is read once, as the initial phase.
-        key={createdFromScan?.food?.id ?? 'scan'}
-        initialResult={createdFromScan}
-        open={scannerOpen}
-        onOpenChange={setScannerOpen}
-        mode={{ kind: 'log', slotName, onLog: logScanned }}
-        onCreateFood={(barcode) => {
-          setScannerOpen(false);
-          setScannedBarcode(barcode);
-        }}
-        // The scanner stays open underneath: "Prüfen" is a look at the values, and closing
-        // the editor has to land back on the result you were deciding about.
-        onOpenFood={setInspecting}
-      />
-
-      {/* Both misses, or "Prüfen": the editor, with the scanned barcode already filled in. */}
-      <FoodEditorDialog
-        open={scannedBarcode !== null || inspecting !== null}
-        onOpenChange={(next) => {
-          if (!next) {
-            setScannedBarcode(null);
-            setInspecting(null);
-          }
-        }}
-        food={inspecting ?? undefined}
-        initialBarcode={scannedBarcode ?? undefined}
-        onChanged={(saved) => {
-          // Created from a "Kein Treffer": go back to the scanner showing it, so the user can
-          // pick an amount and finish the log they started. Only that path seeds -- a copy made
-          // from "Prüfen" deliberately drops the barcode, so there is no scan to resume.
-          if (saved && scannedBarcode) {
-            setCreatedFromScan({ status: 'local', barcode: scannedBarcode, food: saved });
-            setScannerOpen(true);
-          }
-          setScannedBarcode(null);
-          setInspecting(null);
-          // A food created or copied here belongs in the list behind the picker.
-          setTab('alle');
-          setReloadKey((key) => key + 1);
-        }}
-      />
     </Drawer>
   );
 }

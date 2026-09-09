@@ -15,6 +15,7 @@ import { DiaryEntryRow } from '@/components/nutrition/diary-entry-row';
 import { QuickEntrySheet } from '@/components/nutrition/quick-entry-sheet';
 import { QuantityEditorSheet } from '@/components/nutrition/quantity-editor-sheet';
 import { FoodPickerSheet } from '@/components/nutrition/food-picker-sheet';
+import { ScanToLog } from '@/components/nutrition/scan-to-log';
 
 function formatGrams(value: number): string {
   return `${value.toLocaleString('de-DE', {
@@ -122,6 +123,7 @@ export default function AbschnittPage() {
 
   const [quickOpen, setQuickOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
   const [editEntry, setEditEntry] = useState<DiaryEntry | null>(null);
   const [editOpen, setEditOpen] = useState(false);
 
@@ -260,12 +262,27 @@ export default function AbschnittPage() {
 
       {slot && (
         <FoodPickerSheet
+          onScanRequest={() => {
+            // The picker closes first: the scanner must not open under a modal drawer.
+            setPickerOpen(false);
+            setScanOpen(true);
+          }}
           open={pickerOpen}
           onOpenChange={setPickerOpen}
           slotId={slot.id}
           slotName={slot.name}
           date={date}
           onCommitted={load}
+        />
+      )}
+      {slot && (
+        <ScanToLog
+          open={scanOpen}
+          onOpenChange={setScanOpen}
+          slotId={slot.id}
+          slotName={slot.name}
+          date={date}
+          onLogged={load}
         />
       )}
       <QuickEntrySheet

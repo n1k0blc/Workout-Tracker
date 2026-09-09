@@ -29,6 +29,12 @@ import { useBarcodeScanner } from '@/hooks/useBarcodeScanner';
  * `document.body` and re-enables it only inside its own content. This overlay is a sibling of
  * that content, so without the override it inherits `none` and every control in it is dead --
  * the camera still decodes, the result still renders, and not a single button responds.
+ *
+ * The logging flow no longer needs that override: `ScanToLog` is rendered by the page and the
+ * picker is closed before it opens, so no modal layer is above it. It is still load-bearing
+ * for the Lebensmittel editor's EAN scan button, which opens this from *inside* a Radix
+ * dialog. That path has the other half of the same problem too -- the dialog's focus trap
+ * fights the manual EAN field -- and has not been verified on a device. Treat it as suspect.
  */
 export function BarcodeCapture({
   open,
