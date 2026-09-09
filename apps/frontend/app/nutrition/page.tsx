@@ -21,7 +21,11 @@ export default function NutritionPage() {
   const [day, setDay] = useState<NutritionDay | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Which Abschnitt the picker is for, and whether it is showing. Kept apart on purpose: the
+  // sheet stays mounted while it animates closed, and clearing the slot in the same breath
+  // left it briefly logging against no Abschnitt at all (a 400 from the batch endpoint).
   const [pickerSlot, setPickerSlot] = useState<{ id: string; name: string } | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -41,7 +45,7 @@ export default function NutritionPage() {
 
   // Horizontal swipe moves between days, the same gesture the design calls for. Suspended
   // while a sheet is open so a swipe (or a slot drag) inside it doesn't change the day behind.
-  const sheetOpen = pickerSlot !== null || manageOpen;
+  const sheetOpen = pickerOpen || manageOpen;
   useSwipe({
     onSwipeLeft: sheetOpen ? undefined : () => setDate((d) => addDays(d, 1)),
     onSwipeRight: sheetOpen ? undefined : () => setDate((d) => addDays(d, -1)),
@@ -83,7 +87,10 @@ export default function NutritionPage() {
                       key={slot.id}
                       slot={slot}
                       date={date}
-                      onQuickAdd={() => setPickerSlot({ id: slot.id, name: slot.name })}
+                      onQuickAdd={() => {
+                        setPickerSlot({ id: slot.id, name: slot.name });
+                        setPickerOpen(true);
+                      }}
                     />
                   ))}
                 </div>
@@ -97,16 +104,16 @@ export default function NutritionPage() {
         </div>
       </main>
 
-      <FoodPickerSheet
-        open={pickerSlot !== null}
-        onOpenChange={(o) => {
-          if (!o) setPickerSlot(null);
-        }}
-        slotId={pickerSlot?.id ?? ''}
-        slotName={pickerSlot?.name ?? ''}
-        date={date}
-        onCommitted={load}
-      />
+      {pickerSlot && (
+        <FoodPickerSheet
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          slotId={pickerSlot.id}
+          slotName={pickerSlot.name}
+          date={date}
+          onCommitted={load}
+        />
+      )}
 
       <ManageSlotsSheet
         open={manageOpen}
