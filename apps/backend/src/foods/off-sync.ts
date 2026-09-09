@@ -18,7 +18,7 @@
  * The last-run marker is a unix second -- the end of the newest delta window applied -- and
  * lives in a file the host wrapper owns, so this script stays stateless: it takes the marker
  * as `--since` and prints the next one as its last line. Without one it falls back to the
- * newest `lastSyncedAt` in the library, which is when the bulk import last wrote a row.
+ * library itself, see {@link lastBulkSyncAt}.
  */
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Readable } from 'stream';
@@ -60,15 +60,29 @@ async function get(url: string, timeoutMs: number): Promise<Response> {
 }
 
 /**
- * Where to resume when the wrapper has no marker file yet: the newest row the import or a
- * previous sync wrote. Null when the library holds no Open Food Facts food at all, which
- * means nothing has ever been imported.
+ * A bulk write stamps every row it touches with one instant -- `importOffProducts` takes a
+ * single `now` for the whole run -- so a `lastSyncedAt` thousands of rows share is an import
+ * or a sync, and one a single row holds is a barcode scan the live lookup cached (#149).
  */
-async function lastSyncedAt(prisma: PrismaClient): Promise<number | null> {
-  const newest = await prisma.food.findFirst({
+const BULK_ROWS = 100;
+
+/**
+ * Where to resume when the wrapper has no marker file yet: the last time the library was
+ * refreshed in bulk. Deliberately not the plain newest `lastSyncedAt` -- that is whenever
+ * somebody last scanned something, which runs ahead of the deltas and would make the sync
+ * skip the window between the import and that scan without ever warning about it.
+ *
+ * Erring old is the safe direction: re-applying a delta is idempotent, and a marker past
+ * retention is reported. Null when no bulk write has ever happened, which the caller treats
+ * as "no marker" -- every delta still published, and a warning.
+ */
+async function lastBulkSyncAt(prisma: PrismaClient): Promise<number | null> {
+  const [newest] = await prisma.food.groupBy({
+    by: ['lastSyncedAt'],
     where: { source: 'OPEN_FOOD_FACTS', lastSyncedAt: { not: null } },
+    having: { lastSyncedAt: { _count: { gte: BULK_ROWS } } },
     orderBy: { lastSyncedAt: 'desc' },
-    select: { lastSyncedAt: true },
+    take: 1,
   });
   return newest?.lastSyncedAt ? Math.floor(newest.lastSyncedAt.getTime() / 1000) : null;
 }
@@ -91,11 +105,11 @@ async function main() {
   let plan: DeltaPlan;
 
   try {
-    const since = SINCE ? Number(SINCE) : await lastSyncedAt(prisma);
+    const since = SINCE ? Number(SINCE) : await lastBulkSyncAt(prisma);
     console.log(
       `🌍 Open Food Facts delta sync${DRY_RUN ? ' (dry run)' : ''}, resuming from ` +
         `${since === null ? 'nothing' : new Date(since * 1000).toISOString()}` +
-        `${SINCE ? '' : ' (newest lastSyncedAt in the library)'}`,
+        `${SINCE ? '' : " (the library's last bulk refresh)"}`,
     );
 
     plan = planDeltaSync(

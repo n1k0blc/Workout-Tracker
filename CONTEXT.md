@@ -96,8 +96,10 @@ say.
   a row imported from the CSV and later refreshed from a delta does not churn. The sync only ever
   writes rows it owns — a barcode held by a USER or SEED food is left alone — and only ~13 days
   of deltas are published, so a run that is skipped for longer logs a warning to re-run the full
-  import. Its last-run marker is a host file (`~/logs/off-sync.state`), falling back to the newest
-  `lastSyncedAt` in the library. Code: `off-mapping`, `off-import`, `off-delta`, `off-sync`.
+  import. Its last-run marker is a host file (`~/logs/off-sync.state`), falling back to the library's
+  last *bulk* refresh — the newest `lastSyncedAt` thousands of rows share, since a single row's is a
+  scan the live lookup cached, which runs ahead of the deltas. Code: `off-mapping`, `off-import`,
+  `off-delta`, `off-sync`.
 
 ### Tracked nutrients
 
