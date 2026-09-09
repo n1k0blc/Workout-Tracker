@@ -106,7 +106,8 @@ export function FoodEditorDialog({
   food?: Food;
   /** Prefills the EAN field when creating -- a scan that matched nothing anywhere (#149). */
   initialBarcode?: string;
-  onChanged: () => void;
+  /** Receives the saved food, so a caller mid-flow can carry on with it (#149). */
+  onChanged: (saved?: Food) => void;
 }) {
   const [forceForm, setForceForm] = useState(false); // "Eigene Kopie anlegen" from read-only
   const [name, setName] = useState('');
@@ -253,12 +254,10 @@ export function FoodEditorDialog({
 
     setSaving(true);
     try {
-      if (isEdit && food) {
-        await apiClient.updateFood(food.id, input);
-      } else {
-        await apiClient.createFood(input);
-      }
-      onChanged();
+      const saved = isEdit && food
+        ? await apiClient.updateFood(food.id, input)
+        : await apiClient.createFood(input);
+      onChanged(saved);
       onOpenChange(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Speichern fehlgeschlagen.');

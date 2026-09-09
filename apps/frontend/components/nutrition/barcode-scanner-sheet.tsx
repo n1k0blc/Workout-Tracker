@@ -55,6 +55,7 @@ export function BarcodeScannerSheet({
   mode,
   onCreateFood,
   onOpenFood,
+  initialResult,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -63,8 +64,17 @@ export function BarcodeScannerSheet({
   onCreateFood: (barcode: string) => void;
   /** "Prüfen" on an Open Food Facts hit -- its values in full, before logging them. */
   onOpenFood?: (food: Food) => void;
+  /**
+   * Open straight onto a result instead of the viewfinder. Used to resume a scan the user had
+   * to leave: a double miss sends them to "Lebensmittel anlegen", and the food they create
+   * there comes back here so the amount step still happens and the entry is actually logged.
+   * The caller remounts on change, so this is read once, as the initial phase.
+   */
+  initialResult?: BarcodeLookup | null;
 }) {
-  const [phase, setPhase] = useState<Phase>({ step: 'scanning' });
+  const [phase, setPhase] = useState<Phase>(
+    initialResult ? { step: 'result', lookup: initialResult } : { step: 'scanning' },
+  );
   const [lookupError, setLookupError] = useState<string | null>(null);
 
   const lookup = useCallback(async (barcode: string) => {

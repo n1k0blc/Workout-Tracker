@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { apiClient } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { Food, MealListItem, PickerItem } from '@/types';
+import { BarcodeLookup, Food, MealListItem, PickerItem } from '@/types';
 import {
   buildQuantityStops,
   defaultQuantityStopIndex,
@@ -116,6 +116,10 @@ export function FoodPickerSheet({
   const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
   // "Prüfen" on an Open Food Facts hit -- its read-only values, before logging them.
   const [inspecting, setInspecting] = useState<Food | null>(null);
+  // A food just created from a double miss, handed back to the scanner so the amount step
+  // still happens. Scanning was a request to *log* something; creating the Lebensmittel is
+  // only half of it (#149).
+  const [createdFromScan, setCreatedFromScan] = useState<BarcodeLookup | null>(null);
   // Bumped when a food is created from a scan, to pull it into the list behind the picker.
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -134,6 +138,7 @@ export function FoodPickerSheet({
       setScannerOpen(false);
       setScannedBarcode(null);
       setInspecting(null);
+      setCreatedFromScan(null);
     }
   }, [open]);
 
@@ -416,6 +421,10 @@ export function FoodPickerSheet({
       </DrawerContent>
 
       <BarcodeScannerSheet
+        // Remounted when a created food arrives, so it opens on that result rather than the
+        // viewfinder -- `initialResult` is read once, as the initial phase.
+        key={createdFromScan?.food?.id ?? 'scan'}
+        initialResult={createdFromScan}
         open={scannerOpen}
         onOpenChange={setScannerOpen}
         mode={{ kind: 'log', slotName, onLog: logScanned }}
@@ -439,7 +448,14 @@ export function FoodPickerSheet({
         }}
         food={inspecting ?? undefined}
         initialBarcode={scannedBarcode ?? undefined}
-        onChanged={() => {
+        onChanged={(saved) => {
+          // Created from a "Kein Treffer": go back to the scanner showing it, so the user can
+          // pick an amount and finish the log they started. Only that path seeds -- a copy made
+          // from "Prüfen" deliberately drops the barcode, so there is no scan to resume.
+          if (saved && scannedBarcode) {
+            setCreatedFromScan({ status: 'local', barcode: scannedBarcode, food: saved });
+            setScannerOpen(true);
+          }
           setScannedBarcode(null);
           setInspecting(null);
           // A food created or copied here belongs in the list behind the picker.
