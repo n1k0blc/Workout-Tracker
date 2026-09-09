@@ -57,6 +57,13 @@ function makeService(overrides: {
   mealDetail?: unknown;
   // What the injected MealSlotsService.ensureActiveSlot resolves to (the "Sonstiges" fallback).
   fallbackSlot?: { id: string; name: string; order: number; archived: boolean };
+  // The user's Tagesziele row (#152) that getDay reads. Absent -> all four null.
+  targets?: {
+    targetKcal: number | null;
+    targetCarbs: number | null;
+    targetProtein: number | null;
+    targetFat: number | null;
+  } | null;
 } = {}) {
   const foodCreate = jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
     id: 'food-new',
@@ -92,6 +99,18 @@ function makeService(overrides: {
         ...data,
       })),
       deleteMany: jest.fn().mockResolvedValue({ count: overrides.deleteCount ?? 1 }),
+    },
+    user: {
+      findUnique: jest.fn().mockResolvedValue(
+        'targets' in overrides
+          ? overrides.targets
+          : {
+              targetKcal: null,
+              targetCarbs: null,
+              targetProtein: null,
+              targetFat: null,
+            },
+      ),
     },
     // Interactive transaction: run the callback against the same mock.
     $transaction: jest.fn(async (cb: (tx: unknown) => unknown) =>
@@ -355,6 +374,51 @@ describe('DiaryEntriesService.getDay — day read model', () => {
       'Overnight Oats',
       null,
     ]);
+  });
+
+  it('reports targets = null when the user has set none (#152)', async () => {
+    const { service } = makeService({
+      slots,
+      entries: [{ ...ENTRY, id: 'e1', mealSlotId: 'slot-1' }],
+      targets: { targetKcal: null, targetCarbs: null, targetProtein: null, targetFat: null },
+    });
+
+    const day = await service.getDay('user-1', '2026-09-07');
+
+    expect(day.targets).toBeNull();
+  });
+
+  it('carries the Tagesziele through when any are set (#152)', async () => {
+    const { service, prisma } = makeService({
+      slots,
+      entries: [{ ...ENTRY, id: 'e1', mealSlotId: 'slot-1' }],
+      targets: { targetKcal: 2400, targetCarbs: 260, targetProtein: 150, targetFat: 80 },
+    });
+
+    const day = await service.getDay('user-1', '2026-09-07');
+
+    expect(prisma.user.findUnique).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      select: {
+        targetKcal: true,
+        targetCarbs: true,
+        targetProtein: true,
+        targetFat: true,
+      },
+    });
+    expect(day.targets).toEqual({ kcal: 2400, carbs: 260, protein: 150, fat: 80 });
+  });
+
+  it('keeps a partial Tagesziele object, nulling only the unset macros (#152)', async () => {
+    const { service } = makeService({
+      slots,
+      entries: [],
+      targets: { targetKcal: 2000, targetCarbs: null, targetProtein: 140, targetFat: null },
+    });
+
+    const day = await service.getDay('user-1', '2026-09-07');
+
+    expect(day.targets).toEqual({ kcal: 2000, carbs: null, protein: 140, fat: null });
   });
 });
 

@@ -38,9 +38,24 @@ export class NutritionDaySlotDto {
   entries: DiaryEntryDto[];
 }
 
+/**
+ * The user's Tagesziele (#152), each null until set. Sent on the day payload as a whole
+ * object, or `null` when the user has set none -- the client then shows plain totals with no
+ * "Übrig" and no bars.
+ */
+export class MacroTargetsDto {
+  kcal: number | null;
+  carbs: number | null;
+  protein: number | null;
+  fat: number | null;
+}
+
 /** The Tagesansicht payload: the user's Abschnitte for `date`, plus the whole-day totals. */
 export class NutritionDayDto {
   date: string;
   totals: MacroTotals;
+  // Non-null when the user has at least one Tagesziel set; null means "no targets" and the
+  // Tagesansicht renders the plain totals card.
+  targets: MacroTargetsDto | null;
   slots: NutritionDaySlotDto[];
 }

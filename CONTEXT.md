@@ -103,6 +103,16 @@ say.
   scan the live lookup cached, which runs ahead of the deltas. Code: `off-mapping`, `off-import`,
   `off-delta`, `off-sync`.
 
+- **Tagesziele** — four manual daily targets on the user (`targetKcal`, `targetCarbs`,
+  `targetProtein`, `targetFat`, grams for the macros), entered in the profile and never
+  derived from height/weight/age. Each is independently nullable; "no targets set" is all
+  four `null`. When at least one is set the Tagesansicht totals card switches from plain
+  sums to a consumed-vs-target state ("Gegessen X / Y kcal", "Übrig", a kcal bar and three
+  macro bars) and the dashboard gains an "Ernährung heute" card; both fall back to plain
+  totals otherwise. Targets only ever *display* against a day — the diary always totals the
+  entries as logged. Carried on the `GET /nutrition/day` payload as `targets` so the day
+  view needs no second request.
+
 ### Tracked nutrients
 
 Only **kcal**, **Kohlenhydrate** (carbs), **Protein** and **Fett** (fat). No micronutrients.

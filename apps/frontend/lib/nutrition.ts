@@ -32,6 +32,51 @@ export function macroConsistencyHint(
 }
 
 /**
+ * The Tagesziele editor's footer hint: how the three macro targets' energy compares to the
+ * kcal target. `null` when there is no positive kcal target to compare against. The macros
+ * are read at 4 / 4 / 9 kcal per g, the same as the Schnelleintrag hint.
+ */
+export function dailyTargetMacroHint(
+  targetKcal: number | null | undefined,
+  macros: Macros,
+): string | null {
+  if (typeof targetKcal !== 'number' || !Number.isFinite(targetKcal) || targetKcal <= 0) {
+    return null;
+  }
+  const macroKcal = kcalFromMacros(macros);
+  const tail = 'Die Tagesansicht rechnet immer mit den erfassten Einträgen.';
+  const diff = targetKcal - macroKcal;
+  if (diff === 0) return `Makros und Kalorienziel stimmen überein. ${tail}`;
+  const direction = diff > 0 ? 'unter' : 'über';
+  return `${Math.abs(diff)} kcal ${direction} dem Kalorienziel. ${tail}`;
+}
+
+/**
+ * A consumed value as a percentage of its target, clamped to 0–100 and rounded — the width
+ * of a progress bar. `null` when there is no positive target, so the caller shows no bar.
+ */
+export function targetProgressPercent(
+  consumed: number,
+  target: number | null | undefined,
+): number | null {
+  if (typeof target !== 'number' || !Number.isFinite(target) || target <= 0) return null;
+  const pct = (consumed / target) * 100;
+  return Math.round(Math.min(100, Math.max(0, pct)));
+}
+
+/**
+ * What is left of a target after `consumed`, rounded. Negative once the target is exceeded.
+ * `null` when there is no positive target.
+ */
+export function remainingToTarget(
+  consumed: number,
+  target: number | null | undefined,
+): number | null {
+  if (typeof target !== 'number' || !Number.isFinite(target) || target <= 0) return null;
+  return Math.round(target - consumed);
+}
+
+/**
  * A calendar day `n` days from `localDate` (`n` may be negative), as `YYYY-MM-DD`. Goes
  * through the local-date helpers so month, year and leap-day boundaries fall out of the
  * platform's own date maths rather than string arithmetic.
@@ -143,6 +188,13 @@ export function formatMacroLine(macros: Macros): string {
   return `${Math.round(macros.carbs)} g KH · ${Math.round(macros.protein)} g P · ${Math.round(
     macros.fat,
   )} g F`;
+}
+
+/** `"186 g KH · 118 g Protein · 61 g Fett"` -- the spelled-out variant for the dashboard card. */
+export function formatMacroLineLong(macros: Macros): string {
+  return `${Math.round(macros.carbs)} g KH · ${Math.round(
+    macros.protein,
+  )} g Protein · ${Math.round(macros.fat)} g Fett`;
 }
 
 /** Whole-number kcal with a German thousands separator: `1842` -> `"1.842"`. */

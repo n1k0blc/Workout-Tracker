@@ -66,7 +66,7 @@ export default function NutritionPage() {
 
           {day ? (
             <>
-              <NutritionTotalsCard totals={day.totals} />
+              <NutritionTotalsCard totals={day.totals} targets={day.targets} />
 
               <div>
                 <div className="mb-3 flex items-center justify-between">

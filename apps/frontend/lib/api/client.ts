@@ -214,6 +214,11 @@ class ApiClient {
     dateOfBirth?: string;
     height?: number;
     weight?: number;
+    // Tagesziele (#152): a positive integer sets one, null clears it.
+    targetKcal?: number | null;
+    targetCarbs?: number | null;
+    targetProtein?: number | null;
+    targetFat?: number | null;
   }): Promise<User> {
     return this.request<User>('/users/me', {
       method: 'PATCH',

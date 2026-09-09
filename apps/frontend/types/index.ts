@@ -9,6 +9,11 @@ export interface User {
   weight?: number;
   createdAt: string;
   homeGyms?: HomeGym[];
+  /** Tagesziele (#152): manual daily targets, each null until the user sets it. */
+  targetKcal?: number | null;
+  targetCarbs?: number | null;
+  targetProtein?: number | null;
+  targetFat?: number | null;
 }
 
 export interface HomeGym {
@@ -739,9 +744,23 @@ export interface MealSlotList {
   archived: MealSlot[];
 }
 
+/**
+ * The user's Tagesziele (#152) as the day payload carries them. `null` on {@link NutritionDay}
+ * means the user has set none and the client shows plain totals; otherwise each field is the
+ * target or `null` if that one is unset.
+ */
+export interface MacroTargets {
+  kcal: number | null;
+  carbs: number | null;
+  protein: number | null;
+  fat: number | null;
+}
+
 export interface NutritionDay {
   date: string;
   totals: MacroTotals;
+  /** Non-null when at least one Tagesziel is set; drives the consumed-vs-target card. */
+  targets: MacroTargets | null;
   slots: NutritionDaySlot[];
 }
 

@@ -15,6 +15,7 @@ import {
   CopyDiaryDayDto,
   CopyDiarySlotDto,
   DiaryEntryDto,
+  MacroTargetsDto,
   MacroTotals,
   NutritionDayDto,
   NutritionDaySlotDto,
@@ -47,6 +48,13 @@ type MealSlotRow = {
   archivedAt: Date | null;
 };
 
+type UserTargetsRow = {
+  targetKcal: number | null;
+  targetCarbs: number | null;
+  targetProtein: number | null;
+  targetFat: number | null;
+};
+
 type FoodRow = {
   id: string;
   name: string;
@@ -71,6 +79,30 @@ function addNutrients(a: MacroTotals, e: DiaryEntryRow | DiaryEntryDto): MacroTo
 /** The nutrients of `grams` (or ml) of a food, scaled from its per-100 values. */
 function scaleFromFood(food: FoodRow, grams: number) {
   return scalePer100(food, grams);
+}
+
+/**
+ * The user's Tagesziele as the day payload carries them: `null` when not one of the four is
+ * set (the Tagesansicht then shows plain totals), otherwise the whole object with each unset
+ * target still `null`.
+ */
+function toTargets(row: UserTargetsRow | null): MacroTargetsDto | null {
+  if (!row) return null;
+  const { targetKcal, targetCarbs, targetProtein, targetFat } = row;
+  if (
+    targetKcal === null &&
+    targetCarbs === null &&
+    targetProtein === null &&
+    targetFat === null
+  ) {
+    return null;
+  }
+  return {
+    kcal: targetKcal,
+    carbs: targetCarbs,
+    protein: targetProtein,
+    fat: targetFat,
+  };
 }
 
 function toEntryDto(row: DiaryEntryRow): DiaryEntryDto {
@@ -127,10 +159,11 @@ export class DiaryEntriesService {
    * The Tagesansicht read model for one calendar day: every Abschnitt the user has, each with
    * that day's entries and their totals, plus the whole-day totals. An archived Abschnitt
    * (#142) is included only when it already holds entries for `localDate`, so opening an old
-   * day still shows what was eaten there.
+   * day still shows what was eaten there. The user's Tagesziele (#152) ride along so the
+   * client can render the consumed-vs-target card without a second request.
    */
   async getDay(userId: string, localDate: string): Promise<NutritionDayDto> {
-    const [slots, entries] = await Promise.all([
+    const [slots, entries, targetsRow] = await Promise.all([
       this.prisma.mealSlot.findMany({
         where: { userId },
         orderBy: { order: 'asc' },
@@ -140,6 +173,15 @@ export class DiaryEntriesService {
         where: { userId, localDate },
         orderBy: { createdAt: 'asc' },
       }) as Promise<DiaryEntryRow[]>,
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          targetKcal: true,
+          targetCarbs: true,
+          targetProtein: true,
+          targetFat: true,
+        },
+      }) as Promise<UserTargetsRow | null>,
     ]);
 
     const entriesBySlot = new Map<string, DiaryEntryRow[]>();
@@ -166,6 +208,7 @@ export class DiaryEntriesService {
     return {
       date: localDate,
       totals: entries.reduce(addNutrients, { ...ZERO_TOTALS }),
+      targets: toTargets(targetsRow),
       slots: slotDtos,
     };
   }

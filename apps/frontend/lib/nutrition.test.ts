@@ -2,8 +2,12 @@ import { describe, it, expect, afterAll } from 'vitest';
 import {
   kcalFromMacros,
   macroConsistencyHint,
+  dailyTargetMacroHint,
+  targetProgressPercent,
+  remainingToTarget,
   addDays,
   formatMacroLine,
+  formatMacroLineLong,
   formatKcal,
   relativeDayLabel,
   parseAmount,
@@ -62,6 +66,61 @@ describe('macroConsistencyHint', () => {
   });
 });
 
+describe('dailyTargetMacroHint', () => {
+  it('states how far the macro energy sits under the kcal target', () => {
+    expect(dailyTargetMacroHint(2400, { carbs: 260, protein: 150, fat: 80 })).toBe(
+      '40 kcal unter dem Kalorienziel. Die Tagesansicht rechnet immer mit den erfassten Einträgen.',
+    );
+  });
+
+  it('flips to "über" when the macros carry more energy than the target', () => {
+    expect(dailyTargetMacroHint(2000, { carbs: 260, protein: 150, fat: 80 })).toBe(
+      '360 kcal über dem Kalorienziel. Die Tagesansicht rechnet immer mit den erfassten Einträgen.',
+    );
+  });
+
+  it('says so when they line up exactly', () => {
+    expect(dailyTargetMacroHint(2360, { carbs: 260, protein: 150, fat: 80 })).toBe(
+      'Makros und Kalorienziel stimmen überein. Die Tagesansicht rechnet immer mit den erfassten Einträgen.',
+    );
+  });
+
+  it('is null without a positive kcal target', () => {
+    expect(dailyTargetMacroHint(null, { carbs: 260, protein: 150, fat: 80 })).toBeNull();
+    expect(dailyTargetMacroHint(0, { carbs: 260, protein: 150, fat: 80 })).toBeNull();
+  });
+});
+
+describe('targetProgressPercent', () => {
+  it('is the rounded percentage of the target consumed', () => {
+    expect(targetProgressPercent(1842, 2400)).toBe(77);
+    expect(targetProgressPercent(0, 2400)).toBe(0);
+  });
+
+  it('clamps to 100 once the target is exceeded', () => {
+    expect(targetProgressPercent(3000, 2400)).toBe(100);
+  });
+
+  it('is null when there is no positive target', () => {
+    expect(targetProgressPercent(500, null)).toBeNull();
+    expect(targetProgressPercent(500, 0)).toBeNull();
+  });
+});
+
+describe('remainingToTarget', () => {
+  it('is the rounded remainder of the target', () => {
+    expect(remainingToTarget(1842, 2400)).toBe(558);
+  });
+
+  it('goes negative once the target is exceeded', () => {
+    expect(remainingToTarget(2500, 2400)).toBe(-100);
+  });
+
+  it('is null when there is no positive target', () => {
+    expect(remainingToTarget(500, null)).toBeNull();
+  });
+});
+
 describe('addDays', () => {
   it('steps forward and back by whole days', () => {
     process.env.TZ = 'Europe/Berlin';
@@ -89,6 +148,14 @@ describe('formatMacroLine', () => {
   it('renders the "KH · P · F" summary with rounded grams', () => {
     expect(formatMacroLine({ carbs: 53, protein: 19.7, fat: 19.8 })).toBe(
       '53 g KH · 20 g P · 20 g F',
+    );
+  });
+});
+
+describe('formatMacroLineLong', () => {
+  it('spells out Protein and Fett for the dashboard card', () => {
+    expect(formatMacroLineLong({ carbs: 186, protein: 118, fat: 61 })).toBe(
+      '186 g KH · 118 g Protein · 61 g Fett',
     );
   });
 });

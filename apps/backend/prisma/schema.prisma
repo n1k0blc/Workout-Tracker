@@ -18,6 +18,13 @@ model User {
   height        Int?
   lastName      String?
   weight        Float?
+  // Tagesziele (#152): manual daily targets for kcal and the three macros (grams). All four
+  // are independent and nullable -- "no targets set" is all four NULL, and the day summary
+  // and the dashboard card fall back to plain totals then. Never derived, only entered.
+  targetKcal    Int?
+  targetCarbs   Int?
+  targetProtein Int?
+  targetFat     Int?
   exercises     Exercise[]
   homeGyms      HomeGym[]
   workouts      Workout[]
