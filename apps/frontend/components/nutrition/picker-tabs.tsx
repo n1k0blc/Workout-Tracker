@@ -4,16 +4,29 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 /**
- * The Alle / Favoriten / Zuletzt line tabs and their placeholder copy, shared by the logging
- * picker (`food-picker-sheet`) and the Mahlzeit editor's Zutat search (`meal-editor-sheet`)
- * so the two surfaces cannot drift (#148).
+ * The picker's line tabs and their placeholder copy, shared by the logging picker
+ * (`food-picker-sheet`) and the Mahlzeit editor's Zutat search (`meal-editor-screen`) so the
+ * two surfaces cannot drift (#148).
+ *
+ * The tab set is a parameter, not a constant: the logging picker splits its long list into
+ * separate Lebensmittel and Mahlzeiten tabs, while the Zutat search has no Mahlzeiten tab --
+ * a Mahlzeit cannot be an ingredient of another one (#155).
  */
-export const PICKER_TABS = [
-  { id: 'alle', label: 'Alle' },
+export const LOGGING_PICKER_TABS = [
+  { id: 'lebensmittel', label: 'Lebensmittel' },
+  { id: 'mahlzeiten', label: 'Mahlzeiten' },
   { id: 'favoriten', label: 'Favoriten' },
   { id: 'zuletzt', label: 'Zuletzt' },
 ] as const;
-export type PickerTabId = (typeof PICKER_TABS)[number]['id'];
+
+export const ZUTAT_PICKER_TABS = [
+  { id: 'lebensmittel', label: 'Lebensmittel' },
+  { id: 'favoriten', label: 'Favoriten' },
+  { id: 'zuletzt', label: 'Zuletzt' },
+] as const;
+
+export type PickerTabId = (typeof LOGGING_PICKER_TABS)[number]['id'];
+export type PickerTab = { id: PickerTabId; label: string };
 
 /** Empty-state copy for the two derived tabs. */
 export const FAVORITEN_EMPTY = 'Noch keine Favoriten. Tippe den Stern an einer Zeile an.';
@@ -23,13 +36,15 @@ export const PICKER_LOADING = 'Lädt …';
 export function PickerTabBar({
   tab,
   onTab,
+  tabs,
 }: {
   tab: PickerTabId;
   onTab: (t: PickerTabId) => void;
+  tabs: readonly PickerTab[];
 }) {
   return (
     <div className="flex gap-1 border-b">
-      {PICKER_TABS.map((t) => (
+      {tabs.map((t) => (
         <button
           key={t.id}
           type="button"

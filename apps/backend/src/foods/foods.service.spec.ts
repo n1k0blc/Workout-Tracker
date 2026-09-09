@@ -75,7 +75,35 @@ function makeService(
         return rows.filter((f) => f.createdById === where.createdById && f.source === 'USER')
           .length;
       }),
-      findMany: jest.fn().mockResolvedValue(overrides.findMany ?? []),
+      // A thin stand-in for Prisma: honour the `source` / `createdById` / `NOT` narrowing that
+      // `findAll` splits its three source-group queries with (#155), and the `name` sort every
+      // query carries -- so a fixture partitions and orders the way the database would.
+      findMany: jest.fn(
+        async (args: {
+          where?: Record<string, unknown>;
+          orderBy?: { name?: 'asc' | 'desc' };
+        }) => {
+          const where = args.where ?? {};
+          const rows = (overrides.findMany ?? []) as Record<string, unknown>[];
+          const matches = (row: Record<string, unknown>, cond: Record<string, unknown>) =>
+            Object.entries(cond).every(([key, value]) => row[key] === value);
+          const direct: Record<string, unknown> = {};
+          if ('source' in where) direct.source = where.source;
+          if ('createdById' in where) direct.createdById = where.createdById;
+          let out =
+            Object.keys(direct).length > 0 ? rows.filter((r) => matches(r, direct)) : rows;
+          const not = where.NOT;
+          if (Array.isArray(not)) {
+            out = out.filter(
+              (r) => !not.some((cond) => matches(r, cond as Record<string, unknown>)),
+            );
+          }
+          if (args.orderBy?.name === 'asc') {
+            out = [...out].sort((a, b) => String(a.name).localeCompare(String(b.name)));
+          }
+          return out;
+        },
+      ),
       findUnique: jest
         .fn()
         .mockResolvedValue('findUnique' in overrides ? overrides.findUnique : { ...OWN_FOOD }),
@@ -136,20 +164,22 @@ describe('FoodsService.findAll — visibility', () => {
 
     expect(prisma.food.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: {
+        where: expect.objectContaining({
           deletedAt: null,
           OR: [
             { name: { contains: 'hafer', mode: 'insensitive' } },
             { brand: { contains: 'hafer', mode: 'insensitive' } },
           ],
-        },
+        }),
       }),
     );
+    // Grouped by source (#155): own USER, then SEED, then imports / other users' foods, with
+    // name order within a group ("Haferdrink" before "Skyr" in the last group).
     expect(result.items.map((f) => f.id)).toEqual([
       'food-own',
-      'food-other',
       'food-seed',
       'food-off',
+      'food-other',
     ]);
   });
 
@@ -194,15 +224,55 @@ describe('FoodsService.findAll - search matches brand too', () => {
 
     expect(prisma.food.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: {
+        where: expect.objectContaining({
           deletedAt: null,
           OR: [
             { name: { contains: 'Oatly', mode: 'insensitive' } },
             { brand: { contains: 'Oatly', mode: 'insensitive' } },
           ],
-        },
+        }),
       }),
     );
+  });
+});
+
+describe('FoodsService.findAll — search ranking (#155)', () => {
+  it('groups by source: own USER first, then SEED, then imports and other users', async () => {
+    // Fed deliberately out of order: the row order the database returns must not matter, only
+    // which group each row lands in and the name sort inside it.
+    const rows = [
+      { ...OFF_FOOD, id: 'off-tasche', name: 'Apfeltasche' },
+      { ...SEED_FOOD, id: 'seed-apfel', name: 'Apfel' },
+      { ...OWN_FOOD, id: 'own-mus', name: 'Apfelmus' },
+      { ...OTHER_USER_FOOD, id: 'other-ringe', name: 'Apfelringe' },
+      { ...OFF_FOOD, id: 'off-mark', name: 'Apfelmark' },
+    ];
+    const { service } = makeService({ findMany: rows });
+
+    const result = await service.findAll('user-1', 'apfel');
+
+    expect(result.items.map((f) => f.id)).toEqual([
+      'own-mus', // USER, created by the searcher
+      'seed-apfel', // curated staple
+      'off-mark', // imports + other users' USER foods rank together (ADR-0003), name-asc
+      'other-ringe',
+      'off-tasche',
+    ]);
+    // Ordering only -- nothing is filtered out.
+    expect(result.items).toHaveLength(5);
+  });
+
+  it('asks the database for name order within every source group', async () => {
+    const { service, prisma } = makeService({ findMany: [] });
+
+    await service.findAll('user-1', 'milch');
+
+    expect(prisma.food.findMany).toHaveBeenCalledTimes(3);
+    for (const call of prisma.food.findMany.mock.calls) {
+      const args = call[0] as { orderBy?: unknown; take?: unknown };
+      expect(args.orderBy).toEqual({ name: 'asc' });
+      expect(args.take).toBe(200);
+    }
   });
 });
 
@@ -397,8 +467,8 @@ describe('FoodsService.findSimilar', () => {
       }),
     );
     expect(result).toEqual([
-      { id: 'f1', name: 'Haferdrink ungesüßt', kcal: 372, isLiquid: false, usageCount: 24 },
       { id: 'f2', name: 'Haferdrink Barista', kcal: 372, isLiquid: false, usageCount: 0 },
+      { id: 'f1', name: 'Haferdrink ungesüßt', kcal: 372, isLiquid: false, usageCount: 24 },
     ]);
   });
 

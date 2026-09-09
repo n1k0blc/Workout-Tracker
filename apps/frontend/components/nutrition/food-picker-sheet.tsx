@@ -33,6 +33,7 @@ import { FavoriteStar } from './favorite-star';
 import {
   PickerTabBar,
   PickerTabPlaceholder,
+  LOGGING_PICKER_TABS,
   FAVORITEN_EMPTY,
   ZULETZT_EMPTY,
   PICKER_LOADING,
@@ -108,9 +109,9 @@ export function FoodPickerSheet({
   onScanRequest: () => void;
 }) {
   const [search, setSearch] = useState('');
-  const [tab, setTab] = useState<PickerTabId>('alle');
+  const [tab, setTab] = useState<PickerTabId>('lebensmittel');
   const [foods, setFoods] = useState<Food[]>([]);
-  const [meals, setMeals] = useState<MealListItem[]>([]);
+  const [meals, setMeals] = useState<MealListItem[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [basket, setBasket] = useState<BasketItem[]>([]);
@@ -124,7 +125,7 @@ export function FoodPickerSheet({
   useEffect(() => {
     if (open) {
       setSearch('');
-      setTab('alle');
+      setTab('lebensmittel');
       setExpandedKey(null);
       setBasket([]);
       setCommitting(false);
@@ -145,7 +146,7 @@ export function FoodPickerSheet({
   }, [open]);
 
   useEffect(() => {
-    if (!open || tab !== 'alle') return;
+    if (!open || tab !== 'lebensmittel') return;
     let cancelled = false;
     const id = setTimeout(async () => {
       setLoading(true);
@@ -164,37 +165,45 @@ export function FoodPickerSheet({
     };
   }, [open, tab, search]);
 
-  // Foods and meals in one name-sorted list -- meals carry a "Mahlzeit" badge (#147).
-  const rows: PickerRow[] = useMemo(() => {
+  // Lebensmittel and Mahlzeiten are separate tabs (#155): at ~180k imported foods a handful
+  // of meals is unfindable in a merged list, and the two are logged differently anyway (a
+  // Menge vs. a Faktor). Search filters within the active tab only.
+
+  // Foods keep the server's source ranking (#155) -- no client re-sort -- with starred rows
+  // floating to the top (#148).
+  const foodRows: PickerRow[] = useMemo(
+    () =>
+      sortFavoritesFirst(
+        foods.map((f) => ({
+          kind: 'food' as const,
+          key: `food:${f.id}`,
+          name: f.name,
+          food: f,
+          isFavorite: effectiveFavorite('food', f.id, f.isFavorite),
+        })),
+      ),
+    [foods, effectiveFavorite],
+  );
+
+  const mealRows: PickerRow[] = useMemo(() => {
     const term = search.trim().toLowerCase();
-    const foodRows: PickerRow[] = foods.map((f) => ({
-      kind: 'food',
-      key: `food:${f.id}`,
-      name: f.name,
-      food: f,
-    }));
-    const mealRows: PickerRow[] = meals
+    const matched = (meals ?? [])
       .filter(
         (m) =>
           !term ||
           m.name.toLowerCase().includes(term) ||
           m.ingredientNames.some((n) => n.toLowerCase().includes(term)),
       )
-      .map((m) => ({ kind: 'meal', key: `meal:${m.id}`, name: m.name, meal: m }));
-    const byName = [...foodRows, ...mealRows].sort((a, b) =>
-      a.name.localeCompare(b.name, 'de'),
-    );
-    // Starred rows float to the top of "Alle", otherwise name order (#148).
-    return sortFavoritesFirst(
-      byName.map((r) => ({
-        ...r,
-        isFavorite:
-          r.kind === 'food'
-            ? effectiveFavorite('food', r.food.id, r.food.isFavorite)
-            : effectiveFavorite('meal', r.meal.id, r.meal.isFavorite),
-      })),
-    );
-  }, [foods, meals, search, effectiveFavorite]);
+      .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+      .map((m) => ({
+        kind: 'meal' as const,
+        key: `meal:${m.id}`,
+        name: m.name,
+        meal: m,
+        isFavorite: effectiveFavorite('meal', m.id, m.isFavorite),
+      }));
+    return sortFavoritesFirst(matched);
+  }, [meals, search, effectiveFavorite]);
 
   const favoriteRows = useMemo(
     () =>
@@ -348,18 +357,29 @@ export function FoodPickerSheet({
             </Button>
           </div>
 
-          <PickerTabBar tab={tab} onTab={setTab} />
+          <PickerTabBar tab={tab} onTab={setTab} tabs={LOGGING_PICKER_TABS} />
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-3">
-          {tab === 'alle' &&
-            (loading && rows.length === 0
+          {tab === 'lebensmittel' &&
+            (loading && foodRows.length === 0
               ? placeholder(PICKER_LOADING)
-              : rows.length === 0
+              : foodRows.length === 0
                 ? placeholder(
                     search.trim() ? 'Nichts gefunden.' : 'Die Bibliothek ist noch leer.',
                   )
-                : renderRows(rows))}
+                : renderRows(foodRows))}
+
+          {tab === 'mahlzeiten' &&
+            (meals === null
+              ? placeholder(PICKER_LOADING)
+              : mealRows.length === 0
+                ? placeholder(
+                    search.trim()
+                      ? 'Keine Mahlzeit gefunden.'
+                      : 'Noch keine Mahlzeiten. Lege welche in den Vorlagen an.',
+                  )
+                : renderRows(mealRows))}
 
           {tab === 'favoriten' &&
             (favorites === null

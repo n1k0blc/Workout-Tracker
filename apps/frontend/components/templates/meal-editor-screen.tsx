@@ -56,6 +56,7 @@ import { FavoriteStar } from '@/components/nutrition/favorite-star';
 import {
   PickerTabBar,
   PickerTabPlaceholder,
+  ZUTAT_PICKER_TABS,
   FAVORITEN_EMPTY,
   ZULETZT_EMPTY,
   PICKER_LOADING,
@@ -163,7 +164,7 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
   const [baseline, setBaseline] = useState<string | null>(isEdit ? null : signature('', []));
 
   const [searchOpen, setSearchOpen] = useState(false);
-  const [searchTab, setSearchTab] = useState<PickerTabId>('alle');
+  const [searchTab, setSearchTab] = useState<PickerTabId>('lebensmittel');
   const [search, setSearch] = useState('');
   const [results, setResults] = useState<Food[]>([]);
   const [searching, setSearching] = useState(false);
@@ -202,10 +203,11 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
     };
   }, [mealId]);
 
-  // Food search for the "Zutat" picker -- only the "Alle" tab queries; Favoriten / Zuletzt
-  // are served by usePickerLists (#148).
+  // Food search for the "Zutat" picker -- only the Lebensmittel tab queries; Favoriten /
+  // Zuletzt are served by usePickerLists (#148). No Mahlzeiten tab here: a Mahlzeit cannot be
+  // an ingredient of another one (#155).
   useEffect(() => {
-    if (!searchOpen || searchTab !== 'alle') return;
+    if (!searchOpen || searchTab !== 'lebensmittel') return;
     let cancelled = false;
     const id = setTimeout(async () => {
       setSearching(true);
@@ -252,7 +254,7 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
 
   function openSearch() {
     setSearchOpen(true);
-    setSearchTab('alle');
+    setSearchTab('lebensmittel');
     setSearch('');
     setResults([]);
   }
@@ -591,7 +593,7 @@ function FoodSearchView({
   const foodsOf = (items: PickerItem[] | null) =>
     (items ?? []).flatMap((i) => (i.kind === 'food' ? [i.food] : []));
 
-  const alleFoods = sortFavoritesFirst(
+  const lebensmittelFoods = sortFavoritesFirst(
     results.map((f) => ({ ...f, isFavorite: fav.effectiveFavorite('food', f.id, f.isFavorite) })),
   );
   const favoriteFoods = foodsOf(fav.favorites).filter((f) =>
@@ -661,16 +663,16 @@ function FoodSearchView({
             <IconBarcode />
           </Button>
         </div>
-        <PickerTabBar tab={tab} onTab={onTab} />
+        <PickerTabBar tab={tab} onTab={onTab} tabs={ZUTAT_PICKER_TABS} />
       </div>
 
       <div className="flex-1 px-4 py-3">
-        {tab === 'alle' &&
+        {tab === 'lebensmittel' &&
           (searching && results.length === 0
             ? placeholder(PICKER_LOADING)
-            : alleFoods.length === 0
+            : lebensmittelFoods.length === 0
               ? placeholder(search.trim() ? 'Nichts gefunden.' : 'Die Bibliothek ist noch leer.')
-              : foodRows(alleFoods))}
+              : foodRows(lebensmittelFoods))}
 
         {tab === 'favoriten' &&
           (fav.favorites === null

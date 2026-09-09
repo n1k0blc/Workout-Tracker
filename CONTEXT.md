@@ -36,7 +36,12 @@ say.
   the creator edits a `USER` food; `SEED` / `OPEN_FOOD_FACTS` are read-only for everyone.
   Deletion is soft; the `barcode` is a product's global identity. Creator names are never
   shown. `SEED` foods come from `FoodsSeed.csv` at the repo root and carry the CSV's `key`
-  as `seedKey`, the stable identity `prisma db seed` upserts on. Code: `Food` / `FoodPortion`.
+  as `seedKey`, the stable identity `prisma db seed` upserts on. Search results (the picker's
+  Lebensmittel tab and the standalone Lebensmittel tab) are grouped by source before the page
+  cap so the ~180k `OPEN_FOOD_FACTS` imports (#146) never bury a generic staple: the
+  searcher's own `USER` foods first, then `SEED`, then imports and other users' `USER` foods
+  together (ADR-0003), name order within each group (#155). Nothing is hidden. Code: `Food` /
+  `FoodPortion`.
 
 - **Mahlzeit** (meal, a saved combination of foods) — the other shared library an Eintrag can
   be logged from, built in the "Mahlzeiten" tab of Vorlagen. A Mahlzeit has a name and an
@@ -54,17 +59,22 @@ say.
   even when one of its foods has been soft-deleted; it cannot contain another Mahlzeit;
   duplicate names are allowed. Code: `Meal` / `MealItem`.
 
-- **Favoriten / Zuletzt** — the two extra tabs the picker (and the Mahlzeit editor's Zutat
-  search) gain next to "Alle". A star on every picker row toggles a per-user favorite;
-  favoriting happens only where you log, never in the Vorlagen tabs. **Favoriten** lists the
-  starred Lebensmittel and Mahlzeiten ordered by when each was last logged (a never-logged
-  favorite sorts last, by when it was starred); unstarring removes the row. **Zuletzt** is
-  derived from the diary, no table: the last 20 *distinct* foods and meals the user logged,
-  most recent first — an Eintrag expanded from a Mahlzeit counts toward the meal, not its
-  ingredient foods. In "Alle", a starred row floats above non-favorites of equal name order.
-  The Zutat search is foods-only (a Mahlzeit can't be an ingredient). Both tabs drop an item
-  whose Lebensmittel / Mahlzeit has since been soft-deleted. Code: `FoodFavorite` /
-  `MealFavorite`, `FavoritesService`, `PickerService`.
+- **Favoriten / Zuletzt** — two of the picker's tabs, alongside the kind tabs. The logging
+  picker's tab bar is `Lebensmittel | Mahlzeiten | Favoriten | Zuletzt`; the Mahlzeit editor's
+  Zutat search drops the Mahlzeiten tab (a Mahlzeit can't be an ingredient). The kind tabs
+  each hold one kind and separate precisely because the Lebensmittel list is ~180k rows deep;
+  Favoriten and Zuletzt are short user-curated lists and keep both kinds mixed (#155). A star
+  on every picker row toggles a per-user favorite; favoriting happens only where you log,
+  never in the Vorlagen tabs. **Favoriten** lists the starred Lebensmittel and Mahlzeiten
+  ordered by when each was last logged (a never-logged favorite sorts last, by when it was
+  starred); unstarring removes the row. **Zuletzt** is derived from the diary, no table: the
+  last 20 *distinct* foods and meals the user logged, most recent first — an Eintrag expanded
+  from a Mahlzeit counts toward the meal, not its ingredient foods. In the kind tabs, a
+  starred row floats above non-favorites of equal order. The Zutat search's Favoriten and
+  Zuletzt are foods-only. Both tabs drop an item whose Lebensmittel / Mahlzeit has since been
+  soft-deleted. `PICKER_TABS` gave way to `LOGGING_PICKER_TABS` / `ZUTAT_PICKER_TABS`, a
+  parameter of the shared `PickerTabBar`. Code: `FoodFavorite` / `MealFavorite`,
+  `FavoritesService`, `PickerService`.
 
 - **Barcode-Scan** — the camera (or the manual EAN field beside it) resolving a product to a
   Lebensmittel, from the picker and from the Lebensmittel tab. The Lebensmittel editor's EAN

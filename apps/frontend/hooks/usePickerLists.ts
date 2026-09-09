@@ -4,9 +4,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api';
 import { PickerItem } from '@/types';
+import type { PickerTabId } from '@/components/nutrition/picker-tabs';
 
 type Kind = 'food' | 'meal';
-type Tab = 'alle' | 'favoriten' | 'zuletzt';
 
 /**
  * The Favoriten / Zuletzt machinery shared by the logging picker and the Mahlzeit editor's
@@ -26,7 +26,7 @@ export function usePickerLists({
   scope,
 }: {
   open: boolean;
-  tab: Tab;
+  tab: PickerTabId;
   scope?: 'food';
 }) {
   const [overrides, setOverrides] = useState<Map<string, boolean>>(() => new Map());

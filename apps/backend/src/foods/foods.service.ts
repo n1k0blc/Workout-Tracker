@@ -47,6 +47,10 @@ type FoodRow = {
 
 const WITH_PORTIONS = { portions: { orderBy: { order: 'asc' as const } } };
 
+/** How many matching foods one search page returns. The library holds ~180k imported rows
+ *  (#146), so results are always capped. */
+const PAGE_SIZE = 200;
+
 function toDto(food: FoodRow, userId: string, favoriteIds?: Set<string>): FoodDto {
   return {
     id: food.id,
@@ -100,11 +104,17 @@ export class FoodsService {
     private offLookup: OffLookupService,
   ) {}
 
-  /** Every non-deleted food, from every user. Optional case-insensitive name search. */
   /**
    * One capped page of matching foods, plus the totals behind it. The page cap exists because
    * the Open Food Facts import (#146) puts ~180k foods in the library; without the totals the
    * caller can only report the page size, which is not the library size.
+   *
+   * Results are grouped by source before the cap so a generic staple is never pushed off the
+   * page by branded imports (#155): the searcher's own `USER` foods first, then curated `SEED`
+   * staples, then everything else -- `OPEN_FOOD_FACTS` imports and other users' `USER` foods,
+   * which rank together per ADR-0003 (creator names are never shown). Name order decides
+   * within each group. This is why it is three queries rather than one: the alphabetical head
+   * of the merged list would otherwise be all imports.
    */
   async findAll(userId: string, search?: string): Promise<FoodListDto> {
     const where: Record<string, unknown> = { deletedAt: null };
@@ -118,19 +128,29 @@ export class FoodsService {
       ];
     }
 
-    const [foods, total, ownTotal, favoriteIds] = await Promise.all([
+    const own = { source: 'USER' as const, createdById: userId };
+    const seed = { source: 'SEED' as const };
+    const page = (extra: Record<string, unknown>) =>
       this.prisma.food.findMany({
-        where,
+        where: { ...where, ...extra },
         include: WITH_PORTIONS,
         orderBy: { name: 'asc' },
-        take: 200,
-      }) as Promise<FoodRow[]>,
+        take: PAGE_SIZE,
+      }) as Promise<FoodRow[]>;
+
+    const [ownFoods, seedFoods, restFoods, total, ownTotal, favoriteIds] = await Promise.all([
+      page(own),
+      page(seed),
+      page({ NOT: [own, seed] }),
       this.prisma.food.count({ where }),
-      this.prisma.food.count({ where: { ...where, source: 'USER', createdById: userId } }),
+      this.prisma.food.count({ where: { ...where, ...own } }),
       this.favorites.favoriteFoodIds(userId),
     ]);
 
-    return { items: foods.map((f) => toDto(f, userId, favoriteIds)), total, ownTotal };
+    const items = [...ownFoods, ...seedFoods, ...restFoods]
+      .slice(0, PAGE_SIZE)
+      .map((f) => toDto(f, userId, favoriteIds));
+    return { items, total, ownTotal };
   }
 
   /** Resolves a food by id even when it is soft-deleted -- old entries must keep rendering. */
