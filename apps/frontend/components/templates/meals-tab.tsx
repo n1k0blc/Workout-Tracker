@@ -1,13 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { IconChevronRight, IconPlus } from '@tabler/icons-react';
 import { apiClient } from '@/lib/api';
 import { MealListItem } from '@/types';
 import { formatKcal, mealIngredientPreview } from '@/lib/nutrition';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { MealEditorSheet } from './meal-editor-sheet';
 
 function totalsLine(meal: MealListItem): string {
   const { kcal, carbs, protein, fat } = meal.totals;
@@ -17,13 +17,12 @@ function totalsLine(meal: MealListItem): string {
 }
 
 export default function MealsTab() {
+  const router = useRouter();
   const [meals, setMeals] = useState<MealListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [mineTotal, setMineTotal] = useState(0);
   const [mineOnly, setMineOnly] = useState(false);
   const [loading, setLoading] = useState(true);
-  // 'create' | mealId | null
-  const [editing, setEditing] = useState<string | 'create' | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,7 +49,7 @@ export default function MealsTab() {
           {total.toLocaleString('de-DE')} {total === 1 ? 'Mahlzeit' : 'Mahlzeiten'} ·{' '}
           {mineTotal} eigene
         </p>
-        <Button size="sm" onClick={() => setEditing('create')}>
+        <Button size="sm" onClick={() => router.push('/templates/meals/new')}>
           <IconPlus data-icon="inline-start" />
           Neu
         </Button>
@@ -83,7 +82,7 @@ export default function MealsTab() {
             <button
               key={meal.id}
               type="button"
-              onClick={() => setEditing(meal.id)}
+              onClick={() => router.push(`/templates/meals/${meal.id}/edit`)}
               className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/50"
             >
               <div className="min-w-0 flex-1">
@@ -99,12 +98,6 @@ export default function MealsTab() {
         </div>
       )}
 
-      <MealEditorSheet
-        open={editing !== null}
-        onOpenChange={(open) => !open && setEditing(null)}
-        mealId={editing && editing !== 'create' ? editing : undefined}
-        onChanged={load}
-      />
     </div>
   );
 }

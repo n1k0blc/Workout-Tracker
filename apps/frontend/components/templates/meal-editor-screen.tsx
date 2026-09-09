@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   IconArrowLeft,
@@ -28,12 +29,6 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-} from '@/components/ui/drawer';
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -43,6 +38,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { ProtectedRoute } from '@/components/protected-route';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { apiClient } from '@/lib/api';
@@ -65,6 +61,9 @@ import {
   type PickerTabId,
 } from '@/components/nutrition/picker-tabs';
 import { usePickerLists } from '@/hooks/usePickerLists';
+
+/** Where Speichern, Abbrechen and Löschen all return to. */
+const MEALS_TAB = '/templates?tab=meals';
 
 /** An ingredient being edited: the food's live nutrients plus the chosen amount. */
 interface EditorItem {
@@ -126,25 +125,30 @@ function itemSubtitle(item: EditorItem): string {
 }
 
 /**
- * Create / edit a Mahlzeit (#147). A meal is a live combination of foods with quantities:
- * the totals shown here are recomputed from the foods' current nutrients, and logging the
- * meal later expands it into snapshotted entries. Only the creator can edit -- another
- * user's meal opens read-only.
+ * What a save would send. Compared against the loaded Mahlzeit to answer "is this dirty?" --
+ * reordering counts, and so does an amount change, because both are part of the payload.
  */
-export function MealEditorSheet({
-  open,
-  onOpenChange,
-  mealId,
-  onChanged,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  mealId?: string;
-  onChanged: () => void;
-}) {
+function signature(name: string, items: EditorItem[]): string {
+  return JSON.stringify([name.trim(), items.map((i) => [i.foodId, i.quantity])]);
+}
+
+/**
+ * Create / edit a Mahlzeit (#147), as a page rather than a drawer (#155).
+ *
+ * A Mahlzeit is a live combination of Lebensmittel with quantities: the totals here are
+ * recomputed from the foods' current nutrients, and logging it later expands it into
+ * snapshotted Einträge. Only the creator can edit -- another user's Mahlzeit opens read-only.
+ *
+ * `/templates/meals/new` and `/templates/meals/[id]/edit` both render this, so creating and
+ * editing are the same screen. It was a bottom sheet until the drawer proved awkward on a
+ * phone: the Zutat search and the ingredient list had to share one 92vh sheet, and the drag
+ * handles fought the sheet's own drag-to-dismiss.
+ */
+export default function MealEditorScreen({ mealId }: { mealId?: string }) {
+  const router = useRouter();
   const isEdit = mealId != null;
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(isEdit);
   const [readOnly, setReadOnly] = useState(false);
   const [name, setName] = useState('');
   const [items, setItems] = useState<EditorItem[]>([]);
@@ -152,6 +156,9 @@ export function MealEditorSheet({
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  // The payload as loaded. Null until the Mahlzeit arrives, so a slow load cannot look dirty.
+  const [baseline, setBaseline] = useState<string | null>(isEdit ? null : signature('', []));
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchTab, setSearchTab] = useState<PickerTabId>('alle');
@@ -168,32 +175,18 @@ export function MealEditorSheet({
   );
 
   useEffect(() => {
-    if (!open) return;
-    setError('');
-    setSaving(false);
-    setConfirmDelete(false);
-    setExpandedKey(null);
-    setSearchOpen(false);
-    setSearchTab('alle');
-    setSearch('');
-    setResults([]);
-
-    if (!mealId) {
-      setReadOnly(false);
-      setName('');
-      setItems([]);
-      return;
-    }
-
-    setLoading(true);
+    if (!mealId) return;
     let cancelled = false;
+    setLoading(true);
     apiClient
       .getMeal(mealId)
       .then((meal) => {
         if (cancelled) return;
         setReadOnly(!meal.editable);
         setName(meal.name);
-        setItems(meal.items.map(fromMealItem));
+        const loaded = meal.items.map(fromMealItem);
+        setItems(loaded);
+        setBaseline(signature(meal.name, loaded));
       })
       .catch(() => {
         if (!cancelled) setError('Mahlzeit konnte nicht geladen werden.');
@@ -204,7 +197,7 @@ export function MealEditorSheet({
     return () => {
       cancelled = true;
     };
-  }, [open, mealId]);
+  }, [mealId]);
 
   // Food search for the "Zutat" picker -- only the "Alle" tab queries; Favoriten / Zuletzt
   // are served by usePickerLists (#148).
@@ -228,10 +221,31 @@ export function MealEditorSheet({
     };
   }, [searchOpen, searchTab, search]);
 
+  const dirty = !readOnly && baseline !== null && signature(name, items) !== baseline;
+
+  // Covers a reload, a closed tab and a followed link out of the app. In-app navigation is
+  // guarded by `leave()` below. The browser's own back button and the iOS swipe-back gesture
+  // are *not* intercepted -- the App Router has no supported hook for that.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+
   const totals = useMemo(
     () => computeMealTotals(items.map((i) => ({ per100: i.per100, quantity: i.quantity }))),
     [items],
   );
+
+  /** Back to the Mahlzeiten tab, asking first when there is unsaved work. */
+  const leave = useCallback(() => {
+    if (dirty) {
+      setConfirmDiscard(true);
+      return;
+    }
+    router.push(MEALS_TAB);
+  }, [dirty, router]);
 
   function openSearch() {
     setSearchOpen(true);
@@ -251,9 +265,7 @@ export function MealEditorSheet({
   }
 
   function setItemAmount(key: string, quantity: number, portionLabel: string | null) {
-    setItems((prev) =>
-      prev.map((i) => (i.key === key ? { ...i, quantity, portionLabel } : i)),
-    );
+    setItems((prev) => prev.map((i) => (i.key === key ? { ...i, quantity, portionLabel } : i)));
   }
 
   function onDragEnd(event: DragEndEvent) {
@@ -283,12 +295,14 @@ export function MealEditorSheet({
     setSaving(true);
     try {
       if (isEdit) {
-        await apiClient.updateMeal(mealId!, input);
+        await apiClient.updateMeal(mealId, input);
       } else {
         await apiClient.createMeal(input);
       }
-      onChanged();
-      onOpenChange(false);
+      // Match the baseline before navigating, so the guard does not fire on the way out.
+      setBaseline(signature(name, items));
+      toast.success(isEdit ? 'Mahlzeit gespeichert' : 'Mahlzeit angelegt');
+      router.push(MEALS_TAB);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Speichern fehlgeschlagen.');
       setSaving(false);
@@ -299,49 +313,51 @@ export function MealEditorSheet({
     if (!mealId) return;
     try {
       await apiClient.deleteMeal(mealId);
-      onChanged();
-      onOpenChange(false);
+      setBaseline(signature(name, items));
+      toast.success('Mahlzeit gelöscht');
+      router.push(MEALS_TAB);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Löschen fehlgeschlagen.');
     }
   }
 
-  const title = readOnly ? 'Mahlzeit' : isEdit ? 'Mahlzeit bearbeiten' : 'Neue Mahlzeit';
+  const title = searchOpen
+    ? 'Zutat'
+    : readOnly
+      ? 'Mahlzeit'
+      : isEdit
+        ? 'Bearbeiten'
+        : 'Neue Mahlzeit';
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="mx-auto flex h-[92vh] max-w-2xl flex-col">
-        <DrawerHeader className="flex-row items-center justify-between gap-2">
-          {searchOpen ? (
-            <>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Zurück"
-                onClick={() => setSearchOpen(false)}
-              >
-                <IconArrowLeft />
-              </Button>
-              <DrawerTitle>Zutat</DrawerTitle>
-              <span className="w-9" />
-            </>
+    <ProtectedRoute>
+      <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col">
+        <header className="relative flex h-16 shrink-0 items-center justify-between border-b px-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Zurück"
+            onClick={searchOpen ? () => setSearchOpen(false) : leave}
+          >
+            <IconArrowLeft />
+          </Button>
+          <div className="absolute left-1/2 max-w-[60%] -translate-x-1/2 truncate text-lg font-semibold uppercase tracking-[0.05em]">
+            {title}
+          </div>
+          {isEdit && !readOnly && !searchOpen ? (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-destructive"
+              aria-label="Mahlzeit löschen"
+              onClick={() => setConfirmDelete(true)}
+            >
+              <IconTrash />
+            </Button>
           ) : (
-            <>
-              <DrawerTitle className="truncate">{title}</DrawerTitle>
-              {isEdit && !readOnly && (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="text-destructive"
-                  aria-label="Mahlzeit löschen"
-                  onClick={() => setConfirmDelete(true)}
-                >
-                  <IconTrash />
-                </Button>
-              )}
-            </>
+            <div className="w-10" />
           )}
-        </DrawerHeader>
+        </header>
 
         {searchOpen ? (
           <FoodSearchView
@@ -358,9 +374,9 @@ export function MealEditorSheet({
           />
         ) : (
           <>
-            <div className="flex-1 overflow-y-auto px-4 pb-2">
+            <div className="flex-1 px-4 pb-2">
               {error && (
-                <div className="mb-4 rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+                <div className="mt-4 rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
                   {error}
                 </div>
               )}
@@ -368,7 +384,7 @@ export function MealEditorSheet({
               {loading ? (
                 <p className="py-10 text-center text-sm text-muted-foreground">Lädt …</p>
               ) : (
-                <div className="space-y-5 pt-1">
+                <div className="space-y-5 pt-5">
                   <label className="block">
                     <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
                       Name
@@ -463,17 +479,17 @@ export function MealEditorSheet({
               )}
             </div>
 
-            <div className="mt-auto flex gap-2 border-t p-4">
+            <div className="sticky bottom-0 mt-auto flex gap-2 border-t bg-background p-4">
               {readOnly ? (
-                <Button className="flex-1" variant="outline" onClick={() => onOpenChange(false)}>
+                <Button className="flex-1" variant="outline" onClick={leave}>
                   Schließen
                 </Button>
               ) : (
                 <>
                   <Button className="flex-1" onClick={handleSave} disabled={saving || loading}>
-                    Speichern
+                    {saving ? 'Speichert …' : 'Speichern'}
                   </Button>
-                  <Button variant="outline" onClick={() => onOpenChange(false)}>
+                  <Button variant="outline" onClick={leave}>
                     Abbrechen
                   </Button>
                 </>
@@ -481,7 +497,7 @@ export function MealEditorSheet({
             </div>
           </>
         )}
-      </DrawerContent>
+      </div>
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
@@ -503,7 +519,27 @@ export function MealEditorSheet({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Drawer>
+
+      <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Änderungen verwerfen?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Diese Mahlzeit hat ungespeicherte Änderungen. Beim Verlassen gehen sie verloren.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Weiter bearbeiten</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => router.push(MEALS_TAB)}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              Verwerfen
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </ProtectedRoute>
   );
 }
 
@@ -541,9 +577,7 @@ function FoodSearchView({
   );
   const recentFoods = foodsOf(fav.recents);
 
-  const placeholder = (message: string) => (
-    <PickerTabPlaceholder>{message}</PickerTabPlaceholder>
-  );
+  const placeholder = (message: string) => <PickerTabPlaceholder>{message}</PickerTabPlaceholder>;
 
   const foodRows = (foods: Food[]) => (
     <div className="divide-y rounded-lg border">
@@ -586,7 +620,7 @@ function FoodSearchView({
 
   return (
     <>
-      <div className="flex flex-col gap-3 px-4">
+      <div className="flex flex-col gap-3 px-4 pt-4">
         <div className="flex items-center gap-2 border-b border-b-input">
           <IconSearch className="size-4 shrink-0 text-muted-foreground" />
           <Input
@@ -600,14 +634,12 @@ function FoodSearchView({
         <PickerTabBar tab={tab} onTab={onTab} />
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-3">
+      <div className="flex-1 px-4 py-3">
         {tab === 'alle' &&
           (searching && results.length === 0
             ? placeholder(PICKER_LOADING)
             : alleFoods.length === 0
-              ? placeholder(
-                  search.trim() ? 'Nichts gefunden.' : 'Die Bibliothek ist noch leer.',
-                )
+              ? placeholder(search.trim() ? 'Nichts gefunden.' : 'Die Bibliothek ist noch leer.')
               : foodRows(alleFoods))}
 
         {tab === 'favoriten' &&
@@ -625,7 +657,7 @@ function FoodSearchView({
               : foodRows(recentFoods))}
       </div>
 
-      <div className="mt-auto border-t p-4">
+      <div className="sticky bottom-0 mt-auto border-t bg-background p-4">
         <Button className="w-full" onClick={onDone}>
           Fertig
         </Button>
@@ -649,9 +681,10 @@ function IngredientRow({
   onRemove: () => void;
   onAmountChange: (grams: number, portionLabel: string | null) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable(
-    { id: item.key, disabled: readOnly },
-  );
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.key,
+    disabled: readOnly,
+  });
 
   return (
     <div
@@ -684,9 +717,7 @@ function IngredientRow({
               </span>
             )}
           </div>
-          <div className="mt-0.5 truncate text-xs text-muted-foreground">
-            {itemSubtitle(item)}
-          </div>
+          <div className="mt-0.5 truncate text-xs text-muted-foreground">{itemSubtitle(item)}</div>
         </button>
         {!readOnly && (
           <Button
