@@ -350,16 +350,7 @@ export function FoodPickerSheet({
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent
-        className="mx-auto flex h-[88vh] max-w-2xl flex-col"
-        // The scanner is a full-screen overlay portaled to the body, so every tap in it is an
-        // "outside" interaction for this drawer and would dismiss it. That dismissal is
-        // invisible (the scanner covers it) but not harmless: the caller drops the slot it was
-        // opened for, and the scan then logs against no Abschnitt at all.
-        onInteractOutside={(event) => {
-          if (scannerOpen) event.preventDefault();
-        }}
-      >
+      <DrawerContent className="mx-auto flex h-[88vh] max-w-2xl flex-col">
         <DrawerHeader className="flex-row items-center justify-between">
           <DrawerTitle>Hinzufügen</DrawerTitle>
           <span className="text-xs text-muted-foreground">{slotName}</span>
