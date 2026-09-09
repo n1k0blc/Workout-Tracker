@@ -17,8 +17,16 @@ Du bist der Dev-Environment Manager für den Workout Tracker.
      cd "$(pwd)/apps/backend" && pnpm run start:dev
 **Für Tests auf iPhone / anderem Gerät im selben WiFi (lokal auf Mac-IP zugreifen):**
 
-Die CORS-Konfiguration ist jetzt dev-freundlich (siehe main.ts):
-- Erlaubt standardmäßig localhost:3000 + 127.0.0.1:3000 + private Netzwerke (192.168.*, 10.*, 172.16-31.*)
+> **Kamera / Barcode-Scan (#149)? Dann NICHT `dev:mobile`, sondern `pnpm run dev:https`.**
+> `getUserMedia` braucht einen sicheren Kontext (HTTPS oder localhost). Über `dev:mobile`
+> läuft alles über plain HTTP, deshalb gibt es dort **keine Kamera** — nur das manuelle
+> EAN-Feld. `dev:https` startet Backend + Frontend über HTTPS, stellt das Zertifikat auf die
+> aktuelle LAN-Adresse aus und schickt `/api` über denselben Origin.
+> Vollständige Anleitung inkl. Zertifikat auf dem iPhone: `docs/barcode-scanner-testing.md`.
+
+Die CORS-Konfiguration ist jetzt dev-freundlich (siehe main.ts und `isLocalDevOrigin`):
+- Erlaubt localhost, private Netzwerke (192.168.*, 10.*, 172.16-31.*) und Bonjour-Namen
+  (`*.local`) — jeweils über http **und** https.
 - Du kannst bei Bedarf explizit weitere Origins via CORS_ORIGIN hinzufügen.
 
 Empfohlener Ablauf:

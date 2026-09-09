@@ -5,6 +5,7 @@
   "description": "Personal Workout Tracking Application",
   "scripts": {
     "dev": "pnpm run backend & pnpm run frontend",
+    "dev:https": "pnpm run backend & pnpm --filter frontend run dev:https",
     "backend": "pnpm --filter backend run start:dev",
     "frontend": "pnpm --filter frontend run dev",
     "backend:build": "pnpm --filter backend run build",
