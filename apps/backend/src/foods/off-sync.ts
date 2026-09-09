@@ -1,7 +1,13 @@
 /**
- * The weekly Open Food Facts sync (#150).
+ * The Open Food Facts delta sync (#150).
  *
- * Downloads the daily delta files published since the last successful run and applies them
+ * Open Food Facts publishes one delta a day, around 06:10 UTC, and keeps about 13 of them, so
+ * this runs daily at 09:00 -- past publication in both DST states. Daily rather than weekly
+ * because the windows are contiguous: seven daily runs fetch exactly the files one weekly run
+ * would, at the same total bandwidth, but leave twelve days of slack against retention instead
+ * of six.
+ *
+ * It downloads the delta files published since the last successful run and applies them
  * with the same adapter, filter and mapping the bulk import (#146) uses, so an existing
  * OPEN_FOOD_FACTS row is refreshed and a new qualifying German product is added. Rows of any
  * other source are never touched, and diary entries are snapshots, so history cannot move.

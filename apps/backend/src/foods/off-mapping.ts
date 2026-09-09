@@ -5,7 +5,7 @@
  * in the CSV export, a nested `nutrition.input_sets` structure in the JSONL export and the
  * daily deltas, and the legacy `nutriments` block from the API. Each gets a thin adapter that
  * produces the `OffProduct` below; everything after that -- the quality filter and this
- * mapping -- is shared by the bulk import, the weekly sync (#150) and the live lookup (#149).
+ * mapping -- is shared by the bulk import, the delta sync (#150) and the live lookup (#149).
  */
 import { isValidEan13 } from './barcode';
 
@@ -38,7 +38,7 @@ export type MappedFood = {
 
 /**
  * The market filter, deliberately separate from the quality gate below. The import (#146) and
- * the weekly sync (#150) narrow the library to products sold in Germany; the live barcode
+ * the delta sync (#150) narrow the library to products sold in Germany; the live barcode
  * lookup (#149) does not, because it caches whatever the user physically scanned.
  *
  * `en:germany` is user-contributed and means only that somebody said the product is sold

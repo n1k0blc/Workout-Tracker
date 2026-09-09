@@ -3,7 +3,7 @@ import { Readable } from 'stream';
 import { emptyFunnel, planDeltaSync, readDeltaProducts } from './off-delta';
 
 /**
- * The delta half of the weekly sync (#150). Open Food Facts publishes one gzipped JSONL file
+ * The delta half of the sync job (#150). Open Food Facts publishes one gzipped JSONL file
  * per day and keeps about 13 of them, so the two things worth testing here are picking the
  * right files out of the index and streaming one of them through the shared filter.
  */

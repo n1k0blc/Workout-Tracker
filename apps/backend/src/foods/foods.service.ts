@@ -215,7 +215,7 @@ export class FoodsService {
    *     the barcode is the product's global identity and is unique across deleted rows too, so
    *     the alternative is a 409 on a code the user is physically holding.
    *  2. **Open Food Facts** -- looked up live, cached as a global `OPEN_FOOD_FACTS` food with
-   *     `lastSyncedAt` so the weekly sync (#150) treats it like any imported row.
+   *     `lastSyncedAt` so the delta sync (#150) treats it like any imported row.
    *  3. **Nothing** -- the caller opens "Lebensmittel anlegen" with the barcode prefilled.
    */
   async lookupByBarcode(userId: string, raw: string): Promise<BarcodeLookupDto> {

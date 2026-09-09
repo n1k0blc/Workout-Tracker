@@ -296,7 +296,7 @@ model Food {
   source       FoodSource    @default(USER)
   // Null for SEED and OPEN_FOOD_FACTS rows; set for USER rows (the only creator that can edit).
   createdById  String?
-  // OPEN_FOOD_FACTS only: when this row was last refreshed from the weekly sync (#150).
+  // OPEN_FOOD_FACTS only: when this row was last refreshed from the delta sync (#150).
   lastSyncedAt DateTime?
   deletedAt    DateTime?
   createdAt    DateTime      @default(now())

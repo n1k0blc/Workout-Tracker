@@ -10,7 +10,7 @@ import {
 
 /**
  * Open Food Facts mapping (#146). The pure product -> Food mapping and the quality filter,
- * shared by the bulk import, the weekly delta sync (#150) and the live barcode lookup (#149).
+ * shared by the bulk import, the delta sync (#150) and the live barcode lookup (#149).
  * Fixtures are real products taken from the German subset of the export.
  */
 

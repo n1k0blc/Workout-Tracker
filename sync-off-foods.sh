@@ -1,11 +1,12 @@
 #!/bin/bash
-# Weekly Open Food Facts delta sync (#150). Runs the sync inside the backend container and
+# Open Food Facts delta sync (#150). Runs the sync inside the backend container and
 # keeps the last-run marker on the host, so the container itself stays stateless.
 #
 #   ./sync-off-foods.sh              # apply every delta published since the last run
 #   ./sync-off-foods.sh --dry-run    # report the counts, write nothing, leave the marker
 #
-# Scheduled by install-off-sync-cron.sh for Sundays at 04:00, after the 03:00 backup.
+# Scheduled by install-off-sync-cron.sh for 09:00 daily, after Open Food Facts has published
+# the day's delta and well after the 03:00 backup.
 set -euo pipefail
 
 CONTAINER="${CONTAINER:-workout-tracker-backend-prod}"

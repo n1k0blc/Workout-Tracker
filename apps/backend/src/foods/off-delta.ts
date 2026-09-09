@@ -1,5 +1,5 @@
 /**
- * The daily Open Food Facts deltas, behind the weekly sync (#150).
+ * The daily Open Food Facts deltas, behind the sync job (#150).
  *
  * Open Food Facts publishes one gzipped JSONL file per day at
  * https://static.openfoodfacts.org/data/delta/ and lists them, newest first, in `index.txt`.

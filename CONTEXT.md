@@ -86,8 +86,10 @@ say.
   `FoodsService.lookupByBarcode`, `OffLookupService`.
 
 - **Open-Food-Facts-Bibliothek** — the shared `OPEN_FOOD_FACTS` foods, filled by a one-off bulk
-  import of the German subset (`pnpm run import:off`) and kept fresh by a weekly delta sync
-  (`sync-off-foods.sh`, Sundays 04:00 on the Pi, after the backup). Open Food Facts publishes
+  import of the German subset (`pnpm run import:off`) and kept fresh by a delta sync
+  (`sync-off-foods.sh`, 09:00 daily on the Pi — Open Food Facts publishes one delta a day around
+  06:10 UTC, and the windows are contiguous, so daily costs the same bandwidth as weekly and
+  leaves twice the slack against the ~13 days kept). Open Food Facts publishes
   one product in three shapes — flat CSV columns, `nutrition.input_sets` in the JSONL export and
   the daily deltas, and the legacy `nutriments` block from the API — so each gets a thin adapter
   and everything after it is shared: the market filter (`isSoldInGermany`), the quality gate
