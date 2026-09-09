@@ -283,8 +283,19 @@ export function FoodEditorDialog({
       : 'Neues Lebensmittel';
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+    // Non-modal while the scanner is up. The scanner is a full-screen overlay portaled to the
+    // body, so it sits outside this dialog's content: a modal dialog would trap focus away
+    // from its EAN field, disable pointer events on every control in it, and treat the first
+    // tap as an outside interaction -- closing this editor and losing the half-filled form.
+    // Radix binds both the focus trap and the pointer-events block to `modal`, so dropping it
+    // removes all three, and `onInteractOutside` keeps the editor open underneath.
+    <Dialog open={open} onOpenChange={onOpenChange} modal={!scannerOpen}>
+      <DialogContent
+        className="max-h-[90vh] max-w-lg overflow-y-auto"
+        onInteractOutside={(event) => {
+          if (scannerOpen) event.preventDefault();
+        }}
+      >
         <DialogHeader className="flex-row items-center justify-between">
           <DialogTitle>{title}</DialogTitle>
           {isEdit && (
