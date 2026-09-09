@@ -85,6 +85,20 @@ say.
   [docs/barcode-scanner-testing.md](docs/barcode-scanner-testing.md). Code: `normalizeBarcode`,
   `FoodsService.lookupByBarcode`, `OffLookupService`.
 
+- **Open-Food-Facts-Bibliothek** — the shared `OPEN_FOOD_FACTS` foods, filled by a one-off bulk
+  import of the German subset (`pnpm run import:off`) and kept fresh by a weekly delta sync
+  (`sync-off-foods.sh`, Sundays 04:00 on the Pi, after the backup). Open Food Facts publishes
+  one product in three shapes — flat CSV columns, `nutrition.input_sets` in the JSONL export and
+  the daily deltas, and the legacy `nutriments` block from the API — so each gets a thin adapter
+  and everything after it is shared: the market filter (`isSoldInGermany`), the quality gate
+  (`rejectOffProduct`: valid EAN-13, plausible per-100 values, macros within ±15% of the stated
+  kcal) and the mapping. A parity test pins all three shapes to the same normalized product, so
+  a row imported from the CSV and later refreshed from a delta does not churn. The sync only ever
+  writes rows it owns — a barcode held by a USER or SEED food is left alone — and only ~13 days
+  of deltas are published, so a run that is skipped for longer logs a warning to re-run the full
+  import. Its last-run marker is a host file (`~/logs/off-sync.state`), falling back to the newest
+  `lastSyncedAt` in the library. Code: `off-mapping`, `off-import`, `off-delta`, `off-sync`.
+
 ### Tracked nutrients
 
 Only **kcal**, **Kohlenhydrate** (carbs), **Protein** and **Fett** (fat). No micronutrients.

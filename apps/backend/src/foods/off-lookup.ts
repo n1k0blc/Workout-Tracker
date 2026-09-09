@@ -35,7 +35,8 @@ const FIELDS = [
 ].join(',');
 
 /** Open Food Facts asks every client to identify itself; an anonymous UA gets rate-limited. */
-const USER_AGENT = 'Workout-Tracker/1.0 (self-hosted; https://github.com/n1k0blc/Workout-Tracker)';
+export const OFF_USER_AGENT =
+  'Workout-Tracker/1.0 (self-hosted; https://github.com/n1k0blc/Workout-Tracker)';
 
 /** A scan is in the foreground with a user watching -- fail over to "Kein Treffer" quickly. */
 const TIMEOUT_MS = 5000;
@@ -51,7 +52,7 @@ export class OffLookupService {
       const response = await fetch(
         `${API_BASE}/${encodeURIComponent(barcode)}.json?fields=${FIELDS}`,
         {
-          headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
+          headers: { 'User-Agent': OFF_USER_AGENT, Accept: 'application/json' },
           signal: AbortSignal.timeout(TIMEOUT_MS),
         },
       );
