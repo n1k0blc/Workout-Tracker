@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api';
 import { BarcodeLookup, Food } from '@/types';
@@ -47,13 +47,10 @@ export function ScanToLog({
   // only half of it.
   const [createdFromScan, setCreatedFromScan] = useState<BarcodeLookup | null>(null);
 
-  useEffect(() => {
-    if (open) {
-      setScannedBarcode(null);
-      setInspecting(null);
-      setCreatedFromScan(null);
-    }
-  }, [open]);
+  // No reset-on-open here, deliberately. Finishing the create flow *reopens* the scanner to
+  // show the new food, so anything keyed on `open` would clear the seed on the very transition
+  // that needs it. Each value above is cleared where it is finished with instead, and
+  // `createdFromScan` is only ever read at mount (through `key`), so a stale one is inert.
 
   async function logScanned(food: Food, grams: number, quantityLabel: string) {
     await apiClient.createDiaryEntriesBatch({

@@ -130,7 +130,13 @@ export function BarcodeScannerSheet({
           <ResultBody
             lookup={phase.lookup}
             mode={mode}
-            onCreateFood={onCreateFood}
+            // Reset before handing off: the caller closes this to show the create form, which
+            // skips the close handler below. Without this, abandoning that form and scanning
+            // again reopens onto the stale result -- with the camera still paused behind it.
+            onCreateFood={(barcode) => {
+              rescan();
+              onCreateFood(barcode);
+            }}
             onOpenFood={onOpenFood}
             onRescan={rescan}
           />
