@@ -135,7 +135,7 @@ function signature(name: string, items: EditorItem[]): string {
 }
 
 /**
- * Create / edit a Mahlzeit (#147), as a page rather than a drawer (#155).
+ * Create / edit a Mahlzeit (#147), as a page rather than the bottom sheet it shipped as.
  *
  * A Mahlzeit is a live combination of Lebensmittel with quantities: the totals here are
  * recomputed from the foods' current nutrients, and logging it later expands it into
