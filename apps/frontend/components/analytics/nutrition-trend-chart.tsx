@@ -22,7 +22,6 @@ import {
   formatKcal,
   nutritionDailyAverage,
   nutritionTargetReached,
-  nutritionRangeLabel,
 } from '@/lib/nutrition';
 import type { NutritionMetric, NutritionTrend } from '@/types';
 
@@ -37,20 +36,22 @@ function formatDayLabel(localDate: string): string {
 
 interface NutritionTrendChartProps {
   trend: NutritionTrend | null;
-  /** How many days the selected range covers -- for the "letzte N Tage" legend line. */
-  rangeDays: number;
+  /** The legend line's range phrase, e.g. `"letzte 7 Tage"` or a cycle's own `"DD.MM. - DD.MM."`
+   *  span in Zyklus-Modus -- the caller decides which, since it knows the mode. */
+  rangeLabel: string;
   loading?: boolean;
 }
 
 /**
  * Ernährungs-Analytics v1 (#153, design screen 11): daily totals over the analytics range
- * selector, a metric toggle (kcal / KH / Protein / Fett), a dashed "ZIEL" reference line when
- * the selected metric has a Tagesziel, and the "Ø pro Tag" / "Ziel erreicht" stat tiles.
- * Days with no entries come back as zeros, so the line is continuous.
+ * selector -- or, in Zyklus-Modus, the selected cycle's own span -- a metric toggle (kcal /
+ * KH / Protein / Fett), a dashed "ZIEL" reference line when the selected metric has a
+ * Tagesziel, and the "Ø pro Tag" / "Ziel erreicht" stat tiles. Days with no entries come back
+ * as zeros, so the line is continuous.
  */
 export default function NutritionTrendChart({
   trend,
-  rangeDays,
+  rangeLabel,
   loading = false,
 }: NutritionTrendChartProps) {
   const [metric, setMetric] = useState<NutritionMetric>('kcal');
@@ -158,7 +159,7 @@ export default function NutritionTrendChart({
             <div className="mt-4 flex items-center gap-2">
               <span className="h-0.5 w-3.5 flex-none bg-foreground" />
               <span className="text-[11px] text-muted-foreground">
-                {metricConfig.label} pro Tag · {nutritionRangeLabel(rangeDays)}
+                {metricConfig.label} pro Tag · {rangeLabel}
               </span>
             </div>
 

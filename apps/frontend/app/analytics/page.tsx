@@ -51,13 +51,65 @@ import { PersonalRecordCard } from '@/components/PersonalRecordCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { NutritionTrend } from '@/types';
-import { addDays } from '@/lib/nutrition';
+import { addDays, nutritionRangeLabel } from '@/lib/nutrition';
 import { toLocalDateString } from '@/lib/local-date';
 
 // The range selector drives the nutrition chart's window. "Alle" has no natural start for a
 // daily series, so it maps to a year -- long enough for a trend, and the endpoint's own cap.
 const nutritionRangeDaysFor = (timeFilter: string) =>
   timeFilter === 'all' ? 365 : Number(timeFilter);
+
+/** The Ernährungs-Analytics endpoint's own day cap (`MAX_RANGE_DAYS` in
+ *  nutrition-analytics.service.ts) -- an active cycle can run past its planned duration, so
+ *  its span is clamped rather than trusted verbatim. */
+const NUTRITION_MAX_RANGE_DAYS = 366;
+
+type CycleSpan = { startDate: string; completedAt?: string };
+
+/**
+ * The nutrition chart's date range: in Zyklus-Modus, the selected cycle's own span -- its
+ * start to its completion, or to today while still active -- clamped to the endpoint's day
+ * cap; otherwise the shared range selector above the chart. `null` in cycle mode with no
+ * cycle to show yet (mirrors `loadCycleModeData`'s own no-op there).
+ */
+function nutritionRangeFor(
+  cycleMode: boolean,
+  selectedCycle: CycleSpan | undefined,
+  timeFilter: string,
+): { start: string; end: string } | null {
+  const today = toLocalDateString(new Date());
+  if (cycleMode) {
+    if (!selectedCycle) return null;
+    const end = selectedCycle.completedAt
+      ? toLocalDateString(new Date(selectedCycle.completedAt))
+      : today;
+    const rawStart = toLocalDateString(new Date(selectedCycle.startDate));
+    const earliestStart = addDays(end, -(NUTRITION_MAX_RANGE_DAYS - 1));
+    return { start: rawStart > earliestStart ? rawStart : earliestStart, end };
+  }
+  const days = nutritionRangeDaysFor(timeFilter);
+  return { start: addDays(today, -(days - 1)), end: today };
+}
+
+/**
+ * The chart legend's range phrase: the selected cycle's own span in Zyklus-Modus (same
+ * "DD.MM. - DD.MM." wording as the cycle navigation header above), otherwise the shared range
+ * selector's "letzte N Tage".
+ */
+function nutritionRangeLabelFor(
+  cycleMode: boolean,
+  selectedCycle: CycleSpan | undefined,
+  timeFilter: string,
+): string {
+  if (cycleMode) {
+    if (!selectedCycle) return '';
+    const start = formatDate(selectedCycle.startDate);
+    return selectedCycle.completedAt
+      ? `${start} - ${formatDate(selectedCycle.completedAt)}`
+      : `${start} - heute`;
+  }
+  return nutritionRangeLabel(nutritionRangeDaysFor(timeFilter));
+}
 
 export default function AnalyticsPage() {
   // Data states
@@ -96,31 +148,38 @@ export default function AnalyticsPage() {
   const [timeFilter, setTimeFilter] = useState('7');
   const [gymFilter, setGymFilter] = useState('alle');
 
-  // Ernährungs-Analytics (#153): its own fetch, keyed on the shared range selector.
+  // Ernährungs-Analytics (#153): its own fetch, keyed on the shared range selector (or, in
+  // Zyklus-Modus, on the selected cycle's own span -- see `nutritionRangeFor`).
   const [nutritionTrend, setNutritionTrend] = useState<NutritionTrend | null>(null);
   const [nutritionLoading, setNutritionLoading] = useState(true);
-  const nutritionRangeDays = nutritionRangeDaysFor(timeFilter);
-  
+
   // Exercise filter state
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [showExerciseModal, setShowExerciseModal] = useState(false);
-  
+
   // Cycle navigation
   const [selectedCycleIndex, setSelectedCycleIndex] = useState<number>(0);
+
+  // The cycle list and the one currently shown -- hoisted here (rather than declared once
+  // near the JSX, as before) because the nutrition trend below needs it too.
+  const allCycles = cycles
+    ? [...(cycles.activeCycle ? [cycles.activeCycle] : []), ...cycles.completedCycles]
+    : [];
+  const selectedCycle = allCycles[selectedCycleIndex];
 
   // Load initial data
   useEffect(() => {
     loadInitialData();
   }, []);
 
-  // Nutrition trend follows the range selector only -- it is independent of cycle mode and
-  // the workout filters. The previous chart stays visible while a new range loads.
+  // Nutrition trend follows the range selector, or the selected cycle's own span in Zyklus-
+  // Modus. The previous chart stays visible while a new range loads.
   useEffect(() => {
+    const range = nutritionRangeFor(cycleMode, selectedCycle, timeFilter);
+    if (!range) return; // cycle mode with no cycle to show yet -- mirrors loadCycleModeData
     let cancelled = false;
-    const end = toLocalDateString(new Date());
-    const start = addDays(end, -(nutritionRangeDays - 1));
     apiClient
-      .getNutritionAnalytics(start, end)
+      .getNutritionAnalytics(range.start, range.end)
       .then((trend) => {
         if (!cancelled) {
           setNutritionTrend(trend);
@@ -137,7 +196,7 @@ export default function AnalyticsPage() {
     return () => {
       cancelled = true;
     };
-  }, [nutritionRangeDays]);
+  }, [cycleMode, selectedCycle, timeFilter]);
 
   // Reload analytics when filters change.
   // Also runs on initial mount (with default filter values) so the chart renders immediately
@@ -928,10 +987,6 @@ export default function AnalyticsPage() {
     Equipment.EZ_BAR,
   ];
 
-  const allCycles = cycles
-    ? [...(cycles.activeCycle ? [cycles.activeCycle] : []), ...cycles.completedCycles]
-    : [];
-  const selectedCycle = allCycles[selectedCycleIndex];
   const isActiveCycle = selectedCycle?.status === 'ACTIVE';
 
   return (
@@ -1811,12 +1866,13 @@ export default function AnalyticsPage() {
                   </Card>
                 )}
 
-                {/* Ernährungs-Analytics (#153) -- reuses the range selector above. Placed
-                    ahead of the Personal Records / Empty State cards so it doesn't need a
-                    scroll past the workout charts to reach. */}
+                {/* Ernährungs-Analytics (#153) -- reuses the range selector above, or the
+                    selected cycle's own span in Zyklus-Modus. Placed ahead of the Personal
+                    Records / Empty State cards so it doesn't need a scroll past the workout
+                    charts to reach. */}
                 <NutritionTrendChart
                   trend={nutritionTrend}
-                  rangeDays={nutritionRangeDays}
+                  rangeLabel={nutritionRangeLabelFor(cycleMode, selectedCycle, timeFilter)}
                   loading={nutritionLoading}
                 />
 
