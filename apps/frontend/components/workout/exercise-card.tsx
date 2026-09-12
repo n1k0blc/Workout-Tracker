@@ -245,11 +245,17 @@ export default function ExerciseCard({
   // columns. Active-workout logging (issue #102), the plan editors (issue #103) and the history
   // editor (issue #105) all use it; read-only surfaces render a breakdown instead (#101).
   // `perSidePlanEntry` writes straight through `onUpdatePlannedSet`; `perSideEntry` buffers a
-  // draft that is aggregated on log; `perSideHistoryEdit` writes each already-logged set's
-  // sides straight back via `onUpdateSet`, re-deriving the aggregate the same way the server does.
+  // draft that is aggregated on log; `perSideLoggedEdit` writes each already-logged set's
+  // sides straight back via `onUpdateSet`/the context, re-deriving the aggregate the same way
+  // the server does.
   const perSideEntry = !!exercise.isUnilateral && !isReadonly && effectiveAllowLogging;
   const perSidePlanEntry = !!exercise.isUnilateral && !isReadonly && ownsPlan;
-  const perSideHistoryEdit = !!exercise.isUnilateral && !isReadonly && editsLoggedSets;
+  // Editing an already-logged set's sides in place: the history editor (issue #105) and the
+  // active card once the set is logged. A logged *bilateral* set has always stayed editable
+  // through its inputs; a unilateral one used to freeze into a read-only L/R breakdown here,
+  // which left no way to correct a typo short of deleting and re-logging the set.
+  const perSideLoggedEdit =
+    !!exercise.isUnilateral && !isReadonly && (editsLoggedSets || effectiveAllowLogging);
   const perSideCells = perSideEntry || perSidePlanEntry;
 
   // Which side renders first, and its label. Per-exercise, session-only, not persisted --
@@ -954,8 +960,8 @@ export default function ExerciseCard({
       },
     );
 
-  // Editable L/R inputs for an already-logged unilateral set in the history editor (issue
-  // #105), each side written straight back through `updateSet`.
+  // Editable L/R inputs for an already-logged unilateral set, each side written straight back
+  // through `updateSet` (issue #105, and the active card).
   const renderLoggedSideEntryCells = (set: SetLog) =>
     renderSideEntryCells(
       getLoggedSideDraft(set),
@@ -963,9 +969,8 @@ export default function ExerciseCard({
       { disabled: loading },
     );
 
-  // A logged unilateral set is shown as a read-only L/R breakdown: the active card does not
-  // edit a logged set's sides (discard via RTL swipe and re-log), and a rounded aggregate
-  // would hide an asymmetric 10/9 set as "x 10" (issue #101/#102).
+  // A read-only L/R breakdown for surfaces that never edit (issue #101): a rounded aggregate
+  // would hide an asymmetric 10/9 set as "x 10".
   const renderLoggedSideCells = (breakdown: PerSideBreakdown) => (
     <div className="col-span-3 flex flex-col gap-0.5 text-sm">
       {sideRows.map(([label, side]) => {
@@ -1076,12 +1081,12 @@ export default function ExerciseCard({
     const isWarmup = set.setType === SetType.WARMUP;
     const isEditingThis = editingSetId === set.id;
     // A unilateral set shows both sides: `reps` is a rounded average, so a 10/9 set
-    // would otherwise render as "× 10" and hide the imbalance. Read-only surfaces (#101)
-    // and the active card once the set is logged (#102) render a breakdown; the history
-    // editor renders editable per-side inputs instead (#105, handled below).
+    // would otherwise render as "× 10" and hide the imbalance. Read-only surfaces render a
+    // static breakdown (#101); everywhere the set is editable it gets per-side inputs
+    // (#105 and the active card), handled by `perSideLoggedEdit` below.
     const perSide =
-      (perSideEntry || isReadonly) && exercise.isUnilateral
-        ? setPerSide(set) ?? (isReadonly ? symmetricBreakdown(set) : null)
+      isReadonly && exercise.isUnilateral
+        ? setPerSide(set) ?? symmetricBreakdown(set)
         : null;
 
     const swipeKey = set.id;
@@ -1132,8 +1137,8 @@ export default function ExerciseCard({
 
           {/* Value cells - always inputs for consistent layout; live edit for logged via updateSet.
               Read-only unilateral sets replace the trio with an L/R breakdown (issue #101);
-              the history editor replaces it with editable L/R inputs (issue #105). */}
-          {perSideHistoryEdit ? (
+              editable ones replace it with per-side L/R inputs (issue #105). */}
+          {perSideLoggedEdit ? (
             renderLoggedSideEntryCells(set)
           ) : perSide ? (
             renderLoggedSideCells(perSide)
@@ -1304,8 +1309,6 @@ export default function ExerciseCard({
               const setNumber = plannedSet.order;
               const loggedSet = getLoggedSet(setNumber);
               const isEditingThis = editingSetId === loggedSet?.id;
-              // Unilateral: two entry sub-rows while unlogged, a read-only L/R breakdown once logged.
-              const plannedRowPerSide = perSideEntry && loggedSet ? setPerSide(loggedSet) : null;
               // `setRows` is built from the same filtered planned list, so it is index-aligned
               // here: this row and the type resolved for it cannot come from different sets.
               const currentType = loggedSet
@@ -1376,8 +1379,11 @@ export default function ExerciseCard({
                       </Badge>
                     </button>
 
-                    {perSideEntry && plannedRowPerSide ? (
-                      renderLoggedSideCells(plannedRowPerSide)
+                    {/* Unilateral: two entry sub-rows while unlogged, the same two as editable
+                        per-side inputs once logged -- a logged row must stay correctable here
+                        exactly as it is on the extra-set rows below. */}
+                    {perSideLoggedEdit && loggedSet ? (
+                      renderLoggedSideEntryCells(loggedSet)
                     ) : isReadonly && exercise.isUnilateral && !loggedSet ? (
                       renderLoggedSideCells(setPerSide(plannedSet) ?? symmetricBreakdown(plannedSet))
                     ) : perSideCells && !loggedSet ? (
