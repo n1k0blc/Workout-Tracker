@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { Logger, UnauthorizedException } from '@nestjs/common';
 import { RefreshTokenService } from './refresh-token.service';
 import { hashToken } from '../common/utils/token.util';
 
@@ -28,6 +28,10 @@ function makeFakePrisma() {
       if ('tokenHash' in where && row.tokenHash !== where.tokenHash) return false;
       if ('userId' in where && row.userId !== where.userId) return false;
       if ('revokedAt' in where && where.revokedAt === null && row.revokedAt !== null) return false;
+      if ('expiresAt' in where) {
+        const filter = where.expiresAt as { gt: Date };
+        if (row.expiresAt.getTime() <= filter.gt.getTime()) return false;
+      }
       return true;
     });
   }
@@ -104,14 +108,28 @@ describe('RefreshTokenService.rotate', () => {
     expect(rows.get('row-seed')?.revokedAt).toBeNull();
   });
 
-  it('revokes the whole family when an already-rotated token is presented again (reuse)', async () => {
+  it('revokes the whole family when an already-rotated token is presented again well after rotation (reuse)', async () => {
     const { prisma, rows } = makeFakePrisma();
-    seedToken(rows, { revokedAt: new Date(), replacedByTokenHash: 'some-hash' });
+    seedToken(rows, {
+      revokedAt: new Date(Date.now() - 60_000),
+      replacedByTokenHash: 'some-hash',
+    });
     seedToken(rows, { id: 'row-other', tokenHash: 'other-hash' });
     const service = new RefreshTokenService(prisma as any);
 
     await expect(service.rotate('raw-token')).rejects.toThrow('Refresh token reuse detected');
     expect(rows.get('row-other')?.revokedAt).not.toBeNull();
+  });
+
+  it('rejects a token rotated moments ago without treating it as reuse (benign collision)', async () => {
+    const { prisma, rows } = makeFakePrisma();
+    seedToken(rows, { revokedAt: new Date(), replacedByTokenHash: 'some-hash' });
+    seedToken(rows, { id: 'row-other', tokenHash: 'other-hash' });
+    const service = new RefreshTokenService(prisma as any);
+
+    await expect(service.rotate('raw-token')).rejects.toThrow('Refresh token already rotated');
+    // The other session must survive -- this wasn't treated as theft.
+    expect(rows.get('row-other')?.revokedAt).toBeNull();
   });
 
   it('#159 regression: five simultaneous refreshes of the same cookie produce one success and four rejections', async () => {
@@ -158,15 +176,99 @@ describe('RefreshTokenService.revoke / revokeAllForUser', () => {
     await expect(service.revoke('never-issued')).resolves.toBeUndefined();
   });
 
-  it('revokeAllForUser only touches that user\'s live tokens', async () => {
+  it('revokeAllForUser only touches that user\'s live tokens, and reports how many', async () => {
     const { prisma, rows } = makeFakePrisma();
     seedToken(rows, { id: 'mine', userId: 'user-1' });
+    seedToken(rows, { id: 'mine-2', userId: 'user-1', tokenHash: 'mine-2-hash' });
     seedToken(rows, { id: 'theirs', userId: 'user-2', tokenHash: 'other-hash' });
     const service = new RefreshTokenService(prisma as any);
 
-    await service.revokeAllForUser('user-1');
+    const count = await service.revokeAllForUser('user-1');
 
+    expect(count).toBe(2);
     expect(rows.get('mine')?.revokedAt).not.toBeNull();
+    expect(rows.get('mine-2')?.revokedAt).not.toBeNull();
     expect(rows.get('theirs')?.revokedAt).toBeNull();
+  });
+});
+
+// #160: the backend must log every rejected refresh (reason + user, never the raw
+// token/cookie) so a session problem can be diagnosed from `docker logs` alone.
+describe('RefreshTokenService rejection logging (#160)', () => {
+  let warnSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+  });
+
+  function loggedLines(): string[] {
+    return warnSpy.mock.calls.map(call => String(call[0]));
+  }
+
+  it('logs a warning naming "unknown token" for a token that was never issued', async () => {
+    const { prisma } = makeFakePrisma();
+    const service = new RefreshTokenService(prisma as any);
+
+    await expect(service.rotate('never-issued')).rejects.toThrow(UnauthorizedException);
+
+    expect(loggedLines()).toEqual([expect.stringContaining('unknown token')]);
+  });
+
+  it('logs a warning naming "expired token" and identifying the user', async () => {
+    const { prisma, rows } = makeFakePrisma();
+    seedToken(rows, { expiresAt: new Date(Date.now() - 1000) });
+    const service = new RefreshTokenService(prisma as any);
+
+    await expect(service.rotate('raw-token')).rejects.toThrow(UnauthorizedException);
+
+    expect(loggedLines()).toEqual([
+      expect.stringMatching(/expired token.*user-1/),
+    ]);
+  });
+
+  it('logs a warning naming "superseded token" for the loser of a rotation race, without ending other sessions', async () => {
+    const { prisma, rows } = makeFakePrisma();
+    seedToken(rows);
+    const service = new RefreshTokenService(prisma as any);
+
+    await Promise.allSettled(Array.from({ length: 5 }, () => service.rotate('raw-token')));
+
+    const supersededLines = loggedLines().filter(line => line.includes('superseded token') && !line.includes('reused'));
+    expect(supersededLines).toHaveLength(4);
+    supersededLines.forEach(line => expect(line).toContain('user-1'));
+  });
+
+  it('logs reuse detection with how many sessions it ended', async () => {
+    const { prisma, rows } = makeFakePrisma();
+    seedToken(rows, {
+      revokedAt: new Date(Date.now() - 60_000),
+      replacedByTokenHash: 'some-hash',
+    });
+    seedToken(rows, { id: 'row-other', tokenHash: 'other-hash' });
+    const service = new RefreshTokenService(prisma as any);
+
+    await expect(service.rotate('raw-token')).rejects.toThrow('Refresh token reuse detected');
+
+    expect(loggedLines()).toEqual([
+      expect.stringMatching(/superseded token reused.*user-1.*ended 1 session/),
+    ]);
+  });
+
+  it('never writes the raw token into a log line, only a short hash prefix', async () => {
+    const { prisma, rows } = makeFakePrisma();
+    seedToken(rows, { expiresAt: new Date(Date.now() - 1000) });
+    const service = new RefreshTokenService(prisma as any);
+
+    await expect(service.rotate('raw-token')).rejects.toThrow(UnauthorizedException);
+
+    const [line] = loggedLines();
+    expect(line).not.toContain('raw-token');
+    const fullHash = hashToken('raw-token');
+    expect(line).not.toContain(fullHash);
+    expect(line).toContain(fullHash.slice(0, 8));
   });
 });

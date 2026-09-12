@@ -1,8 +1,22 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { generateOpaqueToken, hashToken } from '../common/utils/token.util';
 
 const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+// A concurrent rotation of the very same token can lose the atomic race below by mere
+// milliseconds, and at that point the row looks identical to a stale, already-rotated
+// token being replayed: both are revoked with a successor already recorded. Only a
+// presentation *outside* this short window is treated as reuse (and revokes the whole
+// token family); one arriving within it is a benign collision the atomic write already
+// resolved, so it is just rejected -- it must not tear down the race winner's brand-new
+// session (#159/#160).
+const REUSE_GRACE_PERIOD_MS = 5000;
+
+// Identifies a token in logs without ever writing the raw value or the full hash (#160).
+function hashPrefix(tokenHash: string): string {
+  return tokenHash.slice(0, 8);
+}
 
 export interface IssuedRefreshToken {
   rawToken: string;
@@ -11,6 +25,8 @@ export interface IssuedRefreshToken {
 
 @Injectable()
 export class RefreshTokenService {
+  private readonly logger = new Logger(RefreshTokenService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async issue(userId: string): Promise<IssuedRefreshToken> {
@@ -30,31 +46,25 @@ export class RefreshTokenService {
 
   /**
    * Rotates a valid refresh token: revokes the presented one and atomically issues a new one.
-   * Reuse of an already-rotated token (a strong theft signal) revokes the user's entire
-   * token family, forcing re-authentication on every device.
+   * Reuse of an already-rotated token well outside the grace period (a strong theft signal)
+   * revokes the user's entire token family, forcing re-authentication on every device.
    *
    * The revoke is a conditional write (`WHERE revokedAt IS NULL`), not a read-then-write:
    * when several requests present the same token at the same instant, every one of them
    * can pass the initial read, but only one's UPDATE actually flips `revokedAt` -- the
    * losers' affected-row count comes back 0, so a token can never gain two live successors
-   * (#159). Those losers are simply rejected rather than treated as reuse: they raced a
-   * legitimate rotation, not replayed a stale token, so the winner's new session stands.
+   * (#159). Whether a loser is treated as reuse is decided from a *fresh* re-read taken
+   * after losing the race, not from the stale pre-race read -- otherwise every loser would
+   * look identical to a genuine stale-token replay and trigger family revocation, tearing
+   * down the very session the atomic write just created.
    */
   async rotate(rawToken: string): Promise<{ userId: string } & IssuedRefreshToken> {
     const tokenHash = hashToken(rawToken);
     const existing = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
 
     if (!existing) {
+      this.logger.warn(`Refresh rejected: unknown token (hash ${hashPrefix(tokenHash)})`);
       throw new UnauthorizedException('Invalid refresh token');
-    }
-
-    if (existing.revokedAt) {
-      await this.revokeAllForUser(existing.userId);
-      throw new UnauthorizedException('Refresh token reuse detected');
-    }
-
-    if (existing.expiresAt.getTime() < Date.now()) {
-      throw new UnauthorizedException('Refresh token expired');
     }
 
     const nextRawToken = generateOpaqueToken();
@@ -63,17 +73,43 @@ export class RefreshTokenService {
 
     await this.prisma.$transaction(async tx => {
       const { count } = await tx.refreshToken.updateMany({
-        where: { id: existing.id, revokedAt: null },
+        where: { id: existing.id, revokedAt: null, expiresAt: { gt: new Date() } },
         data: { revokedAt: new Date(), replacedByTokenHash: nextTokenHash },
       });
 
-      if (count === 0) {
+      if (count === 1) {
+        await tx.refreshToken.create({
+          data: { userId: existing.userId, tokenHash: nextTokenHash, expiresAt: nextExpiresAt },
+        });
+        return;
+      }
+
+      // Lost the race, or the token was already expired -- re-read to find out which.
+      const current = await tx.refreshToken.findUnique({ where: { id: existing.id } });
+
+      if (!current?.revokedAt) {
+        this.logger.warn(
+          `Refresh rejected: expired token (hash ${hashPrefix(tokenHash)}, user ${existing.userId})`,
+        );
+        throw new UnauthorizedException('Refresh token expired');
+      }
+
+      if (Date.now() - current.revokedAt.getTime() <= REUSE_GRACE_PERIOD_MS) {
+        this.logger.warn(
+          `Refresh rejected: superseded token (hash ${hashPrefix(tokenHash)}, user ${existing.userId})`,
+        );
         throw new UnauthorizedException('Refresh token already rotated');
       }
 
-      await tx.refreshToken.create({
-        data: { userId: existing.userId, tokenHash: nextTokenHash, expiresAt: nextExpiresAt },
+      const { count: endedCount } = await tx.refreshToken.updateMany({
+        where: { userId: existing.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
       });
+      this.logger.warn(
+        `Refresh rejected: superseded token reused (hash ${hashPrefix(tokenHash)}, ` +
+          `user ${existing.userId}) - ended ${endedCount} session(s)`,
+      );
+      throw new UnauthorizedException('Refresh token reuse detected');
     });
 
     return { userId: existing.userId, rawToken: nextRawToken, expiresAt: nextExpiresAt };
@@ -88,10 +124,12 @@ export class RefreshTokenService {
     });
   }
 
-  async revokeAllForUser(userId: string): Promise<void> {
-    await this.prisma.refreshToken.updateMany({
+  /** Returns how many live sessions were ended, so reuse detection can log the blast radius. */
+  async revokeAllForUser(userId: string): Promise<number> {
+    const { count } = await this.prisma.refreshToken.updateMany({
       where: { userId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+    return count;
   }
 }
