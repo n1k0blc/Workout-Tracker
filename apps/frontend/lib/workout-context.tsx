@@ -244,9 +244,13 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
-  // Workout Duration Timer (timestamp-based, persists across tab switches and app restarts)
+  // Workout Duration Timer (timestamp-based, persists across tab switches and app restarts).
+  // Keyed off *whether* a workout is active, not the workout object: every set logged or
+  // edited replaces that object, and depending on it tore down and rebuilt the interval on
+  // each keystroke, so the clock stopped advancing for as long as the user kept typing.
+  const hasActiveWorkout = activeWorkout !== null;
   useEffect(() => {
-    if (activeWorkout && !isPaused && !isPastWorkout) {
+    if (hasActiveWorkout && !isPaused && !isPastWorkout) {
       if (workoutStartTime === null) {
         const now = Date.now();
         setWorkoutStartTime(now);
@@ -271,7 +275,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         setWorkoutDuration(pausedWorkoutDuration);
       }
 
-      if (!activeWorkout) {
+      if (!hasActiveWorkout) {
         setWorkoutDuration(0);
         setWorkoutStartTime(null);
         setPausedWorkoutDuration(null);
@@ -289,7 +293,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         clearInterval(workoutTimerRef.current);
       }
     };
-  }, [activeWorkout, isPaused, isPastWorkout, workoutStartTime, pausedWorkoutDuration, keys, user]);
+  }, [hasActiveWorkout, isPaused, isPastWorkout, workoutStartTime, pausedWorkoutDuration, keys, user]);
 
   // Rest Timer (timestamp-based, persists across tab switches)
   useEffect(() => {
@@ -380,15 +384,31 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Every patch of a live session routes through here too -- a set logged, a logged set's
+    // value edited keystroke by keystroke, an exercise added. Such a patch must not be
+    // mistaken for a session start: resetting the elapsed seconds and the pause flags on it
+    // made the header's `Dauer` snap back to 0 between the keystroke and the timer's next
+    // tick (a visible flutter), and silently resumed a paused workout.
+    const isPatchOfSameSession = activeWorkoutRef.current?.id === workout.id;
+
     setActiveWorkout(workout);
     setIsPastWorkout(isPast ?? false);
     setPastWorkoutDuration(pastDuration ?? 0);
-    setWorkoutDuration(pastDuration ?? 0);
-    setPausedWorkoutDuration(null);
-    setPausedRestTimer(null);
-    setPausedRestTimerValue(null);
-    setIsPaused(false);
-    setIsRestTimerPaused(false);
+    // Past tracking has no running clock: its duration *is* the caller's value, on a patch
+    // as much as on a start. A live session's duration is owned by the interval below and is
+    // only zeroed when the session actually begins.
+    if (isPast) {
+      setWorkoutDuration(pastDuration ?? 0);
+    } else if (!isPatchOfSameSession) {
+      setWorkoutDuration(0);
+    }
+    if (!isPatchOfSameSession) {
+      setPausedWorkoutDuration(null);
+      setPausedRestTimer(null);
+      setPausedRestTimerValue(null);
+      setIsPaused(false);
+      setIsRestTimerPaused(false);
+    }
 
     const isLiveSession = !isPast;
     if (isLiveSession) {
