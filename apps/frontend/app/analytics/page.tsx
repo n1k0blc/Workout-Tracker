@@ -1811,6 +1811,15 @@ export default function AnalyticsPage() {
                   </Card>
                 )}
 
+                {/* Ernährungs-Analytics (#153) -- reuses the range selector above. Placed
+                    ahead of the Personal Records / Empty State cards so it doesn't need a
+                    scroll past the workout charts to reach. */}
+                <NutritionTrendChart
+                  trend={nutritionTrend}
+                  rangeDays={nutritionRangeDays}
+                  loading={nutritionLoading}
+                />
+
                 {/* Personal Records (only for Home Gyms) */}
                 {gymFilter !== 'andere' && (
                   <Card>
@@ -1858,13 +1867,6 @@ export default function AnalyticsPage() {
                     </CardContent>
                   </Card>
                 )}
-
-                {/* Ernährungs-Analytics (#153) -- reuses the range selector above */}
-                <NutritionTrendChart
-                  trend={nutritionTrend}
-                  rangeDays={nutritionRangeDays}
-                  loading={nutritionLoading}
-                />
               </div>
             )}
           </div>
