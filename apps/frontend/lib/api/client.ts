@@ -60,6 +60,15 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 class ApiClient {
   private baseUrl: string;
 
+  // Concurrent 401s share this one in-flight refresh instead of each racing their own
+  // (#158) -- the server rotates the refresh token on use, so a second refresh mid-flight
+  // would arrive with a token the first already superseded and lose the whole session.
+  private refreshPromise: Promise<boolean> | null = null;
+
+  // Set once a failed refresh sends the user to /login, so the other waiters from the same
+  // fan-out don't each also assign window.location.href.
+  private redirecting = false;
+
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
   }
@@ -72,7 +81,16 @@ class ApiClient {
 
   // Cookie-based auth session refresh. Raw fetch (not this.request) so it can't
   // recursively trigger its own refresh/redirect handling.
-  private async tryRefresh(): Promise<boolean> {
+  private tryRefresh(): Promise<boolean> {
+    if (!this.refreshPromise) {
+      this.refreshPromise = this.performRefresh().finally(() => {
+        this.refreshPromise = null;
+      });
+    }
+    return this.refreshPromise;
+  }
+
+  private async performRefresh(): Promise<boolean> {
     try {
       const response = await fetch(`${this.baseUrl}/auth/refresh`, {
         method: 'POST',
@@ -128,7 +146,13 @@ class ApiClient {
         }
       }
 
-      if (!opts.suppressRedirect && !isAuthEndpoint && typeof window !== 'undefined') {
+      if (
+        !opts.suppressRedirect &&
+        !isAuthEndpoint &&
+        typeof window !== 'undefined' &&
+        !this.redirecting
+      ) {
+        this.redirecting = true;
         window.location.href = '/login';
       }
       throw new Error('Unauthorized');
