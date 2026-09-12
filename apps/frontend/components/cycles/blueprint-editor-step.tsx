@@ -19,7 +19,7 @@ import { Input } from '@/components/ui/input';
 import type { ExerciseLog } from '@/types';
 import { replacePlanExerciseInList } from '@/lib/exercise-replace';
 import { usePlanExercisePrefill } from '@/lib/plan-exercise-prefill';
-import { withArrayPositionOrder } from '@/lib/workout-order';
+import { reorderExerciseLogs, withArrayPositionOrder } from '@/lib/workout-order';
 import { plannedSideFields } from '@/lib/set-sides';
 import { addPlannedSet } from '@/lib/planned-sets';
 import type { PlannedSet } from '@/types';
@@ -205,10 +205,12 @@ export default function BlueprintEditorStep({
 
     if (oldIndex === -1 || newIndex === -1) return;
 
-    const reordered = arrayMove(currentExercises, oldIndex, newIndex).map((ex, idx) => ({
-      ...ex,
-      order: idx + 1,
-    }));
+    const orderedIds = arrayMove(
+      currentExercises.map((ex) => ex.id),
+      oldIndex,
+      newIndex,
+    );
+    const reordered = reorderExerciseLogs(currentExercises, orderedIds);
 
     setCurrentExercises(reordered);
     syncCurrentExercisesToFormData(reordered);

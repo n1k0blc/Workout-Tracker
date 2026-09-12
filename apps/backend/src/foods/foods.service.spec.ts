@@ -1,0 +1,616 @@
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
+import { FoodsService } from './foods.service';
+import { CreateFoodDto } from './dto';
+
+/**
+ * Domain rules for the shared Lebensmittel library, through the service's public methods with
+ * a mocked Prisma client. Covered: every food is visible to every user, only the creator can
+ * edit a USER food, SEED / Open-Food-Facts foods are read-only for everyone, barcodes are
+ * globally unique (409), and delete is soft (the food leaves search but resolves by id).
+ */
+
+const OWN_FOOD = {
+  id: 'food-own',
+  name: 'Haferflocken',
+  brand: null as string | null,
+  barcode: '4008713700086' as string | null,
+  isLiquid: false,
+  kcal: 372,
+  carbs: 58.7,
+  protein: 13.5,
+  fat: 7,
+  source: 'USER' as const,
+  createdById: 'user-1',
+  deletedAt: null as Date | null,
+  portions: [{ id: 'p1', label: '1 Portion', grams: 40, order: 1, isDefault: true }],
+};
+
+const OTHER_USER_FOOD = {
+  ...OWN_FOOD,
+  id: 'food-other',
+  name: 'Skyr',
+  createdById: 'user-2',
+  barcode: null,
+};
+const SEED_FOOD = {
+  ...OWN_FOOD,
+  id: 'food-seed',
+  name: 'Butter',
+  source: 'SEED' as const,
+  createdById: null,
+  barcode: null,
+};
+const OFF_FOOD = {
+  ...OWN_FOOD,
+  id: 'food-off',
+  name: 'Haferdrink',
+  source: 'OPEN_FOOD_FACTS' as const,
+  createdById: null,
+  barcode: null,
+};
+
+function makeService(
+  overrides: {
+    findMany?: unknown[];
+    findUnique?: unknown;
+    findFirst?: unknown;
+    createImpl?: (args: { data: Record<string, unknown> }) => unknown;
+    updateImpl?: (args: { data: Record<string, unknown> }) => unknown;
+    diaryEntries?: unknown[];
+    favoriteFoodIds?: string[];
+    offProduct?: unknown;
+  } = {},
+) {
+  const prisma = {
+    food: {
+      // Counts ignore the page cap; "own" narrows to the caller's editable foods.
+      count: jest.fn(async ({ where }: { where: Record<string, unknown> }) => {
+        const rows = (overrides.findMany ?? []) as { createdById?: string; source?: string }[];
+        if (!where.createdById) return rows.length;
+        return rows.filter((f) => f.createdById === where.createdById && f.source === 'USER')
+          .length;
+      }),
+      // A thin stand-in for Prisma: honour the `source` / `createdById` / `NOT` narrowing that
+      // `findAll` splits its three source-group queries with (#155), and the `name` sort every
+      // query carries -- so a fixture partitions and orders the way the database would.
+      findMany: jest.fn(
+        async (args: {
+          where?: Record<string, unknown>;
+          orderBy?: { name?: 'asc' | 'desc' };
+        }) => {
+          const where = args.where ?? {};
+          const rows = (overrides.findMany ?? []) as Record<string, unknown>[];
+          const matches = (row: Record<string, unknown>, cond: Record<string, unknown>) =>
+            Object.entries(cond).every(([key, value]) => row[key] === value);
+          const direct: Record<string, unknown> = {};
+          if ('source' in where) direct.source = where.source;
+          if ('createdById' in where) direct.createdById = where.createdById;
+          let out =
+            Object.keys(direct).length > 0 ? rows.filter((r) => matches(r, direct)) : rows;
+          const not = where.NOT;
+          if (Array.isArray(not)) {
+            out = out.filter(
+              (r) => !not.some((cond) => matches(r, cond as Record<string, unknown>)),
+            );
+          }
+          if (args.orderBy?.name === 'asc') {
+            out = [...out].sort((a, b) => String(a.name).localeCompare(String(b.name)));
+          }
+          return out;
+        },
+      ),
+      findUnique: jest
+        .fn()
+        .mockResolvedValue('findUnique' in overrides ? overrides.findUnique : { ...OWN_FOOD }),
+      findFirst: jest.fn().mockResolvedValue(overrides.findFirst ?? null),
+      create: jest.fn(
+        overrides.createImpl ??
+          (async ({ data }: { data: Record<string, unknown> }) => ({
+            ...OWN_FOOD,
+            ...data,
+            portions: [],
+          })),
+      ),
+      update: jest.fn(
+        overrides.updateImpl ??
+          (async ({ data }: { data: Record<string, unknown> }) => ({
+            ...OWN_FOOD,
+            ...data,
+            portions: [],
+          })),
+      ),
+    },
+    diaryEntry: {
+      findMany: jest.fn().mockResolvedValue(overrides.diaryEntries ?? []),
+    },
+  };
+  const favorites = {
+    favoriteFoodIds: jest.fn().mockResolvedValue(new Set(overrides.favoriteFoodIds ?? [])),
+  };
+  const offLookup = {
+    lookup: jest.fn().mockResolvedValue(overrides.offProduct ?? null),
+  };
+  return {
+    service: new FoodsService(prisma as never, favorites as never, offLookup as never),
+    prisma,
+    favorites,
+    offLookup,
+  };
+}
+
+function baseCreateDto(overrides: Partial<CreateFoodDto> = {}): CreateFoodDto {
+  return {
+    name: 'Neues Lebensmittel',
+    kcal: 100,
+    carbs: 10,
+    protein: 5,
+    fat: 2,
+    ...overrides,
+  };
+}
+
+describe('FoodsService.findAll — visibility', () => {
+  it('returns foods from every user, filtered to non-deleted, name search applied', async () => {
+    const { service, prisma } = makeService({
+      findMany: [OWN_FOOD, OTHER_USER_FOOD, SEED_FOOD, OFF_FOOD],
+    });
+
+    const result = await service.findAll('user-1', 'hafer');
+
+    expect(prisma.food.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          deletedAt: null,
+          OR: [
+            { name: { contains: 'hafer', mode: 'insensitive' } },
+            { brand: { contains: 'hafer', mode: 'insensitive' } },
+          ],
+        }),
+      }),
+    );
+    // Grouped by source (#155): own USER, then SEED, then imports / other users' foods, with
+    // name order within a group ("Haferdrink" before "Skyr" in the last group).
+    expect(result.items.map((f) => f.id)).toEqual([
+      'food-own',
+      'food-seed',
+      'food-off',
+      'food-other',
+    ]);
+  });
+
+  it("marks editable only for the current user's own non-deleted USER food", async () => {
+    const { service } = makeService({
+      findMany: [OWN_FOOD, OTHER_USER_FOOD, SEED_FOOD, OFF_FOOD],
+    });
+
+    const byId = Object.fromEntries((await service.findAll('user-1')).items.map((f) => [f.id, f]));
+
+    expect(byId['food-own'].editable).toBe(true);
+    expect(byId['food-other'].editable).toBe(false); // someone else's
+    expect(byId['food-seed'].editable).toBe(false); // seeded
+    expect(byId['food-off'].editable).toBe(false); // imported
+  });
+});
+
+describe('FoodsService.findAll - totals are not the page size', () => {
+  it("reports how many foods match and how many are the caller's own, beyond the page cap", async () => {
+    // The library holds ~180k imported foods (#146) but a page is capped, so the totals have
+    // to be counted separately -- otherwise the tab reports the page size as the library size.
+    const { service, prisma } = makeService({
+      findMany: [OWN_FOOD, OTHER_USER_FOOD, SEED_FOOD, OFF_FOOD],
+    });
+    prisma.food.count = jest.fn().mockResolvedValueOnce(180983).mockResolvedValueOnce(9);
+
+    const result = await service.findAll('user-1');
+
+    expect(result.total).toBe(180983);
+    expect(result.ownTotal).toBe(9);
+    expect(result.items).toHaveLength(4);
+  });
+});
+
+describe('FoodsService.findAll - search matches brand too', () => {
+  it('finds an imported product by its brand, not just its name', async () => {
+    // The Open Food Facts import (#146) fills the library with branded products, so a
+    // search for the brand has to reach them.
+    const { service, prisma } = makeService({ findMany: [OFF_FOOD] });
+
+    await service.findAll('user-1', 'Oatly');
+
+    expect(prisma.food.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          deletedAt: null,
+          OR: [
+            { name: { contains: 'Oatly', mode: 'insensitive' } },
+            { brand: { contains: 'Oatly', mode: 'insensitive' } },
+          ],
+        }),
+      }),
+    );
+  });
+});
+
+describe('FoodsService.findAll — search ranking (#155)', () => {
+  it('groups by source: own USER first, then SEED, then imports and other users', async () => {
+    // Fed deliberately out of order: the row order the database returns must not matter, only
+    // which group each row lands in and the name sort inside it.
+    const rows = [
+      { ...OFF_FOOD, id: 'off-tasche', name: 'Apfeltasche' },
+      { ...SEED_FOOD, id: 'seed-apfel', name: 'Apfel' },
+      { ...OWN_FOOD, id: 'own-mus', name: 'Apfelmus' },
+      { ...OTHER_USER_FOOD, id: 'other-ringe', name: 'Apfelringe' },
+      { ...OFF_FOOD, id: 'off-mark', name: 'Apfelmark' },
+    ];
+    const { service } = makeService({ findMany: rows });
+
+    const result = await service.findAll('user-1', 'apfel');
+
+    expect(result.items.map((f) => f.id)).toEqual([
+      'own-mus', // USER, created by the searcher
+      'seed-apfel', // curated staple
+      'off-mark', // imports + other users' USER foods rank together (ADR-0003), name-asc
+      'other-ringe',
+      'off-tasche',
+    ]);
+    // Ordering only -- nothing is filtered out.
+    expect(result.items).toHaveLength(5);
+  });
+
+  it('asks the database for name order within every source group', async () => {
+    const { service, prisma } = makeService({ findMany: [] });
+
+    await service.findAll('user-1', 'milch');
+
+    expect(prisma.food.findMany).toHaveBeenCalledTimes(3);
+    for (const call of prisma.food.findMany.mock.calls) {
+      const args = call[0] as { orderBy?: unknown; take?: unknown };
+      expect(args.orderBy).toEqual({ name: 'asc' });
+      expect(args.take).toBe(200);
+    }
+  });
+});
+
+describe('FoodsService.findById — resolves soft-deleted', () => {
+  it('still returns a soft-deleted food, flagged deleted and not editable', async () => {
+    const { service } = makeService({
+      findUnique: { ...OWN_FOOD, deletedAt: new Date('2026-01-01') },
+    });
+
+    const food = await service.findById('food-own', 'user-1');
+
+    expect(food.deleted).toBe(true);
+    expect(food.editable).toBe(false);
+  });
+
+  it('404s when the id is unknown', async () => {
+    const { service } = makeService({ findUnique: null });
+    await expect(service.findById('nope', 'user-1')).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('FoodsService.create', () => {
+  it('stamps source USER and the creator, trims the name, empty barcode -> null', async () => {
+    const { service, prisma } = makeService();
+
+    await service.create('user-1', baseCreateDto({ name: '  Reis  ', barcode: '' }));
+
+    expect(prisma.food.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          name: 'Reis',
+          barcode: null,
+          source: 'USER',
+          createdById: 'user-1',
+        }),
+      }),
+    );
+  });
+
+  it('rejects a duplicate barcode with a 409', async () => {
+    const { service } = makeService({
+      createImpl: async () => {
+        throw { code: 'P2002' };
+      },
+    });
+
+    await expect(
+      service.create('user-1', baseCreateDto({ barcode: '4008713700086' })),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('writes portions with order from array position and requires exactly one default', async () => {
+    const { service, prisma } = makeService();
+
+    await service.create(
+      'user-1',
+      baseCreateDto({
+        portions: [
+          { label: '1 Portion', grams: 40, isDefault: true },
+          { label: '1 EL', grams: 12 },
+        ],
+      }),
+    );
+
+    expect(prisma.food.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          portions: {
+            create: [
+              { label: '1 Portion', grams: 40, order: 1, isDefault: true },
+              { label: '1 EL', grams: 12, order: 2, isDefault: false },
+            ],
+          },
+        }),
+      }),
+    );
+  });
+
+  it('rejects a portion list with no default or with more than one default', async () => {
+    const { service } = makeService();
+
+    await expect(
+      service.create(
+        'user-1',
+        baseCreateDto({
+          portions: [
+            { label: 'a', grams: 1 },
+            { label: 'b', grams: 2 },
+          ],
+        }),
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    await expect(
+      service.create(
+        'user-1',
+        baseCreateDto({
+          portions: [
+            { label: 'a', grams: 1, isDefault: true },
+            { label: 'b', grams: 2, isDefault: true },
+          ],
+        }),
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+});
+
+describe('FoodsService.update / softDelete — creator-only, read-only globals', () => {
+  it('403s when a USER food is edited by someone other than its creator', async () => {
+    const { service, prisma } = makeService({ findUnique: { ...OTHER_USER_FOOD } });
+
+    await expect(service.update('user-1', 'food-other', baseCreateDto())).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(prisma.food.update).not.toHaveBeenCalled();
+  });
+
+  it('403s on a SEED food for everyone', async () => {
+    const { service } = makeService({ findUnique: { ...SEED_FOOD } });
+    await expect(service.update('user-1', 'food-seed', baseCreateDto())).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it('403s on an OPEN_FOOD_FACTS food for everyone', async () => {
+    const { service } = makeService({ findUnique: { ...OFF_FOOD } });
+    await expect(service.softDelete('user-1', 'food-off')).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it('lets the creator update their own food and maps a barcode clash to 409', async () => {
+    const ok = makeService();
+    await ok.service.update('user-1', 'food-own', baseCreateDto({ name: 'Haferflocken fein' }));
+    expect(ok.prisma.food.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          name: 'Haferflocken fein',
+          portions: { deleteMany: {}, create: [] },
+        }),
+      }),
+    );
+
+    const clash = makeService({
+      updateImpl: async () => {
+        throw { code: 'P2002' };
+      },
+    });
+    await expect(
+      clash.service.update('user-1', 'food-own', baseCreateDto({ barcode: '111' })),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('soft-deletes by stamping deletedAt, and 404s a second time', async () => {
+    const { service, prisma } = makeService();
+
+    await service.softDelete('user-1', 'food-own');
+
+    expect(prisma.food.update).toHaveBeenCalledWith({
+      where: { id: 'food-own' },
+      data: { deletedAt: expect.any(Date) },
+    });
+
+    const gone = makeService({ findUnique: { ...OWN_FOOD, deletedAt: new Date() } });
+    await expect(gone.service.softDelete('user-1', 'food-own')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+});
+
+describe('FoodsService.findSimilar', () => {
+  it("returns the user's own matching foods with a per-user usage count", async () => {
+    const { service, prisma } = makeService({
+      findMany: [
+        { ...OWN_FOOD, id: 'f1', name: 'Haferdrink ungesüßt' },
+        { ...OWN_FOOD, id: 'f2', name: 'Haferdrink Barista' },
+      ],
+      // f1 referenced by 24 of the user's entries, f2 by none.
+      diaryEntries: Array.from({ length: 24 }, () => ({ foodId: 'f1' })),
+    });
+
+    const result = await service.findSimilar('user-1', 'haferdrink');
+
+    expect(prisma.food.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          source: 'USER',
+          createdById: 'user-1',
+          deletedAt: null,
+          name: { contains: 'haferdrink', mode: 'insensitive' },
+        }),
+      }),
+    );
+    expect(result).toEqual([
+      { id: 'f2', name: 'Haferdrink Barista', kcal: 372, isLiquid: false, usageCount: 0 },
+      { id: 'f1', name: 'Haferdrink ungesüßt', kcal: 372, isLiquid: false, usageCount: 24 },
+    ]);
+  });
+
+  it('returns nothing for a query shorter than two characters', async () => {
+    const { service, prisma } = makeService();
+    expect(await service.findSimilar('user-1', 'h')).toEqual([]);
+    expect(prisma.food.findMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The barcode miss chain (#149): local library, then a live Open Food Facts lookup cached as a
+ * global food, then nothing. A rescan of a soft-deleted barcode brings that row back rather
+ * than colliding with its unique barcode.
+ */
+describe('FoodsService.lookupByBarcode — the miss chain', () => {
+  const OFF_PRODUCT = {
+    barcode: '4013200104108',
+    name: 'Haferdrink Barista',
+    brand: 'Oatly',
+    isLiquid: true,
+    kcal: 59,
+    carbs: 6.5,
+    protein: 1,
+    fat: 3,
+    portions: [{ label: '1 Portion', grams: 200, isDefault: true }],
+  };
+
+  it('rejects a barcode that fails its check digit before touching the library', async () => {
+    const { service, prisma, offLookup } = makeService();
+
+    await expect(service.lookupByBarcode('user-1', '4025500287956')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(prisma.food.findFirst).not.toHaveBeenCalled();
+    expect(offLookup.lookup).not.toHaveBeenCalled();
+  });
+
+  it('answers from the library and never calls Open Food Facts on a local hit', async () => {
+    const { service, offLookup } = makeService({
+      findFirst: { ...OWN_FOOD, barcode: '4025500287955' },
+    });
+
+    const result = await service.lookupByBarcode('user-1', '4025500287955');
+
+    expect(result.status).toBe('local');
+    expect(result.food?.id).toBe('food-own');
+    expect(offLookup.lookup).not.toHaveBeenCalled();
+  });
+
+  it('looks the code up in its canonical form, so a UPC-A finds the EAN-13 row', async () => {
+    const { service, prisma } = makeService({ findFirst: { ...OWN_FOOD } });
+
+    await service.lookupByBarcode('user-1', '036000291452');
+
+    expect(prisma.food.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ barcode: '0036000291452' }) }),
+    );
+  });
+
+  it('undeletes a soft-deleted row instead of creating a duplicate barcode', async () => {
+    const { service, prisma, offLookup } = makeService({
+      findFirst: { ...OWN_FOOD, barcode: '4025500287955', deletedAt: new Date('2026-01-01') },
+    });
+
+    const result = await service.lookupByBarcode('user-1', '4025500287955');
+
+    expect(prisma.food.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'food-own' },
+        data: { deletedAt: null },
+      }),
+    );
+    expect(prisma.food.create).not.toHaveBeenCalled();
+    expect(result.status).toBe('local');
+    expect(result.food?.deleted).toBe(false);
+  });
+
+  it('caches an Open Food Facts hit as a global food carrying lastSyncedAt', async () => {
+    const { service, prisma } = makeService({ findFirst: null, offProduct: OFF_PRODUCT });
+
+    const result = await service.lookupByBarcode('user-1', '4013200104108');
+
+    expect(result.status).toBe('openFoodFacts');
+    const { data } = (prisma.food.create as jest.Mock).mock.calls[0][0] as {
+      data: Record<string, unknown>;
+    };
+    expect(data).toMatchObject({
+      barcode: '4013200104108',
+      name: 'Haferdrink Barista',
+      source: 'OPEN_FOOD_FACTS',
+      createdById: null,
+      isLiquid: true,
+    });
+    expect(data.lastSyncedAt).toBeInstanceOf(Date);
+    expect(data.portions).toEqual({
+      create: [{ label: '1 Portion', grams: 200, order: 1, isDefault: true }],
+    });
+  });
+
+  it('reports a double miss with the barcode, for the prefilled create form', async () => {
+    const { service, prisma } = makeService({ findFirst: null, offProduct: null });
+
+    const result = await service.lookupByBarcode('user-1', '4013200104108');
+
+    expect(result).toEqual({ status: 'notFound', barcode: '4013200104108', food: null });
+    expect(prisma.food.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('FoodsService.lookupByBarcode — two scans of the same new barcode', () => {
+  it('answers with the row the other scan wrote, rather than a unique-constraint 500', async () => {
+    // The scanner's decode loop can fire twice before the first lookup returns, so two
+    // requests reach the cache write with the same barcode. The loser re-reads.
+    const CACHED = {
+      id: 'food-cached',
+      name: 'Haferdrink Barista',
+      brand: 'Oatly',
+      barcode: '4013200104108',
+      isLiquid: true,
+      kcal: 59,
+      carbs: 6.5,
+      protein: 1,
+      fat: 3,
+      source: 'OPEN_FOOD_FACTS' as const,
+      createdById: null,
+      deletedAt: null,
+      portions: [],
+    };
+    const { service, prisma } = makeService({
+      findFirst: null,
+      offProduct: { ...CACHED, portions: [] },
+    });
+    prisma.food.create = jest.fn().mockRejectedValue({ code: 'P2002' });
+    prisma.food.findFirst = jest
+      .fn()
+      .mockResolvedValueOnce(null) // the initial local miss
+      .mockResolvedValueOnce(CACHED); // the row the winning scan wrote
+
+    const result = await service.lookupByBarcode('user-1', '4013200104108');
+
+    expect(result.status).toBe('openFoodFacts');
+    expect(result.food?.id).toBe('food-cached');
+  });
+});

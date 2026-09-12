@@ -6,16 +6,19 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { fromLocalDateString } from '@/lib/local-date';
-import { 
-  WorkoutListItem, 
-  PersonalRecord, 
+import { WEEKDAY_NAMES } from '@/lib/weekday';
+import {
+  WorkoutListItem,
+  PersonalRecord,
   DashboardStats,
   NextPlannedWorkout,
   CycleProgress,
+  NutritionDay,
 } from '@/types';
 import CircularProgress from '@/components/CircularProgress';
 import TrendIndicator from '@/components/TrendIndicator';
 import { PersonalRecordCard } from '@/components/PersonalRecordCard';
+import { NutritionTodayCard } from '@/components/nutrition/nutrition-today-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +31,7 @@ export default function DashboardPage() {
   const [nextWorkout, setNextWorkout] = useState<NextPlannedWorkout | null>(null);
   const [weekWorkouts, setWeekWorkouts] = useState<WorkoutListItem[]>([]);
   const [prs, setPrs] = useState<PersonalRecord[]>([]);
+  const [nutritionToday, setNutritionToday] = useState<NutritionDay | null>(null);
   const [loading, setLoading] = useState(true);
   
   // State for recently completed cycle
@@ -112,6 +116,16 @@ export default function DashboardPage() {
     checkRecentlyCompletedCycle();
   }, []);
 
+  // Today's nutrition, for the "Ernährung heute" card. Loaded on its own so a nutrition
+  // hiccup never blocks the rest of the dashboard; the card hides itself when no Tagesziele
+  // are set (#152).
+  useEffect(() => {
+    apiClient
+      .getNutritionDay()
+      .then(setNutritionToday)
+      .catch((error) => console.error('Failed to load nutrition day:', error));
+  }, []);
+
   const formatDay = (date: Date) =>
     new Intl.DateTimeFormat('de-DE', {
       day: '2-digit',
@@ -128,10 +142,7 @@ export default function DashboardPage() {
     return new Intl.NumberFormat('de-DE').format(Math.round(num));
   };
 
-  const getDayName = (dayOfWeek: number): string => {
-    const days = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-    return days[dayOfWeek];
-  };
+  const getDayName = (dayOfWeek: number): string => WEEKDAY_NAMES[dayOfWeek];
 
   return (
     <ProtectedRoute>
@@ -255,6 +266,14 @@ export default function DashboardPage() {
                     </CardContent>
                   </Card>
                 </div>
+
+                {/* Ernährung heute (#152) - only once Tagesziele are set */}
+                {nutritionToday?.targets && (
+                  <NutritionTodayCard
+                    totals={nutritionToday.totals}
+                    targets={nutritionToday.targets}
+                  />
+                )}
 
                 {/* Quick Actions */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

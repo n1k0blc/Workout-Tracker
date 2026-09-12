@@ -30,4 +30,31 @@ export class UpdateUserDto {
   @Min(20)
   @Max(500)
   weight?: number;
+
+  // Tagesziele (#152): each may be sent as a positive integer to set it, or as null to clear
+  // it. `@IsOptional()` lets null through untouched, and the service writes it straight to the
+  // column.
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(20000)
+  targetKcal?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(2000)
+  targetCarbs?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(2000)
+  targetProtein?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(2000)
+  targetFat?: number | null;
 }

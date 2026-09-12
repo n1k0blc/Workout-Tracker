@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { mapExercisesToResponse, WORKOUT_EXERCISE_TREE_INCLUDE } from '../workout-tree/workout-tree.service';
 import { WorkoutExerciseResponseDto } from '../common/dto/workout-tree.dto';
-import { Today, addLocalDays, weekdayOfLocalDate } from '../common/utils/today.util';
+import { Today, addLocalDays, instantToLocalDate, weekdayOfLocalDate } from '../common/utils/today.util';
 
 export interface SuggestedWorkout {
   cycleId: string;
@@ -114,7 +114,7 @@ export class WorkoutEngineService {
   }
 
   private startLocalDate(cycle: { startDate: Date }): string {
-    return cycle.startDate.toISOString().slice(0, 10);
+    return instantToLocalDate(cycle.startDate);
   }
 
   /** The planned day whose weekday is `weekday`, if it has a blueprint to start from. */

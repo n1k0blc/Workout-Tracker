@@ -1,0 +1,179 @@
+# Context
+
+Domain vocabulary for the Workout Tracker. This is a single-context repo — one `CONTEXT.md`,
+one `docs/adr/`, covering both `apps/backend` and `apps/frontend`.
+
+Routes and code identifiers are English; user-facing labels are German (Zyklen, Vorlagen,
+Verlauf, Ernährung). When a concept below has a code name, that name is what the models,
+services and types use; the German term is what the UI shows and what issues and ADRs should
+say.
+
+## Glossary
+
+### Anmeldung (session)
+
+- **Anmeldung** (sign-in) — the German UI term for logging in (`/login`, the "Anmelden"
+  button). It establishes a session: the server issues a **Zugriffs-Cookie** and a
+  **Refresh-Token**, both httpOnly, `SameSite=Lax`. Code: `AuthService.login`,
+  `AuthController`.
+
+- **Zugriffs-Cookie** (access cookie) — a short-lived JWT, 15 minutes
+  (`ACCESS_TOKEN_MAX_AGE_MS`, `JWT_EXPIRATION` default `15m`), sent on every request and
+  checked by `JwtAuthGuard`. Its short lifetime is deliberate: session length is controlled by
+  the Refresh-Token below, not by this cookie. On the client, several requests hitting 401 at
+  once because it just expired share one in-flight refresh call instead of each starting their
+  own (#158) — only one request reaches the server in the common case. Code: `access_token`
+  cookie.
+
+- **Refresh-Token** — a `RefreshToken` row: an opaque, high-entropy token whose SHA-256 hash
+  (never the raw value) is persisted, 30 days (`REFRESH_TOKEN_MAX_AGE_MS`), carried in the
+  `refresh_token` cookie scoped to path `/api/auth` only — it is never sent anywhere else.
+  Presenting it to `POST /auth/refresh` is the only way to get a new Zugriffs-Cookie once the
+  old one expires. Code: `RefreshToken`, `RefreshTokenService`.
+
+- **Rotation** — every refresh both consumes and replaces the Refresh-Token: the presented one
+  is marked revoked (`revokedAt`, `replacedByTokenHash`) and a successor is issued, in one
+  transaction. The revoke is a single conditional write (`WHERE revokedAt IS NULL`), not a
+  read-then-write, so two refreshes racing the same cookie can never both succeed — at most one
+  ever gets a successor (#159). A loser arriving within 5 seconds of the winner is treated as a
+  benign collision and simply rejected; only a presentation clearly later is treated as reuse,
+  below. See
+  [ADR-0004](docs/adr/0004-refresh-token-rotation-is-one-atomic-write-with-a-grace-period.md).
+
+- **Wiederverwendungserkennung** (reuse detection) — presenting a Refresh-Token that was
+  already rotated away, well outside the collision window above, is a strong theft signal:
+  every session with `createdAt` at or before the moment that token was superseded is ended,
+  forcing re-authentication everywhere the stolen token's lineage could reach. A session
+  created *after* that moment — a later, unrelated sign-in — is left alone (#161). Every
+  rejected refresh (unknown, expired, superseded, or reused token) logs one warning line
+  naming the reason and the user, never the raw token or cookie, at most a short hash prefix
+  (#160). **Changing the password** takes the unconditional path instead: every session is
+  ended, with no exceptions, via `revokeAllForUser`.
+
+### Ernährung (nutrition)
+
+- **Abschnitt** — a named division of a user's eating day: **Frühstück**, **Mittagessen**,
+  **Abendessen**, **Snacks** by default. Per user, with a 1-based contiguous `order` (the same
+  invariant as `WorkoutDay.order`) and an `archivedAt`. Four are created with every account
+  and backfilled for older ones. An archived Abschnitt disappears from new days but still
+  shows on past days that already have entries in it. Code: `MealSlot`.
+
+- **Eintrag** — one logged item inside an Abschnitt on one calendar day: a name and its kcal,
+  Kohlenhydrate, Protein and Fett. The nutrients are a **snapshot** taken when it is logged —
+  a quantity change rescales them proportionally, they are never recomputed from a Lebensmittel
+  (see [ADR-0002](docs/adr/0002-diary-entries-are-snapshots.md)). `localDate` is client-stamped
+  and the `X-Timezone` header decides "today", exactly as for a workout. Code: `DiaryEntry`.
+
+- **Schnelleintrag** — an Eintrag typed in directly (name + kcal + macros) with no Lebensmittel
+  or Mahlzeit behind it. Not a separate type: it is a `DiaryEntry` with `foodId` and `mealId`
+  null. For restaurant or canteen food you do not want in the shared library.
+
+- **Lebensmittel** — a food in the shared library, with nutrients per 100 g (or 100 ml when
+  `isLiquid`) and zero or more named **Portionsgrößen** (`FoodPortion`: label + grams, one
+  marked default). `source` is `SEED`, `OPEN_FOOD_FACTS` or `USER`. **Every Lebensmittel is
+  visible to every user** regardless of creator — a deliberate divergence from custom
+  exercises (see [ADR-0003](docs/adr/0003-user-created-foods-and-meals-are-shared.md)). Only
+  the creator edits a `USER` food; `SEED` / `OPEN_FOOD_FACTS` are read-only for everyone.
+  Deletion is soft; the `barcode` is a product's global identity. Creator names are never
+  shown. `SEED` foods come from `FoodsSeed.csv` at the repo root and carry the CSV's `key`
+  as `seedKey`, the stable identity `prisma db seed` upserts on. Search results (the picker's
+  Lebensmittel tab and the standalone Lebensmittel tab) are grouped by source before the page
+  cap so the ~180k `OPEN_FOOD_FACTS` imports (#146) never bury a generic staple: the
+  searcher's own `USER` foods first, then `SEED`, then imports and other users' `USER` foods
+  together (ADR-0003), name order within each group (#155). Nothing is hidden. Code: `Food` /
+  `FoodPortion`.
+
+- **Mahlzeit** (meal, a saved combination of foods) — the other shared library an Eintrag can
+  be logged from, built in the "Mahlzeiten" tab of Vorlagen. A Mahlzeit has a name and an
+  ordered list of **Zutaten** (`MealItem`: a `Food` + a `quantity` in g/ml, `order` 1-based
+  and contiguous from array position). It is a *live* reference in its editor and in the
+  picker — the totals shown are recomputed from the referenced foods' current nutrients, so
+  editing a food changes a meal's displayed total. Logging it is the opposite: the picker
+  asks for a **Faktor** (0,5× / 1× / 1,5× / 2×) and the meal expands into one snapshotted
+  `DiaryEntry` per ingredient (ADR-0002), each carrying the meal's id as a grouping tag so
+  the Abschnitt page groups them under "MAHLZEIT &lt;name&gt;"; a single ingredient entry can
+  then be edited or removed on its own. Same sharing rules as Lebensmittel (ADR-0003): every
+  Mahlzeit is visible to every user, only the creator edits or deletes it (**403** otherwise),
+  `createdById` is nullable so the row outlives its creator's account, deletion is soft, and
+  the creator's name is never shown ("Meine" marker only). A Mahlzeit resolves and computes
+  even when one of its foods has been soft-deleted; it cannot contain another Mahlzeit;
+  duplicate names are allowed. Code: `Meal` / `MealItem`.
+
+- **Favoriten / Zuletzt** — two of the picker's tabs, alongside the kind tabs. The logging
+  picker's tab bar is `Lebensmittel | Mahlzeiten | Favoriten | Zuletzt`; the Mahlzeit editor's
+  Zutat search drops the Mahlzeiten tab (a Mahlzeit can't be an ingredient). The kind tabs
+  each hold one kind and separate precisely because the Lebensmittel list is ~180k rows deep;
+  Favoriten and Zuletzt are short user-curated lists and keep both kinds mixed (#155). A star
+  on every picker row toggles a per-user favorite; favoriting happens only where you log,
+  never in the Vorlagen tabs. **Favoriten** lists the starred Lebensmittel and Mahlzeiten
+  ordered by when each was last logged (a never-logged favorite sorts last, by when it was
+  starred); unstarring removes the row. **Zuletzt** is derived from the diary, no table: the
+  last 20 *distinct* foods and meals the user logged, most recent first — an Eintrag expanded
+  from a Mahlzeit counts toward the meal, not its ingredient foods. In the kind tabs, a
+  starred row floats above non-favorites of equal order. The Zutat search's Favoriten and
+  Zuletzt are foods-only. Both tabs drop an item whose Lebensmittel / Mahlzeit has since been
+  soft-deleted. `PICKER_TABS` gave way to `LOGGING_PICKER_TABS` / `ZUTAT_PICKER_TABS`, a
+  parameter of the shared `PickerTabBar`. Code: `FoodFavorite` / `MealFavorite`,
+  `FavoritesService`, `PickerService`.
+
+- **Barcode-Scan** — the camera (or the manual EAN field beside it) resolving a product to a
+  Lebensmittel, from the picker and from the Lebensmittel tab. The Lebensmittel editor's EAN
+  field scans too, but only to fill itself in — capturing a code and resolving one are separate
+  (`BarcodeCapture` / `BarcodeScannerSheet`). A code is only ever acted on in
+  its **canonical** form: EAN-13, EAN-8 and UPC-A are accepted, the check digit is verified,
+  and a UPC-A is widened to the EAN-13 it is — so one physical product cannot become two rows.
+  The **miss chain** is local library → live Open Food Facts → nothing: a local hit answers
+  with no network call, a miss is looked up live and **cached as a global `OPEN_FOOD_FACTS`
+  food** with `lastSyncedAt` (the same shape the bulk import writes), and a double miss opens
+  "Lebensmittel anlegen" with the barcode prefilled. A rescanned barcode whose food was
+  soft-deleted **undeletes that row** rather than creating a duplicate — the barcode is the
+  product's global identity and is unique across deleted rows too. The live lookup drops two of
+  the bulk import's rules on purpose: no Germany filter and no 13-digit-only rule, because the
+  user is physically holding the thing they scanned. Decoding uses the browser's own
+  `BarcodeDetector` where there is one and a zxing WebAssembly fallback where there is not
+  (Safari, so every iPhone); either way the camera needs HTTPS or `localhost`, see
+  [docs/barcode-scanner-testing.md](docs/barcode-scanner-testing.md). Code: `normalizeBarcode`,
+  `FoodsService.lookupByBarcode`, `OffLookupService`.
+
+- **Open-Food-Facts-Bibliothek** — the shared `OPEN_FOOD_FACTS` foods, filled by a one-off bulk
+  import of the German subset (`pnpm run import:off`) and kept fresh by a delta sync
+  (`sync-off-foods.sh`, 09:00 daily on the Pi — Open Food Facts publishes one delta a day around
+  06:10 UTC, and the windows are contiguous, so daily costs the same bandwidth as weekly and
+  leaves twice the slack against the ~13 days kept). Open Food Facts publishes
+  one product in three shapes — flat CSV columns, `nutrition.input_sets` in the JSONL export and
+  the daily deltas, and the legacy `nutriments` block from the API — so each gets a thin adapter
+  and everything after it is shared: the market filter (`isSoldInGermany`), the quality gate
+  (`rejectOffProduct`: valid EAN-13, plausible per-100 values, macros within ±15% of the stated
+  kcal) and the mapping. A parity test pins all three shapes to the same normalized product, so
+  a row imported from the CSV and later refreshed from a delta does not churn. The sync only ever
+  writes rows it owns — a barcode held by a USER or SEED food is left alone — and only ~13 days
+  of deltas are published, so a run that is skipped for longer logs a warning to re-run the full
+  import. Its last-run marker is a host file (`~/logs/off-sync.state`), falling back to the library's
+  last *bulk* refresh — the newest `lastSyncedAt` thousands of rows share, since a single row's is a
+  scan the live lookup cached, which runs ahead of the deltas. Code: `off-mapping`, `off-import`,
+  `off-delta`, `off-sync`.
+
+- **Tagesziele** — four manual daily targets on the user (`targetKcal`, `targetCarbs`,
+  `targetProtein`, `targetFat`, grams for the macros), entered in the profile and never
+  derived from height/weight/age. Each is independently nullable; "no targets set" is all
+  four `null`. When at least one is set the Tagesansicht totals card switches from plain
+  sums to a consumed-vs-target state ("Gegessen X / Y kcal", "Übrig", a kcal bar and three
+  macro bars) and the dashboard gains an "Ernährung heute" card; both fall back to plain
+  totals otherwise. Targets only ever *display* against a day — the diary always totals the
+  entries as logged. Carried on the `GET /nutrition/day` payload as `targets` so the day
+  view needs no second request.
+
+- **Ernährungs-Analytics** — the "Ernährung" card on the analytics page: a line of daily
+  kcal / Kohlenhydrate / Protein / Fett totals over the page's range selector, one metric at
+  a time, with a dashed "ZIEL" reference line when that metric has a Tagesziel and two stat
+  tiles ("Ø pro Tag", "Ziel erreicht · N von M Tagen" — days whose total is at or above the
+  target). `GET /nutrition/analytics?start&end` returns one row per calendar day in the
+  inclusive range, a day with no entries as zeros (never a gap), plus the same `targets`
+  object as the day payload. `start` / `end` are the client's own calendar days, so the
+  series is in the client's timezone; omitted, the window is the last 7 days up to the
+  client's "today". No weight correlation. Code: `NutritionAnalyticsService`.
+
+### Tracked nutrients
+
+Only **kcal**, **Kohlenhydrate** (carbs), **Protein** and **Fett** (fat). No micronutrients.
+Macro energy is 4 / 4 / 9 kcal per gram.

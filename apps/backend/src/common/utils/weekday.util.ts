@@ -1,3 +1,5 @@
+import { instantToLocalDate, weekdayOfLocalDate } from './today.util';
+
 /** `WorkoutDay.weekday` is 0 = Sunday .. 6 = Saturday, matching `Date.getDay()`. */
 export const WEEKDAY_NAMES = [
   'Sonntag',
@@ -17,4 +19,14 @@ export const WEEKDAY_NAMES = [
  */
 export function getWeekdayDistanceFromCycleStart(weekday: number, startWeekday: number): number {
   return (weekday - startWeekday + 7) % 7;
+}
+
+/**
+ * The weekday (0 = Sunday .. 6 = Saturday) a cycle's week is anchored on: the UTC calendar
+ * day of its `startDate`. Accepts the stored `Date` or the `@IsDateString` string a
+ * create/update DTO carries. Pass the result as `startWeekday` to
+ * `getWeekdayDistanceFromCycleStart`.
+ */
+export function cycleStartWeekday(startDate: Date | string): number {
+  return weekdayOfLocalDate(instantToLocalDate(new Date(startDate)));
 }

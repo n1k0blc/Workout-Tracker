@@ -1,6 +1,8 @@
 import {
   SERVER_TIME_ZONE,
   addLocalDays,
+  instantToLocalDate,
+  localDateToInstant,
   resolveTimeZone,
   resolveToday,
   weekdayOfLocalDate,
@@ -50,6 +52,17 @@ describe('weekdayOfLocalDate', () => {
     expect(weekdayOfLocalDate('2026-08-16')).toBe(0);
     expect(weekdayOfLocalDate('2026-08-17')).toBe(1);
     expect(weekdayOfLocalDate('2026-08-22')).toBe(6);
+  });
+});
+
+describe('instantToLocalDate', () => {
+  it('returns the UTC calendar day of an instant as YYYY-MM-DD', () => {
+    expect(instantToLocalDate(new Date('2026-08-23T00:00:00.000Z'))).toBe('2026-08-23');
+    expect(instantToLocalDate(new Date('2026-08-23T23:30:00.000Z'))).toBe('2026-08-23');
+  });
+
+  it('round-trips with localDateToInstant', () => {
+    expect(instantToLocalDate(localDateToInstant('2026-10-25'))).toBe('2026-10-25');
   });
 });
 

@@ -1,4 +1,4 @@
-import { getWeekdayDistanceFromCycleStart } from './weekday.util';
+import { cycleStartWeekday, getWeekdayDistanceFromCycleStart } from './weekday.util';
 
 describe('getWeekdayDistanceFromCycleStart', () => {
   it('returns 0 for the start weekday itself', () => {
@@ -25,5 +25,24 @@ describe('getWeekdayDistanceFromCycleStart', () => {
       getWeekdayDistanceFromCycleStart(weekday, startWeekday),
     );
     expect(new Set(distances).size).toBe(7);
+  });
+});
+
+describe('cycleStartWeekday', () => {
+  // 2026-08-23 is a Sunday.
+  it('returns the UTC weekday of a stored Date startDate', () => {
+    expect(cycleStartWeekday(new Date('2026-08-23T00:00:00.000Z'))).toBe(0);
+    expect(cycleStartWeekday(new Date('2026-08-24T00:00:00.000Z'))).toBe(1);
+  });
+
+  it('accepts the @IsDateString form a create/update DTO carries', () => {
+    expect(cycleStartWeekday('2026-08-23')).toBe(0);
+    expect(cycleStartWeekday('2026-08-28T00:00:00.000Z')).toBe(5);
+  });
+
+  it('matches the old inline new Date(startDate).getUTCDay()', () => {
+    for (const iso of ['2026-01-01', '2026-06-15T12:00:00.000Z', '2026-12-31']) {
+      expect(cycleStartWeekday(iso)).toBe(new Date(iso).getUTCDay());
+    }
   });
 });

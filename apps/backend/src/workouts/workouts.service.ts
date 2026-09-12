@@ -10,6 +10,7 @@ import {
   WORKOUT_EXERCISE_TREE_INCLUDE,
 } from '../workout-tree/workout-tree.service';
 import { setWorkingVolume } from '../common/utils/volume.util';
+import { instantToLocalDate } from '../common/utils/today.util';
 import { ExercisesService } from '../exercises/exercises.service';
 import { CreateWorkoutDto, SaveAsTemplateMode } from './dto/create-workout.dto';
 import { UpdateWorkoutDto } from './dto/update-workout.dto';
@@ -310,7 +311,7 @@ export class WorkoutsService {
       // A cycle built ahead of its start date (planned Thursday for next Monday) has nothing
       // to start yet -- no workout of any kind, logged-today or backfilled, can predate it.
       const localDate = dto.localDate ?? existing?.localDate;
-      const cycleStartLocalDate = day.cycle.startDate.toISOString().slice(0, 10);
+      const cycleStartLocalDate = instantToLocalDate(day.cycle.startDate);
       if (localDate && localDate < cycleStartLocalDate) {
         throw new BadRequestException('Dieser Zyklus hat noch nicht begonnen.');
       }

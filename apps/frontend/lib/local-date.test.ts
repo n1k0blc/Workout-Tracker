@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll } from 'vitest';
-import { fromLocalDateString, toLocalDateString } from './local-date';
+import { fromLocalDateString, toLocalDateString, isLocalDate } from './local-date';
 
 const originalTz = process.env.TZ;
 
@@ -52,5 +52,20 @@ describe('fromLocalDateString', () => {
   it('round-trips with toLocalDateString', () => {
     process.env.TZ = 'Europe/Berlin';
     expect(toLocalDateString(fromLocalDateString('2026-01-05'))).toBe('2026-01-05');
+  });
+});
+
+describe('isLocalDate', () => {
+  it('accepts a real calendar day in YYYY-MM-DD form', () => {
+    expect(isLocalDate('2026-09-07')).toBe(true);
+    expect(isLocalDate('2028-02-29')).toBe(true); // leap day
+  });
+
+  it('rejects the wrong shape or an impossible day', () => {
+    expect(isLocalDate('2026-9-7')).toBe(false);
+    expect(isLocalDate('07.09.2026')).toBe(false);
+    expect(isLocalDate('2026-02-30')).toBe(false);
+    expect(isLocalDate('2026-13-01')).toBe(false);
+    expect(isLocalDate('')).toBe(false);
   });
 });
