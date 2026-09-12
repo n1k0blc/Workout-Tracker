@@ -14,6 +14,7 @@ import {
   IconListCheck,
   IconHistory,
   IconChartBar,
+  IconApple,
   IconLogout,
 } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
@@ -108,6 +109,7 @@ export function MobileNav() {
     { href: '/cycles', label: 'Zyklen', icon: IconRefresh },
     { href: '/templates', label: 'Vorlagen', icon: IconListCheck },
     { href: '/history', label: 'Verlauf', icon: IconHistory },
+    { href: '/nutrition', label: 'Ernährung', icon: IconApple },
     { href: '/analytics', label: 'Analytics', icon: IconChartBar },
   ];
 

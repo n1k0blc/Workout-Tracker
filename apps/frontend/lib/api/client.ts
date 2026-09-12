@@ -33,6 +33,25 @@ import {
   CurrentCycleWorkouts,
   WorkoutExerciseInput,
   LastPerformance,
+  NutritionDay,
+  NutritionTrend,
+  DiaryEntry,
+  CreateDiaryEntryInput,
+  DiaryEntriesBatchInput,
+  MealSlot,
+  MealSlotList,
+  BarcodeLookup,
+  Food,
+  FoodInput,
+  FoodList,
+  SimilarFood,
+  MealList,
+  MealDetail,
+  MealInput,
+  DiaryEntriesFromMealInput,
+  CopyDiaryDayInput,
+  CopyDiarySlotInput,
+  PickerList,
 } from '@/types';
 import { clientTimeZone } from '@/lib/local-date';
 
@@ -196,6 +215,11 @@ class ApiClient {
     dateOfBirth?: string;
     height?: number;
     weight?: number;
+    // Tagesziele (#152): a positive integer sets one, null clears it.
+    targetKcal?: number | null;
+    targetCarbs?: number | null;
+    targetProtein?: number | null;
+    targetFat?: number | null;
   }): Promise<User> {
     return this.request<User>('/users/me', {
       method: 'PATCH',
@@ -534,6 +558,226 @@ class ApiClient {
     await this.request(`/workout-templates/${id}`, {
       method: 'DELETE',
     });
+  }
+
+  // Nutrition Methods (#141)
+
+  // `date` is a YYYY-MM-DD calendar day; omitted, the server uses the client's "today" from
+  // the X-Timezone header, exactly like the workout recommendation.
+  async getNutritionDay(date?: string): Promise<NutritionDay> {
+    const query = date ? `?date=${encodeURIComponent(date)}` : '';
+    return this.request<NutritionDay>(`/nutrition/day${query}`);
+  }
+
+  // The Ernährungs-Analytics daily series (#153). `start` / `end` are the client's own
+  // YYYY-MM-DD calendar days, inclusive -- the server aggregates the stored localDate as-is.
+  async getNutritionAnalytics(start: string, end: string): Promise<NutritionTrend> {
+    const query = new URLSearchParams({ start, end });
+    return this.request<NutritionTrend>(`/nutrition/analytics?${query.toString()}`);
+  }
+
+  async createDiaryEntry(data: CreateDiaryEntryInput): Promise<DiaryEntry> {
+    return this.request<DiaryEntry>('/nutrition/entries', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Commits the picker's basket -- several food entries into one Abschnitt/day in one request.
+  async createDiaryEntriesBatch(
+    data: DiaryEntriesBatchInput,
+  ): Promise<{ count: number }> {
+    return this.request<{ count: number }>('/nutrition/entries/batch', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Logs a Mahlzeit: the server expands it into one snapshotted entry per ingredient,
+  // scaled by `factor`, each carrying the meal id as a grouping tag (#147).
+  async createDiaryEntriesFromMeal(
+    data: DiaryEntriesFromMealInput,
+  ): Promise<{ count: number }> {
+    return this.request<{ count: number }>('/nutrition/entries/meal', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // The server rescales the kcal/macro snapshot by newQuantity / oldQuantity. A food-backed
+  // editor also passes the refreshed display label ("2 Portionen (80 g)").
+  async updateDiaryEntryQuantity(
+    id: string,
+    quantity: number,
+    quantityLabel?: string,
+  ): Promise<DiaryEntry> {
+    return this.request<DiaryEntry>(`/nutrition/entries/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(
+        quantityLabel !== undefined ? { quantity, quantityLabel } : { quantity },
+      ),
+    });
+  }
+
+  async deleteDiaryEntry(id: string): Promise<void> {
+    await this.request(`/nutrition/entries/${id}`, { method: 'DELETE' });
+  }
+
+  // Von einem anderen Tag kopieren (#151)
+
+  // The calendar days the user has entries on -- the copy date picker offers only these.
+  // `excludeDate` drops the day the picker was opened on.
+  async getDiaryCopySourceDates(excludeDate?: string): Promise<string[]> {
+    const query = excludeDate ? `?exclude=${encodeURIComponent(excludeDate)}` : '';
+    const { dates } = await this.request<{ dates: string[] }>(
+      `/nutrition/copy/source-dates${query}`,
+    );
+    return dates;
+  }
+
+  // Copies one Abschnitt's entries from another day into the same Abschnitt on the target day.
+  async copyDiarySlot(input: CopyDiarySlotInput): Promise<{ count: number }> {
+    return this.request<{ count: number }>('/nutrition/entries/copy-slot', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  // Copies a whole previous day's entries onto the target day (archived Abschnitte fall back
+  // to a visible "Sonstiges").
+  async copyDiaryDay(input: CopyDiaryDayInput): Promise<{ count: number }> {
+    return this.request<{ count: number }>('/nutrition/entries/copy-day', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    });
+  }
+
+  // Abschnitte management (#142)
+
+  async getMealSlots(): Promise<MealSlotList> {
+    return this.request<MealSlotList>('/nutrition/slots');
+  }
+
+  async createMealSlot(name: string): Promise<MealSlot> {
+    return this.request<MealSlot>('/nutrition/slots', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+  }
+
+  async renameMealSlot(id: string, name: string): Promise<MealSlot> {
+    return this.request<MealSlot>(`/nutrition/slots/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+    });
+  }
+
+  async setMealSlotArchived(id: string, archived: boolean): Promise<MealSlot> {
+    return this.request<MealSlot>(`/nutrition/slots/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ archived }),
+    });
+  }
+
+  // `slots` is the full active list, each order restating its array position (1-based).
+  async reorderMealSlots(slots: { id: string; order: number }[]): Promise<MealSlotList> {
+    return this.request<MealSlotList>('/nutrition/slots/order', {
+      method: 'PATCH',
+      body: JSON.stringify({ slots }),
+    });
+  }
+
+  // Lebensmittel library (#143)
+
+  // One capped page plus the totals behind it -- the library holds ~180k imported foods
+  // (#146), so the page length is not the number of matches.
+  async getFoods(search?: string): Promise<FoodList> {
+    const query = search ? `?search=${encodeURIComponent(search)}` : '';
+    return this.request<FoodList>(`/foods${query}`);
+  }
+
+  // The current user's own foods whose name matches -- for the duplicate-avoidance hint.
+  async getSimilarFoods(name: string): Promise<SimilarFood[]> {
+    return this.request<SimilarFood[]>(`/foods/similar?name=${encodeURIComponent(name)}`);
+  }
+
+  // Resolves even a soft-deleted food.
+  async getFood(id: string): Promise<Food> {
+    return this.request<Food>(`/foods/${id}`);
+  }
+
+  async createFood(data: FoodInput): Promise<Food> {
+    return this.request<Food>('/foods', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateFood(id: string, data: FoodInput): Promise<Food> {
+    return this.request<Food>(`/foods/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteFood(id: string): Promise<void> {
+    await this.request(`/foods/${id}`, { method: 'DELETE' });
+  }
+
+  // The scanner's miss chain (#149): the shared library, then a live Open Food Facts lookup
+  // cached as a global food, then `notFound`. 400 when the check digit does not hold.
+  async lookupBarcode(barcode: string): Promise<BarcodeLookup> {
+    return this.request<BarcodeLookup>(`/foods/barcode/${encodeURIComponent(barcode)}`);
+  }
+
+  // Mahlzeiten (#147) -- a shared library like foods (ADR-0003).
+
+  // `mineOnly` narrows to the caller's own meals (the tab's "Nur meine" filter).
+  async getMeals(mineOnly?: boolean): Promise<MealList> {
+    return this.request<MealList>(`/meals${mineOnly ? '?mine=1' : ''}`);
+  }
+
+  // Ingredients resolved, totals computed live from the current food nutrients.
+  async getMeal(id: string): Promise<MealDetail> {
+    return this.request<MealDetail>(`/meals/${id}`);
+  }
+
+  async createMeal(data: MealInput): Promise<MealDetail> {
+    return this.request<MealDetail>('/meals', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateMeal(id: string, data: MealInput): Promise<MealDetail> {
+    return this.request<MealDetail>(`/meals/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteMeal(id: string): Promise<void> {
+    await this.request(`/meals/${id}`, { method: 'DELETE' });
+  }
+
+  // Favoriten & Zuletzt (#148)
+
+  // Star / unstar a Lebensmittel or Mahlzeit. Both verbs are idempotent server-side, so the
+  // optimistic caller never has to reconcile a conflict.
+  async setFoodFavorite(id: string, favorite: boolean): Promise<void> {
+    await this.request(`/favorites/foods/${id}`, { method: favorite ? 'POST' : 'DELETE' });
+  }
+
+  async setMealFavorite(id: string, favorite: boolean): Promise<void> {
+    await this.request(`/favorites/meals/${id}`, { method: favorite ? 'POST' : 'DELETE' });
+  }
+
+  // The picker's Favoriten tab: starred foods and meals ordered by last use. `scope='food'`
+  // narrows to foods only -- the Zutat search inside the Mahlzeit editor.
+  async getPickerFavorites(scope?: 'food'): Promise<PickerList> {
+    return this.request<PickerList>(`/nutrition/picker/favorites${scope ? `?scope=${scope}` : ''}`);
+  }
+
+  // The picker's Zuletzt tab: the last 20 distinct foods and meals from the diary.
+  async getPickerRecent(scope?: 'food'): Promise<PickerList> {
+    return this.request<PickerList>(`/nutrition/picker/recent${scope ? `?scope=${scope}` : ''}`);
   }
 }
 

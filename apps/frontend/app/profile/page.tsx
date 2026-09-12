@@ -13,6 +13,13 @@ import {
   IconTrash,
   IconLock,
 } from '@tabler/icons-react';
+import {
+  kcalFromMacros,
+  dailyTargetMacroHint,
+  targetProgressPercent,
+  formatKcal,
+} from '@/lib/nutrition';
+import { MacroProgressBar } from '@/components/nutrition/macro-progress-bar';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { LogoutButton } from '@/components/logout-button';
@@ -46,6 +53,14 @@ export default function ProfilePage() {
   const [weight, setWeight] = useState('');
   const [isEditingProfile, setIsEditingProfile] = useState(false);
 
+  // Tagesziele (#152) - manual daily targets, each field blank when unset
+  const [targetKcal, setTargetKcal] = useState('');
+  const [targetCarbs, setTargetCarbs] = useState('');
+  const [targetProtein, setTargetProtein] = useState('');
+  const [targetFat, setTargetFat] = useState('');
+  const [isEditingTargets, setIsEditingTargets] = useState(false);
+  const [targetsLoading, setTargetsLoading] = useState(false);
+
   // Change Password
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -68,6 +83,10 @@ export default function ProfilePage() {
       setDateOfBirth(user.dateOfBirth ? new Date(user.dateOfBirth) : null);
       setHeight(user.height?.toString() || '');
       setWeight(user.weight?.toString() || '');
+      setTargetKcal(user.targetKcal?.toString() || '');
+      setTargetCarbs(user.targetCarbs?.toString() || '');
+      setTargetProtein(user.targetProtein?.toString() || '');
+      setTargetFat(user.targetFat?.toString() || '');
       if (user.homeGyms) {
         setHomeGyms(user.homeGyms);
       }
@@ -147,6 +166,42 @@ export default function ProfilePage() {
       setError(err.message || 'Fehler beim Aktualisieren des Profils');
     } finally {
       setLoading(false);
+    }
+  };
+
+  /** A blank Tagesziel field clears the target (null); otherwise it must be a whole number in range. */
+  const parseTargetField = (raw: string, label: string, max: number): number | null => {
+    const trimmed = raw.trim();
+    if (trimmed === '') return null;
+    const value = Number(trimmed);
+    if (!Number.isInteger(value) || value < 1 || value > max) {
+      throw new Error(`${label} muss eine ganze Zahl zwischen 1 und ${max} sein`);
+    }
+    return value;
+  };
+
+  const handleUpdateTargets = async () => {
+    setError('');
+    setSuccess('');
+    setTargetsLoading(true);
+
+    try {
+      const payload = {
+        targetKcal: parseTargetField(targetKcal, 'Kalorienziel', 20000),
+        targetCarbs: parseTargetField(targetCarbs, 'Kohlenhydrate-Ziel', 2000),
+        targetProtein: parseTargetField(targetProtein, 'Protein-Ziel', 2000),
+        targetFat: parseTargetField(targetFat, 'Fett-Ziel', 2000),
+      };
+
+      await apiClient.updateProfile(payload);
+
+      setSuccess('Tagesziele gespeichert');
+      setIsEditingTargets(false);
+      window.location.reload();
+    } catch (err: any) {
+      setError(err.message || 'Fehler beim Speichern der Tagesziele');
+    } finally {
+      setTargetsLoading(false);
     }
   };
 
@@ -246,6 +301,21 @@ export default function ProfilePage() {
     }
   };
 
+  // Tagesziele card: the footer compares the macro targets' energy (4/4/9) to the kcal target
+  // and shows a fill bar, exactly as the Schnelleintrag hint does.
+  const targetMacros = {
+    carbs: Number(targetCarbs.trim()) || 0,
+    protein: Number(targetProtein.trim()) || 0,
+    fat: Number(targetFat.trim()) || 0,
+  };
+  const targetMacroKcal = kcalFromMacros(targetMacros);
+  const kcalTargetNum = targetKcal.trim() === '' ? null : Number(targetKcal.trim());
+  const targetHint = dailyTargetMacroHint(kcalTargetNum, targetMacros);
+  const anyTargetSet = [targetKcal, targetCarbs, targetProtein, targetFat].some(
+    (s) => s.trim() !== '',
+  );
+  const targetBarPercent = targetProgressPercent(targetMacroKcal, kcalTargetNum);
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -271,6 +341,116 @@ export default function ProfilePage() {
             <AlertDescription>{success}</AlertDescription>
           </Alert>
         )}
+
+        {/* Tagesziele Section (#152) */}
+        <Card className="mb-6">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Tagesziele</CardTitle>
+            {!isEditingTargets ? (
+              <Button variant="outline" onClick={() => setIsEditingTargets(true)}>
+                <IconEdit className="mr-2 size-4" />
+                Bearbeiten
+              </Button>
+            ) : (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditingTargets(false);
+                    setTargetKcal(user?.targetKcal?.toString() || '');
+                    setTargetCarbs(user?.targetCarbs?.toString() || '');
+                    setTargetProtein(user?.targetProtein?.toString() || '');
+                    setTargetFat(user?.targetFat?.toString() || '');
+                  }}
+                >
+                  Abbrechen
+                </Button>
+                <Button onClick={handleUpdateTargets} disabled={targetsLoading}>
+                  <IconCheck className="mr-2 size-4" />
+                  Speichern
+                </Button>
+              </div>
+            )}
+          </CardHeader>
+
+          <CardContent>
+            {!isEditingTargets && !anyTargetSet ? (
+              <p className="text-sm text-muted-foreground">
+                Noch keine Tagesziele festgelegt. Ohne Ziele zeigt die Tagesansicht nur die
+                erfassten Summen.
+              </p>
+            ) : (
+              <div className="space-y-5">
+                <Field>
+                  <FieldLabel>Kalorien</FieldLabel>
+                  {isEditingTargets ? (
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      value={targetKcal}
+                      onChange={(e) => setTargetKcal(e.target.value)}
+                      min="1"
+                      max="20000"
+                      placeholder="z.B. 2400"
+                    />
+                  ) : (
+                    <p className="flex items-baseline gap-1.5 py-2">
+                      <span className="text-2xl font-bold">
+                        {targetKcal.trim() ? formatKcal(Number(targetKcal)) : '–'}
+                      </span>
+                      <span className="text-sm text-muted-foreground">kcal / Tag</span>
+                    </p>
+                  )}
+                </Field>
+
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { label: 'Kohlenh.', value: targetCarbs, set: setTargetCarbs },
+                    { label: 'Protein', value: targetProtein, set: setTargetProtein },
+                    { label: 'Fett', value: targetFat, set: setTargetFat },
+                  ].map((f) => (
+                    <Field key={f.label}>
+                      <FieldLabel>{f.label}</FieldLabel>
+                      {isEditingTargets ? (
+                        <Input
+                          type="number"
+                          inputMode="numeric"
+                          value={f.value}
+                          onChange={(e) => f.set(e.target.value)}
+                          min="1"
+                          max="2000"
+                          placeholder="g"
+                        />
+                      ) : (
+                        <p className="py-2">
+                          <span className="text-base font-semibold">
+                            {f.value.trim() ? Number(f.value) : '–'}
+                          </span>
+                          <span className="text-xs text-muted-foreground"> g</span>
+                        </p>
+                      )}
+                    </Field>
+                  ))}
+                </div>
+
+                {(isEditingTargets || anyTargetSet) && (
+                  <div className="border-t pt-3.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Makros ergeben</span>
+                      <span className="text-[13px] font-semibold">
+                        {formatKcal(targetMacroKcal)} kcal
+                      </span>
+                    </div>
+                    <MacroProgressBar percent={targetBarPercent} className="mt-2.5" />
+                    {targetHint && (
+                      <p className="mt-2.5 text-xs text-muted-foreground">{targetHint}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Profile Section */}
         <Card className="mb-6">

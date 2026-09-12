@@ -23,6 +23,10 @@ export function buildCsp(nonce: string): string {
     "'self'",
     `'nonce-${nonce}'`,
     "'strict-dynamic'",
+    // The barcode scanner's zxing fallback compiles WebAssembly on browsers without a native
+    // BarcodeDetector -- Safari, so every iPhone (#149). Far narrower than 'unsafe-eval': it
+    // permits WebAssembly compilation and nothing else.
+    "'wasm-unsafe-eval'",
     // React Refresh / HMR needs eval in `next dev`; never in a production build.
     isProd ? null : "'unsafe-eval'",
   ].filter(Boolean);

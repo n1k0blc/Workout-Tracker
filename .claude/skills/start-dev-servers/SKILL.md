@@ -15,101 +15,107 @@ Du bist der Dev-Environment Manager für den Workout Tracker.
    - **Terminal 1 – Backend**
      ```bash
      cd "$(pwd)/apps/backend" && pnpm run start:dev
-**Für Tests auf iPhone / anderem Gerät im selben WiFi (lokal auf Mac-IP zugreifen):**
+     ```
+     (Bindet automatisch auf `0.0.0.0` — läuft unverändert für jeden der folgenden Modi.)
+   - **Terminal 2 – Frontend**
+     ```bash
+     cd "$(pwd)/apps/frontend" && pnpm run dev
+     ```
+     Reicht für alles, was nur im Mac-Browser auf `localhost:3000` getestet wird.
 
-Die CORS-Konfiguration ist jetzt dev-freundlich (siehe main.ts):
-- Erlaubt standardmäßig localhost:3000 + 127.0.0.1:3000 + private Netzwerke (192.168.*, 10.*, 172.16-31.*)
-- Du kannst bei Bedarf explizit weitere Origins via CORS_ORIGIN hinzufügen.
+## Tests auf dem iPhone (oder anderem Gerät im selben WiFi)
 
-Empfohlener Ablauf:
+Welches Frontend-Script du brauchst, hängt davon ab, ob die Kamera (Barcode-Scan, #149) eine
+Rolle spielt — `getUserMedia` braucht einen **sicheren Kontext** (HTTPS oder `localhost`), und
+über plain HTTP ist die Kamera auf dem Telefon schlicht nicht vorhanden, kein Prompt, kein
+Fehler.
 
-1. Finde die lokale IP deines Macs:
+### Kamera / Barcode-Scan gebraucht → `pnpm run dev:https`
+
+```bash
+cd apps/frontend && pnpm run dev:https
+```
+
+Das ist der einzige Weg, den Scanner auf einem iPhone mit echter Kamera zu testen. Ein
+Script, ein Terminal (Backend bleibt separat wie oben):
+
+- Startet Next über HTTPS mit einem mkcert-Zertifikat und setzt `NEXT_PUBLIC_API_URL=/api`,
+  sodass der Browser **keinen Cross-Origin-Call** macht — `next.config.ts`s Dev-Rewrite
+  proxied `/api/*` zum Backend auf `:3001`. Ohne den Proxy ginge es über HTTPS gar nicht: ein
+  `https://`-Origin, der direkt `http://…:3001` aufruft, ist **Mixed Content** und wird vom
+  Browser blockiert, bevor CORS überhaupt ins Spiel kommt.
+- `predev:https` reißt vor jedem Start `scripts/dev-cert.mjs` an und erneuert das Zertifikat
+  um die aktuelle LAN-Adresse und den Bonjour-`.local`-Namen dieses Macs — Next selbst deckt
+  mit `--experimental-https` nur `localhost`/`127.0.0.1` ab, und der Namens-Mismatch ist in
+  iOS Safari ein Hard-Fail ohne "Trotzdem fortfahren".
+- CORS (`main.ts`, `isLocalDevOrigin`) erlaubt bereits automatisch `localhost`, private Netze
+  (`192.168.*`, `10.*`, `172.16-31.*`) und `*.local`-Namen, jeweils über `http` **und**
+  `https` — normalerweise ist kein `CORS_ORIGIN` nötig.
+
+Auf dem iPhone (gleiches WiFi, kein VPN):
+
+1. Mac-Hostname holen: `scutil --get LocalHostName` (überlebt einen DHCP-Lease-Wechsel,
+   die rohe IP nicht — deshalb den Namen bevorzugen).
+2. Safari → `https://<LocalHostName>.local:3000`.
+3. Die CA ist lokal, Safari warnt beim ersten Mal: **Details einblenden → Diese Website
+   besuchen.** Kamera sollte danach funktionieren.
+4. Falls Safari das nicht anbietet oder die Kamera trotzdem nicht startet, muss die CA einmal
+   auf dem iPhone vertraut werden — die komplette Anleitung inkl. AirDrop-Schritt steht in
+   [`docs/barcode-scanner-testing.md`](../../../docs/barcode-scanner-testing.md).
+
+Nach einem Netzwerkwechsel einfach `pnpm run dev:https` neu starten — das Script merkt die
+neue Adresse und erneuert das Zertifikat; die CA bleibt auf dem Telefon vertraut.
+
+**Zwei Next-Config-Einstellungen sind nur dafür da und leicht zu vergessen, wenn ein Telefon
+plötzlich "nicht einloggen kann":** `allowedDevOrigins` (sonst 403en die `/_next/*`-Dev-Assets
+für jeden Host außer localhost, React hydriert nie, und kein Request erreicht je das Backend —
+sieht aus wie ein kaputtes Login gegen eine gesunde API) und der `/api/*`-Rewrite von oben.
+Beide werden aus den aktuellen Mac-Adressen berechnet, ein DHCP-Wechsel bricht also nichts
+still.
+
+### Keine Kamera nötig (nur UI/Login/Layout testen) → `pnpm run dev:mobile`
+
+```bash
+cd apps/frontend && pnpm run dev:mobile
+```
+
+Läuft über **plain HTTP** mit `NEXT_PUBLIC_API_URL` fest auf die Mac-IP gesetzt (in
+`package.json` hinterlegt) — einfacher aufzusetzen, aber **keine Kamera**: der
+Barcode-Scanner zeigt "Kamera braucht HTTPS" und fällt auf das manuelle EAN-Feld zurück, was
+für alles außer dem Kamera-Pfad selbst ausreicht.
+
+Ablauf:
+
+1. Lokale Mac-IP prüfen (`ipconfig getifaddr en0`) und mit der in `dev:mobile` hinterlegten
+   IP abgleichen — bei einem geänderten Netz das Script in `apps/frontend/package.json`
+   anpassen oder manuell überschreiben:
    ```bash
-   ipconfig getifaddr en0   # für WiFi; ggf. en1 oder `ifconfig`
+   NEXT_PUBLIC_API_URL=http://<mac-ip>:3001/api pnpm run dev -- -H 0.0.0.0
    ```
-   Beispiel: 192.168.1.42
+2. Backend läuft wie oben (`pnpm run start:dev`, bindet automatisch auf `0.0.0.0`).
+3. iPhone, gleiches WiFi: Safari → `http://<mac-ip>:3000` (mit `http://` und Port, nicht nur
+   die IP eintippen — sonst startet Safari eine Google-Suche).
 
-2. Backend starten (meist ohne spezielles CORS_ORIGIN nötig):
-   ```bash
-   cd apps/backend && pnpm run start:dev
-   ```
-   (Bindet automatisch auf 0.0.0.0.)
+**Wichtig:** Ohne die passende `NEXT_PUBLIC_API_URL` lädt die Seite zwar, aber jeder API-Call
+(Login etc.) geht vom iPhone aus an `localhost` und scheitert — deshalb nie nur `pnpm run
+dev`, wenn ein anderes Gerät zugreifen soll.
 
-   Falls du explizit sein willst:
-   ```bash
-   CORS_ORIGIN="http://192.168.1.42:3000" pnpm run start:dev
-   ```
+## Troubleshooting (Telefon lädt nicht / verbindet nicht)
 
-3. Frontend starten mit der Mac-IP als API-URL (wichtig!):
-   Einfach (empfohlen):
-   ```bash
-   cd apps/frontend && pnpm run dev:mobile
-   ```
-   (Das neue Script setzt automatisch NEXT_PUBLIC_API_URL=http://192.168.178.24:3001/api und bindet auf 0.0.0.0.)
+Gilt für beide Modi:
 
-   Oder manuell:
-   ```bash
-   cd apps/frontend && NEXT_PUBLIC_API_URL=http://192.168.178.24:3001/api pnpm run dev
-   ```
+- **macOS-Firewall** ist die häufigste Ursache, wenn es vom Mac-Browser per IP geht, aber
+  nicht vom Telefon: Systemeinstellungen → Netzwerk → Firewall → Firewall-Optionen → "node"
+  / "next" / "Terminal" / "iTerm" eingehende Verbindungen erlauben. Nach einer Änderung immer
+  den Server neu starten.
+- Beide Geräte im selben WLAN, kein VPN, kein Gastnetz, iPhone-WLAN-Einstellung "Private
+  Adresse" aus (kann sonst die Mac-Firewall-Regel umgehen).
+- `lsof -i :3000 | grep LISTEN` sollte `*:3000` zeigen (Sternchen = alle Interfaces), nicht
+  nur `127.0.0.1:3000`.
+- Erreichbarkeit isoliert testen: `http://<mac-ip>` (ohne Port) vom iPhone aus — kommt eine
+  Router-Seite oder ein Fehler, ist es Netzwerk/Firewall, nicht die App.
 
-4. Auf dem iPhone:
-   - Gleiches WiFi (VPN aus!)
-   - Safari → `http://192.168.1.42:3000`
-   - Die App lädt und spricht mit dem Backend über die gesetzte NEXT_PUBLIC_API_URL.
-
-**Hinweise & Troubleshooting (iPhone lädt nicht):**
-
-**Wichtig: Du MUSST den Frontend-Server mit der korrekten Env-Variable starten, sonst lädt die App zwar die HTML, aber alle API-Calls (Login etc.) gehen an localhost auf dem iPhone und scheitern.**
-
-1. **Auf dem Mac Terminal (Frontend-Ordner):**
-   Empfohlen:
-   ```bash
-   pnpm run dev:mobile
-   ```
-   - Oder manuell: NEXT_PUBLIC_API_URL=http://192.168.178.24:3001/api pnpm run dev
-   - Nicht nur `pnpm run dev`!
-   - Warte bis du siehst:
-     - Local:   http://localhost:3000
-     - **Network: http://192.168.178.24:3000**   <--- das ist die URL fürs iPhone (kopiere sie!)
-
-     **Wichtig:** Next.js zeigt oft "http://0.0.0.0:3000" in der Network-Zeile bei -H 0.0.0.0. Das ist normal und **nicht** die Adresse, die du auf dem iPhone verwenden sollst!
-     Verwende immer deine echte Mac-IP: `http://192.168.178.24:3000` auf dem iPhone. 0.0.0.0 funktioniert nicht von anderen Geräten aus.
-
-2. **Backend muss auch laufen** (anderes Terminal):
-   ```bash
-   cd apps/backend && pnpm run start:dev
-   ```
-
-3. **Auf dem iPhone Safari exakt eingeben (kopieren aus dem Mac-Terminal!):**
-   `http://192.168.178.24:3000`
-
-   - Mit `http://` am Anfang
-   - Mit `:3000` am Ende
-   - Safari Adressleiste nicht nur IP eintippen (sonst Google-Suche)
-
-4. **Falls es immer noch nicht lädt:**
-   - Stelle sicher, dass beide Server auf dem Mac laufen und **keine Fehler** im Terminal haben.
-   - Mac Firewall: Erlaube "node" oder "Terminal" für eingehende Verbindungen (Systemeinstellungen > Netzwerk > Firewall).
-   - iPhone und Mac im selben WLAN (kein VPN, kein Mobile-Hotspot).
-   - Teste vom Mac aus, ob http://192.168.178.24:3000 im Browser funktioniert (sollte die App laden).
-   - Starte beide Server neu nach Änderungen.
-
-**Mac Firewall häufiges Problem (wenn es auf Mac per IP geht, aber nicht vom iPhone):**
-- Das ist **fast immer** die macOS Firewall, die Verbindungen vom iPhone blockt (auch wenn Mac-Browser die IP erreicht).
-- Gehe zu: Systemeinstellungen > Netzwerk > Firewall (rechts oben) > "Firewall-Optionen..."
-- In der Liste nach "node", "next", "Terminal" oder "iTerm" suchen und "Eingehende Verbindungen erlauben" anhaken.
-- Alternativ: Firewall temporär komplett deaktivieren (Häkchen oben raus) zum Testen → Server neu starten → wenn es geht, Firewall wieder an und die App erlauben.
-- Wichtig: Nach Firewall-Änderung immer `Ctrl + C` im Terminal und `pnpm run dev:mobile` neu starten.
-
-**Zusätzliche Checks:**
-- Stelle sicher, dass im Mac-Terminal beim Start von `pnpm run dev:mobile` die Zeile steht (auch wenn sie "0.0.0.0" zeigt):
-  Kopiere **deine echte IP** aus dem "Network"-Bereich oder nutze `192.168.178.24:3000` und baue die URL `http://192.168.178.24:3000` auf dem iPhone.
-  (0.0.0.0 ist nicht zum Verbinden von anderen Geräten geeignet — immer die reale IP verwenden!)
-- Teste auf dem iPhone, ob du die Mac-IP überhaupt erreichen kannst: Versuche `http://192.168.178.24` (ohne :3000). Wenn das eine Router-Seite oder Fehler zeigt, ist es Netzwerk/Firewall.
-- iPhone: "Private Adresse" für das WLAN deaktivieren (Einstellungen > WLAN > das Netzwerk > "Private Adresse" aus).
-- Beide Geräte im selben WLAN (nicht eines im 5GHz, eines im 2.4GHz wenn getrennt, kein Gastnetz).
-- Auf dem Mac: `lsof -i :3000 | grep LISTEN` sollte etwas mit `*:3000` zeigen (Sternchen = alle Interfaces).
-
-Falls du die exakte Fehlermeldung auf dem iPhone (oder was genau passiert - weiße Seite? Timeout? "Seite kann nicht geladen werden"?) und den Output der beiden Mac-Terminals (die letzten 10 Zeilen von frontend und backend) hier postest, kann ich genauer helfen.
-
-Die .env.local im Frontend hat jetzt auch Kommentare mit deiner IP.
+Bei Problemen speziell mit der Kamera (schwarzes Bild, "Kamera wird gestartet…" hängt, Scan
+erkennt nichts) ist [`docs/barcode-scanner-testing.md`](../../../docs/barcode-scanner-testing.md)
+die genauere Anlaufstelle — inklusive Testcodes pro Symbologie und was pro Browser-Engine
+(Safari/zxing-Fallback vs. Chrome/natives `BarcodeDetector`) zu prüfen ist.

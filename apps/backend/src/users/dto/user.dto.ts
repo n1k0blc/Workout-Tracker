@@ -14,4 +14,9 @@ export class UserDto {
   weight?: number;
   createdAt: Date;
   homeGyms?: HomeGymDto[];
+  // Tagesziele (#152): manual daily targets, each null until the user sets it.
+  targetKcal?: number | null;
+  targetCarbs?: number | null;
+  targetProtein?: number | null;
+  targetFat?: number | null;
 }

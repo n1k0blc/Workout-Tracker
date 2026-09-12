@@ -9,6 +9,11 @@ export interface User {
   weight?: number;
   createdAt: string;
   homeGyms?: HomeGym[];
+  /** Tagesziele (#152): manual daily targets, each null until the user sets it. */
+  targetKcal?: number | null;
+  targetCarbs?: number | null;
+  targetProtein?: number | null;
+  targetFat?: number | null;
 }
 
 export interface HomeGym {
@@ -682,4 +687,323 @@ export interface CurrentCycleWorkouts {
   cycleId: string;
   cycleName: string;
   workoutDays: CycleWorkoutDay[];
+}
+
+// Nutrition Types (#141)
+
+export interface MacroTotals {
+  kcal: number;
+  carbs: number;
+  protein: number;
+  fat: number;
+}
+
+/**
+ * One logged Eintrag. Its nutrients are a snapshot taken at log time -- a quantity edit
+ * rescales them proportionally, they are never recomputed. `foodId` / `mealId` are always
+ * null in this ticket (a Schnelleintrag); later tickets attach foods and meals.
+ */
+export interface DiaryEntry {
+  id: string;
+  mealSlotId: string;
+  localDate: string;
+  foodId: string | null;
+  /** Set on entries expanded from a Mahlzeit (#147); they group under `mealName`. */
+  mealId: string | null;
+  /** The meal's name, snapshotted at expansion time (ADR-0002). Null unless `mealId` is set. */
+  mealName: string | null;
+  name: string;
+  quantity: number;
+  quantityLabel: string | null;
+  kcal: number;
+  carbs: number;
+  protein: number;
+  fat: number;
+}
+
+export interface NutritionDaySlot {
+  id: string;
+  name: string;
+  order: number;
+  /** True for an archived Abschnitt; only returned on days that already have entries in it. */
+  archived: boolean;
+  totals: MacroTotals;
+  entries: DiaryEntry[];
+}
+
+export interface MealSlot {
+  id: string;
+  name: string;
+  order: number;
+  archived: boolean;
+}
+
+export interface MealSlotList {
+  /** Active Abschnitte in display order (1-based, contiguous). */
+  active: MealSlot[];
+  archived: MealSlot[];
+}
+
+/**
+ * The user's Tagesziele (#152) as the day payload carries them. `null` on {@link NutritionDay}
+ * means the user has set none and the client shows plain totals; otherwise each field is the
+ * target or `null` if that one is unset.
+ */
+export interface MacroTargets {
+  kcal: number | null;
+  carbs: number | null;
+  protein: number | null;
+  fat: number | null;
+}
+
+export interface NutritionDay {
+  date: string;
+  totals: MacroTotals;
+  /** Non-null when at least one Tagesziel is set; drives the consumed-vs-target card. */
+  targets: MacroTargets | null;
+  slots: NutritionDaySlot[];
+}
+
+/** The four metrics the Ernährungs-Analytics chart (#153) can toggle between. */
+export type NutritionMetric = 'kcal' | 'carbs' | 'protein' | 'fat';
+
+/** One day of the Ernährungs-Analytics series; a day with no entries has every total at 0. */
+export interface NutritionTrendDay {
+  date: string;
+  /** 0 = Sunday .. 6 = Saturday, for the weekday x-axis labels. */
+  weekday: number;
+  kcal: number;
+  carbs: number;
+  protein: number;
+  fat: number;
+}
+
+/** `GET /nutrition/analytics`: one row per calendar day in `[start, end]`, plus the Tagesziele. */
+export interface NutritionTrend {
+  start: string;
+  end: string;
+  days: NutritionTrendDay[];
+  targets: MacroTargets | null;
+}
+
+export interface CreateDiaryEntryInput {
+  mealSlotId: string;
+  localDate: string;
+  name: string;
+  kcal: number;
+  carbs: number;
+  protein: number;
+  fat: number;
+  quantity?: number;
+  quantityLabel?: string;
+  /** Also save the entered values as a new USER Lebensmittel and link this entry to it. */
+  saveAsFood?: boolean;
+}
+
+/** One food picked in the drawer; `grams` is already normalized to g / ml. */
+export interface DiaryEntryFromFoodInput {
+  foodId: string;
+  grams: number;
+  quantityLabel?: string;
+}
+
+export interface DiaryEntriesBatchInput {
+  mealSlotId: string;
+  localDate: string;
+  items: DiaryEntryFromFoodInput[];
+}
+
+// Lebensmittel library (#143)
+
+export type FoodSource = 'SEED' | 'OPEN_FOOD_FACTS' | 'USER';
+
+export interface FoodPortion {
+  id: string;
+  label: string;
+  /** Grams, or millilitres when the food is a liquid. */
+  grams: number;
+  order: number;
+  isDefault: boolean;
+}
+
+export interface Food {
+  id: string;
+  name: string;
+  brand: string | null;
+  barcode: string | null;
+  isLiquid: boolean;
+  /** Per 100 g / 100 ml. */
+  kcal: number;
+  carbs: number;
+  protein: number;
+  fat: number;
+  source: FoodSource;
+  createdById: string | null;
+  /** Soft-deleted: gone from search, still resolves by id. */
+  deleted: boolean;
+  /** The current user's own, non-deleted USER food -- the only case the editor is writable. */
+  editable: boolean;
+  /** The current user has starred this food (#148). Floats it up the picker's "Alle" tab. */
+  isFavorite: boolean;
+  portions: FoodPortion[];
+}
+
+/**
+ * One capped page of the library plus the totals behind it. The Open Food Facts import (#146)
+ * puts ~180k foods in the library, so `items.length` is the page size, never the number of
+ * matches -- render the totals, not the page.
+ */
+export interface FoodList {
+  items: Food[];
+  /** Foods matching the search, ignoring the page cap. */
+  total: number;
+  /** How many of `total` are the current user's own editable foods. */
+  ownTotal: number;
+}
+
+export interface FoodPortionInput {
+  label: string;
+  grams: number;
+  isDefault?: boolean;
+}
+
+export interface FoodInput {
+  name: string;
+  brand?: string;
+  barcode?: string;
+  isLiquid?: boolean;
+  kcal: number;
+  carbs: number;
+  protein: number;
+  fat: number;
+  portions?: FoodPortionInput[];
+}
+
+export interface SimilarFood {
+  id: string;
+  name: string;
+  kcal: number;
+  isLiquid: boolean;
+  /** How many of the current user's diary entries reference this food. */
+  usageCount: number;
+}
+
+// Barcode-Scan (#149)
+
+/**
+ * Where a scanned barcode landed in the miss chain: `local` -- already in the shared library;
+ * `openFoodFacts` -- fetched live and cached as a global food; `notFound` -- neither, so the
+ * create form opens with the barcode prefilled.
+ */
+export type BarcodeLookupStatus = 'local' | 'openFoodFacts' | 'notFound';
+
+export interface BarcodeLookup {
+  status: BarcodeLookupStatus;
+  /** The code in its canonical form -- a scanned UPC-A comes back widened to an EAN-13. */
+  barcode: string;
+  /** The resolved food; null only when `status` is `notFound`. */
+  food: Food | null;
+}
+
+// Mahlzeiten (#147)
+
+/** One ingredient of a Mahlzeit, with the live per-100 values needed to recompute its share. */
+export interface MealItem {
+  id: string;
+  foodId: string;
+  order: number;
+  /** Grams or millilitres, matching the food's `isLiquid`. */
+  quantity: number;
+  foodName: string;
+  isLiquid: boolean;
+  /** The referenced food has been soft-deleted -- it still resolves and still computes. */
+  deleted: boolean;
+  per100: MacroTotals;
+  portions: FoodPortion[];
+}
+
+/** A Mahlzeit with its ingredients resolved and totals computed live, per 1x. Editor payload. */
+export interface MealDetail {
+  id: string;
+  name: string;
+  /**
+   * The caller's own, non-deleted meal -- the only case the editor writes. The sole
+   * creator-derived fact exposed; no creator id or name (ADR-0003).
+   */
+  editable: boolean;
+  /** The current user has starred this meal (#148). */
+  isFavorite: boolean;
+  deleted: boolean;
+  items: MealItem[];
+  totals: MacroTotals;
+}
+
+/** A row in the Mahlzeiten tab / picker list. */
+export interface MealListItem {
+  id: string;
+  name: string;
+  editable: boolean;
+  /** The current user has starred this meal (#148). Floats it up the picker's "Alle" tab. */
+  isFavorite: boolean;
+  itemCount: number;
+  /** Ingredient names in item order, for the "Reis, Hähnchen, Paprika +3" preview. */
+  ingredientNames: string[];
+  totals: MacroTotals;
+}
+
+export interface MealList {
+  items: MealListItem[];
+  /** Meals matching the filter. */
+  total: number;
+  /** How many of `total` the current user created. */
+  mineTotal: number;
+}
+
+export interface MealItemInput {
+  foodId: string;
+  /** Grams or millilitres. */
+  quantity: number;
+}
+
+export interface MealInput {
+  name: string;
+  items: MealItemInput[];
+}
+
+/** Logs a Mahlzeit: the server expands it into one entry per ingredient, scaled by `factor`. */
+export interface DiaryEntriesFromMealInput {
+  mealSlotId: string;
+  localDate: string;
+  mealId: string;
+  factor: number;
+}
+
+// Von einem anderen Tag kopieren (#151)
+
+/** Copy a whole previous day's entries onto `toDate`, each staying in its own Abschnitt. */
+export interface CopyDiaryDayInput {
+  fromDate: string;
+  toDate: string;
+}
+
+/** Copy just one Abschnitt's entries from `fromDate` into the same Abschnitt on `toDate`. */
+export interface CopyDiarySlotInput {
+  fromDate: string;
+  toDate: string;
+  mealSlotId: string;
+}
+
+// Favoriten & Zuletzt (#148)
+
+/**
+ * One row of the picker's Favoriten / Zuletzt tab: a Lebensmittel or a Mahlzeit, tagged so
+ * the client renders the right row. Foods and meals are interleaved in one ordered array so
+ * the tab's ordering (last use / most recent) survives.
+ */
+export type PickerItem =
+  | { kind: 'food'; food: Food }
+  | { kind: 'meal'; meal: MealListItem };
+
+export interface PickerList {
+  items: PickerItem[];
 }

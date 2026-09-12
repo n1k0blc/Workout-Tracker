@@ -27,3 +27,20 @@ export function fromLocalDateString(localDate: string): Date {
 export function clientTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
+
+/**
+ * True when `value` is a real calendar day in `YYYY-MM-DD` form. Round-trips through UTC so a
+ * well-formed-but-impossible date (`2026-02-30`) is rejected rather than silently rolled
+ * forward. Used to sanity-check a `?date=` URL parameter before trusting it.
+ */
+export function isLocalDate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+  const [, year, month, day] = match.map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return (
+    parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day
+  );
+}
