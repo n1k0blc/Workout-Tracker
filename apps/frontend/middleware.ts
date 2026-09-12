@@ -13,10 +13,23 @@ import { NextRequest, NextResponse } from "next/server";
 // scripts it injects. `style-src` keeps `'unsafe-inline'` because Next, recharts,
 // vaul, dnd-kit and react-day-picker all set inline `style=` attributes, which a
 // nonce cannot cover.
-// Same origin as the app in production (Cloudflare routes /api to the backend);
-// in local dev NEXT_PUBLIC_API_URL points straight at the backend on :3001.
-const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "/api").replace(/\/$/, "");
-const REPORT_PATH = `${API_BASE}/security/csp-report`;
+// Same origin as the app in production (every deployment config sets NEXT_PUBLIC_API_URL
+// explicitly to its own domain -- see docker-compose.prod.yml / Dockerfile /
+// .env.production.example). A bare `next dev` with no env file at all falls back to the
+// same cross-origin backend address `apiClient` itself defaults to
+// (apps/frontend/lib/api/client.ts) -- the two must agree, or the CSP below allows a
+// different origin than the app actually calls, and login and every API request are
+// silently blocked. Read fresh (not frozen at module load) so tests can exercise both.
+function getApiBase(): string {
+  return (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api").replace(/\/$/, "");
+}
+
+// Covers the cross-origin case (local dev, the backend on its own port); a same-origin
+// API_BASE adds nothing here since 'self' already covers it.
+function getApiOrigin(): string | null {
+  const apiBase = getApiBase();
+  return /^https?:\/\//.test(apiBase) ? new URL(apiBase).origin : null;
+}
 
 export function buildCsp(nonce: string): string {
   const isProd = process.env.NODE_ENV === "production";
@@ -31,6 +44,7 @@ export function buildCsp(nonce: string): string {
     // React Refresh / HMR needs eval in `next dev`; never in a production build.
     isProd ? null : "'unsafe-eval'",
   ].filter(Boolean);
+  const connectSrc = ["'self'", getApiOrigin()].filter(Boolean);
 
   return [
     "default-src 'self'",
@@ -43,10 +57,10 @@ export function buildCsp(nonce: string): string {
     "object-src 'none'",
     `script-src ${scriptSrc.join(" ")}`,
     "style-src 'self' 'unsafe-inline'",
-    "connect-src 'self'",
+    `connect-src ${connectSrc.join(" ")}`,
     "manifest-src 'self'",
     "worker-src 'self' blob:",
-    `report-uri ${REPORT_PATH}`,
+    `report-uri ${getApiBase()}/security/csp-report`,
     "report-to csp-endpoint",
   ].join("; ");
 }
@@ -63,9 +77,10 @@ export function middleware(request: NextRequest) {
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("Content-Security-Policy", csp);
+  const reportPath = `${getApiBase()}/security/csp-report`;
   response.headers.set(
     "Reporting-Endpoints",
-    `csp-endpoint="${new URL(REPORT_PATH, request.nextUrl.origin).toString()}"`,
+    `csp-endpoint="${new URL(reportPath, request.nextUrl.origin).toString()}"`,
   );
   return response;
 }
