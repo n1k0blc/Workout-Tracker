@@ -6,34 +6,34 @@ function run(url = "https://workout.nikobjelic.com/dashboard") {
   return middleware(new NextRequest(new URL(url)));
 }
 
-describe("CSP middleware (issue #125, report-only phase)", () => {
-  it("sends report-only, not the enforcing header", () => {
+describe("CSP middleware (issue #125, enforcing phase)", () => {
+  it("sends the enforcing header, not report-only", () => {
     const res = run();
-    expect(res.headers.get("content-security-policy-report-only")).toBeTruthy();
-    expect(res.headers.get("content-security-policy")).toBeNull();
+    expect(res.headers.get("content-security-policy")).toBeTruthy();
+    expect(res.headers.get("content-security-policy-report-only")).toBeNull();
   });
 
   it("uses a per-request nonce with strict-dynamic for scripts", () => {
-    const csp = run().headers.get("content-security-policy-report-only")!;
+    const csp = run().headers.get("content-security-policy")!;
     expect(csp).toMatch(/script-src [^;]*'strict-dynamic'/);
     expect(csp).toMatch(/script-src [^;]*'nonce-[A-Za-z0-9+/=]+'/);
   });
 
   it("issues a fresh nonce each request", () => {
     const nonceOf = (csp: string) => /'nonce-([A-Za-z0-9+/=]+)'/.exec(csp)?.[1];
-    expect(nonceOf(run().headers.get("content-security-policy-report-only")!)).not.toBe(
-      nonceOf(run().headers.get("content-security-policy-report-only")!),
+    expect(nonceOf(run().headers.get("content-security-policy")!)).not.toBe(
+      nonceOf(run().headers.get("content-security-policy")!),
     );
   });
 
   it("keeps style-src unsafe-inline (inline style attributes cannot carry a nonce)", () => {
-    expect(run().headers.get("content-security-policy-report-only")).toContain(
+    expect(run().headers.get("content-security-policy")).toContain(
       "style-src 'self' 'unsafe-inline'",
     );
   });
 
   it("locks down the high-risk directives", () => {
-    const csp = run().headers.get("content-security-policy-report-only")!;
+    const csp = run().headers.get("content-security-policy")!;
     expect(csp).toContain("default-src 'self'");
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("frame-ancestors 'none'");
@@ -43,7 +43,7 @@ describe("CSP middleware (issue #125, report-only phase)", () => {
 
   it("points violation reports at the backend endpoint, old and new syntax", () => {
     const res = run();
-    const csp = res.headers.get("content-security-policy-report-only")!;
+    const csp = res.headers.get("content-security-policy")!;
     expect(csp).toContain("report-uri /api/security/csp-report");
     expect(csp).toContain("report-to csp-endpoint");
     expect(res.headers.get("reporting-endpoints")).toBe(
@@ -52,7 +52,7 @@ describe("CSP middleware (issue #125, report-only phase)", () => {
   });
 
   it("forwards the nonce to the app on the x-nonce request header", () => {
-    const csp = run().headers.get("content-security-policy-report-only")!;
+    const csp = run().headers.get("content-security-policy")!;
     // The response CSP and the request x-nonce must agree; assert the shape here
     // and trust Next to read the request CSP header for script injection.
     expect(csp).toMatch(/'nonce-[A-Za-z0-9+/=]+'/);

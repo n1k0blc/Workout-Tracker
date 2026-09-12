@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Content-Security-Policy, phase 1: report-only.
+// Content-Security-Policy, phase 2: enforcing.
 //
-// It ships as `Content-Security-Policy-Report-Only` so a missed source reports a
-// violation instead of blanking the page. Observe production for a real usage
-// window, widen for any legitimate source, then switch the header name to the
-// enforcing `Content-Security-Policy`. See issue #125.
+// Phase 1 shipped as `Content-Security-Policy-Report-Only` on 2026-09-06. A
+// six-day production observation window (real logins, dashboard loads, and
+// active workout sessions, container never recreated) logged zero genuine
+// violations -- only the synthetic test entries from initial verification.
+// See issue #125.
 //
 // A per-request nonce plus `strict-dynamic` covers Next's framework scripts;
 // Next reads the CSP request header set below and stamps the nonce onto the
@@ -57,12 +58,11 @@ export function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
   // Next reads the *request* `Content-Security-Policy` header to stamp the nonce
-  // onto the scripts it injects. The browser never sees this one — the response
-  // below carries the report-only header instead, so nothing is enforced yet.
+  // onto the scripts it injects.
   requestHeaders.set("Content-Security-Policy", csp);
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
-  response.headers.set("Content-Security-Policy-Report-Only", csp);
+  response.headers.set("Content-Security-Policy", csp);
   response.headers.set(
     "Reporting-Endpoints",
     `csp-endpoint="${new URL(REPORT_PATH, request.nextUrl.origin).toString()}"`,
