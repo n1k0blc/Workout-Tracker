@@ -10,6 +10,46 @@ say.
 
 ## Glossary
 
+### Anmeldung (session)
+
+- **Anmeldung** (sign-in) — the German UI term for logging in (`/login`, the "Anmelden"
+  button). It establishes a session: the server issues a **Zugriffs-Cookie** and a
+  **Refresh-Token**, both httpOnly, `SameSite=Lax`. Code: `AuthService.login`,
+  `AuthController`.
+
+- **Zugriffs-Cookie** (access cookie) — a short-lived JWT, 15 minutes
+  (`ACCESS_TOKEN_MAX_AGE_MS`, `JWT_EXPIRATION` default `15m`), sent on every request and
+  checked by `JwtAuthGuard`. Its short lifetime is deliberate: session length is controlled by
+  the Refresh-Token below, not by this cookie. On the client, several requests hitting 401 at
+  once because it just expired share one in-flight refresh call instead of each starting their
+  own (#158) — only one request reaches the server in the common case. Code: `access_token`
+  cookie.
+
+- **Refresh-Token** — a `RefreshToken` row: an opaque, high-entropy token whose SHA-256 hash
+  (never the raw value) is persisted, 30 days (`REFRESH_TOKEN_MAX_AGE_MS`), carried in the
+  `refresh_token` cookie scoped to path `/api/auth` only — it is never sent anywhere else.
+  Presenting it to `POST /auth/refresh` is the only way to get a new Zugriffs-Cookie once the
+  old one expires. Code: `RefreshToken`, `RefreshTokenService`.
+
+- **Rotation** — every refresh both consumes and replaces the Refresh-Token: the presented one
+  is marked revoked (`revokedAt`, `replacedByTokenHash`) and a successor is issued, in one
+  transaction. The revoke is a single conditional write (`WHERE revokedAt IS NULL`), not a
+  read-then-write, so two refreshes racing the same cookie can never both succeed — at most one
+  ever gets a successor (#159). A loser arriving within 5 seconds of the winner is treated as a
+  benign collision and simply rejected; only a presentation clearly later is treated as reuse,
+  below. See
+  [ADR-0004](docs/adr/0004-refresh-token-rotation-is-one-atomic-write-with-a-grace-period.md).
+
+- **Wiederverwendungserkennung** (reuse detection) — presenting a Refresh-Token that was
+  already rotated away, well outside the collision window above, is a strong theft signal:
+  every session with `createdAt` at or before the moment that token was superseded is ended,
+  forcing re-authentication everywhere the stolen token's lineage could reach. A session
+  created *after* that moment — a later, unrelated sign-in — is left alone (#161). Every
+  rejected refresh (unknown, expired, superseded, or reused token) logs one warning line
+  naming the reason and the user, never the raw token or cookie, at most a short hash prefix
+  (#160). **Changing the password** takes the unconditional path instead: every session is
+  ended, with no exceptions, via `revokeAllForUser`.
+
 ### Ernährung (nutrition)
 
 - **Abschnitt** — a named division of a user's eating day: **Frühstück**, **Mittagessen**,
