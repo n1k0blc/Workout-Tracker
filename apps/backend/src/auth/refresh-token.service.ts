@@ -47,7 +47,11 @@ export class RefreshTokenService {
   /**
    * Rotates a valid refresh token: revokes the presented one and atomically issues a new one.
    * Reuse of an already-rotated token well outside the grace period (a strong theft signal)
-   * revokes the user's entire token family, forcing re-authentication on every device.
+   * ends every session that predates the moment it was superseded, forcing re-authentication
+   * wherever the stolen token's lineage could reach -- but spares sessions created afterward
+   * (#161): a sign-in that happened *after* the token was rotated away has nothing to do with
+   * whoever is now replaying the old one, and a single stale request must not be able to log
+   * that later session out.
    *
    * The revoke is a conditional write (`WHERE revokedAt IS NULL`), not a read-then-write:
    * when several requests present the same token at the same instant, every one of them
@@ -72,14 +76,23 @@ export class RefreshTokenService {
     const nextTokenHash = hashToken(nextRawToken);
 
     await this.prisma.$transaction(async tx => {
+      // Both the revoke and the successor's createdAt use this single instant, so a later
+      // reuse check can compare "created at/before the supersession" without the successor's
+      // own createdAt (a DB-side default) racing the JS clock used for revokedAt.
+      const now = new Date();
       const { count } = await tx.refreshToken.updateMany({
-        where: { id: existing.id, revokedAt: null, expiresAt: { gt: new Date() } },
-        data: { revokedAt: new Date(), replacedByTokenHash: nextTokenHash },
+        where: { id: existing.id, revokedAt: null, expiresAt: { gt: now } },
+        data: { revokedAt: now, replacedByTokenHash: nextTokenHash },
       });
 
       if (count === 1) {
         await tx.refreshToken.create({
-          data: { userId: existing.userId, tokenHash: nextTokenHash, expiresAt: nextExpiresAt },
+          data: {
+            userId: existing.userId,
+            tokenHash: nextTokenHash,
+            expiresAt: nextExpiresAt,
+            createdAt: now,
+          },
         });
         return;
       }
@@ -102,7 +115,11 @@ export class RefreshTokenService {
       }
 
       const { count: endedCount } = await tx.refreshToken.updateMany({
-        where: { userId: existing.userId, revokedAt: null },
+        where: {
+          userId: existing.userId,
+          revokedAt: null,
+          createdAt: { lte: current.revokedAt },
+        },
         data: { revokedAt: new Date() },
       });
       this.logger.warn(

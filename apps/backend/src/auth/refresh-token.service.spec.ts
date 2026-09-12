@@ -14,6 +14,7 @@ interface Row {
   id: string;
   userId: string;
   tokenHash: string;
+  createdAt: Date;
   expiresAt: Date;
   revokedAt: Date | null;
   replacedByTokenHash: string | null;
@@ -31,6 +32,10 @@ function makeFakePrisma() {
       if ('expiresAt' in where) {
         const filter = where.expiresAt as { gt: Date };
         if (row.expiresAt.getTime() <= filter.gt.getTime()) return false;
+      }
+      if ('createdAt' in where) {
+        const filter = where.createdAt as { lte: Date };
+        if (row.createdAt.getTime() > filter.lte.getTime()) return false;
       }
       return true;
     });
@@ -50,8 +55,19 @@ function makeFakePrisma() {
       matches.forEach(row => Object.assign(row, data));
       return { count: matches.length };
     },
-    create: async ({ data }: { data: Omit<Row, 'id' | 'revokedAt' | 'replacedByTokenHash'> }) => {
-      const row: Row = { id: `row-${rows.size + 1}`, revokedAt: null, replacedByTokenHash: null, ...data };
+    create: async ({
+      data,
+    }: {
+      data: Omit<Row, 'id' | 'revokedAt' | 'replacedByTokenHash' | 'createdAt'> &
+        Partial<Pick<Row, 'createdAt'>>;
+    }) => {
+      const row: Row = {
+        id: `row-${rows.size + 1}`,
+        createdAt: new Date(),
+        revokedAt: null,
+        replacedByTokenHash: null,
+        ...data,
+      };
       rows.set(row.id, row);
       return row;
     },
@@ -70,6 +86,7 @@ function seedToken(rows: Map<string, Row>, overrides: Partial<Row> = {}): Row {
     id: overrides.id ?? 'row-seed',
     userId: 'user-1',
     tokenHash: hashToken('raw-token'),
+    createdAt: new Date(),
     expiresAt: new Date(Date.now() + 60_000),
     revokedAt: null,
     replacedByTokenHash: null,
@@ -108,17 +125,19 @@ describe('RefreshTokenService.rotate', () => {
     expect(rows.get('row-seed')?.revokedAt).toBeNull();
   });
 
-  it('revokes the whole family when an already-rotated token is presented again well after rotation (reuse)', async () => {
+  it('revokes sessions predating the supersession when an already-rotated token is presented again well after rotation (reuse)', async () => {
     const { prisma, rows } = makeFakePrisma();
+    const supersededAt = new Date(Date.now() - 60_000);
+    seedToken(rows, { revokedAt: supersededAt, replacedByTokenHash: 'some-hash' });
     seedToken(rows, {
-      revokedAt: new Date(Date.now() - 60_000),
-      replacedByTokenHash: 'some-hash',
+      id: 'row-older',
+      tokenHash: 'other-hash',
+      createdAt: new Date(supersededAt.getTime() - 10_000),
     });
-    seedToken(rows, { id: 'row-other', tokenHash: 'other-hash' });
     const service = new RefreshTokenService(prisma as any);
 
     await expect(service.rotate('raw-token')).rejects.toThrow('Refresh token reuse detected');
-    expect(rows.get('row-other')?.revokedAt).not.toBeNull();
+    expect(rows.get('row-older')?.revokedAt).not.toBeNull();
   });
 
   it('rejects a token rotated moments ago without treating it as reuse (benign collision)', async () => {
@@ -163,6 +182,66 @@ describe('RefreshTokenService.rotate', () => {
       [...rows.values()].map(row => row.replacedByTokenHash).filter(Boolean),
     );
     expect(successorHashes.size).toBeLessThanOrEqual(1);
+  });
+});
+
+// #161: reuse detection must still end whatever predates the compromised token, but a
+// sign-in that happened *after* it was superseded is a different, unrelated session and
+// must not become collateral damage from a single late/stale request.
+describe('RefreshTokenService reuse detection spares newer sessions (#161)', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('reproduces the production sequence: sign in, refresh, sign in again, then a late refresh with the first cookie -- the second session still works', async () => {
+    const { prisma } = makeFakePrisma();
+    const service = new RefreshTokenService(prisma as any);
+    const t0 = Date.now();
+    jest.useFakeTimers({ doNotFake: ['nextTick'] });
+    jest.setSystemTime(t0);
+
+    // Sign in: session 1 is born.
+    const session1First = await service.issue('user-1');
+
+    // A normal refresh moments later rotates session 1's token.
+    jest.setSystemTime(t0 + 1_000);
+    const session1Second = await service.rotate(session1First.rawToken);
+
+    // The user signs in again elsewhere -- a second, independent session.
+    jest.setSystemTime(t0 + 2_000);
+    const session2First = await service.issue('user-1');
+
+    // A late, stale refresh finally arrives presenting session 1's *original* cookie, well
+    // outside the service's collision grace period, so this is treated as a genuine reuse
+    // signal rather than a benign race.
+    jest.setSystemTime(t0 + 1_000 + 10_000);
+    await expect(service.rotate(session1First.rawToken)).rejects.toThrow(
+      'Refresh token reuse detected',
+    );
+
+    // Session 1's current token predates the compromise reveal and must die with it.
+    await expect(service.rotate(session1Second.rawToken)).rejects.toThrow(UnauthorizedException);
+
+    // Session 2 was created after session 1's token was superseded -- it must still work.
+    await expect(service.rotate(session2First.rawToken)).resolves.toMatchObject({
+      userId: 'user-1',
+    });
+  });
+
+  it('spares a session created after the token was superseded even without a live successor to rotate', async () => {
+    const { prisma, rows } = makeFakePrisma();
+    const supersededAt = new Date(Date.now() - 60_000);
+    seedToken(rows, { revokedAt: supersededAt, replacedByTokenHash: 'some-hash' });
+    seedToken(rows, {
+      id: 'row-newer',
+      tokenHash: 'newer-hash',
+      createdAt: new Date(supersededAt.getTime() + 1_000),
+    });
+    const service = new RefreshTokenService(prisma as any);
+
+    await expect(service.rotate('raw-token')).rejects.toThrow('Refresh token reuse detected');
+
+    expect(rows.get('row-newer')?.revokedAt).toBeNull();
   });
 });
 
@@ -244,11 +323,13 @@ describe('RefreshTokenService rejection logging (#160)', () => {
 
   it('logs reuse detection with how many sessions it ended', async () => {
     const { prisma, rows } = makeFakePrisma();
+    const supersededAt = new Date(Date.now() - 60_000);
+    seedToken(rows, { revokedAt: supersededAt, replacedByTokenHash: 'some-hash' });
     seedToken(rows, {
-      revokedAt: new Date(Date.now() - 60_000),
-      replacedByTokenHash: 'some-hash',
+      id: 'row-older',
+      tokenHash: 'other-hash',
+      createdAt: new Date(supersededAt.getTime() - 10_000),
     });
-    seedToken(rows, { id: 'row-other', tokenHash: 'other-hash' });
     const service = new RefreshTokenService(prisma as any);
 
     await expect(service.rotate('raw-token')).rejects.toThrow('Refresh token reuse detected');
