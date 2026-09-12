@@ -297,6 +297,9 @@ export default function AbschnittPage() {
           slotName={slot.name}
           date={date}
           onLogged={load}
+          // Dismissing the scanner returns to the picker it was opened from, so the user can
+          // keep picking foods by search or from Favoriten/Zuletzt.
+          onCancel={() => setPickerOpen(true)}
         />
       )}
       {slot && !slot.archived && (

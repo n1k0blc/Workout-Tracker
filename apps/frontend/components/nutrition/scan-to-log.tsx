@@ -18,6 +18,7 @@ export function ScanToLog({
   slotName,
   date,
   onLogged,
+  onCancel,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -26,6 +27,8 @@ export function ScanToLog({
   date: string;
   /** An Eintrag was written -- reload the day behind this. */
   onLogged: () => void;
+  /** The user dismissed the scanner without logging anything -- see {@link ScanFlow}. */
+  onCancel?: () => void;
 }) {
   async function logScanned(food: Food, grams: number, quantityLabel: string) {
     await apiClient.createDiaryEntriesBatch({
@@ -42,6 +45,7 @@ export function ScanToLog({
       open={open}
       onOpenChange={onOpenChange}
       mode={{ kind: 'log', slotName, onLog: logScanned }}
+      onCancel={onCancel}
     />
   );
 }

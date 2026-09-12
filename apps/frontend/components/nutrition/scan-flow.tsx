@@ -25,10 +25,18 @@ export function ScanFlow({
   open,
   onOpenChange,
   mode,
+  onCancel,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: ScannerMode;
+  /**
+   * The user dismissed the scanner itself (the "X", Escape, or the backdrop) rather than
+   * completing or continuing a scan. Not called for the double-miss "Lebensmittel anlegen"
+   * hand-off below, which also closes this sheet but immediately hands off to the create
+   * form -- that is a continuation, not an exit.
+   */
+  onCancel?: () => void;
 }) {
   // A scanned barcode that matched nothing: the create form opens with it prefilled.
   const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
@@ -50,7 +58,10 @@ export function ScanFlow({
         key={createdFromScan?.food?.id ?? 'scan'}
         initialResult={createdFromScan}
         open={open}
-        onOpenChange={onOpenChange}
+        onOpenChange={(next) => {
+          onOpenChange(next);
+          if (!next) onCancel?.();
+        }}
         mode={mode}
         onCreateFood={(barcode) => {
           onOpenChange(false);

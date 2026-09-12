@@ -1,13 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { IconAdjustmentsHorizontal } from '@tabler/icons-react';
 import { ProtectedRoute } from '@/components/protected-route';
 import { Button } from '@/components/ui/button';
 import { useSwipe } from '@/hooks/useSwipe';
 import { apiClient } from '@/lib/api';
 import { NutritionDay } from '@/types';
-import { toLocalDateString } from '@/lib/local-date';
+import { isLocalDate, toLocalDateString } from '@/lib/local-date';
 import { addDays } from '@/lib/nutrition';
 import { NutritionDayBar } from '@/components/nutrition/nutrition-day-bar';
 import { NutritionTotalsCard } from '@/components/nutrition/nutrition-totals-card';
@@ -18,7 +19,13 @@ import { ManageSlotsSheet } from '@/components/nutrition/manage-slots-sheet';
 
 export default function NutritionPage() {
   const today = useMemo(() => toLocalDateString(new Date()), []);
-  const [date, setDate] = useState(today);
+  // The Abschnitt page's back arrow links here with `?date=` so leaving it returns to the day
+  // it was opened from, not always today.
+  const searchParams = useSearchParams();
+  const dateParam = searchParams.get('date');
+  const [date, setDate] = useState(() =>
+    dateParam && isLocalDate(dateParam) ? dateParam : today,
+  );
   const [day, setDay] = useState<NutritionDay | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -129,6 +136,9 @@ export default function NutritionPage() {
           slotName={pickerSlot.name}
           date={date}
           onLogged={load}
+          // Dismissing the scanner returns to the picker it was opened from, so the user can
+          // keep picking foods by search or from Favoriten/Zuletzt.
+          onCancel={() => setPickerOpen(true)}
         />
       )}
 
