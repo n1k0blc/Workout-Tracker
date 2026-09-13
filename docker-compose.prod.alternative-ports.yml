@@ -41,7 +41,10 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-https://workout.nikobjelic.com}
     ports:
       # ⚠️ CHANGE THIS if port 3011 is also in use
-      - "3011:3001"  # External:Internal
+      # Loopback-only: cloudflared runs on the same host and reaches this via
+      # localhost. Do not bind to 0.0.0.0 — that would expose the backend
+      # directly on the Pi's LAN, bypassing the tunnel (issue #168).
+      - "127.0.0.1:3011:3001"  # External:Internal
     depends_on:
       postgres:
         condition: service_healthy
@@ -68,7 +71,8 @@ services:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3011}
     ports:
       # ⚠️ CHANGE THIS if port 3010 is also in use
-      - "3010:3000"  # External:Internal
+      # Loopback-only, see backend service above (issue #168).
+      - "127.0.0.1:3010:3000"  # External:Internal
     depends_on:
       backend:
         condition: service_healthy

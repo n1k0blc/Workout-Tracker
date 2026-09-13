@@ -44,7 +44,10 @@ services:
       JWT_EXPIRATION: ${JWT_EXPIRATION:-15m}
       CORS_ORIGIN: ${CORS_ORIGIN:-https://workout.nikobjelic.com}
     ports:
-      - "3001:3001"
+      # Loopback-only: cloudflared runs on the same host and reaches this via
+      # localhost. Do not bind to 0.0.0.0 — that would expose the backend
+      # directly on the Pi's LAN, bypassing the tunnel (issue #168).
+      - "127.0.0.1:3001:3001"
     volumes:
       # CSV Dateien für Exercise Migration (read-only)
       # Liegen im Repo-Root, werden mit git pull aktualisiert
@@ -79,7 +82,8 @@ services:
       NODE_ENV: production
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3001}
     ports:
-      - "3000:3000"
+      # Loopback-only, see backend service above (issue #168).
+      - "127.0.0.1:3000:3000"
     depends_on:
       backend:
         condition: service_healthy
