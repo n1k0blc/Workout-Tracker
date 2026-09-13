@@ -50,6 +50,20 @@ say.
   (#160). **Changing the password** takes the unconditional path instead: every session is
   ended, with no exceptions, via `revokeAllForUser`.
 
+- **CSRF** — investigated in #169 and confirmed to already be closed, not merely absent because
+  tokens live in a header. Both the Zugriffs-Cookie and Refresh-Token are `httpOnly` (never
+  readable by JS, so no token to steal via XSS-and-forward), and every mutating request is
+  additionally covered by a double-submit `csrf_token` cookie: non-`httpOnly` on purpose, so the
+  frontend can read it and echo it back as `X-CSRF-Token` (`apps/frontend/lib/api/client.ts`),
+  which `CsrfMiddleware` compares to the cookie with a timing-safe check on every non-safe method
+  except login/register/refresh (`apps/backend/src/common/middleware/csrf.middleware.ts`) — a
+  forged cross-site request can ride the cookie but can't read it, so it can never produce a
+  matching header. `SameSite=Lax` on all three cookies and the same-origin production deployment
+  (Cloudflare routes `/api` to the backend under `workout.nikobjelic.com`, no cross-origin cookie
+  attachment at all) are the two further independent layers behind that. Covered by
+  `csrf.middleware.spec.ts`. Re-flag only if the token transport changes (e.g. a mobile client
+  reintroducing bearer-header auth) or a route bypasses the global middleware.
+
 ### Ernährung (nutrition)
 
 - **Abschnitt** — a named division of a user's eating day: **Frühstück**, **Mittagessen**,
