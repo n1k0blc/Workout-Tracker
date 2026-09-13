@@ -20,9 +20,9 @@ describe('AnalyticsFilterDto', () => {
     // with 400 "exerciseId must be a UUID" and the view never updated. The write path
     // (`WorkoutExerciseInputDto.exerciseId`) already treats the id as a plain string.
     it('accepts a seeded (non-UUID) exercise id', async () => {
-      await expect(
-        runPipe({ exerciseId: 'seed-bayesian-curl' }),
-      ).resolves.toMatchObject({ exerciseId: 'seed-bayesian-curl' });
+      await expect(runPipe({ exerciseId: 'seed-bayesian-curl' })).resolves.toMatchObject({
+        exerciseId: 'seed-bayesian-curl',
+      });
     });
 
     it('accepts a real UUID exercise id', async () => {

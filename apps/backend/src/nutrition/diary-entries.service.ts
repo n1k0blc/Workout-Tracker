@@ -8,11 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { scalePer100 } from '../common/utils/nutrition.util';
 import { MealsService } from '../meals/meals.service';
 import { MealSlotsService } from './meal-slots.service';
-import {
-  toMacroTargetsDto,
-  UserTargetsRow,
-  USER_TARGETS_SELECT,
-} from './nutrition-targets.util';
+import { toMacroTargetsDto, UserTargetsRow, USER_TARGETS_SELECT } from './nutrition-targets.util';
 import {
   CreateDiaryEntryDto,
   CreateDiaryEntriesBatchDto,
@@ -356,9 +352,7 @@ export class DiaryEntriesService {
     }
 
     return this.prisma.diaryEntry.createMany({
-      data: source.map((e) =>
-        DiaryEntriesService.copyOf(e, userId, dto.toDate, dto.mealSlotId),
-      ),
+      data: source.map((e) => DiaryEntriesService.copyOf(e, userId, dto.toDate, dto.mealSlotId)),
     });
   }
 
@@ -385,9 +379,7 @@ export class DiaryEntriesService {
       return { count: 0 };
     }
 
-    const activeSlotIds = new Set(
-      slots.filter((s) => s.archivedAt === null).map((s) => s.id),
-    );
+    const activeSlotIds = new Set(slots.filter((s) => s.archivedAt === null).map((s) => s.id));
     const needsFallback = source.some((e) => !activeSlotIds.has(e.mealSlotId));
     const fallbackSlotId = needsFallback
       ? (await this.mealSlots.ensureActiveSlot(userId, FALLBACK_SLOT_NAME)).id
@@ -395,9 +387,7 @@ export class DiaryEntriesService {
 
     return this.prisma.diaryEntry.createMany({
       data: source.map((e) => {
-        const targetSlotId = activeSlotIds.has(e.mealSlotId)
-          ? e.mealSlotId
-          : fallbackSlotId!;
+        const targetSlotId = activeSlotIds.has(e.mealSlotId) ? e.mealSlotId : fallbackSlotId!;
         return DiaryEntriesService.copyOf(e, userId, dto.toDate, targetSlotId);
       }),
     });

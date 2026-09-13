@@ -58,7 +58,10 @@ describe('SecurityController', () => {
     try {
       controller.ingest([
         { type: 'csp-violation', body: { effectiveDirective: 'img-src', blockedURL: 'data:' } },
-        { type: 'csp-violation', body: { effectiveDirective: 'connect-src', blockedURL: 'wss://x' } },
+        {
+          type: 'csp-violation',
+          body: { effectiveDirective: 'connect-src', blockedURL: 'wss://x' },
+        },
       ]);
       expect(warn).toHaveBeenCalledTimes(2);
       expect(warn.mock.calls[0][0]).toContain('violated=img-src');

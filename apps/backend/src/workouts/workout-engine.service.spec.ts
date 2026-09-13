@@ -4,13 +4,36 @@ import { Today, resolveToday } from '../common/utils/today.util';
 /** Monday/Wednesday/Saturday, the cycle shape the acceptance criteria are written against. */
 function cycleDays() {
   return [
-    { id: 'day-mon', name: 'Push', weekday: 1, order: 1, plannedHomeGymId: null, workouts: [{ exercises: [] }] },
-    { id: 'day-wed', name: 'Pull', weekday: 3, order: 2, plannedHomeGymId: null, workouts: [{ exercises: [] }] },
-    { id: 'day-sat', name: 'Legs', weekday: 6, order: 3, plannedHomeGymId: null, workouts: [{ exercises: [] }] },
+    {
+      id: 'day-mon',
+      name: 'Push',
+      weekday: 1,
+      order: 1,
+      plannedHomeGymId: null,
+      workouts: [{ exercises: [] }],
+    },
+    {
+      id: 'day-wed',
+      name: 'Pull',
+      weekday: 3,
+      order: 2,
+      plannedHomeGymId: null,
+      workouts: [{ exercises: [] }],
+    },
+    {
+      id: 'day-sat',
+      name: 'Legs',
+      weekday: 6,
+      order: 3,
+      plannedHomeGymId: null,
+      workouts: [{ exercises: [] }],
+    },
   ];
 }
 
-function makeService(options: { workoutDays?: ReturnType<typeof cycleDays>; loggedDates?: string[] } = {}) {
+function makeService(
+  options: { workoutDays?: ReturnType<typeof cycleDays>; loggedDates?: string[] } = {},
+) {
   const loggedDates = options.loggedDates ?? [];
   const prisma = {
     workoutCycle: {
@@ -24,8 +47,9 @@ function makeService(options: { workoutDays?: ReturnType<typeof cycleDays>; logg
       }),
     },
     workout: {
-      count: jest.fn(async ({ where }: { where: { localDate: string } }) =>
-        loggedDates.filter((date) => date === where.localDate).length,
+      count: jest.fn(
+        async ({ where }: { where: { localDate: string } }) =>
+          loggedDates.filter((date) => date === where.localDate).length,
       ),
     },
   };
@@ -132,7 +156,9 @@ describe('getSuggestedWorkout', () => {
     // Sunday 20:30 UTC: still Sunday in Berlin, already Monday in Auckland.
     const sundayNight = new Date('2026-08-16T20:30:00.000Z');
 
-    expect(await service.getSuggestedWorkout('user-1', resolveToday(undefined, sundayNight))).toBeNull();
+    expect(
+      await service.getSuggestedWorkout('user-1', resolveToday(undefined, sundayNight)),
+    ).toBeNull();
     expect(
       await service.getSuggestedWorkout('user-1', resolveToday('Pacific/Auckland', sundayNight)),
     ).toMatchObject({ workoutDayId: 'day-mon' });
@@ -152,7 +178,7 @@ describe('getCurrentCycleWorkouts', () => {
     ]);
   });
 
-  it("highlights nothing on a day with nothing planned, while still listing every day", async () => {
+  it('highlights nothing on a day with nothing planned, while still listing every day', async () => {
     const { service } = makeService();
 
     const cycle = await service.getCurrentCycleWorkouts('user-1', today(TUESDAY));
@@ -301,7 +327,7 @@ describe('getNextScheduledWorkout', () => {
     expect(await service.getNextScheduledWorkout('user-1', today(SUNDAY))).toBeNull();
   });
 
-  it('still offers a planned day landing on the cycle\'s own expiry boundary', async () => {
+  it("still offers a planned day landing on the cycle's own expiry boundary", async () => {
     const { service, prisma } = makeService();
     // Same one-week cycle. Monday the 24th is the boundary itself, which `isCycleExpired`
     // still counts as inside -- so the search must not cut a day early and disagree with the

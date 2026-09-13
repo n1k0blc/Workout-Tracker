@@ -13,8 +13,18 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { WorkoutsService } from './workouts.service';
-import { WorkoutEngineService, SuggestedWorkout, CurrentCycleWorkouts } from './workout-engine.service';
-import { CreateWorkoutDto, UpdateWorkoutDto, WorkoutResponseDto, WorkoutListItemDto, LastPerformanceDto } from './dto';
+import {
+  WorkoutEngineService,
+  SuggestedWorkout,
+  CurrentCycleWorkouts,
+} from './workout-engine.service';
+import {
+  CreateWorkoutDto,
+  UpdateWorkoutDto,
+  WorkoutResponseDto,
+  WorkoutListItemDto,
+  LastPerformanceDto,
+} from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ClientToday } from '../common/decorators/client-today.decorator';

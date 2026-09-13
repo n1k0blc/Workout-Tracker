@@ -174,10 +174,7 @@ export class WorkoutTreeService {
  * mean silently choosing one of the two sequences the client sent. There is no safe way to
  * guess which was intended, so it is the client's bug to fix.
  */
-function assertOrderMatchesPosition(
-  items: { order: number }[],
-  label: string,
-): void {
+function assertOrderMatchesPosition(items: { order: number }[], label: string): void {
   items.forEach((item, index) => {
     const expected = index + 1;
     if (item.order !== expected) {

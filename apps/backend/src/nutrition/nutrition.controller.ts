@@ -84,9 +84,7 @@ export class NutritionController {
       !isLocalDate(start) ||
       !isLocalDate(end)
     ) {
-      throw new BadRequestException(
-        'start und end müssen Kalendertage in YYYY-MM-DD-Form sein',
-      );
+      throw new BadRequestException('start und end müssen Kalendertage in YYYY-MM-DD-Form sein');
     }
     return this.nutritionAnalytics.getTrend(user.id, start, end);
   }
@@ -221,20 +219,12 @@ export class NutritionController {
     @Param('id') id: string,
     @Body() dto: UpdateDiaryEntryDto,
   ): Promise<DiaryEntryDto> {
-    return this.diaryEntries.updateEntryQuantity(
-      user.id,
-      id,
-      dto.quantity,
-      dto.quantityLabel,
-    );
+    return this.diaryEntries.updateEntryQuantity(user.id, id, dto.quantity, dto.quantityLabel);
   }
 
   @Delete('entries/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteEntry(
-    @CurrentUser() user: { id: string },
-    @Param('id') id: string,
-  ): Promise<void> {
+  async deleteEntry(@CurrentUser() user: { id: string }, @Param('id') id: string): Promise<void> {
     return this.diaryEntries.deleteEntry(user.id, id);
   }
 }

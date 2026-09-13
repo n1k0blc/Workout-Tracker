@@ -141,7 +141,16 @@ describe('toExerciseInputs per-side shape (#100)', () => {
 
   it('averages weight and takes the lower RIR for an asymmetric set', () => {
     const [ex] = run(
-      [uni({ repsLeft: 10, repsRight: 10, weightLeft: 40, weightRight: 45, rirLeft: 3, rirRight: 1 })],
+      [
+        uni({
+          repsLeft: 10,
+          repsRight: 10,
+          weightLeft: 40,
+          weightRight: 45,
+          rirLeft: 3,
+          rirRight: 1,
+        }),
+      ],
       { a: { isUnilateral: true } },
     );
 
@@ -176,21 +185,21 @@ describe('toExerciseInputs per-side shape (#100)', () => {
   });
 
   it('rejects a unilateral set missing one side', () => {
-    expect(() =>
-      run([uni({ repsRight: undefined })], { a: { isUnilateral: true } }),
-    ).toThrow(BadRequestException);
+    expect(() => run([uni({ repsRight: undefined })], { a: { isUnilateral: true } })).toThrow(
+      BadRequestException,
+    );
   });
 
   it('rejects a unilateral set with RIR on only one side', () => {
-    expect(() =>
-      run([uni({ rirLeft: 2 })], { a: { isUnilateral: true } }),
-    ).toThrow(BadRequestException);
+    expect(() => run([uni({ rirLeft: 2 })], { a: { isUnilateral: true } })).toThrow(
+      BadRequestException,
+    );
   });
 
   it('rejects a bilateral set that carries per-side data, naming the exercise', () => {
-    expect(() =>
-      run([uni()], { a: { isUnilateral: false, name: 'Bench Press' } }),
-    ).toThrow(/Bench Press/);
+    expect(() => run([uni()], { a: { isUnilateral: false, name: 'Bench Press' } })).toThrow(
+      /Bench Press/,
+    );
   });
 
   it('leaves a bilateral set with no per-side data untouched', () => {

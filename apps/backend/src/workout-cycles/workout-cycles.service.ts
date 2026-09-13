@@ -2,11 +2,20 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { WorkoutTreeService, mapExercisesToResponse, toExerciseInputs, WORKOUT_EXERCISE_TREE_INCLUDE } from '../workout-tree/workout-tree.service';
+import {
+  WorkoutTreeService,
+  mapExercisesToResponse,
+  toExerciseInputs,
+  WORKOUT_EXERCISE_TREE_INCLUDE,
+} from '../workout-tree/workout-tree.service';
 import { setWorkingVolume } from '../common/utils/volume.util';
 import { calculateCycleWeek, getCurrentDate } from '../common/utils/date.util';
 import { Today, localDateToInstant } from '../common/utils/today.util';
-import { WEEKDAY_NAMES, cycleStartWeekday, getWeekdayDistanceFromCycleStart } from '../common/utils/weekday.util';
+import {
+  WEEKDAY_NAMES,
+  cycleStartWeekday,
+  getWeekdayDistanceFromCycleStart,
+} from '../common/utils/weekday.util';
 import { ExercisesService } from '../exercises/exercises.service';
 import {
   CreateCycleDto,
@@ -29,7 +38,9 @@ function isUniqueIndexConflict(error: unknown, indexName: string, fields: string
   // `meta.target` is the index name on Postgres, but has been a field-name array on other
   // connectors and older client versions -- match either shape.
   const target = error.meta?.target;
-  return Array.isArray(target) ? fields.every((field) => target.includes(field)) : target === indexName;
+  return Array.isArray(target)
+    ? fields.every((field) => target.includes(field))
+    : target === indexName;
 }
 
 function isWeekdayConflict(error: unknown): boolean {
@@ -122,7 +133,9 @@ export class WorkoutCyclesService {
     });
 
     if (existingActiveCycle) {
-      throw new BadRequestException('Es existiert bereits ein aktiver Zyklus. Bitte beende diesen zuerst.');
+      throw new BadRequestException(
+        'Es existiert bereits ein aktiver Zyklus. Bitte beende diesen zuerst.',
+      );
     }
 
     const { name, duration, startDate, workoutDays } = createCycleDto;
@@ -173,7 +186,11 @@ export class WorkoutCyclesService {
     return this.findById(cycleId, userId);
   }
 
-  async update(id: string, updateCycleDto: UpdateCycleDto, userId: string): Promise<CycleResponseDto> {
+  async update(
+    id: string,
+    updateCycleDto: UpdateCycleDto,
+    userId: string,
+  ): Promise<CycleResponseDto> {
     const cycle = await this.findById(id, userId);
 
     // The re-anchor below writes WorkoutDay rows, so this shares the move and swap paths'
@@ -301,7 +318,10 @@ export class WorkoutCyclesService {
       await this.runWorkoutDayWrite(
         () =>
           this.prisma.$transaction(async (tx) => {
-            await tx.workoutDay.update({ where: { id: workoutDayId }, data: { weekday: -1, order: -1 } });
+            await tx.workoutDay.update({
+              where: { id: workoutDayId },
+              data: { weekday: -1, order: -1 },
+            });
             await tx.workoutDay.update({
               where: { id: conflict.id },
               data: { weekday: workoutDay.weekday, order: conflictOrder },
@@ -358,7 +378,9 @@ export class WorkoutCyclesService {
       return await write();
     } catch (error) {
       if (weekday !== null && isWeekdayConflict(error)) {
-        throw new BadRequestException(`${WEEKDAY_NAMES[weekday]} ist in diesem Zyklus bereits belegt.`);
+        throw new BadRequestException(
+          `${WEEKDAY_NAMES[weekday]} ist in diesem Zyklus bereits belegt.`,
+        );
       }
       if (isWeekdayConflict(error) || isOrderConflict(error)) {
         throw new BadRequestException(

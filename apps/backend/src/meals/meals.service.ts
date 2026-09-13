@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { FavoritesService } from '../favorites/favorites.service';
 import { scalePer100 } from '../common/utils/nutrition.util';
@@ -71,15 +67,18 @@ const ZERO: MealMacroTotals = { kcal: 0, carbs: 0, protein: 0, fat: 0 };
  * (they snapshotted -- ADR-0002). A soft-deleted food still contributes.
  */
 function computeTotals(items: MealItemRow[]): MealMacroTotals {
-  return items.reduce((sum, item) => {
-    const part = scalePer100(item.food, item.quantity);
-    return {
-      kcal: sum.kcal + part.kcal,
-      carbs: sum.carbs + part.carbs,
-      protein: sum.protein + part.protein,
-      fat: sum.fat + part.fat,
-    };
-  }, { ...ZERO });
+  return items.reduce(
+    (sum, item) => {
+      const part = scalePer100(item.food, item.quantity);
+      return {
+        kcal: sum.kcal + part.kcal,
+        carbs: sum.carbs + part.carbs,
+        protein: sum.protein + part.protein,
+        fat: sum.fat + part.fat,
+      };
+    },
+    { ...ZERO },
+  );
 }
 
 @Injectable()

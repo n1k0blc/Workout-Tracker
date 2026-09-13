@@ -1,9 +1,9 @@
 /**
  * Date utilities for testing and development
- * 
+ *
  * SECURITY: Mock date only works in development mode (NODE_ENV=development)
  * Production will ALWAYS use real date regardless of MOCK_DATE env variable
- * 
+ *
  * Usage:
  * 1. Create .env.local in apps/backend/
  * 2. Add: NODE_ENV=development
@@ -14,7 +14,7 @@
 
 /**
  * Get current date, or mocked date if MOCK_DATE env variable is set
- * 
+ *
  * SECURITY LAYERS:
  * - Only works if NODE_ENV === 'development'
  * - .env.local is gitignored (never committed)
@@ -24,19 +24,19 @@
 export function getCurrentDate(): Date {
   const mockDate = process.env.MOCK_DATE;
   const nodeEnv = process.env.NODE_ENV;
-  
+
   // SECURITY: Never mock in production
   if (nodeEnv !== 'development') {
     return new Date();
   }
-  
+
   if (mockDate) {
     const parsed = new Date(mockDate);
-    
+
     if (!isNaN(parsed.getTime())) {
       // Get current time components
       const now = new Date();
-      
+
       // Combine mock date with real time
       const combined = new Date(
         parsed.getFullYear(),
@@ -45,22 +45,22 @@ export function getCurrentDate(): Date {
         now.getHours(),
         now.getMinutes(),
         now.getSeconds(),
-        now.getMilliseconds()
+        now.getMilliseconds(),
       );
-      
+
       console.warn(
         `⚠️  MOCK_DATE ACTIVE: Using ${mockDate} with current time ${combined.toISOString()} ` +
-        `(NODE_ENV=${nodeEnv})`
+          `(NODE_ENV=${nodeEnv})`,
       );
       return combined;
     } else {
       console.error(
         `❌ Invalid MOCK_DATE format: "${mockDate}". ` +
-        `Use YYYY-MM-DD format. Falling back to real date.`
+          `Use YYYY-MM-DD format. Falling back to real date.`,
       );
     }
   }
-  
+
   return new Date();
 }
 
@@ -87,7 +87,11 @@ export function isMockDateActive(): boolean {
  * across dashboard/cycles/engine (two used `floor`, one used `ceil`, disagreeing near
  * week boundaries). 1-indexed, capped at the cycle's total duration.
  */
-export function calculateCycleWeek(startDate: Date, duration: number, now: Date = getCurrentDate()): number {
+export function calculateCycleWeek(
+  startDate: Date,
+  duration: number,
+  now: Date = getCurrentDate(),
+): number {
   const diffDays = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
   return Math.min(Math.floor(diffDays / 7) + 1, duration);
 }

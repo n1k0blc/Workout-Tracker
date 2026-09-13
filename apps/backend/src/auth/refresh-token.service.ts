@@ -75,7 +75,7 @@ export class RefreshTokenService {
     const nextExpiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
     const nextTokenHash = hashToken(nextRawToken);
 
-    await this.prisma.$transaction(async tx => {
+    await this.prisma.$transaction(async (tx) => {
       // Both the revoke and the successor's createdAt use this single instant, so a later
       // reuse check can compare "created at/before the supersession" without the successor's
       // own createdAt (a DB-side default) racing the JS clock used for revokedAt.

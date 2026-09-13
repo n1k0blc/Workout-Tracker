@@ -1,4 +1,13 @@
-import { IsString, IsEnum, IsOptional, MaxLength, IsBoolean, IsInt, Min, Max } from 'class-validator';
+import {
+  IsString,
+  IsEnum,
+  IsOptional,
+  MaxLength,
+  IsBoolean,
+  IsInt,
+  Min,
+  Max,
+} from 'class-validator';
 import { MuscleGroup } from '../../common/muscle.util';
 
 export { MuscleGroup };

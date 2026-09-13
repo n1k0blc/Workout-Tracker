@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -227,9 +232,13 @@ export class WorkoutsService {
       throw new NotFoundException('Workout not found');
     }
 
-    const wantsSideEffect = dto.overwriteBlueprint || (dto.saveAsTemplateMode && dto.saveAsTemplateMode !== SaveAsTemplateMode.NONE);
+    const wantsSideEffect =
+      dto.overwriteBlueprint ||
+      (dto.saveAsTemplateMode && dto.saveAsTemplateMode !== SaveAsTemplateMode.NONE);
     if (wantsSideEffect && !dto.exercises) {
-      throw new BadRequestException('exercises must be provided when requesting a save side-effect');
+      throw new BadRequestException(
+        'exercises must be provided when requesting a save side-effect',
+      );
     }
 
     const ctx = await this.resolveSaveContext(dto, userId, existing);
@@ -248,7 +257,9 @@ export class WorkoutsService {
           ...(dto.homeGymId !== undefined && { homeGymId: dto.homeGymId || null }),
           ...(dto.cycleId !== undefined && { cycleId: dto.cycleId || null }),
           ...(dto.workoutDayId !== undefined && { workoutDayId: dto.workoutDayId || null }),
-          ...(dto.originTemplateId !== undefined && { originTemplateId: dto.originTemplateId || null }),
+          ...(dto.originTemplateId !== undefined && {
+            originTemplateId: dto.originTemplateId || null,
+          }),
         },
       });
 
@@ -320,8 +331,14 @@ export class WorkoutsService {
     }
 
     if (dto.originTemplateId) {
-      const template = await this.prisma.workout.findUnique({ where: { id: dto.originTemplateId } });
-      if (!template || template.kind !== 'TEMPLATE' || (template.isCustom && template.userId !== userId)) {
+      const template = await this.prisma.workout.findUnique({
+        where: { id: dto.originTemplateId },
+      });
+      if (
+        !template ||
+        template.kind !== 'TEMPLATE' ||
+        (template.isCustom && template.userId !== userId)
+      ) {
         throw new NotFoundException('Origin template not found');
       }
     }
@@ -342,10 +359,19 @@ export class WorkoutsService {
         throw new BadRequestException('overwriteTemplateId is required');
       }
       if (dto.overwriteTemplateId !== originTemplateId) {
-        throw new BadRequestException("overwriteTemplateId must match the workout's origin template");
+        throw new BadRequestException(
+          "overwriteTemplateId must match the workout's origin template",
+        );
       }
-      const template = await this.prisma.workout.findUnique({ where: { id: dto.overwriteTemplateId } });
-      if (!template || template.kind !== 'TEMPLATE' || !template.isCustom || template.userId !== userId) {
+      const template = await this.prisma.workout.findUnique({
+        where: { id: dto.overwriteTemplateId },
+      });
+      if (
+        !template ||
+        template.kind !== 'TEMPLATE' ||
+        !template.isCustom ||
+        template.userId !== userId
+      ) {
         throw new NotFoundException('Template not found');
       }
       overwriteTemplate = { id: template.id };
@@ -396,7 +422,10 @@ export class WorkoutsService {
       await this.workoutTreeService.replaceTree(tx, template.id, exerciseInputs);
     } else if (dto.saveAsTemplateMode === SaveAsTemplateMode.OVERWRITE && ctx.overwriteTemplate) {
       await this.workoutTreeService.replaceTree(tx, ctx.overwriteTemplate.id, exerciseInputs);
-      await tx.workout.update({ where: { id: ctx.overwriteTemplate.id }, data: { updatedAt: new Date() } });
+      await tx.workout.update({
+        where: { id: ctx.overwriteTemplate.id },
+        data: { updatedAt: new Date() },
+      });
     }
   }
 

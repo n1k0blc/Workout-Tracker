@@ -91,7 +91,7 @@ describe('WorkoutsService localDate', () => {
     );
   });
 
-  it('stores a past workout\'s picked date verbatim, with no timezone arithmetic', async () => {
+  it("stores a past workout's picked date verbatim, with no timezone arithmetic", async () => {
     const { service, tx } = makeService();
 
     const dto: CreateWorkoutDto = {
@@ -187,7 +187,14 @@ describe('WorkoutsService per-side aggregates (#100)', () => {
           exerciseId: 'exercise-1',
           order: 1,
           sets: [
-            { order: 1, setType: SetType.WORKING, reps: 10, weight: 40, repsLeft: 10, repsRight: 10 },
+            {
+              order: 1,
+              setType: SetType.WORKING,
+              reps: 10,
+              weight: 40,
+              repsLeft: 10,
+              repsRight: 10,
+            },
           ],
         },
       ],

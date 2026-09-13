@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateExerciseDto, FilterExerciseDto, ExerciseDto, UpdateExerciseDto } from './dto';
 import {
@@ -86,9 +91,7 @@ export class ExercisesService {
       throw new NotFoundException('One or more exercises not found');
     }
 
-    return new Map(
-      accessible.map((e) => [e.id, { isUnilateral: e.isUnilateral, name: e.name }]),
-    );
+    return new Map(accessible.map((e) => [e.id, { isUnilateral: e.isUnilateral, name: e.name }]));
   }
 
   /**
@@ -188,9 +191,7 @@ export class ExercisesService {
     });
 
     const inUseIds = await this.findInUseIds(exercises.map((e) => e.id));
-    const dtos = exercises.map((e) =>
-      toDto(e as ExerciseRow, inUseIds.has(e.id)),
-    );
+    const dtos = exercises.map((e) => toDto(e as ExerciseRow, inUseIds.has(e.id)));
     return primaryMuscle ? dtos.filter((e) => e.primaryMuscle === primaryMuscle) : dtos;
   }
 
@@ -212,10 +213,7 @@ export class ExercisesService {
     return toDto(exercise as ExerciseRow, await this.isInUse(id));
   }
 
-  async create(
-    createExerciseDto: CreateExerciseDto,
-    userId: string,
-  ): Promise<ExerciseDto> {
+  async create(createExerciseDto: CreateExerciseDto, userId: string): Promise<ExerciseDto> {
     const { name, equipment, isUnilateral, isDoubleWeight } = createExerciseDto;
 
     // Check if custom exercise with same name already exists for this user

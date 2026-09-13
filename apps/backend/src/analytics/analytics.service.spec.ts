@@ -91,7 +91,10 @@ describe('AnalyticsService', () => {
     it('applies scope=non-cycle by forcing cycleId: null when no cycleId is given', async () => {
       prisma.workout.findMany.mockResolvedValue([]);
 
-      const filter: AnalyticsFilterDto = { scope: AnalyticsScope.NON_CYCLE, period: 'month' } as AnalyticsFilterDto;
+      const filter: AnalyticsFilterDto = {
+        scope: AnalyticsScope.NON_CYCLE,
+        period: 'month',
+      } as AnalyticsFilterDto;
       await service.getVolumeAnalytics('user-1', filter);
 
       const whereArg = prisma.workout.findMany.mock.calls[0][0].where;
@@ -125,7 +128,14 @@ describe('AnalyticsService', () => {
               exerciseId: 'exercise-1',
               exercise: { ...baseExercise, isUnilateral: true, isDoubleWeight: true },
               sets: [
-                { setType: 'WARMUP', reps: 100, weight: 999, rir: null, rest: null, completedAt: null },
+                {
+                  setType: 'WARMUP',
+                  reps: 100,
+                  weight: 999,
+                  rir: null,
+                  rest: null,
+                  completedAt: null,
+                },
                 {
                   setType: 'WORKING',
                   reps: 10,
@@ -155,10 +165,14 @@ describe('AnalyticsService', () => {
     it('distributes volume across muscle groups by percent and filters byMuscleGroup', async () => {
       prisma.workout.findMany.mockResolvedValue([makeWorkout()]);
 
-      const result = await service.getVolumeAnalytics('user-1', { muscleGroup: ['CHEST'] } as AnalyticsFilterDto);
+      const result = await service.getVolumeAnalytics('user-1', {
+        muscleGroup: ['CHEST'],
+      } as AnalyticsFilterDto);
 
       // 2 working sets * 8 reps * 100kg = 1600 total; 80% chest = 1280, 20% shoulders = 320
-      expect(result.byMuscleGroup).toEqual([{ muscleGroup: 'CHEST', volume: 1280, percentage: 100 }]);
+      expect(result.byMuscleGroup).toEqual([
+        { muscleGroup: 'CHEST', volume: 1280, percentage: 100 },
+      ]);
       // dataPoint volume is narrowed to only the CHEST portion when muscleGroup filter is set
       expect(result.dataPoints[0].volume).toBe(1280);
     });
@@ -171,7 +185,9 @@ describe('AnalyticsService', () => {
       });
       prisma.workout.findMany.mockResolvedValue([makeWorkout()]);
 
-      const cycleResult = await service.getVolumeAnalytics('user-1', { cycleId: 'cycle-1' } as AnalyticsFilterDto);
+      const cycleResult = await service.getVolumeAnalytics('user-1', {
+        cycleId: 'cycle-1',
+      } as AnalyticsFilterDto);
       expect(cycleResult.dataPoints[0].trainingDay).toBe(1);
 
       prisma.workout.findMany.mockResolvedValue([makeWorkout()]);
@@ -212,7 +228,16 @@ describe('AnalyticsService', () => {
             {
               exerciseId: 'exercise-1',
               exercise: baseExercise,
-              sets: [{ setType: 'WORKING', reps: 10, weight: 100, rir: null, rest: 90, completedAt: null }],
+              sets: [
+                {
+                  setType: 'WORKING',
+                  reps: 10,
+                  weight: 100,
+                  rir: null,
+                  rest: 90,
+                  completedAt: null,
+                },
+              ],
             },
           ],
         }),
@@ -281,7 +306,9 @@ describe('AnalyticsService', () => {
             {
               exerciseId: 'exercise-1',
               exercise: { ...baseExercise, isDoubleWeight: true },
-              sets: [{ setType: 'WORKING', reps: 5, weight: 40, rir: 1, rest: 90, completedAt: null }],
+              sets: [
+                { setType: 'WORKING', reps: 5, weight: 40, rir: 1, rest: 90, completedAt: null },
+              ],
             },
           ],
         }),
@@ -291,7 +318,9 @@ describe('AnalyticsService', () => {
             {
               exerciseId: 'exercise-1',
               exercise: { ...baseExercise, isDoubleWeight: true },
-              sets: [{ setType: 'WORKING', reps: 5, weight: 30, rir: 1, rest: 90, completedAt: null }],
+              sets: [
+                { setType: 'WORKING', reps: 5, weight: 30, rir: 1, rest: 90, completedAt: null },
+              ],
             },
           ],
         }),
@@ -364,7 +393,9 @@ describe('AnalyticsService', () => {
         makeWorkout({ date: new Date('2026-06-08T22:00:00.000Z'), localDate: '2026-06-07' }),
       ]);
 
-      const result = await service.getVolumeAnalytics('user-1', { aggregation: 'week' } as AnalyticsFilterDto);
+      const result = await service.getVolumeAnalytics('user-1', {
+        aggregation: 'week',
+      } as AnalyticsFilterDto);
 
       expect(result.dataPoints[0].weekStartDate).toBe('2026-06-01');
     });
@@ -376,10 +407,18 @@ describe('AnalyticsService', () => {
         startDate: new Date('2026-06-01T00:00:00.000Z'), // Monday
       });
       prisma.workout.findMany.mockResolvedValue([
-        makeWorkout({ id: 'w1', date: new Date('2026-06-03T20:00:00.000Z'), localDate: '2026-06-03' }), // week 1
+        makeWorkout({
+          id: 'w1',
+          date: new Date('2026-06-03T20:00:00.000Z'),
+          localDate: '2026-06-03',
+        }), // week 1
         // Instant is 2026-06-07 in UTC (cycle day 6, week 1), but localDate is Monday
         // 06-08 -- cycle day 7, week 2.
-        makeWorkout({ id: 'w2', date: new Date('2026-06-07T23:30:00.000Z'), localDate: '2026-06-08' }),
+        makeWorkout({
+          id: 'w2',
+          date: new Date('2026-06-07T23:30:00.000Z'),
+          localDate: '2026-06-08',
+        }),
       ]);
 
       const result = await service.getVolumeAnalytics('user-1', {

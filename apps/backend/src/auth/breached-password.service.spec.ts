@@ -53,7 +53,9 @@ describe('BreachedPasswordService', () => {
   });
 
   it('accepts a password whose suffix is absent from the range', async () => {
-    mockFetch(() => textResponse('00000000000000000000000000000000000:5\nABCDEF0123456789ABCDEF0123456789ABCD:1'));
+    mockFetch(() =>
+      textResponse('00000000000000000000000000000000000:5\nABCDEF0123456789ABCDEF0123456789ABCD:1'),
+    );
     await expect(makeService().isBreached('a-strong-unique-passphrase')).resolves.toBe(false);
   });
 

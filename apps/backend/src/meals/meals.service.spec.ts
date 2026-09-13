@@ -83,8 +83,9 @@ function makeService(
     },
     food: {
       // Default: every queried id exists. `foodCount` forces a lower number (a missing food).
-      count: jest.fn(async ({ where }: { where: { id: { in: string[] } } }) =>
-        overrides.foodCount ?? where.id.in.length,
+      count: jest.fn(
+        async ({ where }: { where: { id: { in: string[] } } }) =>
+          overrides.foodCount ?? where.id.in.length,
       ),
     },
   };
@@ -110,7 +111,7 @@ function baseCreateDto(overrides: Partial<CreateMealDto> = {}): CreateMealDto {
 }
 
 describe('MealsService.findAll — visibility and counts', () => {
-  it('returns meals from every user, with editable set only for the caller\'s own', async () => {
+  it("returns meals from every user, with editable set only for the caller's own", async () => {
     const { service, prisma } = makeService({
       findMany: [
         mealRow({ id: 'm1', createdById: 'user-1' }),
@@ -247,9 +248,9 @@ describe('MealsService.update / softDelete — creator only', () => {
       findUnique: mealRow({ createdById: 'user-2' }),
     });
 
-    await expect(
-      service.update('user-1', 'meal-1', baseCreateDto()),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.update('user-1', 'meal-1', baseCreateDto())).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
     expect(prisma.meal.update).not.toHaveBeenCalled();
   });
 
@@ -275,16 +276,14 @@ describe('MealsService.update / softDelete — creator only', () => {
 
   it('404s updating a soft-deleted meal', async () => {
     const { service } = makeService({ findUnique: mealRow({ deletedAt: new Date() }) });
-    await expect(
-      service.update('user-1', 'meal-1', baseCreateDto()),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.update('user-1', 'meal-1', baseCreateDto())).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('403s when a non-creator deletes the meal', async () => {
     const { service } = makeService({ findUnique: mealRow({ createdById: 'user-2' }) });
-    await expect(service.softDelete('user-1', 'meal-1')).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    await expect(service.softDelete('user-1', 'meal-1')).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('soft-deletes by stamping deletedAt, and 404s a second time', async () => {

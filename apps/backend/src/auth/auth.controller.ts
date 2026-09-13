@@ -96,7 +96,11 @@ export class AuthController {
     this.clearAuthCookies(res);
   }
 
-  private setAuthCookies(res: Response, accessToken: string, refreshToken: IssuedRefreshToken): void {
+  private setAuthCookies(
+    res: Response,
+    accessToken: string,
+    refreshToken: IssuedRefreshToken,
+  ): void {
     const isProduction = process.env.NODE_ENV === 'production';
     const base: CookieOptions = {
       httpOnly: true,

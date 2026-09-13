@@ -89,7 +89,11 @@ export class WorkoutTemplatesService {
     return this.findOne(templateId, userId);
   }
 
-  async update(id: string, userId: string, updateDto: UpdateWorkoutTemplateDto): Promise<WorkoutTemplateDto> {
+  async update(
+    id: string,
+    userId: string,
+    updateDto: UpdateWorkoutTemplateDto,
+  ): Promise<WorkoutTemplateDto> {
     const template = await this.prisma.workout.findUnique({ where: { id } });
 
     if (!template || template.kind !== 'TEMPLATE') {
@@ -127,7 +131,9 @@ export class WorkoutTemplatesService {
         where: { id },
         data: {
           name: updateDto.name,
-          ...(updateDto.recommendedGymId !== undefined && { homeGymId: updateDto.recommendedGymId }),
+          ...(updateDto.recommendedGymId !== undefined && {
+            homeGymId: updateDto.recommendedGymId,
+          }),
         },
       });
 

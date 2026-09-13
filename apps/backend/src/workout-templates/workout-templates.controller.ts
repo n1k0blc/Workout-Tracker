@@ -11,11 +11,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { WorkoutTemplatesService } from './workout-templates.service';
-import {
-  WorkoutTemplateDto,
-  CreateWorkoutTemplateDto,
-  UpdateWorkoutTemplateDto,
-} from './dto';
+import { WorkoutTemplateDto, CreateWorkoutTemplateDto, UpdateWorkoutTemplateDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
@@ -59,10 +55,7 @@ export class WorkoutTemplatesController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(
-    @Param('id') id: string,
-    @CurrentUser() user: { id: string },
-  ): Promise<void> {
+  async delete(@Param('id') id: string, @CurrentUser() user: { id: string }): Promise<void> {
     return this.workoutTemplatesService.delete(id, user.id);
   }
 }

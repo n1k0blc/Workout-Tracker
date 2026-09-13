@@ -1,4 +1,4 @@
-import { getCurrentDate, getCurrentISOString, isMockDateActive } from './date.util';
+import { getCurrentDate, isMockDateActive } from './date.util';
 
 describe('Date Utilities', () => {
   const originalEnv = process.env;
@@ -39,7 +39,6 @@ describe('Date Utilities', () => {
       process.env.MOCK_DATE = '2026-04-01';
 
       const date = getCurrentDate();
-      const expected = new Date('2026-04-01');
 
       // Should be exactly the mocked date
       expect(date.toISOString().split('T')[0]).toBe('2026-04-01');

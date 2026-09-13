@@ -142,28 +142,19 @@ const FOUR = () => [
 
 describe('assertContiguousOrder — the workout-tree order rule', () => {
   it('passes a 1-based contiguous list that matches array position', () => {
-    expect(() =>
-      assertContiguousOrder([{ order: 1 }, { order: 2 }, { order: 3 }]),
-    ).not.toThrow();
+    expect(() => assertContiguousOrder([{ order: 1 }, { order: 2 }, { order: 3 }])).not.toThrow();
   });
 
   it('rejects an order that disagrees with its position (400)', () => {
-    expect(() => assertContiguousOrder([{ order: 2 }, { order: 1 }])).toThrow(
-      BadRequestException,
-    );
-    expect(() => assertContiguousOrder([{ order: 1 }, { order: 3 }])).toThrow(
-      BadRequestException,
-    );
+    expect(() => assertContiguousOrder([{ order: 2 }, { order: 1 }])).toThrow(BadRequestException);
+    expect(() => assertContiguousOrder([{ order: 1 }, { order: 3 }])).toThrow(BadRequestException);
     expect(() => assertContiguousOrder([{ order: 0 }])).toThrow(BadRequestException);
   });
 });
 
 describe('MealSlotsService.ensureActiveSlot — the whole-day-copy fallback (#151)', () => {
   it('returns the existing active slot of that name without creating one', async () => {
-    const { service, rows } = makeStore([
-      ...FOUR(),
-      { id: 'x', name: 'Sonstiges', order: 5 },
-    ]);
+    const { service, rows } = makeStore([...FOUR(), { id: 'x', name: 'Sonstiges', order: 5 }]);
 
     const slot = await service.ensureActiveSlot('user-1', 'Sonstiges');
 

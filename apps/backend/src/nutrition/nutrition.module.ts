@@ -11,12 +11,7 @@ import { FavoritesModule } from '../favorites/favorites.module';
 @Module({
   imports: [MealsModule, FoodsModule, FavoritesModule],
   controllers: [NutritionController],
-  providers: [
-    MealSlotsService,
-    DiaryEntriesService,
-    NutritionAnalyticsService,
-    PickerService,
-  ],
+  providers: [MealSlotsService, DiaryEntriesService, NutritionAnalyticsService, PickerService],
   exports: [MealSlotsService],
 })
 export class NutritionModule {}
