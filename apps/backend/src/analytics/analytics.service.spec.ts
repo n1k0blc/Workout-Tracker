@@ -60,7 +60,7 @@ describe('AnalyticsService', () => {
   });
 
   describe('loadWorkoutsForAnalytics', () => {
-    it('throws NotFoundException when cycleId does not belong to the user (BOLA guard)', async () => {
+    it('throws NotFoundException when cycleId does not belong to the user (BOLA guard), never reaching workout.findMany', async () => {
       prisma.workoutCycle.findFirst.mockResolvedValue(null);
 
       const filter: AnalyticsFilterDto = { cycleId: 'someone-elses-cycle' } as AnalyticsFilterDto;
@@ -70,6 +70,7 @@ describe('AnalyticsService', () => {
         where: { id: 'someone-elses-cycle', userId: 'user-1' },
         select: { id: true, name: true, startDate: true },
       });
+      expect(prisma.workout.findMany).not.toHaveBeenCalled();
     });
 
     it('scopes to cycleId when present, without applying period/date filters', async () => {
@@ -116,6 +117,16 @@ describe('AnalyticsService', () => {
 
       await service.getVolumeAnalytics('user-1', { gymId: 'gym-42' } as AnalyticsFilterDto);
       expect(prisma.workout.findMany.mock.calls[3][0].where.homeGymId).toBe('gym-42');
+    });
+
+    it('scopes workout.findMany to the calling user, not some other user id', async () => {
+      prisma.workout.findMany.mockResolvedValue([]);
+
+      await service.getVolumeAnalytics('user-1', {} as AnalyticsFilterDto);
+      await service.getVolumeAnalytics('user-2', {} as AnalyticsFilterDto);
+
+      expect(prisma.workout.findMany.mock.calls[0][0].where.userId).toBe('user-1');
+      expect(prisma.workout.findMany.mock.calls[1][0].where.userId).toBe('user-2');
     });
   });
 

@@ -201,6 +201,15 @@ describe('MealsService.findById — live reference', () => {
     const { service } = makeService({ findUnique: null });
     await expect(service.findById('nope', 'user-1')).rejects.toBeInstanceOf(NotFoundException);
   });
+
+  it('resolves a meal created by a different user (reads are shared per ADR-0003)', async () => {
+    const { service } = makeService({ findUnique: mealRow({ createdById: 'user-2' }) });
+
+    const meal = await service.findById('meal-1', 'user-1');
+
+    expect(meal.editable).toBe(false);
+    expect(meal.totals.kcal).toBeCloseTo(243.3, 6);
+  });
 });
 
 describe('MealsService.create', () => {
@@ -284,6 +293,15 @@ describe('MealsService.update / softDelete — creator only', () => {
   it('403s when a non-creator deletes the meal', async () => {
     const { service } = makeService({ findUnique: mealRow({ createdById: 'user-2' }) });
     await expect(service.softDelete('user-1', 'meal-1')).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('does not touch the row when a non-creator attempts to delete it', async () => {
+    const { service, prisma } = makeService({
+      findUnique: mealRow({ createdById: 'user-2' }),
+    });
+
+    await expect(service.softDelete('user-1', 'meal-1')).rejects.toBeInstanceOf(ForbiddenException);
+    expect(prisma.meal.update).not.toHaveBeenCalled();
   });
 
   it('soft-deletes by stamping deletedAt, and 404s a second time', async () => {

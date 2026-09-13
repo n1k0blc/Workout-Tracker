@@ -1,5 +1,6 @@
+import { NotFoundException } from '@nestjs/common';
 import { WorkoutsService } from './workouts.service';
-import { CreateWorkoutDto } from './dto/create-workout.dto';
+import { CreateWorkoutDto, SaveAsTemplateMode } from './dto/create-workout.dto';
 import { UpdateWorkoutDto } from './dto/update-workout.dto';
 import { SetType } from '../../generated/prisma/client';
 
@@ -42,6 +43,7 @@ function makeService() {
         totalDuration: 3600,
         exercises: [],
       }),
+      delete: jest.fn(),
     },
     workoutDay: {
       findUnique: jest.fn().mockResolvedValue({
@@ -50,6 +52,9 @@ function makeService() {
         plannedHomeGymId: null,
         cycle: { userId: 'user-1', startDate: new Date('2026-08-01T00:00:00.000Z') },
       }),
+    },
+    homeGym: {
+      findUnique: jest.fn().mockResolvedValue({ id: 'gym-1', userId: 'user-1' }),
     },
     $transaction: jest.fn(async (cb: (client: typeof tx) => unknown) => cb(tx)),
   };
@@ -269,5 +274,137 @@ describe('WorkoutsService cycle start boundary', () => {
     await expect(service.update('workout-1', dto, 'user-1')).rejects.toThrow(
       'Dieser Zyklus hat noch nicht begonnen.',
     );
+  });
+});
+
+describe('WorkoutsService.findById — ownership', () => {
+  it("404s on another user's workout", async () => {
+    const { service, prisma } = makeService();
+    prisma.workout.findUnique.mockResolvedValue({
+      id: 'workout-1',
+      kind: 'WORKOUT',
+      userId: 'someone-else',
+      exercises: [],
+    });
+
+    await expect(service.findById('workout-1', 'user-1')).rejects.toBeInstanceOf(NotFoundException);
+  });
+});
+
+describe('WorkoutsService.update — ownership', () => {
+  it("404s on another user's workout and writes nothing", async () => {
+    const { service, prisma, tx } = makeService();
+    prisma.workout.findUnique.mockResolvedValue({
+      id: 'workout-1',
+      kind: 'WORKOUT',
+      userId: 'someone-else',
+    });
+
+    await expect(
+      service.update('workout-1', { totalDuration: 1800 } as UpdateWorkoutDto, 'user-1'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(tx.workout.update).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('404s when overwriting a template owned by another user, writes nothing', async () => {
+    const { service, prisma, tx } = makeService();
+    prisma.workout.findUnique.mockImplementation(async ({ where }: any) => {
+      if (where.id === 'workout-1') {
+        return {
+          id: 'workout-1',
+          kind: 'WORKOUT',
+          userId: 'user-1',
+          originTemplateId: 'template-1',
+          localDate: '2026-08-15',
+        };
+      }
+      if (where.id === 'template-1') {
+        return { id: 'template-1', kind: 'TEMPLATE', isCustom: true, userId: 'someone-else' };
+      }
+      return null;
+    });
+
+    const dto: UpdateWorkoutDto = {
+      saveAsTemplateMode: SaveAsTemplateMode.OVERWRITE,
+      overwriteTemplateId: 'template-1',
+      exercises,
+    } as UpdateWorkoutDto;
+
+    await expect(service.update('workout-1', dto, 'user-1')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(tx.workout.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('WorkoutsService.delete — ownership', () => {
+  it("404s on another user's workout and does not delete", async () => {
+    const { service, prisma } = makeService();
+    prisma.workout.findUnique.mockResolvedValue({
+      id: 'workout-1',
+      kind: 'WORKOUT',
+      userId: 'someone-else',
+    });
+
+    await expect(service.delete('workout-1', 'user-1')).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.workout.delete).not.toHaveBeenCalled();
+  });
+});
+
+describe('WorkoutsService.resolveSaveContext — ownership of referenced resources', () => {
+  it('404s when the referenced home gym belongs to another user', async () => {
+    const { service, prisma, tx } = makeService();
+    prisma.homeGym.findUnique.mockResolvedValue({ id: 'gym-1', userId: 'someone-else' });
+
+    const dto: CreateWorkoutDto = {
+      ...lateNight,
+      isFreeWorkout: true,
+      homeGymId: 'gym-1',
+      exercises,
+    } as CreateWorkoutDto;
+
+    await expect(service.create(dto, 'user-1')).rejects.toBeInstanceOf(NotFoundException);
+    expect(tx.workout.create).not.toHaveBeenCalled();
+  });
+
+  it("404s when the workout day belongs to another user's cycle", async () => {
+    const { service, prisma, tx } = makeService();
+    prisma.workoutDay.findUnique.mockResolvedValue({
+      id: 'day-1',
+      cycleId: 'cycle-1',
+      plannedHomeGymId: null,
+      cycle: { userId: 'someone-else', startDate: new Date('2026-08-01T00:00:00.000Z') },
+    });
+
+    const dto: CreateWorkoutDto = {
+      ...lateNight,
+      cycleId: 'cycle-1',
+      workoutDayId: 'day-1',
+      exercises,
+    } as CreateWorkoutDto;
+
+    await expect(service.create(dto, 'user-1')).rejects.toBeInstanceOf(NotFoundException);
+    expect(tx.workout.create).not.toHaveBeenCalled();
+  });
+
+  it('404s when the origin template belongs to another user', async () => {
+    const { service, prisma, tx } = makeService();
+    prisma.workout.findUnique.mockImplementation(async ({ where }: any) => {
+      if (where.id === 'template-1') {
+        return { id: 'template-1', kind: 'TEMPLATE', isCustom: true, userId: 'someone-else' };
+      }
+      return null;
+    });
+
+    const dto: CreateWorkoutDto = {
+      ...lateNight,
+      isFreeWorkout: true,
+      originTemplateId: 'template-1',
+      exercises,
+    } as CreateWorkoutDto;
+
+    await expect(service.create(dto, 'user-1')).rejects.toBeInstanceOf(NotFoundException);
+    expect(tx.workout.create).not.toHaveBeenCalled();
   });
 });
