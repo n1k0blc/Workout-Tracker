@@ -3,7 +3,7 @@ import * as argon2 from 'argon2';
 import * as bcrypt from 'bcrypt';
 
 // OWASP floor for argon2id (2024 cheat sheet), benchmarked as acceptable on the Pi 5.
-const ARGON2_OPTIONS: argon2.Options = {
+const ARGON2_OPTIONS: argon2.HashOptions = {
   type: argon2.argon2id,
   memoryCost: 19 * 1024, // 19 MiB, in KiB
   timeCost: 2,

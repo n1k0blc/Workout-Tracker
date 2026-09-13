@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  audit:
+    name: Dependency vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Fails on high/critical findings. --ignore-unfixable skips only advisories
+      # pnpm cannot resolve without violating a parent package's own version pin
+      # (e.g. Prisma's bundled driver deps) - those are tracked as known,
+      # explicitly-documented exceptions in pnpm-workspace.yaml's
+      # auditConfig.ignoreGhsas instead of silently passing here (issue #170).
+      - name: pnpm audit (high/critical)
+        run: pnpm audit --audit-level=high --ignore-unfixable
