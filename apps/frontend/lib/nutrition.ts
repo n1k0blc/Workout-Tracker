@@ -321,6 +321,22 @@ export function sortFavoritesFirst<T extends { isFavorite: boolean }>(rows: T[])
 }
 
 /**
+ * Overlays a picker's pending favorite toggles onto a list, then floats favorites to the top
+ * (#193) -- the shape every plain "browse a library" list (Templates' Lebensmittel / Mahlzeiten
+ * tabs) needs, as opposed to the picker sheet's own `foodRows`/`mealRows`, which mix in
+ * search-tab filtering the browse tabs don't have.
+ */
+export function withFavoriteOverrides<T extends { id: string; isFavorite: boolean }>(
+  items: T[],
+  kind: 'food' | 'meal',
+  effectiveFavorite: (kind: 'food' | 'meal', id: string, fallback: boolean) => boolean,
+): T[] {
+  return sortFavoritesFirst(
+    items.map((item) => ({ ...item, isFavorite: effectiveFavorite(kind, item.id, item.isFavorite) })),
+  );
+}
+
+/**
  * How a day reads relative to the client's today: `"Heute"`, `"Gestern"`, `"Morgen"`, or the
  * full German weekday for anything further out.
  */

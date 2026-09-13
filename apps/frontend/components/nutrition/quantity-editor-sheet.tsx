@@ -19,6 +19,8 @@ import {
   formatQuantityLabel,
   QUANTITY_FACTORS,
 } from '@/lib/nutrition';
+import { useFavoriteToggle } from '@/hooks/useFavoriteToggle';
+import { FavoriteStar } from './favorite-star';
 import { QuantityStepper } from './quantity-stepper';
 
 const STEP = 0.5;
@@ -27,6 +29,7 @@ const MIN = 0.5;
 interface FoodInfo {
   portions: FoodPortion[];
   isLiquid: boolean;
+  isFavorite: boolean;
 }
 
 /** Seed the stepper from the entry: match its amount to a portion, else start on free g/ml. */
@@ -64,6 +67,7 @@ export function QuantityEditorSheet({
   );
   const [food, setFood] = useState<FoodInfo | null>(null);
   const [saving, setSaving] = useState(false);
+  const { effectiveFavorite, toggleFavorite, reset: resetFavorite } = useFavoriteToggle();
 
   const [wasOpen, setWasOpen] = useState(false);
   if (open !== wasOpen) {
@@ -73,6 +77,10 @@ export function QuantityEditorSheet({
       setAmount(null);
       setFood(null);
       setSaving(false);
+      // This sheet is a page-level singleton reused across entries (never remounted) -- without
+      // this, a favorite toggled here for one entry's food would keep overriding a later
+      // entry's food of the same id even after the real state changed elsewhere.
+      resetFavorite();
     }
   }
 
@@ -84,12 +92,16 @@ export function QuantityEditorSheet({
       .getFood(entry.foodId)
       .then((f) => {
         if (cancelled) return;
-        setFood({ portions: f.portions, isLiquid: f.isLiquid });
+        setFood({ portions: f.portions, isLiquid: f.isLiquid, isFavorite: f.isFavorite });
         setAmount(seedAmount(entry, f.portions));
       })
       .catch(() => {
         if (cancelled) return;
-        setFood({ portions: [], isLiquid: (entry.quantityLabel ?? '').includes('ml') });
+        setFood({
+          portions: [],
+          isLiquid: (entry.quantityLabel ?? '').includes('ml'),
+          isFavorite: false,
+        });
         setAmount({ grams: entry.quantity, portionLabel: null });
       });
     return () => {
@@ -138,7 +150,22 @@ export function QuantityEditorSheet({
         </DrawerHeader>
 
         <div className="flex flex-col gap-5 px-4 pb-2">
-          <div className="text-sm font-medium">{entry.name}</div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-medium">{entry.name}</span>
+            {isFoodBacked && food && entry.foodId && (
+              <FavoriteStar
+                favorite={effectiveFavorite('food', entry.foodId, food.isFavorite)}
+                onToggle={() =>
+                  toggleFavorite(
+                    'food',
+                    entry.foodId!,
+                    effectiveFavorite('food', entry.foodId!, food.isFavorite),
+                  )
+                }
+                label={entry.name}
+              />
+            )}
+          </div>
 
           {isFoodBacked ? (
             !food || !amount ? (

@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { IconBarcode, IconChevronRight, IconPlus, IconSearch } from '@tabler/icons-react';
 import { apiClient } from '@/lib/api';
 import { Food } from '@/types';
-import { foodSourceLabel } from '@/lib/nutrition';
+import { foodSourceLabel, withFavoriteOverrides } from '@/lib/nutrition';
+import { useFavoriteToggle } from '@/hooks/useFavoriteToggle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { FavoriteStar } from '@/components/nutrition/favorite-star';
 import { FoodEditorDialog } from './food-editor-dialog';
 import { BarcodeScannerSheet } from '@/components/nutrition/barcode-scanner-sheet';
 
@@ -28,6 +30,12 @@ export default function FoodsTab() {
   const [scannerOpen, setScannerOpen] = useState(false);
   // A scanned code that matched nothing: the create form opens with it prefilled (#149).
   const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
+  const { effectiveFavorite, toggleFavorite } = useFavoriteToggle();
+
+  const rows = useMemo(
+    () => withFavoriteOverrides(foods, 'food', effectiveFavorite),
+    [foods, effectiveFavorite],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -103,28 +111,34 @@ export default function FoodsTab() {
         </div>
       ) : (
         <div className="divide-y rounded-lg border bg-card">
-          {foods.map((food) => {
+          {rows.map((food) => {
             const badge = foodSourceLabel(food);
             return (
-              <button
-                key={food.id}
-                type="button"
-                onClick={() => setEditing(food)}
-                className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/50"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{food.name}</span>
-                    {badge && (
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                        {badge}
-                      </span>
-                    )}
+              <div key={food.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50">
+                <button
+                  type="button"
+                  onClick={() => setEditing(food)}
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{food.name}</span>
+                      {badge && (
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                          {badge}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">{subtitle(food)}</div>
                   </div>
-                  <div className="mt-0.5 text-xs text-muted-foreground">{subtitle(food)}</div>
-                </div>
-                <IconChevronRight className="size-4 shrink-0 text-muted-foreground" />
-              </button>
+                  <IconChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                </button>
+                <FavoriteStar
+                  favorite={food.isFavorite}
+                  onToggle={() => toggleFavorite('food', food.id, food.isFavorite)}
+                  label={food.name}
+                />
+              </div>
             );
           })}
         </div>
@@ -147,7 +161,12 @@ export default function FoodsTab() {
       {/* A hit opens the food rather than logging it -- this tab is library management. */}
       <BarcodeScannerSheet
         open={scannerOpen}
-        onOpenChange={setScannerOpen}
+        // The scan result has its own favorite star (#193), separate from this list's -- reload
+        // on close so a toggle made there is reflected here without waiting for an edit save.
+        onOpenChange={(next) => {
+          setScannerOpen(next);
+          if (!next) reload();
+        }}
         mode={{
           kind: 'pick',
           label: 'Öffnen',

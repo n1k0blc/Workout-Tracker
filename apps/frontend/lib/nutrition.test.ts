@@ -22,6 +22,7 @@ import {
   mealIngredientPreview,
   groupDiaryEntries,
   sortFavoritesFirst,
+  withFavoriteOverrides,
   metricTarget,
   formatMetricValue,
   nutritionDailyAverage,
@@ -460,6 +461,33 @@ describe('sortFavoritesFirst', () => {
     const rows = [row('Apfel', false), row('Banane', true)];
     sortFavoritesFirst(rows);
     expect(rows.map((r) => r.name)).toEqual(['Apfel', 'Banane']);
+  });
+});
+
+describe('withFavoriteOverrides', () => {
+  const item = (id: string, isFavorite: boolean) => ({ id, isFavorite });
+
+  it('overlays the effective favorite and floats it to the top', () => {
+    const items = [item('f1', false), item('f2', false)];
+    const effectiveFavorite = (kind: 'food' | 'meal', id: string) => kind === 'food' && id === 'f2';
+
+    const result = withFavoriteOverrides(items, 'food', effectiveFavorite);
+
+    expect(result.map((r) => [r.id, r.isFavorite])).toEqual([
+      ['f2', true],
+      ['f1', false],
+    ]);
+  });
+
+  it('falls back to the item’s own isFavorite when nothing overrides it', () => {
+    const items = [item('f1', true), item('f2', false)];
+
+    const result = withFavoriteOverrides(items, 'meal', (_kind, _id, fallback) => fallback);
+
+    expect(result.map((r) => [r.id, r.isFavorite])).toEqual([
+      ['f1', true],
+      ['f2', false],
+    ]);
   });
 });
 
