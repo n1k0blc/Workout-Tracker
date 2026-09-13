@@ -49,7 +49,8 @@ export class AuthService {
   ) {}
 
   async register(registerDto: RegisterDto): Promise<AuthSession> {
-    const { email, password, firstName, lastName, dateOfBirth, height, weight, homeGyms } = registerDto;
+    const { email, password, firstName, lastName, dateOfBirth, height, weight, homeGyms } =
+      registerDto;
 
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
@@ -91,7 +92,7 @@ export class AuthService {
         },
         select: USER_SELECT,
       });
-    } catch (error) {
+    } catch {
       throw new InternalServerErrorException('Failed to create user');
     }
 
@@ -114,7 +115,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const isPasswordValid = await this.passwordService.verify(password, userWithPassword.passwordHash);
+    const isPasswordValid = await this.passwordService.verify(
+      password,
+      userWithPassword.passwordHash,
+    );
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
@@ -137,7 +141,9 @@ export class AuthService {
     return this.issueSession(user);
   }
 
-  async refresh(rawRefreshToken: string): Promise<{ accessToken: string; refreshToken: IssuedRefreshToken }> {
+  async refresh(
+    rawRefreshToken: string,
+  ): Promise<{ accessToken: string; refreshToken: IssuedRefreshToken }> {
     const { userId, ...refreshToken } = await this.refreshTokenService.rotate(rawRefreshToken);
     const accessToken = await this.generateAccessToken(userId);
     return { accessToken, refreshToken };
@@ -157,7 +163,10 @@ export class AuthService {
       throw new UnauthorizedException();
     }
 
-    const isCurrentPasswordValid = await this.passwordService.verify(dto.currentPassword, user.passwordHash);
+    const isCurrentPasswordValid = await this.passwordService.verify(
+      dto.currentPassword,
+      user.passwordHash,
+    );
     if (!isCurrentPasswordValid) {
       throw new UnauthorizedException('Current password is incorrect');
     }

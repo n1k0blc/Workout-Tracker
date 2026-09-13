@@ -31,18 +31,12 @@ export class MealsController {
   }
 
   @Get(':id')
-  async findOne(
-    @CurrentUser() user: { id: string },
-    @Param('id') id: string,
-  ): Promise<MealDto> {
+  async findOne(@CurrentUser() user: { id: string }, @Param('id') id: string): Promise<MealDto> {
     return this.meals.findById(id, user.id);
   }
 
   @Post()
-  async create(
-    @CurrentUser() user: { id: string },
-    @Body() dto: CreateMealDto,
-  ): Promise<MealDto> {
+  async create(@CurrentUser() user: { id: string }, @Body() dto: CreateMealDto): Promise<MealDto> {
     return this.meals.create(user.id, dto);
   }
 
@@ -57,10 +51,7 @@ export class MealsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(
-    @CurrentUser() user: { id: string },
-    @Param('id') id: string,
-  ): Promise<void> {
+  async remove(@CurrentUser() user: { id: string }, @Param('id') id: string): Promise<void> {
     return this.meals.softDelete(user.id, id);
   }
 }

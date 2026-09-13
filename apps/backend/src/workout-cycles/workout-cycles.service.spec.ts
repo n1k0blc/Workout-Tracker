@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client';
 import { WorkoutCyclesService } from './workout-cycles.service';
 import { CreateCycleDto } from './dto';
@@ -43,6 +43,8 @@ function makeService() {
     workoutCycle: {
       findUnique: jest.fn().mockResolvedValue(cycle),
       findFirst: jest.fn().mockResolvedValue(null),
+      update: jest.fn().mockResolvedValue({}),
+      delete: jest.fn().mockResolvedValue({}),
     },
     workoutDay: {
       findUnique: jest.fn(async ({ where }: { where: { id: string } }) => {
@@ -466,5 +468,98 @@ describe('WorkoutCyclesService cycle-detail week (#89 follow-up)', () => {
     await expect(
       service.getCycleDetails('cycle-1', 'user-1', resolveToday(undefined, DETAILS_INSTANT)),
     ).resolves.toMatchObject({ currentWeek: 1 });
+  });
+});
+
+describe('WorkoutCyclesService ownership scoping (#171)', () => {
+  it("findById 404s on another user's cycle", async () => {
+    const { service } = makeService();
+
+    await expect(service.findById('cycle-1', 'user-2')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it("getCycleDetails 404s on another user's cycle, with its own message", async () => {
+    // getCycleDetails does its own ownership check inline instead of going through
+    // findById, so it needs its own coverage rather than inheriting findById's.
+    const service = makeDetailsService();
+    const result = service.getCycleDetails(
+      'cycle-1',
+      'user-2',
+      resolveToday(undefined, DETAILS_INSTANT),
+    );
+
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toThrow('Zyklus nicht gefunden');
+  });
+
+  it("update 404s on another user's cycle and writes nothing", async () => {
+    const { service, prisma } = makeService();
+
+    await expect(service.update('cycle-1', { name: 'Hijacked' }, 'user-2')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("completeCycle 404s on another user's cycle and does not complete it", async () => {
+    const { service, prisma } = makeService();
+
+    await expect(service.completeCycle('cycle-1', 'user-2')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+
+    expect(prisma.workoutCycle.update).not.toHaveBeenCalled();
+  });
+
+  it("delete 404s on another user's cycle and does not delete it", async () => {
+    const { service, prisma } = makeService();
+
+    await expect(service.delete('cycle-1', 'user-2')).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(prisma.workoutCycle.delete).not.toHaveBeenCalled();
+  });
+
+  it('updateWorkoutDay 404s when the workout day belongs to a different cycle', async () => {
+    // day-x exists, but under cycle-2 -- not cycle-1, which the caller (user-1's own cycle)
+    // names. This is the day-level lookup's own scoping check, separate from findById's.
+    const { service, prisma } = makeService();
+    prisma.workoutDay.findUnique.mockResolvedValueOnce({
+      id: 'day-x',
+      cycleId: 'cycle-2',
+      weekday: 2,
+      order: 0,
+      name: 'Foreign day',
+      plannedHomeGymId: null,
+      workouts: [],
+    });
+
+    await expect(
+      service.updateWorkoutDay('cycle-1', 'day-x', { name: 'Hijack', weekday: 5 }, 'user-1'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(prisma.workoutDay.update).not.toHaveBeenCalled();
+  });
+
+  it('updateBlueprint 404s when the workout day belongs to a different cycle', async () => {
+    const { service, prisma } = makeService();
+    // A non-empty workouts array so, if the cycleId check were ever removed, execution
+    // would reach $transaction instead of tripping the separate "Blueprint not found"
+    // guard for an unrelated reason -- that would make this test pass either way.
+    prisma.workoutDay.findUnique.mockResolvedValueOnce({
+      id: 'day-x',
+      cycleId: 'cycle-2',
+      weekday: 2,
+      order: 0,
+      name: 'Foreign day',
+      plannedHomeGymId: null,
+      workouts: [{ id: 'blueprint-x' }],
+    });
+
+    await expect(
+      service.updateBlueprint('cycle-1', 'day-x', { exercises } as never, 'user-1'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });

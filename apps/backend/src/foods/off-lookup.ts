@@ -62,9 +62,7 @@ export class OffLookupService {
       }
       payload = (await response.json()) as typeof payload;
     } catch (error) {
-      this.logger.warn(
-        `Open Food Facts lookup for ${barcode} failed: ${(error as Error).message}`,
-      );
+      this.logger.warn(`Open Food Facts lookup for ${barcode} failed: ${(error as Error).message}`);
       return null;
     }
 

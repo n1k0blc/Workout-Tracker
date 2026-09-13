@@ -79,6 +79,46 @@ describe('NutritionAnalyticsService.getTrend — aggregation by localDate', () =
   });
 });
 
+describe('NutritionAnalyticsService.getTrend — cross-user isolation (#171)', () => {
+  it("never aggregates another user's entries into the caller's trend", async () => {
+    const pool: (EntryRow & { userId: string })[] = [
+      { userId: 'user-1', localDate: '2026-09-07', kcal: 500, carbs: 40, protein: 20, fat: 15 },
+      { userId: 'user-2', localDate: '2026-09-07', kcal: 5000, carbs: 400, protein: 200, fat: 150 },
+    ];
+    const prisma = {
+      diaryEntry: {
+        findMany: jest.fn(({ where }: any) =>
+          Promise.resolve(
+            pool
+              .filter(
+                (e) =>
+                  e.userId === where.userId &&
+                  e.localDate >= where.localDate.gte &&
+                  e.localDate <= where.localDate.lte,
+              )
+              .map(({ userId: _userId, ...rest }) => rest),
+          ),
+        ),
+      },
+      user: {
+        findUnique: jest.fn().mockResolvedValue({
+          targetKcal: null,
+          targetCarbs: null,
+          targetProtein: null,
+          targetFat: null,
+        }),
+      },
+    };
+    const service = new NutritionAnalyticsService(prisma as never);
+
+    const result = await service.getTrend('user-1', '2026-09-07', '2026-09-07');
+
+    expect(result.days).toEqual([
+      { date: '2026-09-07', weekday: 1, kcal: 500, carbs: 40, protein: 20, fat: 15 },
+    ]);
+  });
+});
+
 describe('NutritionAnalyticsService.getTrend — range boundaries', () => {
   it('emits one row per calendar day in the inclusive range, zero-filled', async () => {
     const { service } = makeService([
@@ -141,17 +181,17 @@ describe('NutritionAnalyticsService.getTrend — range boundaries', () => {
   it('rejects an end before the start', async () => {
     const { service } = makeService([]);
 
-    await expect(
-      service.getTrend('user-1', '2026-09-10', '2026-09-01'),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.getTrend('user-1', '2026-09-10', '2026-09-01')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 
   it('rejects a range longer than a year', async () => {
     const { service } = makeService([]);
 
-    await expect(
-      service.getTrend('user-1', '2025-01-01', '2026-06-01'),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.getTrend('user-1', '2025-01-01', '2026-06-01')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 });
 

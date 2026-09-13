@@ -1,8 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { mapExercisesToResponse, WORKOUT_EXERCISE_TREE_INCLUDE } from '../workout-tree/workout-tree.service';
+import {
+  mapExercisesToResponse,
+  WORKOUT_EXERCISE_TREE_INCLUDE,
+} from '../workout-tree/workout-tree.service';
 import { WorkoutExerciseResponseDto } from '../common/dto/workout-tree.dto';
-import { Today, addLocalDays, instantToLocalDate, weekdayOfLocalDate } from '../common/utils/today.util';
+import {
+  Today,
+  addLocalDays,
+  instantToLocalDate,
+  weekdayOfLocalDate,
+} from '../common/utils/today.util';
 
 export interface SuggestedWorkout {
   cycleId: string;
@@ -81,7 +89,9 @@ export class WorkoutEngineService {
       orderBy: { startDate: 'desc' },
       include: {
         workoutDays: {
-          include: { workouts: { where: { kind: 'BLUEPRINT' }, include: WORKOUT_EXERCISE_TREE_INCLUDE } },
+          include: {
+            workouts: { where: { kind: 'BLUEPRINT' }, include: WORKOUT_EXERCISE_TREE_INCLUDE },
+          },
           orderBy: { order: 'asc' },
         },
       },
@@ -173,7 +183,10 @@ export class WorkoutEngineService {
    * than a workout that silently vanishes. A cycle that hasn't started yet looks ahead from
    * its own start date instead of today, so the dashboard can show what the plan opens with.
    */
-  async getNextScheduledWorkout(userId: string, today: Today): Promise<NextScheduledWorkout | null> {
+  async getNextScheduledWorkout(
+    userId: string,
+    today: Today,
+  ): Promise<NextScheduledWorkout | null> {
     const activeCycle = await this.getRecommendableCycle(userId, today);
     if (!activeCycle) {
       return null;
@@ -236,7 +249,10 @@ export class WorkoutEngineService {
     return null;
   }
 
-  async getCurrentCycleWorkouts(userId: string, today: Today): Promise<CurrentCycleWorkouts | null> {
+  async getCurrentCycleWorkouts(
+    userId: string,
+    today: Today,
+  ): Promise<CurrentCycleWorkouts | null> {
     const activeCycle = await this.getRecommendableCycle(userId, today);
     if (!activeCycle || this.isCycleNotStarted(activeCycle, today)) {
       return null;

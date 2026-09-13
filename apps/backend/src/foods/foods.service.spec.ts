@@ -79,10 +79,7 @@ function makeService(
       // `findAll` splits its three source-group queries with (#155), and the `name` sort every
       // query carries -- so a fixture partitions and orders the way the database would.
       findMany: jest.fn(
-        async (args: {
-          where?: Record<string, unknown>;
-          orderBy?: { name?: 'asc' | 'desc' };
-        }) => {
+        async (args: { where?: Record<string, unknown>; orderBy?: { name?: 'asc' | 'desc' } }) => {
           const where = args.where ?? {};
           const rows = (overrides.findMany ?? []) as Record<string, unknown>[];
           const matches = (row: Record<string, unknown>, cond: Record<string, unknown>) =>
@@ -90,8 +87,7 @@ function makeService(
           const direct: Record<string, unknown> = {};
           if ('source' in where) direct.source = where.source;
           if ('createdById' in where) direct.createdById = where.createdById;
-          let out =
-            Object.keys(direct).length > 0 ? rows.filter((r) => matches(r, direct)) : rows;
+          let out = Object.keys(direct).length > 0 ? rows.filter((r) => matches(r, direct)) : rows;
           const not = where.NOT;
           if (Array.isArray(not)) {
             out = out.filter(
@@ -530,7 +526,7 @@ describe('FoodsService.lookupByBarcode — the miss chain', () => {
   });
 
   it('undeletes a soft-deleted row instead of creating a duplicate barcode', async () => {
-    const { service, prisma, offLookup } = makeService({
+    const { service, prisma } = makeService({
       findFirst: { ...OWN_FOOD, barcode: '4025500287955', deletedAt: new Date('2026-01-01') },
     });
 

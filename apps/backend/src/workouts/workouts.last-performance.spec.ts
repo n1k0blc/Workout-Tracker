@@ -78,7 +78,12 @@ describe('WorkoutsService.findExerciseLastPerformance', () => {
     });
     expect(prisma.workout.findFirst).toHaveBeenCalledTimes(1);
     const args = prisma.workout.findFirst.mock.calls[0][0];
-    expect(args.where).toMatchObject({ userId: 'user-1', kind: 'WORKOUT', homeGymId: 'gym-1', exercises: { some: { exerciseId: 'ex-1' } } });
+    expect(args.where).toMatchObject({
+      userId: 'user-1',
+      kind: 'WORKOUT',
+      homeGymId: 'gym-1',
+      exercises: { some: { exerciseId: 'ex-1' } },
+    });
     expect(args.orderBy).toEqual({ date: 'desc' });
   });
 
@@ -86,7 +91,9 @@ describe('WorkoutsService.findExerciseLastPerformance', () => {
     const { service, prisma } = makeService();
     prisma.workout.findFirst
       .mockResolvedValueOnce(null) // CURRENT_GYM miss
-      .mockResolvedValueOnce(workoutRow({ homeGymId: 'gym-2', homeGym: { id: 'gym-2', name: 'Other Home' } }));
+      .mockResolvedValueOnce(
+        workoutRow({ homeGymId: 'gym-2', homeGym: { id: 'gym-2', name: 'Other Home' } }),
+      );
 
     const result = await service.findExerciseLastPerformance('user-1', 'ex-1', 'gym-1');
 

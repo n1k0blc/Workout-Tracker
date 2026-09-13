@@ -12,6 +12,20 @@ Du bist der Deployment-Experte für den Workout Tracker auf dem Raspberry Pi 5.
 - Ports: 3000 (Frontend), 3001 (Backend), 5432 (DB)
 - Cloudflare Tunnel aktiv für `workout.nikobjelic.com`
 
+**Netzwerk-Exposure (seit #168):**
+- Frontend (3000) und Backend (3001) binden in `docker-compose.prod.yml` (und der
+  Alternative-Ports-Variante) auf `127.0.0.1`, nicht auf `0.0.0.0` – von einem anderen
+  Gerät im LAN sind die Ports also nicht mehr erreichbar, nur `cloudflared` auf demselben
+  Host kann sie über `localhost` ansprechen. Postgres (5432) hatte nie ein `ports:`-Mapping.
+- Kein zusätzliches Host-Firewall (ufw/iptables) nötig, solange dieses Loopback-Binding
+  besteht – die Docker-Portmappings sind der einzige Weg nach außen.
+- Nach jedem Deployment kurz verifizieren, dass die Bindung noch stimmt:
+  `docker compose -f docker-compose.prod.yml port frontend 3000` und `... backend 3001`
+  müssen `127.0.0.1:3000` bzw. `127.0.0.1:3001` zurückgeben, nie `0.0.0.0:...`.
+  Von einem anderen Gerät im selben WLAN sollte `curl http://<pi-lan-ip>:3000` fehlschlagen
+  (Connection refused/timeout), während `https://workout.nikobjelic.com` weiterhin über den
+  Tunnel funktioniert.
+
 **IMMER ZUERST FOLGENDE PRE-DEPLOYMENT CHECKS (auf deinem Mac):**
 1. `pnpm run backend:build` → muss fehlerfrei laufen (das Repo ist ein pnpm-Workspace, **nicht** npm)
 2. `pnpm run frontend:build` → muss fehlerfrei laufen

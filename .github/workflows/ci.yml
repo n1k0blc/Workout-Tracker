@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  audit:
+    name: Dependency vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # pnpm audit reads pnpm-lock.yaml directly and doesn't need node_modules
+      # on disk, so there's no install step (and no need to cache one) here.
+
+      # Fails on high/critical findings. Advisories pnpm can't resolve without
+      # violating a parent package's own version pin (e.g. Prisma's bundled
+      # driver deps) are explicit, commented exceptions in pnpm-workspace.yaml's
+      # auditConfig.ignoreGhsas - deliberately NOT --ignore-unfixable here, since
+      # that flag would silently wave through any *future* unfixable finding too,
+      # with no reviewed entry ever required (issue #170).
+      - name: pnpm audit (high/critical)
+        run: pnpm audit --audit-level=high

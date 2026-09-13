@@ -14,9 +14,7 @@ export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) {}
 
   @Get('stats/current-week')
-  async getCurrentWeekStats(
-    @CurrentUser() user: { id: string },
-  ): Promise<DashboardStatsDto> {
+  async getCurrentWeekStats(@CurrentUser() user: { id: string }): Promise<DashboardStatsDto> {
     return this.dashboardService.getLastSevenDaysStats(user.id);
   }
 

@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { ExercisesService } from './exercises.service';
 import { UpdateExerciseDto } from './dto';
 import { MuscleGroup } from '../common/muscle.util';
@@ -43,10 +43,15 @@ function baseUpdateDto(overrides: Partial<UpdateExerciseDto> = {}): UpdateExerci
   } as UpdateExerciseDto;
 }
 
-function makeService({ inUse }: { inUse: boolean }) {
+function makeService({
+  inUse = false,
+  findUnique = { ...CUSTOM_EXERCISE },
+  findMany = [],
+}: { inUse?: boolean; findUnique?: unknown; findMany?: unknown[] } = {}) {
   const prisma = {
     exercise: {
-      findUnique: jest.fn().mockResolvedValue({ ...CUSTOM_EXERCISE }),
+      findUnique: jest.fn().mockResolvedValue(findUnique),
+      findMany: jest.fn().mockResolvedValue(findMany),
       update: jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
         ...CUSTOM_EXERCISE,
         ...data,
@@ -181,5 +186,82 @@ describe('ExercisesService.update — isUnilateral toggle guard', () => {
     const result = await service.update('exercise-1', 'user-1', baseUpdateDto());
 
     expect(result.inUse).toBe(true);
+  });
+});
+
+/**
+ * Ownership guards (§2.1/§3.1): a custom exercise is visible only to the user it belongs
+ * to, while a system exercise (isCustom: false) stays globally readable.
+ */
+const SYSTEM_EXERCISE = {
+  ...CUSTOM_EXERCISE,
+  id: 'exercise-system',
+  name: 'Barbell Squat',
+  equipment: Equipment.BARBELL,
+  isUnilateral: false,
+  isCustom: false,
+  userId: null,
+};
+
+const OTHER_USER_EXERCISE = { ...CUSTOM_EXERCISE, id: 'exercise-other', userId: 'user-2' };
+
+describe('ExercisesService.findById — cross-user access', () => {
+  it("404s on another user's custom exercise", async () => {
+    const { service } = makeService({ findUnique: OTHER_USER_EXERCISE });
+
+    await expect(service.findById(OTHER_USER_EXERCISE.id, 'user-1')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('remains accessible to any user for a system exercise', async () => {
+    const { service } = makeService({ findUnique: SYSTEM_EXERCISE });
+
+    const result = await service.findById(SYSTEM_EXERCISE.id, 'user-1');
+
+    expect(result.id).toBe(SYSTEM_EXERCISE.id);
+  });
+});
+
+describe('ExercisesService.update — cross-user access', () => {
+  it("404s updating another user's custom exercise, without writing", async () => {
+    const { service, prisma } = makeService({ findUnique: OTHER_USER_EXERCISE });
+
+    await expect(
+      service.update(OTHER_USER_EXERCISE.id, 'user-1', baseUpdateDto()),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(prisma.exercise.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('ExercisesService.delete — cross-user access', () => {
+  it("404s deleting another user's custom exercise, without deleting it", async () => {
+    const { service, prisma } = makeService({ findUnique: OTHER_USER_EXERCISE });
+
+    await expect(service.delete(OTHER_USER_EXERCISE.id, 'user-1')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(prisma.exercise.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('ExercisesService.validateAccessible — cross-user access', () => {
+  it("rejects when one of the requested ids is another user's custom exercise", async () => {
+    const { service } = makeService({ findMany: [SYSTEM_EXERCISE, OTHER_USER_EXERCISE] });
+
+    await expect(
+      service.validateAccessible([SYSTEM_EXERCISE.id, OTHER_USER_EXERCISE.id], 'user-1'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('accepts system exercises and the same custom exercise for its own owner', async () => {
+    const { service } = makeService({ findMany: [SYSTEM_EXERCISE, CUSTOM_EXERCISE] });
+
+    const accessible = await service.validateAccessible(
+      [SYSTEM_EXERCISE.id, CUSTOM_EXERCISE.id],
+      'user-1',
+    );
+
+    expect(Array.from(accessible.keys())).toEqual([SYSTEM_EXERCISE.id, CUSTOM_EXERCISE.id]);
   });
 });

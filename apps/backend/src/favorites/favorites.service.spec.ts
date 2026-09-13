@@ -151,4 +151,47 @@ describe('FavoritesService id-set and list helpers', () => {
     });
     expect(rows).toEqual([{ foodId: 'a', createdAt: at }]);
   });
+
+  it('listMealFavorites carries the starred-at timestamp, scoped to the user', async () => {
+    const at = new Date('2026-09-01T00:00:00Z');
+    const { service, prisma } = makeService({ mealRows: [{ mealId: 'm1', createdAt: at }] });
+
+    const rows = await service.listMealFavorites('user-1');
+
+    expect(prisma.mealFavorite.findMany).toHaveBeenCalledWith({
+      where: { userId: 'user-1' },
+      select: { mealId: true, createdAt: true },
+    });
+    expect(rows).toEqual([{ mealId: 'm1', createdAt: at }]);
+  });
+});
+
+describe('FavoritesService id-set and list helpers — scoped to the calling user', () => {
+  it('passes the given userId through to every query, not some other id', async () => {
+    const { service, prisma } = makeService();
+
+    await service.favoriteFoodIds('user-7');
+    expect(prisma.foodFavorite.findMany).toHaveBeenLastCalledWith({
+      where: { userId: 'user-7' },
+      select: { foodId: true },
+    });
+
+    await service.favoriteMealIds('user-7');
+    expect(prisma.mealFavorite.findMany).toHaveBeenLastCalledWith({
+      where: { userId: 'user-7' },
+      select: { mealId: true },
+    });
+
+    await service.listFoodFavorites('user-7');
+    expect(prisma.foodFavorite.findMany).toHaveBeenLastCalledWith({
+      where: { userId: 'user-7' },
+      select: { foodId: true, createdAt: true },
+    });
+
+    await service.listMealFavorites('user-7');
+    expect(prisma.mealFavorite.findMany).toHaveBeenLastCalledWith({
+      where: { userId: 'user-7' },
+      select: { mealId: true, createdAt: true },
+    });
+  });
 });

@@ -159,7 +159,7 @@ export class AnalyticsService {
     const firstThursday = tempDate.valueOf();
     tempDate.setUTCMonth(0, 1);
     if (tempDate.getUTCDay() !== 4) {
-      tempDate.setUTCMonth(0, 1 + ((4 - tempDate.getUTCDay()) + 7) % 7);
+      tempDate.setUTCMonth(0, 1 + ((4 - tempDate.getUTCDay() + 7) % 7));
     }
     return 1 + Math.ceil((firstThursday - tempDate.valueOf()) / 604_800_000);
   }
@@ -226,7 +226,11 @@ export class AnalyticsService {
     return aggregated.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }
 
-  private getDateFilter(period: 'week' | 'month' | 'all' = 'month', customStart?: Date, customEnd?: Date) {
+  private getDateFilter(
+    period: 'week' | 'month' | 'all' = 'month',
+    customStart?: Date,
+    customEnd?: Date,
+  ) {
     if (customStart || customEnd) {
       return {
         ...(customStart && { gte: customStart }),
@@ -267,7 +271,11 @@ export class AnalyticsService {
     options: { includeHomeGym?: boolean } = {},
   ): Promise<AnalyticsContext> {
     const gymFilter =
-      filter.gymId === 'andere' ? null : filter.gymId === 'alle' || filter.gymId === undefined ? undefined : filter.gymId;
+      filter.gymId === 'andere'
+        ? null
+        : filter.gymId === 'alle' || filter.gymId === undefined
+          ? undefined
+          : filter.gymId;
 
     const where: Record<string, unknown> = { userId, kind: 'WORKOUT' };
     let cycle: AnalyticsCycleContext | null = null;
@@ -318,7 +326,10 @@ export class AnalyticsService {
    * Volume Analytics (§4.5: one volume primitive via `setWorkingVolume`, distributed across
    * muscles for the byMuscleGroup breakdown per §3.7).
    */
-  async getVolumeAnalytics(userId: string, filter: AnalyticsFilterDto): Promise<VolumeAnalyticsDto> {
+  async getVolumeAnalytics(
+    userId: string,
+    filter: AnalyticsFilterDto,
+  ): Promise<VolumeAnalyticsDto> {
     const muscleGroups = filter.muscleGroup ?? [];
     const equipments = filter.equipment ?? [];
     const { workouts, cycle } = await this.loadWorkoutsForAnalytics(userId, filter);
@@ -368,13 +379,17 @@ export class AnalyticsService {
     }
 
     const finalDataPoints =
-      filter.aggregation === 'week' ? this.aggregateByWeek(dataPoints, 'sum', 'volume', cycle?.startDate) : dataPoints;
+      filter.aggregation === 'week'
+        ? this.aggregateByWeek(dataPoints, 'sum', 'volume', cycle?.startDate)
+        : dataPoints;
 
-    let byMuscleGroup: VolumeByMuscleGroup[] = Array.from(volumeByMuscleGroup.entries()).map(([muscleGroup, volume]) => ({
-      muscleGroup,
-      volume,
-      percentage: totalVolume > 0 ? (volume / totalVolume) * 100 : 0,
-    }));
+    let byMuscleGroup: VolumeByMuscleGroup[] = Array.from(volumeByMuscleGroup.entries()).map(
+      ([muscleGroup, volume]) => ({
+        muscleGroup,
+        volume,
+        percentage: totalVolume > 0 ? (volume / totalVolume) * 100 : 0,
+      }),
+    );
     if (muscleGroups.length > 0) {
       byMuscleGroup = byMuscleGroup.filter((item) => muscleGroups.includes(item.muscleGroup));
     }
@@ -390,7 +405,10 @@ export class AnalyticsService {
   }
 
   /** Muscle Distribution -- same distribution primitive as volume, no timeline (a snapshot). */
-  async getMuscleDistribution(userId: string, filter: AnalyticsFilterDto): Promise<MuscleDistributionDto> {
+  async getMuscleDistribution(
+    userId: string,
+    filter: AnalyticsFilterDto,
+  ): Promise<MuscleDistributionDto> {
     const { workouts, cycle } = await this.loadWorkoutsForAnalytics(userId, filter);
 
     const distributionMap = new Map<string, { volume: number; workoutCount: Set<string> }>();
@@ -416,12 +434,14 @@ export class AnalyticsService {
       }
     }
 
-    const distribution: MuscleDistributionItem[] = Array.from(distributionMap.entries()).map(([muscleGroup, data]) => ({
-      muscleGroup,
-      volume: data.volume,
-      percentage: totalVolume > 0 ? (data.volume / totalVolume) * 100 : 0,
-      workoutCount: data.workoutCount.size,
-    }));
+    const distribution: MuscleDistributionItem[] = Array.from(distributionMap.entries()).map(
+      ([muscleGroup, data]) => ({
+        muscleGroup,
+        volume: data.volume,
+        percentage: totalVolume > 0 ? (data.volume / totalVolume) * 100 : 0,
+        workoutCount: data.workoutCount.size,
+      }),
+    );
 
     return {
       cycleId: cycle?.id,
@@ -441,10 +461,15 @@ export class AnalyticsService {
     equipment?: string | string[],
     gymId?: string,
   ): Promise<PersonalRecordsDto> {
-    const muscleGroups = Array.isArray(muscleGroup) ? muscleGroup : muscleGroup ? [muscleGroup] : [];
+    const muscleGroups = Array.isArray(muscleGroup)
+      ? muscleGroup
+      : muscleGroup
+        ? [muscleGroup]
+        : [];
     const equipments = Array.isArray(equipment) ? equipment : equipment ? [equipment] : [];
 
-    const gymFilter = gymId === 'andere' ? null : gymId === 'alle' || gymId === undefined ? { not: null } : gymId;
+    const gymFilter =
+      gymId === 'andere' ? null : gymId === 'alle' || gymId === undefined ? { not: null } : gymId;
 
     const workouts = await this.prisma.workout.findMany({
       where: {
@@ -456,7 +481,15 @@ export class AnalyticsService {
         homeGym: { select: { id: true, name: true } },
         exercises: {
           include: {
-            exercise: { select: { name: true, equipment: true, isUnilateral: true, isDoubleWeight: true, ...MUSCLE_PERCENT_SELECT } },
+            exercise: {
+              select: {
+                name: true,
+                equipment: true,
+                isUnilateral: true,
+                isDoubleWeight: true,
+                ...MUSCLE_PERCENT_SELECT,
+              },
+            },
             sets: true,
           },
         },
@@ -471,7 +504,10 @@ export class AnalyticsService {
         const exerciseId = exerciseLog.exerciseId;
         const exerciseName = exerciseLog.exercise.name;
 
-        if (!this.matchesMuscleFilter(derivePrimaryMuscle(exerciseLog.exercise as any), muscleGroups)) continue;
+        if (
+          !this.matchesMuscleFilter(derivePrimaryMuscle(exerciseLog.exercise as any), muscleGroups)
+        )
+          continue;
         if (!this.matchesEquipmentFilter(exerciseLog.exercise.equipment, equipments)) continue;
 
         for (const set of exerciseLog.sets) {
@@ -491,7 +527,9 @@ export class AnalyticsService {
               date: workout.date!,
               workoutId: workout.id,
               details: { weight: adjustedWeight, reps: set.reps },
-              homeGym: workout.homeGym ? { id: workout.homeGym.id, name: workout.homeGym.name } : null,
+              homeGym: workout.homeGym
+                ? { id: workout.homeGym.id, name: workout.homeGym.name }
+                : null,
             });
           }
         }
@@ -515,7 +553,15 @@ export class AnalyticsService {
     const cycles = await this.prisma.workoutCycle.findMany({
       where: { userId },
       orderBy: [{ status: 'asc' }, { startDate: 'desc' }],
-      select: { id: true, name: true, duration: true, startDate: true, status: true, completedAt: true, createdAt: true },
+      select: {
+        id: true,
+        name: true,
+        duration: true,
+        startDate: true,
+        status: true,
+        completedAt: true,
+        createdAt: true,
+      },
     });
 
     return {
@@ -551,7 +597,8 @@ export class AnalyticsService {
         if (filter.exerciseId) {
           if (ex.exerciseId !== filter.exerciseId) continue;
         } else {
-          if (!this.matchesMuscleFilter(derivePrimaryMuscle(ex.exercise as any), muscleGroups)) continue;
+          if (!this.matchesMuscleFilter(derivePrimaryMuscle(ex.exercise as any), muscleGroups))
+            continue;
           if (!this.matchesEquipmentFilter(ex.exercise.equipment, equipments)) continue;
         }
 
@@ -597,7 +644,9 @@ export class AnalyticsService {
         const weekEnd = new Date(weekStart);
         weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
 
-        const weekNumber = cycle ? this.getCycleWeekNumber(weekStart, cycle.startDate) : this.getCalendarWeek(weekStart);
+        const weekNumber = cycle
+          ? this.getCycleWeekNumber(weekStart, cycle.startDate)
+          : this.getCalendarWeek(weekStart);
         const weekLabel = cycle ? `Woche ${weekNumber}` : `KW${weekNumber}`;
 
         finalDataPoints.push({
@@ -628,7 +677,10 @@ export class AnalyticsService {
   }
 
   /** Duration -- merges the old separate "time-tracking" endpoint (§3.9: workout-level metric). */
-  async getDurationAnalytics(userId: string, filter: AnalyticsFilterDto): Promise<DurationAnalyticsDto> {
+  async getDurationAnalytics(
+    userId: string,
+    filter: AnalyticsFilterDto,
+  ): Promise<DurationAnalyticsDto> {
     const muscleGroups = filter.muscleGroup ?? [];
     const equipments = filter.equipment ?? [];
     const { workouts, cycle } = await this.loadWorkoutsForAnalytics(userId, filter);
@@ -647,7 +699,8 @@ export class AnalyticsService {
       if (muscleGroups.length > 0 || equipments.length > 0 || filter.exerciseId) {
         const hasMatchingExercise = workout.exercises.some((ex) => {
           if (filter.exerciseId) return ex.exerciseId === filter.exerciseId;
-          if (!this.matchesMuscleFilter(derivePrimaryMuscle(ex.exercise as any), muscleGroups)) return false;
+          if (!this.matchesMuscleFilter(derivePrimaryMuscle(ex.exercise as any), muscleGroups))
+            return false;
           if (!this.matchesEquipmentFilter(ex.exercise.equipment, equipments)) return false;
           return true;
         });
@@ -672,7 +725,9 @@ export class AnalyticsService {
     }
 
     const finalDataPoints =
-      filter.aggregation === 'week' ? this.aggregateByWeek(dataPoints, 'average', 'duration', cycle?.startDate) : dataPoints;
+      filter.aggregation === 'week'
+        ? this.aggregateByWeek(dataPoints, 'average', 'duration', cycle?.startDate)
+        : dataPoints;
 
     return {
       cycleId: cycle?.id,
@@ -685,7 +740,10 @@ export class AnalyticsService {
   }
 
   /** Rest time -- averages the seconds rested after each set that recorded one. */
-  async getRestTimeAnalytics(userId: string, filter: AnalyticsFilterDto): Promise<RestTimeAnalyticsDto> {
+  async getRestTimeAnalytics(
+    userId: string,
+    filter: AnalyticsFilterDto,
+  ): Promise<RestTimeAnalyticsDto> {
     const muscleGroups = filter.muscleGroup ?? [];
     const equipments = filter.equipment ?? [];
     const { workouts, cycle } = await this.loadWorkoutsForAnalytics(userId, filter);
@@ -703,7 +761,8 @@ export class AnalyticsService {
         if (filter.exerciseId) {
           if (ex.exerciseId !== filter.exerciseId) continue;
         } else {
-          if (!this.matchesMuscleFilter(derivePrimaryMuscle(ex.exercise as any), muscleGroups)) continue;
+          if (!this.matchesMuscleFilter(derivePrimaryMuscle(ex.exercise as any), muscleGroups))
+            continue;
           if (!this.matchesEquipmentFilter(ex.exercise.equipment, equipments)) continue;
         }
 
@@ -761,7 +820,8 @@ export class AnalyticsService {
         if (filter.exerciseId) {
           if (ex.exerciseId !== filter.exerciseId) continue;
         } else {
-          if (!this.matchesMuscleFilter(derivePrimaryMuscle(ex.exercise as any), muscleGroups)) continue;
+          if (!this.matchesMuscleFilter(derivePrimaryMuscle(ex.exercise as any), muscleGroups))
+            continue;
           if (!this.matchesEquipmentFilter(ex.exercise.equipment, equipments)) continue;
         }
 
@@ -771,8 +831,15 @@ export class AnalyticsService {
         }
       }
 
-      if (workoutReps > 0 || (muscleGroups.length === 0 && equipments.length === 0 && !filter.exerciseId)) {
-        const dataPoint: RepsDataPoint = { date: workout.localDate, reps: workoutReps, workoutId: workout.id };
+      if (
+        workoutReps > 0 ||
+        (muscleGroups.length === 0 && equipments.length === 0 && !filter.exerciseId)
+      ) {
+        const dataPoint: RepsDataPoint = {
+          date: workout.localDate,
+          reps: workoutReps,
+          workoutId: workout.id,
+        };
         if (cycle) dataPoint.trainingDay = trainingDayCounter;
         dataPoints.push(dataPoint);
         totalReps += workoutReps;
@@ -782,7 +849,9 @@ export class AnalyticsService {
     }
 
     const finalDataPoints =
-      filter.aggregation === 'week' ? this.aggregateByWeek(dataPoints, 'sum', 'reps', cycle?.startDate) : dataPoints;
+      filter.aggregation === 'week'
+        ? this.aggregateByWeek(dataPoints, 'sum', 'reps', cycle?.startDate)
+        : dataPoints;
 
     return {
       cycleId: cycle?.id,
@@ -813,7 +882,8 @@ export class AnalyticsService {
         if (filter.exerciseId) {
           if (ex.exerciseId !== filter.exerciseId) continue;
         } else {
-          if (!this.matchesMuscleFilter(derivePrimaryMuscle(ex.exercise as any), muscleGroups)) continue;
+          if (!this.matchesMuscleFilter(derivePrimaryMuscle(ex.exercise as any), muscleGroups))
+            continue;
           if (!this.matchesEquipmentFilter(ex.exercise.equipment, equipments)) continue;
         }
 
@@ -823,8 +893,15 @@ export class AnalyticsService {
         }
       }
 
-      if (workoutSets > 0 || (muscleGroups.length === 0 && equipments.length === 0 && !filter.exerciseId)) {
-        const dataPoint: SetsDataPoint = { date: workout.localDate, sets: workoutSets, workoutId: workout.id };
+      if (
+        workoutSets > 0 ||
+        (muscleGroups.length === 0 && equipments.length === 0 && !filter.exerciseId)
+      ) {
+        const dataPoint: SetsDataPoint = {
+          date: workout.localDate,
+          sets: workoutSets,
+          workoutId: workout.id,
+        };
         if (cycle) dataPoint.trainingDay = trainingDayCounter;
         dataPoints.push(dataPoint);
         totalSets += workoutSets;
@@ -834,7 +911,9 @@ export class AnalyticsService {
     }
 
     const finalDataPoints =
-      filter.aggregation === 'week' ? this.aggregateByWeek(dataPoints, 'sum', 'sets', cycle?.startDate) : dataPoints;
+      filter.aggregation === 'week'
+        ? this.aggregateByWeek(dataPoints, 'sum', 'sets', cycle?.startDate)
+        : dataPoints;
 
     return {
       cycleId: cycle?.id,
@@ -852,7 +931,10 @@ export class AnalyticsService {
    * working set, averaged. Weight cancels out by design, which is exactly why (unlike PRs)
    * it needs no benchmark and works across every workout and every gym.
    */
-  async getIntensityAnalytics(userId: string, filter: AnalyticsFilterDto): Promise<IntensityAnalyticsDto> {
+  async getIntensityAnalytics(
+    userId: string,
+    filter: AnalyticsFilterDto,
+  ): Promise<IntensityAnalyticsDto> {
     const muscleGroups = filter.muscleGroup ?? [];
     const equipments = filter.equipment ?? [];
     const { workouts, cycle } = await this.loadWorkoutsForAnalytics(userId, filter);
@@ -870,7 +952,8 @@ export class AnalyticsService {
         if (filter.exerciseId) {
           if (ex.exerciseId !== filter.exerciseId) continue;
         } else {
-          if (!this.matchesMuscleFilter(derivePrimaryMuscle(ex.exercise as any), muscleGroups)) continue;
+          if (!this.matchesMuscleFilter(derivePrimaryMuscle(ex.exercise as any), muscleGroups))
+            continue;
           if (!this.matchesEquipmentFilter(ex.exercise.equipment, equipments)) continue;
         }
 
@@ -897,12 +980,15 @@ export class AnalyticsService {
     }
 
     const finalDataPoints =
-      filter.aggregation === 'week' ? this.aggregateByWeek(dataPoints, 'average', 'intensity', cycle?.startDate) : dataPoints;
+      filter.aggregation === 'week'
+        ? this.aggregateByWeek(dataPoints, 'average', 'intensity', cycle?.startDate)
+        : dataPoints;
 
     return {
       cycleId: cycle?.id,
       cycleName: cycle?.name,
-      averageIntensity: totalSetCount > 0 ? Math.round((totalIntensitySum / totalSetCount) * 10) / 10 : 0,
+      averageIntensity:
+        totalSetCount > 0 ? Math.round((totalIntensitySum / totalSetCount) * 10) / 10 : 0,
       period: cycle ? undefined : filter.period,
       totalWorkouts: dataPoints.length,
       dataPoints: finalDataPoints,

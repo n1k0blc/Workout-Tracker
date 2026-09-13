@@ -25,12 +25,7 @@ export const USER_TARGETS_SELECT = {
 export function toMacroTargetsDto(row: UserTargetsRow | null): MacroTargetsDto | null {
   if (!row) return null;
   const { targetKcal, targetCarbs, targetProtein, targetFat } = row;
-  if (
-    targetKcal === null &&
-    targetCarbs === null &&
-    targetProtein === null &&
-    targetFat === null
-  ) {
+  if (targetKcal === null && targetCarbs === null && targetProtein === null && targetFat === null) {
     return null;
   }
   return {

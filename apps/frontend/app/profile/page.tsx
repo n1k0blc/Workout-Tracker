@@ -344,7 +344,7 @@ export default function ProfilePage() {
 
         {/* Tagesziele Section (#152) */}
         <Card className="mb-6">
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-y-2">
             <CardTitle>Tagesziele</CardTitle>
             {!isEditingTargets ? (
               <Button variant="outline" onClick={() => setIsEditingTargets(true)}>
@@ -355,6 +355,7 @@ export default function ProfilePage() {
               <div className="flex gap-2">
                 <Button
                   variant="outline"
+                  size="sm"
                   onClick={() => {
                     setIsEditingTargets(false);
                     setTargetKcal(user?.targetKcal?.toString() || '');
@@ -365,7 +366,7 @@ export default function ProfilePage() {
                 >
                   Abbrechen
                 </Button>
-                <Button onClick={handleUpdateTargets} disabled={targetsLoading}>
+                <Button size="sm" onClick={handleUpdateTargets} disabled={targetsLoading}>
                   <IconCheck className="mr-2 size-4" />
                   Speichern
                 </Button>
@@ -454,7 +455,7 @@ export default function ProfilePage() {
 
         {/* Profile Section */}
         <Card className="mb-6">
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-y-2">
             <CardTitle>Profildaten</CardTitle>
             {!isEditingProfile ? (
               <Button
@@ -468,11 +469,13 @@ export default function ProfilePage() {
               <div className="flex gap-2">
                 <Button
                   variant="outline"
+                  size="sm"
                   onClick={() => setIsEditingProfile(false)}
                 >
                   Abbrechen
                 </Button>
                 <Button
+                  size="sm"
                   onClick={handleUpdateProfile}
                   disabled={loading}
                 >

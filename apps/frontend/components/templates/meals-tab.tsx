@@ -1,12 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { IconChevronRight, IconPlus } from '@tabler/icons-react';
 import { apiClient } from '@/lib/api';
 import { MealListItem } from '@/types';
-import { formatKcal, mealIngredientPreview } from '@/lib/nutrition';
+import { formatKcal, mealIngredientPreview, withFavoriteOverrides } from '@/lib/nutrition';
+import { useFavoriteToggle } from '@/hooks/useFavoriteToggle';
 import { Button } from '@/components/ui/button';
+import { FavoriteStar } from '@/components/nutrition/favorite-star';
 import { cn } from '@/lib/utils';
 
 function totalsLine(meal: MealListItem): string {
@@ -23,6 +25,12 @@ export default function MealsTab() {
   const [mineTotal, setMineTotal] = useState(0);
   const [mineOnly, setMineOnly] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { effectiveFavorite, toggleFavorite } = useFavoriteToggle();
+
+  const rows = useMemo(
+    () => withFavoriteOverrides(meals, 'meal', effectiveFavorite),
+    [meals, effectiveFavorite],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,22 +86,28 @@ export default function MealsTab() {
         </div>
       ) : (
         <div className="divide-y rounded-lg border bg-card">
-          {meals.map((meal) => (
-            <button
-              key={meal.id}
-              type="button"
-              onClick={() => router.push(`/templates/meals/${meal.id}/edit`)}
-              className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/50"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium">{meal.name}</div>
-                <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                  {mealIngredientPreview(meal.ingredientNames)}
+          {rows.map((meal) => (
+            <div key={meal.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50">
+              <button
+                type="button"
+                onClick={() => router.push(`/templates/meals/${meal.id}/edit`)}
+                className="flex min-w-0 flex-1 items-center gap-3 text-left"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium">{meal.name}</div>
+                  <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {mealIngredientPreview(meal.ingredientNames)}
+                  </div>
+                  <div className="mt-1 text-xs">{totalsLine(meal)}</div>
                 </div>
-                <div className="mt-1 text-xs">{totalsLine(meal)}</div>
-              </div>
-              <IconChevronRight className="size-4 shrink-0 text-muted-foreground" />
-            </button>
+                <IconChevronRight className="size-4 shrink-0 text-muted-foreground" />
+              </button>
+              <FavoriteStar
+                favorite={meal.isFavorite}
+                onToggle={() => toggleFavorite('meal', meal.id, meal.isFavorite)}
+                label={meal.name}
+              />
+            </div>
           ))}
         </div>
       )}

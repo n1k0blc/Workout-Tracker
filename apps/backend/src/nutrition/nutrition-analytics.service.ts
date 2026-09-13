@@ -1,11 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { addLocalDays, weekdayOfLocalDate } from '../common/utils/today.util';
-import {
-  toMacroTargetsDto,
-  UserTargetsRow,
-  USER_TARGETS_SELECT,
-} from './nutrition-targets.util';
+import { toMacroTargetsDto, UserTargetsRow, USER_TARGETS_SELECT } from './nutrition-targets.util';
 import { NutritionTrendDayDto, NutritionTrendDto } from './dto';
 
 /** The widest range the daily series will zero-fill -- a leap year's worth of days. */
@@ -40,9 +36,7 @@ export class NutritionAnalyticsService {
     const days: NutritionTrendDayDto[] = [];
     for (let date = start; date <= end; date = addLocalDays(date, 1)) {
       if (days.length >= MAX_RANGE_DAYS) {
-        throw new BadRequestException(
-          `Zeitraum darf höchstens ${MAX_RANGE_DAYS} Tage umfassen`,
-        );
+        throw new BadRequestException(`Zeitraum darf höchstens ${MAX_RANGE_DAYS} Tage umfassen`);
       }
       days.push({
         date,

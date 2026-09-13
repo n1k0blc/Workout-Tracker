@@ -27,8 +27,7 @@ export class BreachedPasswordService {
       /\/$/,
       '',
     );
-    this.timeoutMs =
-      configService.get<number>('PWNED_PASSWORDS_TIMEOUT_MS') || DEFAULT_TIMEOUT_MS;
+    this.timeoutMs = configService.get<number>('PWNED_PASSWORDS_TIMEOUT_MS') || DEFAULT_TIMEOUT_MS;
   }
 
   async isBreached(password: string): Promise<boolean> {

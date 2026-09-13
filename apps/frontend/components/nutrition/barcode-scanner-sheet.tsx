@@ -15,8 +15,10 @@ import {
   foodSourceLabel,
   formatQuantityLabel,
 } from '@/lib/nutrition';
+import { useFavoriteToggle } from '@/hooks/useFavoriteToggle';
 import { BarcodeLookup, Food } from '@/types';
 import { BarcodeCapture, CaptureSheet } from './barcode-capture';
+import { FavoriteStar } from './favorite-star';
 import { QuantityStepper } from './quantity-stepper';
 
 /**
@@ -225,6 +227,7 @@ function FoodResult({
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { effectiveFavorite, toggleFavorite } = useFavoriteToggle();
 
   const unit = food.isLiquid ? 'ml' : 'g';
   // Keyed off the food, not off where the miss chain stopped: an Open Food Facts product
@@ -269,7 +272,16 @@ function FoodResult({
         {sourceLabel === 'Eigenes' ? 'Eigenes Lebensmittel' : (sourceLabel ?? 'Lebensmittel')}
       </ResultLabel>
 
-      <div className="mt-2.5 text-lg font-semibold">{food.name}</div>
+      <div className="mt-2.5 flex items-center gap-1.5">
+        <span className="text-lg font-semibold">{food.name}</span>
+        <FavoriteStar
+          favorite={effectiveFavorite('food', food.id, food.isFavorite)}
+          onToggle={() =>
+            toggleFavorite('food', food.id, effectiveFavorite('food', food.id, food.isFavorite))
+          }
+          label={food.name}
+        />
+      </div>
       {food.barcode && (
         <div className="mt-0.5 font-mono text-xs text-muted-foreground">EAN {food.barcode}</div>
       )}

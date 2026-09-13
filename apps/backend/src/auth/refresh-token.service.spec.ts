@@ -24,7 +24,7 @@ function makeFakePrisma() {
   const rows = new Map<string, Row>();
 
   function findMatches(where: Record<string, unknown>): Row[] {
-    return [...rows.values()].filter(row => {
+    return [...rows.values()].filter((row) => {
       if ('id' in where && row.id !== where.id) return false;
       if ('tokenHash' in where && row.tokenHash !== where.tokenHash) return false;
       if ('userId' in where && row.userId !== where.userId) return false;
@@ -44,15 +44,9 @@ function makeFakePrisma() {
   const refreshToken = {
     findUnique: async ({ where }: { where: Record<string, unknown> }) =>
       findMatches(where)[0] ?? null,
-    updateMany: async ({
-      where,
-      data,
-    }: {
-      where: Record<string, unknown>;
-      data: Partial<Row>;
-    }) => {
+    updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Partial<Row> }) => {
       const matches = findMatches(where);
-      matches.forEach(row => Object.assign(row, data));
+      matches.forEach((row) => Object.assign(row, data));
       return { count: matches.length };
     },
     create: async ({
@@ -160,14 +154,14 @@ describe('RefreshTokenService.rotate', () => {
       Array.from({ length: 5 }, () => service.rotate('raw-token')),
     );
 
-    const fulfilled = outcomes.filter(o => o.status === 'fulfilled');
-    const rejected = outcomes.filter(o => o.status === 'rejected');
+    const fulfilled = outcomes.filter((o) => o.status === 'fulfilled');
+    const rejected = outcomes.filter((o) => o.status === 'rejected');
     expect(fulfilled).toHaveLength(1);
     expect(rejected).toHaveLength(4);
 
     // The four losers were rejected outright -- they must not have torn down the winner's
     // brand new session by triggering family-wide revocation.
-    const survivors = [...rows.values()].filter(row => row.revokedAt === null);
+    const survivors = [...rows.values()].filter((row) => row.revokedAt === null);
     expect(survivors).toHaveLength(1);
   });
 
@@ -179,7 +173,7 @@ describe('RefreshTokenService.rotate', () => {
     await Promise.allSettled(Array.from({ length: 5 }, () => service.rotate('raw-token')));
 
     const successorHashes = new Set(
-      [...rows.values()].map(row => row.replacedByTokenHash).filter(Boolean),
+      [...rows.values()].map((row) => row.replacedByTokenHash).filter(Boolean),
     );
     expect(successorHashes.size).toBeLessThanOrEqual(1);
   });
@@ -255,7 +249,7 @@ describe('RefreshTokenService.revoke / revokeAllForUser', () => {
     await expect(service.revoke('never-issued')).resolves.toBeUndefined();
   });
 
-  it('revokeAllForUser only touches that user\'s live tokens, and reports how many', async () => {
+  it("revokeAllForUser only touches that user's live tokens, and reports how many", async () => {
     const { prisma, rows } = makeFakePrisma();
     seedToken(rows, { id: 'mine', userId: 'user-1' });
     seedToken(rows, { id: 'mine-2', userId: 'user-1', tokenHash: 'mine-2-hash' });
@@ -285,7 +279,7 @@ describe('RefreshTokenService rejection logging (#160)', () => {
   });
 
   function loggedLines(): string[] {
-    return warnSpy.mock.calls.map(call => String(call[0]));
+    return warnSpy.mock.calls.map((call) => String(call[0]));
   }
 
   it('logs a warning naming "unknown token" for a token that was never issued', async () => {
@@ -304,9 +298,7 @@ describe('RefreshTokenService rejection logging (#160)', () => {
 
     await expect(service.rotate('raw-token')).rejects.toThrow(UnauthorizedException);
 
-    expect(loggedLines()).toEqual([
-      expect.stringMatching(/expired token.*user-1/),
-    ]);
+    expect(loggedLines()).toEqual([expect.stringMatching(/expired token.*user-1/)]);
   });
 
   it('logs a warning naming "superseded token" for the loser of a rotation race, without ending other sessions', async () => {
@@ -316,9 +308,11 @@ describe('RefreshTokenService rejection logging (#160)', () => {
 
     await Promise.allSettled(Array.from({ length: 5 }, () => service.rotate('raw-token')));
 
-    const supersededLines = loggedLines().filter(line => line.includes('superseded token') && !line.includes('reused'));
+    const supersededLines = loggedLines().filter(
+      (line) => line.includes('superseded token') && !line.includes('reused'),
+    );
     expect(supersededLines).toHaveLength(4);
-    supersededLines.forEach(line => expect(line).toContain('user-1'));
+    supersededLines.forEach((line) => expect(line).toContain('user-1'));
   });
 
   it('logs reuse detection with how many sessions it ended', async () => {

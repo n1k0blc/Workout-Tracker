@@ -29,7 +29,7 @@ async function bootstrap() {
 
   const isProduction = process.env.NODE_ENV === 'production';
   const corsOriginEnv = process.env.CORS_ORIGIN;
-  const explicitOrigins = corsOriginEnv ? corsOriginEnv.split(',').map(o => o.trim()) : [];
+  const explicitOrigins = corsOriginEnv ? corsOriginEnv.split(',').map((o) => o.trim()) : [];
 
   if (isProduction) {
     // Production: strict allowlist only. Wildcard + credentials don't mix, and this is
@@ -87,8 +87,12 @@ async function bootstrap() {
   await app.listen(port, '0.0.0.0');
   console.log(`🚀 Backend is running on:`);
   console.log(`   - Local:   http://localhost:${port}/api`);
-  console.log(`   - Network: http://<deine-ip>:${port}/api   <--- deine IP (192.168.178.24 für dich)`);
-  console.log(`   (Für iPhone: im Frontend-Ordner "npm run dev:mobile" ausführen - das verwendet deine IP automatisch)`);
+  console.log(
+    `   - Network: http://<deine-ip>:${port}/api   <--- deine IP (192.168.178.24 für dich)`,
+  );
+  console.log(
+    `   (Für iPhone: im Frontend-Ordner "npm run dev:mobile" ausführen - das verwendet deine IP automatisch)`,
+  );
 }
 
 bootstrap();

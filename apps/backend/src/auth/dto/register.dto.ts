@@ -1,4 +1,17 @@
-import { IsEmail, IsString, MinLength, MaxLength, IsDateString, IsInt, IsNumber, Min, Max, IsArray, ValidateNested, ArrayMinSize } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  MinLength,
+  MaxLength,
+  IsDateString,
+  IsInt,
+  IsNumber,
+  Min,
+  Max,
+  IsArray,
+  ValidateNested,
+  ArrayMinSize,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class HomeGymInput {

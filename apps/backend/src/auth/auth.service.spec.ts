@@ -59,9 +59,9 @@ describe('AuthService breached-password screening', () => {
     it('rejects a breached password without creating the user', async () => {
       const { service, prisma, passwordService } = makeService({ breached: true });
 
-      await expect(service.register(baseRegisterDto({ password: 'password' }))).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(
+        service.register(baseRegisterDto({ password: 'password' })),
+      ).rejects.toBeInstanceOf(BadRequestException);
       expect(prisma.user.create).not.toHaveBeenCalled();
       expect(passwordService.hash).not.toHaveBeenCalled();
     });

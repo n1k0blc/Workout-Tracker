@@ -54,8 +54,6 @@ function toDto(row: MealSlotRow): MealSlotDto {
   return { id: row.id, name: row.name, order: row.order, archived: row.archivedAt !== null };
 }
 
-const byOrder = (a: { order: number }, b: { order: number }) => a.order - b.order;
-
 @Injectable()
 export class MealSlotsService {
   constructor(private prisma: PrismaService) {}
@@ -171,10 +169,7 @@ export class MealSlotsService {
    * current active Abschnitte, each `order` restating its array position (1-based,
    * contiguous) -- a mismatch is a 400, matching the workout-tree rule.
    */
-  async reorder(
-    userId: string,
-    slots: { id: string; order: number }[],
-  ): Promise<MealSlotListDto> {
+  async reorder(userId: string, slots: { id: string; order: number }[]): Promise<MealSlotListDto> {
     assertContiguousOrder(slots);
 
     const activeIds = slots.map((s) => s.id);
@@ -189,9 +184,7 @@ export class MealSlotsService {
       new Set(activeIds).size === activeIds.length &&
       activeIds.every((id) => currentSet.has(id));
     if (!sameSet) {
-      throw new BadRequestException(
-        'slots muss genau die aktuell aktiven Abschnitte enthalten',
-      );
+      throw new BadRequestException('slots muss genau die aktuell aktiven Abschnitte enthalten');
     }
 
     const archivedIds = (

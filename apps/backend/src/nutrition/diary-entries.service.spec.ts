@@ -1,8 +1,4 @@
-import {
-  NotFoundException,
-  ConflictException,
-  BadRequestException,
-} from '@nestjs/common';
+import { NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { DiaryEntriesService } from './diary-entries.service';
 import { CreateDiaryEntryDto } from './dto';
 
@@ -46,25 +42,27 @@ function baseCreateDto(overrides: Partial<CreateDiaryEntryDto> = {}): CreateDiar
   };
 }
 
-function makeService(overrides: {
-  slot?: unknown;
-  entry?: unknown;
-  slots?: unknown[];
-  entries?: unknown[];
-  deleteCount?: number;
-  foods?: unknown[];
-  // What the injected MealsService.findById resolves to (the expandable meal). `null` -> 404.
-  mealDetail?: unknown;
-  // What the injected MealSlotsService.ensureActiveSlot resolves to (the "Sonstiges" fallback).
-  fallbackSlot?: { id: string; name: string; order: number; archived: boolean };
-  // The user's Tagesziele row (#152) that getDay reads. Absent -> all four null.
-  targets?: {
-    targetKcal: number | null;
-    targetCarbs: number | null;
-    targetProtein: number | null;
-    targetFat: number | null;
-  } | null;
-} = {}) {
+function makeService(
+  overrides: {
+    slot?: unknown;
+    entry?: unknown;
+    slots?: unknown[];
+    entries?: unknown[];
+    deleteCount?: number;
+    foods?: unknown[];
+    // What the injected MealsService.findById resolves to (the expandable meal). `null` -> 404.
+    mealDetail?: unknown;
+    // What the injected MealSlotsService.ensureActiveSlot resolves to (the "Sonstiges" fallback).
+    fallbackSlot?: { id: string; name: string; order: number; archived: boolean };
+    // The user's Tagesziele row (#152) that getDay reads. Absent -> all four null.
+    targets?: {
+      targetKcal: number | null;
+      targetCarbs: number | null;
+      targetProtein: number | null;
+      targetFat: number | null;
+    } | null;
+  } = {},
+) {
   const foodCreate = jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
     id: 'food-new',
     ...data,
@@ -76,9 +74,9 @@ function makeService(overrides: {
 
   const prisma = {
     mealSlot: {
-      findFirst: jest.fn().mockResolvedValue(
-        'slot' in overrides ? overrides.slot : { id: 'slot-1' },
-      ),
+      findFirst: jest
+        .fn()
+        .mockResolvedValue('slot' in overrides ? overrides.slot : { id: 'slot-1' }),
       findMany: jest.fn().mockResolvedValue(overrides.slots ?? []),
     },
     food: {
@@ -87,12 +85,10 @@ function makeService(overrides: {
     },
     diaryEntry: {
       create: diaryCreate,
-      createMany: jest.fn(
-        async ({ data }: { data: Array<Record<string, unknown>> }) => ({ count: data.length }),
-      ),
-      findFirst: jest.fn().mockResolvedValue(
-        'entry' in overrides ? overrides.entry : { ...ENTRY },
-      ),
+      createMany: jest.fn(async ({ data }: { data: Array<Record<string, unknown>> }) => ({
+        count: data.length,
+      })),
+      findFirst: jest.fn().mockResolvedValue('entry' in overrides ? overrides.entry : { ...ENTRY }),
       findMany: jest.fn().mockResolvedValue(overrides.entries ?? []),
       update: jest.fn(async ({ data }: { data: Record<string, unknown> }) => ({
         ...ENTRY,
@@ -129,13 +125,14 @@ function makeService(overrides: {
     }),
   };
   const mealSlots = {
-    ensureActiveSlot: jest.fn(async () =>
-      overrides.fallbackSlot ?? {
-        id: 'slot-sonstiges',
-        name: 'Sonstiges',
-        order: 5,
-        archived: false,
-      },
+    ensureActiveSlot: jest.fn(
+      async () =>
+        overrides.fallbackSlot ?? {
+          id: 'slot-sonstiges',
+          name: 'Sonstiges',
+          order: 5,
+          archived: false,
+        },
     ),
   };
   return {
@@ -180,7 +177,7 @@ describe('DiaryEntriesService.createEntry — snapshot on create', () => {
     });
   });
 
-  it('rejects logging into an Abschnitt that is not the user\'s', async () => {
+  it("rejects logging into an Abschnitt that is not the user's", async () => {
     const { service, prisma } = makeService({ slot: null });
 
     await expect(
@@ -254,9 +251,9 @@ describe('DiaryEntriesService.updateEntryQuantity — proportional rescale', () 
   it("404s on another user's entry and does not write", async () => {
     const { service, prisma } = makeService({ entry: null });
 
-    await expect(
-      service.updateEntryQuantity('user-1', 'entry-1', 2),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.updateEntryQuantity('user-1', 'entry-1', 2)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
 
     expect(prisma.diaryEntry.findFirst).toHaveBeenCalledWith({
       where: { id: 'entry-1', userId: 'user-1' },
@@ -575,7 +572,7 @@ describe('DiaryEntriesService.createFromMeal — expansion', () => {
 });
 
 describe('DiaryEntriesService.createFromFoodBatch — snapshot math', () => {
-  it('scales the food\'s per-100 values by grams / 100 (grams case)', async () => {
+  it("scales the food's per-100 values by grams / 100 (grams case)", async () => {
     const { service, prisma } = makeService({ foods: [FOOD] });
 
     await service.createFromFoodBatch(
@@ -906,10 +903,7 @@ describe('DiaryEntriesService.copyDay — the whole day', () => {
 
     expect(mealSlots.ensureActiveSlot).toHaveBeenCalledWith('user-1', 'Sonstiges');
     const written = prisma.diaryEntry.createMany.mock.calls[0][0].data;
-    expect(written.map((e) => e.mealSlotId)).toEqual([
-      'slot-1',
-      'slot-sonstiges',
-    ]);
+    expect(written.map((e) => e.mealSlotId)).toEqual(['slot-1', 'slot-sonstiges']);
   });
 
   it('does not create "Sonstiges" when no entry needs it', async () => {
