@@ -1,10 +1,15 @@
 const tsPlugin = require('@typescript-eslint/eslint-plugin');
-const tsParser = require('@typescript-eslint/parser');
 const prettierRecommended = require('eslint-plugin-prettier/recommended');
 
-// Flat-config port of the old .eslintrc.js — same parser, same plugin,
-// same rule overrides. ESLint 9+ dropped eslintrc support, so this file
-// (not .eslintrc.js, which ESLint 10 no longer reads) is what runs (issue #170).
+// Flat-config port of the old .eslintrc.js — same plugin, same rule
+// overrides. ESLint 9+ dropped eslintrc support, so this file (not
+// .eslintrc.js, which ESLint 10 no longer reads) is what runs (issue #170).
+//
+// No parserOptions.project here: flat/recommended's own base config already
+// sets the parser, and none of its rules are type-aware (that needs
+// recommended-type-checked instead), so pointing the parser at tsconfig.json
+// would only add a full type-checked parse for every lint run with no rule
+// actually using it.
 module.exports = [
   {
     ignores: ['eslint.config.js', 'dist/**', 'coverage/**'],
@@ -12,14 +17,6 @@ module.exports = [
   ...tsPlugin.configs['flat/recommended'],
   prettierRecommended,
   {
-    languageOptions: {
-      parser: tsParser,
-      parserOptions: {
-        project: 'tsconfig.json',
-        tsconfigRootDir: __dirname,
-        sourceType: 'module',
-      },
-    },
     rules: {
       '@typescript-eslint/interface-name-prefix': 'off',
       '@typescript-eslint/explicit-function-return-type': 'off',
