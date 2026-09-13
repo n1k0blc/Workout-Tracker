@@ -6,7 +6,7 @@ Drafted 2026-09-13 for issue #173 (parent: #167). Analysis + decisions for the n
 
 | | Current | Latest | Notes |
 |---|---|---|---|
-| `@nestjs/*` family (10 packages) | 11.x | 12.x | `@nestjs/config` (4.0.4) and `@nestjs/schedule` (6.1.3) jump straight to 12.x too — see below |
+| `@nestjs/*` family (10 packages) | 11.x | 12.x | Attempted and reverted (2026-09-13) — 12.x is pure ESM, breaks this repo's CommonJS Jest setup outright, see below |
 | TypeScript | 6.0.3 | 7.0.2 | Both workspaces |
 | ESLint (frontend) | 9.39.5 | 10.10.0 | Backend already moved to ESLint 10 in #170 |
 | Vitest (frontend) | 4.1.11 | 5.0.0 | |
@@ -26,12 +26,15 @@ The issue asks for "an explicit call on `@types/react-datepicker`'s deprecated-m
 - **Risk**: None (build + test suite are the only verification needed — nothing imports either package).
 - **Sequencing**: Step 1, immediately, independent of everything else below.
 
-### 2. NestJS 11 → 12 (all 10 packages, backend only)
+### 2. NestJS 11 → 12 (all 10 packages, backend only) — **attempted, reverted: blocks the test suite**
 
-- **Pros**: Stays current with the framework; `@nestjs/config` 12's rewritten `get()`/`getOrThrow()` catches previously-silent config-key typos at compile time; the official `nest upgrade` codemod automates most of the mechanical changes.
-- **Cons**: The `@nestjs/config` (4→12) and `@nestjs/schedule` (6→12) jumps are **mostly version-scheme alignment** with the unified Nest v12 release train, not 8 majors of accumulated breaking history — but not purely cosmetic either: both packages convert to native ESM internally (behind Node's `require(esm)`, so no `"type": "module"` change needed on our side) and drop legacy deep-import paths (`@nestjs/schedule/dist/enums/...`-style imports) — worth a repo-wide grep for deep imports before bumping. `@nestjs/config`'s validation moves from Joi-specific options to a Standard Schema — checked `ConfigModule.forRoot(...)` in `app.module.ts:26`: this repo already passes a custom `validate` function, not a Joi `validationSchema`, so this specific breaking change doesn't apply here at all. Node 21.x is explicitly unsupported (only 20.19+/22.12+) — irrelevant here, we're on 22.18.
-- **Risk**: **Low-Medium.** This backend has no webpack/Rspack bundler in the build path (`nest-cli.json`: `webpack: false`, plain `tsc` output) and stays CommonJS, so NestJS 12's default-bundler and ESM-scaffold changes don't touch us. Express is already on 5.2.1, ahead of the 12.x `platform-express` peer floor. Already checked for deep imports into any `@nestjs/*` package's internal paths (`@nestjs/*/dist/...`-style) across `apps/backend/src` — zero hits, so that risk is closed out, not just "greppable."
-- **Sequencing**: Step 2 — after the datepicker cleanup, before anything else in this round. Validate via full backend type-check + lint + test suite + a Docker build (per the existing arm64 MacBook Air smoke-test flow), since a NestJS major is exactly the kind of change that can look clean in isolated unit tests but break DI wiring or a decorator's runtime behavior only when the whole app boots.
+- **Pros**: Stays current with the framework; `@nestjs/config` 12's rewritten `get()`/`getOrThrow()` catches previously-silent config-key typos at compile time.
+- **Cons found during the original planning pass**: The `@nestjs/config` (4→12) and `@nestjs/schedule` (6→12) jumps are mostly version-scheme alignment with the unified Nest v12 release train, not 8 majors of history; no Joi validation to migrate (`app.module.ts:26` already uses a custom `validate` function); zero deep `@nestjs/*` imports in this codebase; Express already satisfies the 12.x `platform-express` peer floor.
+- **Cons found only by actually attempting the bump — the real blocker**: `@nestjs/common`/`@nestjs/core` 12.x are published as **pure ESM** (`"type": "module"` in their own `package.json`, confirmed directly). This repo's Jest setup is CommonJS (`ts-jest`, no `"type": "module"`, no ESM transform config), and Jest's `require()` of a `"type": "module"` package throws `Must use import to load ES Module` — not a type error, a hard runtime failure at test-collection time. Attempting the bump broke **26 of 40 backend test suites** outright (145/505 tests still ran, the rest never loaded). This is not specific to a misconfiguration in this repo: the `@nestjs/throttler` maintainer who verified NestJS-12 compatibility for that package hit and documented the identical failure independently when trial-upgrading their own CommonJS+Jest devDependencies (`nestjs/throttler#2669`), and deliberately did *not* include that half of the upgrade in their fix for exactly this reason.
+- **A secondary, already-solved issue along the way**: `@nestjs/throttler@6.5.0` (used here for login/register rate-limiting, not itself in the issue's 10-package list) still declares a peer range capped at `^11.0.0`. The widened-range fix is merged upstream (`nestjs/throttler#2670`, merged 2026-09-03) and independently verified against a live Nest 12.0.1 app by its author (`ThrottlerGuard` still returns the expected `429`/`Retry-After`), but not yet published to npm — the package's release pipeline is separately blocked (`nestjs/throttler#2669`/`#2532`). This alone would have been a `pnpm-workspace.yaml` `peerDependencyRules.allowedVersions` entry, not a blocker — solved and then reverted along with everything else once the Jest/ESM problem surfaced.
+- **Risk**: **High, not Low-Medium as originally assessed.** The version-compatibility risk was genuinely low; the toolchain-compatibility risk (Jest can't load an ESM-only Nest) was missed by the original research pass and only surfaced by actually running the test suite after the bump.
+- **Decision**: **Reverted, not proceeding this round.** Real options going forward, none attempted yet: (a) migrate the backend's Jest config to support `require(esm)`/ESM transforms (a real, bounded piece of work, not a one-line fix — `ts-jest`'s ESM preset plus `NODE_OPTIONS=--experimental-vm-modules` is the usual path, would need its own verification pass); (b) wait for Node 24.9+, where Jest supports `require(esm)` natively per Jest's own error message — a Node major bump of its own, unplanned; (c) wait for `@nestjs/*` or the wider Jest/ts-jest ecosystem to close this gap some other way. Needs a maintainer decision on which path (if any) to invest in — not a "wait a few weeks" item like TypeScript 7/ESLint 10, since nothing here is scheduled to change on its own.
+- **Sequencing**: N/A until a path above is chosen.
 
 ### 3. Vitest 4 → 5 (frontend only)
 
@@ -39,7 +42,7 @@ The issue asks for "an explicit call on `@types/react-datepicker`'s deprecated-m
 - **Cons**: Requires Vite ≥6.4.0 and Node ≥22.12 (already satisfied, we're on 22.18). `-t` CLI test-name filtering changes from a single string to a `"suite > test"` space-joined chain — breaks any saved `-t` invocations, though this repo doesn't have any committed in `package.json` scripts. `test.sequential`/`describe.sequential` are removed (replaced by `concurrent: false`) — grepped the frontend test suite, no hits, not a blocker. Checked the `environment: 'node'` vs. `jsdom` question in `apps/frontend/vitest.config.mts`: **not a bug** — the two component tests that actually need a real DOM (`exercise-card-unilateral-edit.test.tsx`, `workout-timer-flutter.test.tsx`) both correctly declare a per-file `// @vitest-environment jsdom` override; the global `node` default is a deliberate speed optimization for the rest of the (pure-logic) suite.
 - **Risk**: **Medium** — no blocking incompatibilities found, but the `clearMocks` default flip and stricter async-assertion enforcement mean this needs an actual full test-suite run (not just `tsc`/build) to catch newly-strict failures, plus a manual skim of any test relying on mock state persisting across cases in the same file.
 - **Config fix, bundle with this bump regardless of outcome**: `apps/frontend/vitest.config.mts` already prints a forward-compat warning on every run (`Your Vite config uses features that are unsupported by configLoader: 'native'... Use import.meta.dirname instead`). Confirmed this isn't a Vitest-5-specific default flip (`configLoader: 'bundle'` is still the default in v5), but it's a one-line, zero-risk fix worth doing in the same pass since the warning already fires today: `path.resolve(__dirname, '.')` → `path.resolve(import.meta.dirname, '.')`.
-- **Sequencing**: Step 3, after NestJS 12 (independent workspace, no shared risk, but sequencing backend-then-frontend keeps each major isolated to one workspace's test run at a time for easy attribution of any failure).
+- **Sequencing**: Independent of NestJS 12 (separate workspace, no shared risk) — done and committed (2026-09-13) on its own once the NestJS attempt was reverted.
 
 ### 4. TypeScript 6.0 → 7.0 (both workspaces) — **deferred, not attempted this round**
 
@@ -64,26 +67,28 @@ The issue asks for "an explicit call on `@types/react-datepicker`'s deprecated-m
 
 ## Execution plan
 
-Each step: full type-check + lint + test suite in the affected workspace(s), then the arm64 MacBook Air Docker build-and-smoke-test flow (native, no emulation) before moving to the next step — same discipline as the prior `DEPENDENCY-HYGIENE-PLAN.md` round. Only steps 1-3 are being executed this round; steps 4-5 are tracked as deferred with explicit unblock conditions, not scheduled.
+Each step: full type-check + lint + test suite in the affected workspace(s), then the arm64 MacBook Air Docker build-and-smoke-test flow (native, no emulation) before moving to the next step — same discipline as the prior `DEPENDENCY-HYGIENE-PLAN.md` round.
 
 ```markdown
-## Step 1 — Remove dead date-picker dependencies (independent, no risk)
-- [ ] Remove `react-datepicker` and `@types/react-datepicker` from apps/frontend/package.json
-- [ ] `pnpm install`, confirm frontend build + test suite still pass (nothing imports either package)
+## Step 1 — Remove dead date-picker dependencies (independent, no risk) — DONE (2026-09-13)
+- [x] Remove `react-datepicker` and `@types/react-datepicker` from apps/frontend/package.json
+- [x] `pnpm install`, confirm frontend build + test suite still pass (nothing imports either package)
 
-## Step 2 — NestJS 11 -> 12 (backend only, low-medium risk)
-- [ ] Bump all 10 `@nestjs/*` packages to their 12.x releases (common, core, config, jwt, passport, platform-express, schedule, schematics, testing, cli)
-- [ ] Run the official `nest upgrade` codemod, review its diff (the Standard Schema validation change doesn't apply here — `app.module.ts:26` already uses a custom `validate` function, not Joi)
-- [ ] Full backend type-check + lint + test suite
-- [ ] Build the backend Docker image on the MacBook Air (arm64, native), `docker compose up`, verify `/api/health` and a full login/workout/nutrition smoke pass
+## Step 2 — NestJS 11 -> 12 (backend only) — ATTEMPTED AND REVERTED (2026-09-13)
+- [x] Bump all 10 `@nestjs/*` packages to their 12.x releases
+- [x] Add a pnpm peerDependencyRules entry for @nestjs/throttler's stale peer range (solved, reverted along with everything else)
+- [x] Full backend type-check + lint + test suite -- **26 of 40 suites failed**: @nestjs/common@12/@nestjs/core@12 are pure ESM (`"type": "module"`), and this repo's CommonJS ts-jest setup cannot `require()` them at all (`Must use import to load ES Module`)
+- [x] Reverted the bump; working tree confirmed clean, all 505 tests passing again
+- [ ] Not attempted: choosing and executing a path to make Jest able to load an ESM-only Nest (see the decision above) -- blocked on a maintainer choice, not scheduled
 
-## Step 3 — Vitest 4 -> 5 (frontend only, medium risk)
-- [ ] Fix `apps/frontend/vitest.config.mts`: `path.resolve(__dirname, '.')` -> `path.resolve(import.meta.dirname, '.')`
-- [ ] Bump `vitest` to 5.0.0
-- [ ] Full frontend test suite -- read the diff of any newly-failing test carefully before patching (the `clearMocks: true` default and stricter unawaited-assertion enforcement are both more likely to reveal real bugs than to be false positives)
-- [ ] Frontend build + manual smoke pass in the browser
+## Step 3 — Vitest 4 -> 5 (frontend only) — DONE (2026-09-13)
+- [x] Fix `apps/frontend/vitest.config.mts`: `path.resolve(__dirname, '.')` -> `path.resolve(import.meta.dirname, '.')`
+- [x] Bump `vitest` to 5.0.0
+- [x] Full frontend test suite -- 292/292 pass unchanged, no `clearMocks`/async-assertion fallout
+- [x] Frontend build succeeds; lint unchanged (same 79 pre-existing problems, nothing new)
 
 ## Deferred (explicit revisit conditions, not scheduled)
+- [ ] NestJS 11 -> 12: revisit once a decision is made on how to make this repo's Jest setup able to load ESM-only `@nestjs/*` packages (ts-jest's ESM preset + `NODE_OPTIONS=--experimental-vm-modules`, or waiting for Node 24.9+ where Jest supports `require(esm)` natively) -- not a "wait a few weeks" item, needs a maintainer decision on which path to invest in
 - [ ] TypeScript 6 -> 7: revisit once 7.1 ships (restores the compiler API) AND @typescript-eslint/ts-jest/ts-node each confirm 7.x support -- track typescript-eslint's issue tracker, don't guess a date
 - [ ] ESLint 9 -> 10 (frontend): revisit once eslint-config-next ships a release with updated eslint-plugin-import(-x)/react/jsx-a11y peers -- track vercel/next.js#89764, re-check on the next Next.js bump regardless
 ```
