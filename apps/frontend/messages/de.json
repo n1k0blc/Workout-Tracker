@@ -83,5 +83,30 @@
       "changeError": "Fehler beim Ändern des Passworts"
     },
     "logout": "Abmelden"
+  },
+  "Exercises": {
+    "muscleGroups": {
+      "ABDOMEN": "Bauch",
+      "LATISSIMUS": "Latissimus",
+      "TRAPEZIUS": "Trapez",
+      "LOWER_BACK": "Unterer Rücken",
+      "HAMSTRINGS": "Beinbeuger",
+      "GLUTES": "Glutes",
+      "SHOULDERS": "Schultern",
+      "BICEPS": "Bizeps",
+      "CHEST": "Brust",
+      "QUADRICEPS": "Quadrizeps",
+      "CALVES": "Waden",
+      "TRICEPS": "Trizeps"
+    },
+    "equipment": {
+      "CABLE": "Kabel",
+      "MACHINE": "Maschine",
+      "DUMBBELL": "Kurzhantel",
+      "BARBELL": "Langhantel",
+      "BODYWEIGHT": "Körpergewicht",
+      "SMITH_MACHINE": "Smith-Maschine",
+      "EZ_BAR": "SZ-Stange"
+    }
   }
 }

@@ -4,7 +4,7 @@ import { ProtectedRoute } from '@/components/protected-route';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
-import { MUSCLE_GROUP_LABELS } from '@/lib/exercise-utils';
+import { useExerciseLabels } from '@/hooks/useExerciseLabels';
 import {
   CycleDetails,
   PersonalRecord,
@@ -229,19 +229,7 @@ export default function CycleDetailPage() {
 
   // Colors now come from the shared chart-styles (imported at top) for consistency with main analytics page.
 
-  // Translation helpers
-  const translateMuscleGroup = (mg: string): string => {
-    return MUSCLE_GROUP_LABELS[mg as MuscleGroup] || mg;
-  };
-
-  const translateEquipment = (eq: Equipment): string => {
-    const translations: Record<Equipment, string> = {
-      CABLE: 'Kabel', MACHINE: 'Maschine', DUMBBELL: 'Kurzhantel',
-      BARBELL: 'Langhantel', BODYWEIGHT: 'Körpergewicht',
-      SMITH_MACHINE: 'Smith-Maschine', EZ_BAR: 'SZ-Stange',
-    };
-    return translations[eq];
-  };
+  const { translateMuscleGroup, translateEquipment } = useExerciseLabels();
 
   // Helper function to generate line name
   const generateLineName = (

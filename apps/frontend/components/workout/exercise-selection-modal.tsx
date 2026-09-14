@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Exercise, MuscleGroup, Equipment } from '@/types';
 import { apiClient } from '@/lib/api';
-import { MUSCLE_GROUP_LABELS } from '@/lib/exercise-utils';
+import { MUSCLE_GROUP_ORDER } from '@/lib/exercise-utils';
+import { useExerciseLabels } from '@/hooks/useExerciseLabels';
 import { ExerciseEditorDialog } from '@/components/exercises/exercise-editor-dialog';
 import {
   Dialog,
@@ -111,20 +112,7 @@ export default function ExerciseSelectionModal({
     setShowCreateDialog(false);
   };
 
-  const muscleGroups = [
-    MuscleGroup.ABDOMEN,
-    MuscleGroup.LATISSIMUS,
-    MuscleGroup.TRAPEZIUS,
-    MuscleGroup.LOWER_BACK,
-    MuscleGroup.HAMSTRINGS,
-    MuscleGroup.GLUTES,
-    MuscleGroup.SHOULDERS,
-    MuscleGroup.BICEPS,
-    MuscleGroup.CHEST,
-    MuscleGroup.QUADRICEPS,
-    MuscleGroup.CALVES,
-    MuscleGroup.TRICEPS,
-  ];
+  const muscleGroups = MUSCLE_GROUP_ORDER;
 
   const equipments = [
     Equipment.CABLE,
@@ -136,22 +124,7 @@ export default function ExerciseSelectionModal({
     Equipment.EZ_BAR,
   ];
 
-  const translateMuscleGroup = (mg: MuscleGroup): string => {
-    return MUSCLE_GROUP_LABELS[mg] || mg;
-  };
-
-  const translateEquipment = (eq: Equipment): string => {
-    const translations: Record<Equipment, string> = {
-      CABLE: 'Kabel',
-      MACHINE: 'Maschine',
-      DUMBBELL: 'Kurzhantel',
-      BARBELL: 'Langhantel',
-      BODYWEIGHT: 'Körpergewicht',
-      SMITH_MACHINE: 'Smith-Maschine',
-      EZ_BAR: 'EZ-Stange',
-    };
-    return translations[eq];
-  };
+  const { translateMuscleGroup, translateEquipment } = useExerciseLabels();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

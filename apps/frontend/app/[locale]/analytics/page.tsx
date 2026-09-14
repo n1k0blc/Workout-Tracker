@@ -34,6 +34,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { IconChevronLeft, IconChevronRight, IconPlus } from '@tabler/icons-react';
+import { useExerciseLabels } from '@/hooks/useExerciseLabels';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import SelectedExerciseCard from '@/components/analytics/selected-exercise-card';
 import ScrollableChart from '@/components/analytics/scrollable-chart';
@@ -297,43 +298,7 @@ export default function AnalyticsPage() {
   // Chart colors, RIR fills and tooltip styles are now imported from the central chart-styles.ts
   // (to avoid duplication with the cycle detail page and keep presentation logic centralized).
 
-  // Translation helpers
-  const translateMuscleGroup = (mg: string): string => {
-    const translations: Record<string, string> = {
-      // Legacy groups (kept for backwards compatibility)
-      CHEST: 'Brust',
-      BACK: 'Rücken',
-      LEGS: 'Beine',
-      SHOULDERS: 'Schultern',
-      BICEPS: 'Bizeps',
-      TRICEPS: 'Trizeps',
-      ABS: 'Bauch',
-      FOREARMS: 'Unterarme',
-      // New granular muscle groups
-      ABDOMEN: 'Bauch',
-      LATISSIMUS: 'Latissimus',
-      TRAPEZIUS: 'Trapez',
-      LOWER_BACK: 'Unterer Rücken',
-      HAMSTRINGS: 'Beinbeuger',
-      GLUTES: 'Glutes',
-      QUADRICEPS: 'Quadrizeps',
-      CALVES: 'Waden',
-    };
-    return translations[mg] || mg;
-  };
-
-  const translateEquipment = (eq: Equipment): string => {
-    const translations: Record<Equipment, string> = {
-      CABLE: 'Kabel',
-      MACHINE: 'Maschine',
-      DUMBBELL: 'Kurzhantel',
-      BARBELL: 'Langhantel',
-      BODYWEIGHT: 'Körpergewicht',
-      SMITH_MACHINE: 'Smith-Maschine',
-      EZ_BAR: 'SZ-Stange',
-    };
-    return translations[eq];
-  };
+  const { translateMuscleGroup, translateEquipment } = useExerciseLabels();
 
   // Helper function to generate line name
   const generateLineName = (

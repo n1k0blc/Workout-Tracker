@@ -1,28 +1,34 @@
 import { Exercise, MuscleGroup } from '@/types';
 
 /**
- * Maps MuscleGroup enum to German display names
+ * Canonical display order for the 12 muscle groups, shared by every picker/slider that
+ * lists them all. Labels come from the `Exercises.muscleGroups` message catalogue (#180)
+ * via `useExerciseLabels`, not from a static map here.
  */
-export const MUSCLE_GROUP_LABELS: Record<MuscleGroup, string> = {
-  [MuscleGroup.ABDOMEN]: 'Bauch',
-  [MuscleGroup.LATISSIMUS]: 'Latissimus',
-  [MuscleGroup.TRAPEZIUS]: 'Trapez',
-  [MuscleGroup.LOWER_BACK]: 'Unterer Rücken',
-  [MuscleGroup.HAMSTRINGS]: 'Beinbeuger',
-  [MuscleGroup.GLUTES]: 'Glutes',
-  [MuscleGroup.SHOULDERS]: 'Schultern',
-  [MuscleGroup.BICEPS]: 'Bizeps',
-  [MuscleGroup.CHEST]: 'Brust',
-  [MuscleGroup.QUADRICEPS]: 'Quadrizeps',
-  [MuscleGroup.CALVES]: 'Waden',
-  [MuscleGroup.TRICEPS]: 'Trizeps',
-};
+export const MUSCLE_GROUP_ORDER: MuscleGroup[] = [
+  MuscleGroup.ABDOMEN,
+  MuscleGroup.LATISSIMUS,
+  MuscleGroup.TRAPEZIUS,
+  MuscleGroup.LOWER_BACK,
+  MuscleGroup.HAMSTRINGS,
+  MuscleGroup.GLUTES,
+  MuscleGroup.SHOULDERS,
+  MuscleGroup.BICEPS,
+  MuscleGroup.CHEST,
+  MuscleGroup.QUADRICEPS,
+  MuscleGroup.CALVES,
+  MuscleGroup.TRICEPS,
+];
 
 /**
  * Gets the secondary muscle groups (>0% and not the primary muscle)
- * Returns array of { muscleGroup, percent }
+ * Returns array of { muscleGroup, percent, label }. `translateMuscleGroup` (from
+ * `useExerciseLabels`) supplies the locale-correct label for each.
  */
-export function getSecondaryMuscleGroups(exercise: Exercise): Array<{ muscleGroup: MuscleGroup; percent: number; label: string }> {
+export function getSecondaryMuscleGroups(
+  exercise: Exercise,
+  translateMuscleGroup: (muscleGroup: MuscleGroup) => string,
+): Array<{ muscleGroup: MuscleGroup; percent: number; label: string }> {
   const percentages: Array<{ muscleGroup: MuscleGroup; percent: number; field: keyof Exercise }> = [
     { muscleGroup: MuscleGroup.ABDOMEN, percent: exercise.abdomenPercent, field: 'abdomenPercent' },
     { muscleGroup: MuscleGroup.LATISSIMUS, percent: exercise.latissimusPercent, field: 'latissimusPercent' },
@@ -44,7 +50,7 @@ export function getSecondaryMuscleGroups(exercise: Exercise): Array<{ muscleGrou
     .map(({ muscleGroup, percent }) => ({
       muscleGroup,
       percent,
-      label: MUSCLE_GROUP_LABELS[muscleGroup],
+      label: translateMuscleGroup(muscleGroup),
     }));
 }
 
@@ -52,8 +58,11 @@ export function getSecondaryMuscleGroups(exercise: Exercise): Array<{ muscleGrou
  * Formats secondary muscle groups as a display string
  * Example: "Trizeps 25%, Schultern 15%"
  */
-export function formatSecondaryMuscleGroups(exercise: Exercise): string {
-  const secondary = getSecondaryMuscleGroups(exercise);
+export function formatSecondaryMuscleGroups(
+  exercise: Exercise,
+  translateMuscleGroup: (muscleGroup: MuscleGroup) => string,
+): string {
+  const secondary = getSecondaryMuscleGroups(exercise, translateMuscleGroup);
   if (secondary.length === 0) return '';
 
   return secondary
@@ -65,7 +74,10 @@ export function formatSecondaryMuscleGroups(exercise: Exercise): string {
  * Gets all muscle groups that this exercise targets (including the primary one)
  * Returns array of { muscleGroup, percent, label, isMain }
  */
-export function getAllMuscleGroups(exercise: Exercise): Array<{
+export function getAllMuscleGroups(
+  exercise: Exercise,
+  translateMuscleGroup: (muscleGroup: MuscleGroup) => string,
+): Array<{
   muscleGroup: MuscleGroup;
   percent: number;
   label: string;
@@ -92,7 +104,7 @@ export function getAllMuscleGroups(exercise: Exercise): Array<{
     .map(({ muscleGroup, percent }) => ({
       muscleGroup,
       percent,
-      label: MUSCLE_GROUP_LABELS[muscleGroup],
+      label: translateMuscleGroup(muscleGroup),
       isMain: muscleGroup === exercise.primaryMuscle,
     }));
 }

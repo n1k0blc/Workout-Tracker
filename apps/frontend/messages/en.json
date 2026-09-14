@@ -83,5 +83,30 @@
       "changeError": "Failed to change password"
     },
     "logout": "Log out"
+  },
+  "Exercises": {
+    "muscleGroups": {
+      "ABDOMEN": "Abs",
+      "LATISSIMUS": "Lats",
+      "TRAPEZIUS": "Traps",
+      "LOWER_BACK": "Lower Back",
+      "HAMSTRINGS": "Hamstrings",
+      "GLUTES": "Glutes",
+      "SHOULDERS": "Shoulders",
+      "BICEPS": "Biceps",
+      "CHEST": "Chest",
+      "QUADRICEPS": "Quads",
+      "CALVES": "Calves",
+      "TRICEPS": "Triceps"
+    },
+    "equipment": {
+      "CABLE": "Cable",
+      "MACHINE": "Machine",
+      "DUMBBELL": "Dumbbell",
+      "BARBELL": "Barbell",
+      "BODYWEIGHT": "Bodyweight",
+      "SMITH_MACHINE": "Smith Machine",
+      "EZ_BAR": "EZ Bar"
+    }
   }
 }

@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { MuscleGroup, Equipment, Exercise } from '@/types';
 import { apiClient } from '@/lib/api';
-import { MUSCLE_GROUP_LABELS, createIsolationPreset, validateMusclePercentages } from '@/lib/exercise-utils';
+import { MUSCLE_GROUP_ORDER, createIsolationPreset, validateMusclePercentages } from '@/lib/exercise-utils';
+import { useExerciseLabels } from '@/hooks/useExerciseLabels';
 import {
   Dialog,
   DialogContent,
@@ -56,29 +57,14 @@ const defaultPercentages: PercentageState = {
   tricepsPercent: 0,
 };
 
-const muscleGroupOptions: { value: MuscleGroup; label: string }[] = [
-  { value: MuscleGroup.ABDOMEN, label: 'Bauch' },
-  { value: MuscleGroup.LATISSIMUS, label: 'Latissimus' },
-  { value: MuscleGroup.TRAPEZIUS, label: 'Trapez' },
-  { value: MuscleGroup.LOWER_BACK, label: 'Unterer Rücken' },
-  { value: MuscleGroup.HAMSTRINGS, label: 'Beinbeuger' },
-  { value: MuscleGroup.GLUTES, label: 'Glutes' },
-  { value: MuscleGroup.SHOULDERS, label: 'Schultern' },
-  { value: MuscleGroup.BICEPS, label: 'Bizeps' },
-  { value: MuscleGroup.CHEST, label: 'Brust' },
-  { value: MuscleGroup.QUADRICEPS, label: 'Quadrizeps' },
-  { value: MuscleGroup.CALVES, label: 'Waden' },
-  { value: MuscleGroup.TRICEPS, label: 'Trizeps' },
-];
-
-const equipmentOptions: { value: Equipment; label: string }[] = [
-  { value: Equipment.BARBELL, label: 'Langhantel' },
-  { value: Equipment.DUMBBELL, label: 'Kurzhantel' },
-  { value: Equipment.CABLE, label: 'Kabel' },
-  { value: Equipment.MACHINE, label: 'Maschine' },
-  { value: Equipment.BODYWEIGHT, label: 'Körpergewicht' },
-  { value: Equipment.SMITH_MACHINE, label: 'Smith Machine' },
-  { value: Equipment.EZ_BAR, label: 'SZ-Stange' },
+const EQUIPMENT_OPTION_ORDER: Equipment[] = [
+  Equipment.BARBELL,
+  Equipment.DUMBBELL,
+  Equipment.CABLE,
+  Equipment.MACHINE,
+  Equipment.BODYWEIGHT,
+  Equipment.SMITH_MACHINE,
+  Equipment.EZ_BAR,
 ];
 
 export function ExerciseEditorDialog({
@@ -94,6 +80,7 @@ export function ExerciseEditorDialog({
   // bilateral -- that would be a different exercise (issue #98). Lock the toggle
   // and show why, in both edit and view mode, instead of only failing on save.
   const unilateralLocked = !!exercise?.inUse;
+  const { translateMuscleGroup, translateEquipment } = useExerciseLabels();
 
   const [name, setName] = useState('');
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup>(MuscleGroup.CHEST);
@@ -248,9 +235,9 @@ export function ExerciseEditorDialog({
                   disabled={isViewMode}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-60"
                 >
-                  {muscleGroupOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
+                  {MUSCLE_GROUP_ORDER.map((mg) => (
+                    <option key={mg} value={mg}>
+                      {translateMuscleGroup(mg)}
                     </option>
                   ))}
                 </select>
@@ -265,9 +252,9 @@ export function ExerciseEditorDialog({
                   disabled={isViewMode}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-60"
                 >
-                  {equipmentOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
+                  {EQUIPMENT_OPTION_ORDER.map((eq) => (
+                    <option key={eq} value={eq}>
+                      {translateEquipment(eq)}
                     </option>
                   ))}
                 </select>
@@ -360,8 +347,9 @@ export function ExerciseEditorDialog({
 
             {/* Sliders */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4 max-h-[320px] overflow-y-auto pr-1">
-              {(Object.entries(MUSCLE_GROUP_LABELS) as [MuscleGroup, string][])
-                .map(([key, label]) => {
+              {MUSCLE_GROUP_ORDER
+                .map((key) => {
+                  const label = translateMuscleGroup(key);
                   const fieldMap: Record<MuscleGroup, keyof PercentageState> = {
                     [MuscleGroup.ABDOMEN]: 'abdomenPercent',
                     [MuscleGroup.LATISSIMUS]: 'latissimusPercent',

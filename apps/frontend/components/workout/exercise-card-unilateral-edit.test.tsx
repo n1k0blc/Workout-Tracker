@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { NextIntlClientProvider } from 'next-intl';
+import messages from '@/messages/de.json';
 
 vi.mock('@/lib/api', () => ({
   apiClient: { getExercises: vi.fn().mockResolvedValue([]) },
@@ -102,7 +104,9 @@ describe('active workout: logged unilateral set', () => {
     ['extra set', unilateralWithLoggedSet],
   ])('renders editable per-side inputs for a logged %s, like a bilateral one does', (_label, build) => {
     render(
-      <ExerciseCard exercise={build()} exerciseNumber={1} mode="active" defaultOpen />,
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <ExerciseCard exercise={build()} exerciseNumber={1} mode="active" defaultOpen />
+      </NextIntlClientProvider>,
     );
 
     const inputs = screen.getAllByRole('spinbutton') as HTMLInputElement[];
