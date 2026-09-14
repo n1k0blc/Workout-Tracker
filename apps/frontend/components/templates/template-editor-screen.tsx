@@ -185,7 +185,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
     } catch (error) {
       console.error('Failed to load data for template editor:', error);
       alert('Fehler beim Laden der Daten.');
-      router.push('/templates');
+      router.push('/de/templates');
     } finally {
       setLoading(false);
     }
@@ -249,7 +249,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
         await apiClient.createWorkoutTemplate(payload);
       }
 
-      router.push('/templates');
+      router.push('/de/templates');
     } catch (error) {
       console.error('Failed to save template:', error);
       alert('Fehler beim Speichern der Vorlage.');
@@ -276,7 +276,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
             {/* Back Button */}
             <Button
               variant="ghost"
-              onClick={() => router.push('/templates')}
+              onClick={() => router.push('/de/templates')}
               className="flex items-center gap-2 -ml-2"
             >
               <IconChevronLeft className="size-4" />
@@ -453,7 +453,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
               <div className="flex gap-3">
                 <Button
                   variant="outline"
-                  onClick={() => router.push('/templates')}
+                  onClick={() => router.push('/de/templates')}
                   disabled={saving}
                   className="flex-1"
                 >

@@ -153,7 +153,7 @@ class ApiClient {
         !this.redirecting
       ) {
         this.redirecting = true;
-        window.location.href = '/login';
+        window.location.href = '/de/login';
       }
       throw new Error('Unauthorized');
     }

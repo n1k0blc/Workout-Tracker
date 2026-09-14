@@ -116,3 +116,18 @@ describe("CSP connect-src covers the configured API origin", () => {
     expect(csp).toContain("connect-src 'self' http://localhost:3001");
   });
 });
+
+describe("locale redirect (issue #177): composed ahead of the CSP logic", () => {
+  it("redirects / to /de without computing a CSP", () => {
+    const res = run("https://workout.nikobjelic.com/");
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toBe("https://workout.nikobjelic.com/de");
+    expect(res.headers.get("content-security-policy")).toBeNull();
+  });
+
+  it("leaves every other route, including under /de, un-redirected with the enforcing CSP intact", () => {
+    const res = run("https://workout.nikobjelic.com/de/dashboard");
+    expect(res.headers.get("location")).toBeNull();
+    expect(res.headers.get("content-security-policy")).toBeTruthy();
+  });
+});

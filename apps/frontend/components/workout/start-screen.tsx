@@ -269,7 +269,7 @@ export default function WorkoutStartScreen() {
             </h1>
             <Button
               variant="ghost"
-              onClick={() => router.push('/dashboard')}
+              onClick={() => router.push('/de/dashboard')}
             >
               <IconX className="mr-2 size-4" />
               Abbrechen

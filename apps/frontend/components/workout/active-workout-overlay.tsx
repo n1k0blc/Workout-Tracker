@@ -46,11 +46,11 @@ export function ActiveWorkoutOverlay() {
 
   // Where a minimize from the /workout route should drop the user. Tracks the last
   // real page they were reading; defaults to the dashboard on the very first minimize.
-  const lastNonWorkoutRoute = useRef('/dashboard');
+  const lastNonWorkoutRoute = useRef('/de/dashboard');
   useEffect(() => {
     if (!pathname) return;
-    if (pathname.startsWith('/workout')) return;
-    if (['/', '/login', '/register'].includes(pathname)) return;
+    if (pathname.startsWith('/de/workout')) return;
+    if (['/de', '/de/login', '/de/register'].includes(pathname)) return;
     lastNonWorkoutRoute.current = pathname;
   }, [pathname]);
 
@@ -72,7 +72,7 @@ export function ActiveWorkoutOverlay() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const markerOnStack = window.history.state?.[EXPANDED_MARKER] === true;
-    const onWorkoutRoute = pathname?.startsWith('/workout') ?? false;
+    const onWorkoutRoute = pathname?.startsWith('/de/workout') ?? false;
     const { hasEntry, effect } = reconcileCollapseEntry(
       collapseEntryRef.current,
       expandedOnScreen,
@@ -112,7 +112,7 @@ export function ActiveWorkoutOverlay() {
         minimizeWorkout();
         // The browser already popped our marker; if that left the guard screen
         // showing, swap it for the page to return to.
-        if (window.location.pathname.startsWith('/workout')) leaveWorkoutRoute();
+        if (window.location.pathname.startsWith('/de/workout')) leaveWorkoutRoute();
       }
     };
     window.addEventListener('popstate', onPopState);

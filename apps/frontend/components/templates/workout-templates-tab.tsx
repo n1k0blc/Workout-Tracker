@@ -65,7 +65,7 @@ export default function WorkoutTemplatesTab() {
           {systemTemplates.length} System-Vorlagen · {customTemplates.length} Benutzerdefinierte
           Vorlagen
         </p>
-        <Button onClick={() => router.push('/templates/new')}>
+        <Button onClick={() => router.push('/de/templates/new')}>
           <IconPlus className="mr-2 size-4" />
           Neue Vorlage
         </Button>
@@ -89,7 +89,7 @@ export default function WorkoutTemplatesTab() {
                   <TemplateCard
                     key={template.id}
                     template={template}
-                    onClick={() => router.push(`/templates/${template.id}/edit`)}
+                    onClick={() => router.push(`/de/templates/${template.id}/edit`)}
                   />
                 ))}
               </div>
@@ -109,7 +109,7 @@ export default function WorkoutTemplatesTab() {
                     key={template.id}
                     template={template}
                     onDelete={() => setDeleteTemplateId(template.id)}
-                    onClick={() => router.push(`/templates/${template.id}/edit`)}
+                    onClick={() => router.push(`/de/templates/${template.id}/edit`)}
                   />
                 ))}
               </div>

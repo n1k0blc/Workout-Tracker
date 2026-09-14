@@ -33,7 +33,7 @@ export function MealSlotRow({
       </div>
 
       <Link
-        href={`/nutrition/slots/${slot.id}?date=${date}`}
+        href={`/de/nutrition/slots/${slot.id}?date=${date}`}
         className="min-w-0 flex-1"
       >
         <div className="flex items-center gap-1.5">

@@ -65,7 +65,16 @@ export function buildCsp(nonce: string): string {
   ].join("; ");
 }
 
+// Locale is hardcoded until real i18n lands (#176) -- this ticket is a pure
+// structural prefactor moving routes under app/[locale]/. Only "/" needs a
+// redirect: every other route already carries the /de prefix in its links.
+const DEFAULT_LOCALE = "de";
+
 export function middleware(request: NextRequest) {
+  if (request.nextUrl.pathname === "/") {
+    return NextResponse.redirect(new URL(`/${DEFAULT_LOCALE}`, request.url));
+  }
+
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const csp = buildCsp(nonce);
 

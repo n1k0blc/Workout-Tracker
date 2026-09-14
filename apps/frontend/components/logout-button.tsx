@@ -39,7 +39,7 @@ export function LogoutButton({ children, onRequestConfirm, ...props }: LogoutBut
 
   const runLogout = useCallback(async () => {
     await logout(); // best-effort client-side, never rejects
-    router.push('/login');
+    router.push('/de/login');
   }, [logout, router]);
 
   return (

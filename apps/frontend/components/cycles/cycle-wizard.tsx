@@ -110,7 +110,7 @@ export default function CycleWizard() {
       };
 
       await apiClient.createCycle(payload);
-      router.push('/cycles');
+      router.push('/de/cycles');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fehler beim Erstellen des Zyklus');
     } finally {
@@ -147,7 +147,7 @@ export default function CycleWizard() {
             </div>
             <Button
               variant="ghost"
-              onClick={() => router.push('/cycles')}
+              onClick={() => router.push('/de/cycles')}
             >
               Abbrechen
             </Button>
