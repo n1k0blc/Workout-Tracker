@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { AppBadRequestException } from '../common/errors/app-exceptions';
 import { Prisma } from '../../generated/prisma/client';
 import { SetType, Equipment } from '../common/types';
 import {
@@ -75,8 +76,9 @@ function deriveSetAggregates(
   if (!shape.isUnilateral) {
     if (carriesSideData) {
       // Every set carrying side data is equally at fault, so this names the exercise, not a set.
-      throw new BadRequestException(
+      throw new AppBadRequestException(
         `${exerciseLabel} is a bilateral exercise; its sets must not carry per-side values`,
+        'WORKOUT_SET_UNEXPECTED_SIDE_DATA',
       );
     }
     return set;
@@ -84,13 +86,15 @@ function deriveSetAggregates(
 
   const { repsLeft, repsRight, weightLeft, weightRight, rirLeft, rirRight } = set;
   if (repsLeft == null || repsRight == null || weightLeft == null || weightRight == null) {
-    throw new BadRequestException(
+    throw new AppBadRequestException(
       `${exerciseLabel}, set ${setNumber}: a unilateral exercise needs reps and weight for both sides`,
+      'WORKOUT_SET_MISSING_SIDE_DATA',
     );
   }
   if ((rirLeft == null) !== (rirRight == null)) {
-    throw new BadRequestException(
+    throw new AppBadRequestException(
       `${exerciseLabel}, set ${setNumber}: RIR is set for only one side; provide both or neither`,
+      'WORKOUT_SET_RIR_SIDE_MISMATCH',
     );
   }
 
@@ -178,9 +182,10 @@ function assertOrderMatchesPosition(items: { order: number }[], label: string): 
   items.forEach((item, index) => {
     const expected = index + 1;
     if (item.order !== expected) {
-      throw new BadRequestException(
+      throw new AppBadRequestException(
         `${label}: order must be 1-based, contiguous, and match the order the items were sent in ` +
           `(expected ${expected} at position ${index}, received ${item.order})`,
+        'WORKOUT_TREE_ORDER_INVALID',
       );
     }
   });

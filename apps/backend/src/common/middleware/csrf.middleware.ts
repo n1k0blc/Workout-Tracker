@@ -1,4 +1,5 @@
-import { ForbiddenException, Injectable, NestMiddleware } from '@nestjs/common';
+import { Injectable, NestMiddleware } from '@nestjs/common';
+import { AppForbiddenException } from '../errors/app-exceptions';
 import type { NextFunction, Request, Response } from 'express';
 import { timingSafeEqualStrings } from '../utils/token.util';
 
@@ -34,7 +35,7 @@ export class CsrfMiddleware implements NestMiddleware {
     const headerToken = req.header(CSRF_HEADER);
 
     if (!cookieToken || !headerToken || !timingSafeEqualStrings(cookieToken, headerToken)) {
-      throw new ForbiddenException('Invalid or missing CSRF token');
+      throw new AppForbiddenException('Invalid or missing CSRF token', 'CSRF_TOKEN_INVALID');
     }
 
     next();

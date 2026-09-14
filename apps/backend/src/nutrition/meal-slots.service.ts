@@ -1,9 +1,9 @@
+import { Injectable } from '@nestjs/common';
 import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  ConflictException,
-} from '@nestjs/common';
+  AppNotFoundException,
+  AppBadRequestException,
+  AppConflictException,
+} from '../common/errors/app-exceptions';
 import { PrismaService } from '../prisma/prisma.service';
 import { MealSlotDto, MealSlotListDto } from './dto';
 
@@ -40,9 +40,10 @@ export function assertContiguousOrder(items: { order: number }[]): void {
   items.forEach((item, index) => {
     const expected = index + 1;
     if (item.order !== expected) {
-      throw new BadRequestException(
+      throw new AppBadRequestException(
         `Abschnitt-Reihenfolge muss 1-basiert, lückenlos und in Sende-Reihenfolge sein ` +
           `(Position ${index} erwartet ${expected}, erhielt ${item.order})`,
+        'MEAL_SLOT_ORDER_INVALID',
       );
     }
   });
@@ -145,7 +146,10 @@ export class MealSlotsService {
         where: { userId, archivedAt: null },
       });
       if (activeCount <= 1) {
-        throw new ConflictException('Mindestens ein Abschnitt muss aktiv bleiben');
+        throw new AppConflictException(
+          'Mindestens ein Abschnitt muss aktiv bleiben',
+          'MEAL_SLOT_LAST_ACTIVE',
+        );
       }
     }
 
@@ -184,7 +188,10 @@ export class MealSlotsService {
       new Set(activeIds).size === activeIds.length &&
       activeIds.every((id) => currentSet.has(id));
     if (!sameSet) {
-      throw new BadRequestException('slots muss genau die aktuell aktiven Abschnitte enthalten');
+      throw new AppBadRequestException(
+        'slots muss genau die aktuell aktiven Abschnitte enthalten',
+        'MEAL_SLOT_REORDER_SET_MISMATCH',
+      );
     }
 
     const archivedIds = (
@@ -213,7 +220,7 @@ export class MealSlotsService {
       select: { id: true, name: true, order: true, archivedAt: true },
     })) as MealSlotRow | null;
     if (!slot) {
-      throw new NotFoundException('Abschnitt nicht gefunden');
+      throw new AppNotFoundException('Abschnitt nicht gefunden', 'MEAL_SLOT_NOT_FOUND');
     }
     return slot;
   }

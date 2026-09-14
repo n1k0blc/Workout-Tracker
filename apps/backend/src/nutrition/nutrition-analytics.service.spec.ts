@@ -181,17 +181,17 @@ describe('NutritionAnalyticsService.getTrend — range boundaries', () => {
   it('rejects an end before the start', async () => {
     const { service } = makeService([]);
 
-    await expect(service.getTrend('user-1', '2026-09-10', '2026-09-01')).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    const result = service.getTrend('user-1', '2026-09-10', '2026-09-01');
+    await expect(result).rejects.toBeInstanceOf(BadRequestException);
+    await expect(result).rejects.toMatchObject({ code: 'NUTRITION_TREND_RANGE_INVERTED' });
   });
 
   it('rejects a range longer than a year', async () => {
     const { service } = makeService([]);
 
-    await expect(service.getTrend('user-1', '2025-01-01', '2026-06-01')).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    const result = service.getTrend('user-1', '2025-01-01', '2026-06-01');
+    await expect(result).rejects.toBeInstanceOf(BadRequestException);
+    await expect(result).rejects.toMatchObject({ code: 'NUTRITION_TREND_RANGE_TOO_LONG' });
   });
 });
 

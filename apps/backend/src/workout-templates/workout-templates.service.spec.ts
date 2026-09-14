@@ -68,7 +68,9 @@ describe('WorkoutTemplatesService.findOne — ownership', () => {
       findUnique: { ...CUSTOM_TEMPLATE, userId: 'someone-else' },
     });
 
-    await expect(service.findOne('tpl-1', 'user-1')).rejects.toBeInstanceOf(NotFoundException);
+    const result = service.findOne('tpl-1', 'user-1');
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'WORKOUT_TEMPLATE_NOT_FOUND' });
   });
 
   it('is readable by any user when it is a system template (isCustom: false)', async () => {

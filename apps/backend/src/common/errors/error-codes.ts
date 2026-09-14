@@ -1,0 +1,113 @@
+/**
+ * Every machine-readable error code the API can return, grouped by the module that throws it.
+ * A code names the *condition* an exception represents, not its (still German/English-mixed)
+ * message text -- this is the expand half of an expand-contract migration (#178): the
+ * frontend keeps reading `message` exactly as it does today, and can start keying off `code`
+ * once a later ticket wires that up.
+ *
+ * The same code is reused across call sites that check the literal same condition (e.g.
+ * `CYCLE_NOT_FOUND` fires from three different services), even where their message text
+ * differs -- that inconsistency is exactly what codes are meant to paper over.
+ */
+export const ERROR_CODES = [
+  // Auth
+  'EMAIL_ALREADY_REGISTERED',
+  'PASSWORD_BREACHED',
+  'USER_CREATION_FAILED',
+  'INVALID_CREDENTIALS',
+  'SESSION_USER_NOT_FOUND',
+  'CURRENT_PASSWORD_INCORRECT',
+  'REFRESH_TOKEN_MISSING',
+  'REFRESH_TOKEN_INVALID',
+  'REFRESH_TOKEN_EXPIRED',
+  'REFRESH_TOKEN_ALREADY_ROTATED',
+  'REFRESH_TOKEN_REUSE_DETECTED',
+
+  // CSRF
+  'CSRF_TOKEN_INVALID',
+
+  // Health
+  'DATABASE_UNREACHABLE',
+
+  // Users / home gyms
+  'USER_NOT_FOUND',
+  'EMAIL_ALREADY_IN_USE',
+  'HOME_GYM_NOT_FOUND',
+  'HOME_GYM_IN_USE_BY_ACTIVE_CYCLE',
+
+  // Foods / favorites (shared library, ADR-0003)
+  'FOOD_NOT_FOUND',
+  'BARCODE_INVALID',
+  'FOOD_READ_ONLY_SOURCE',
+  'FOOD_NOT_OWNER',
+  'FOOD_PORTION_INVALID',
+  'FOOD_PORTION_DEFAULT_COUNT_INVALID',
+  'FOOD_BARCODE_TAKEN',
+
+  // Meals
+  'MEAL_NOT_FOUND',
+  'MEAL_NOT_OWNER',
+  'MEAL_ITEM_FOOD_NOT_FOUND',
+
+  // Nutrition diary
+  'DIARY_COPY_SAME_DAY',
+  'DIARY_ENTRY_NOT_FOUND',
+  'MEAL_SLOT_NOT_FOUND',
+  'MEAL_SLOT_ARCHIVED',
+  'MEAL_SLOT_ORDER_INVALID',
+  'MEAL_SLOT_LAST_ACTIVE',
+  'MEAL_SLOT_REORDER_SET_MISMATCH',
+  'MEAL_SLOT_UPDATE_EMPTY',
+  'NUTRITION_TREND_RANGE_INVERTED',
+  'NUTRITION_TREND_RANGE_TOO_LONG',
+  'NUTRITION_DAY_DATE_INVALID',
+  'NUTRITION_ANALYTICS_RANGE_INVALID',
+
+  // Exercises
+  'EXERCISES_NOT_FOUND',
+  'EXERCISE_NOT_FOUND',
+  'EXERCISE_MUSCLE_PERCENTAGES_REQUIRED',
+  'EXERCISE_MUSCLE_PERCENTAGES_INVALID_SUM',
+  'EXERCISE_NAME_TAKEN',
+  'SYSTEM_EXERCISE_NOT_DELETABLE',
+  'SYSTEM_EXERCISE_NOT_EDITABLE',
+  'EXERCISE_UNILATERAL_CHANGE_BLOCKED',
+  'EXERCISE_ID_REQUIRED',
+
+  // Workout cycles
+  'CYCLE_NOT_FOUND',
+  'CYCLE_NOT_STARTED',
+  'CYCLE_ALREADY_COMPLETED',
+  'CYCLE_CONCURRENT_MODIFICATION',
+  'ACTIVE_CYCLE_ALREADY_EXISTS',
+  'DUPLICATE_WEEKDAY_IN_CYCLE',
+  'WORKOUT_DAY_NOT_FOUND',
+  'WORKOUT_DAY_CYCLE_MISMATCH',
+  'WORKOUT_DAY_WEEKDAY_TAKEN',
+  'BLUEPRINT_NOT_FOUND',
+
+  // Workout templates
+  'WORKOUT_TEMPLATE_NOT_FOUND',
+  'TEMPLATE_NAME_TAKEN',
+  'SYSTEM_TEMPLATE_NOT_EDITABLE',
+  'SYSTEM_TEMPLATE_NOT_DELETABLE',
+
+  // Workout tree (exercises/sets within a workout, blueprint or template)
+  'WORKOUT_SET_UNEXPECTED_SIDE_DATA',
+  'WORKOUT_SET_MISSING_SIDE_DATA',
+  'WORKOUT_SET_RIR_SIDE_MISMATCH',
+  'WORKOUT_TREE_ORDER_INVALID',
+
+  // Workouts
+  'WORKOUT_NOT_FOUND',
+  'WORKOUT_CYCLE_CONTEXT_REQUIRED',
+  'WORKOUT_EXERCISES_REQUIRED_FOR_SIDE_EFFECT',
+  'ORIGIN_TEMPLATE_NOT_FOUND',
+  'OVERWRITE_BLUEPRINT_REQUIRES_WORKOUT_DAY',
+  'OVERWRITE_BLUEPRINT_REQUIRES_HOME_GYM',
+  'OVERWRITE_TEMPLATE_ID_REQUIRED',
+  'OVERWRITE_TEMPLATE_ID_MISMATCH',
+  'SAVE_AS_TEMPLATE_NAME_REQUIRED',
+] as const;
+
+export type ErrorCode = (typeof ERROR_CODES)[number];

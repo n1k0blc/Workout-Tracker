@@ -286,7 +286,9 @@ describe('FoodsService.findById — resolves soft-deleted', () => {
 
   it('404s when the id is unknown', async () => {
     const { service } = makeService({ findUnique: null });
-    await expect(service.findById('nope', 'user-1')).rejects.toBeInstanceOf(NotFoundException);
+    const result = service.findById('nope', 'user-1');
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'FOOD_NOT_FOUND' });
   });
 });
 
@@ -315,9 +317,9 @@ describe('FoodsService.create', () => {
       },
     });
 
-    await expect(
-      service.create('user-1', baseCreateDto({ barcode: '4008713700086' })),
-    ).rejects.toBeInstanceOf(ConflictException);
+    const result = service.create('user-1', baseCreateDto({ barcode: '4008713700086' }));
+    await expect(result).rejects.toBeInstanceOf(ConflictException);
+    await expect(result).rejects.toMatchObject({ code: 'FOOD_BARCODE_TAKEN' });
   });
 
   it('writes portions with order from array position and requires exactly one default', async () => {
@@ -350,29 +352,29 @@ describe('FoodsService.create', () => {
   it('rejects a portion list with no default or with more than one default', async () => {
     const { service } = makeService();
 
-    await expect(
-      service.create(
-        'user-1',
-        baseCreateDto({
-          portions: [
-            { label: 'a', grams: 1 },
-            { label: 'b', grams: 2 },
-          ],
-        }),
-      ),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    const noDefault = service.create(
+      'user-1',
+      baseCreateDto({
+        portions: [
+          { label: 'a', grams: 1 },
+          { label: 'b', grams: 2 },
+        ],
+      }),
+    );
+    await expect(noDefault).rejects.toBeInstanceOf(BadRequestException);
+    await expect(noDefault).rejects.toMatchObject({ code: 'FOOD_PORTION_DEFAULT_COUNT_INVALID' });
 
-    await expect(
-      service.create(
-        'user-1',
-        baseCreateDto({
-          portions: [
-            { label: 'a', grams: 1, isDefault: true },
-            { label: 'b', grams: 2, isDefault: true },
-          ],
-        }),
-      ),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    const twoDefaults = service.create(
+      'user-1',
+      baseCreateDto({
+        portions: [
+          { label: 'a', grams: 1, isDefault: true },
+          { label: 'b', grams: 2, isDefault: true },
+        ],
+      }),
+    );
+    await expect(twoDefaults).rejects.toBeInstanceOf(BadRequestException);
+    await expect(twoDefaults).rejects.toMatchObject({ code: 'FOOD_PORTION_DEFAULT_COUNT_INVALID' });
   });
 });
 
@@ -380,17 +382,17 @@ describe('FoodsService.update / softDelete — creator-only, read-only globals',
   it('403s when a USER food is edited by someone other than its creator', async () => {
     const { service, prisma } = makeService({ findUnique: { ...OTHER_USER_FOOD } });
 
-    await expect(service.update('user-1', 'food-other', baseCreateDto())).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    const result = service.update('user-1', 'food-other', baseCreateDto());
+    await expect(result).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(result).rejects.toMatchObject({ code: 'FOOD_NOT_OWNER' });
     expect(prisma.food.update).not.toHaveBeenCalled();
   });
 
   it('403s on a SEED food for everyone', async () => {
     const { service } = makeService({ findUnique: { ...SEED_FOOD } });
-    await expect(service.update('user-1', 'food-seed', baseCreateDto())).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    const result = service.update('user-1', 'food-seed', baseCreateDto());
+    await expect(result).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(result).rejects.toMatchObject({ code: 'FOOD_READ_ONLY_SOURCE' });
   });
 
   it('403s on an OPEN_FOOD_FACTS food for everyone', async () => {
@@ -496,9 +498,9 @@ describe('FoodsService.lookupByBarcode — the miss chain', () => {
   it('rejects a barcode that fails its check digit before touching the library', async () => {
     const { service, prisma, offLookup } = makeService();
 
-    await expect(service.lookupByBarcode('user-1', '4025500287956')).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    const result = service.lookupByBarcode('user-1', '4025500287956');
+    await expect(result).rejects.toBeInstanceOf(BadRequestException);
+    await expect(result).rejects.toMatchObject({ code: 'BARCODE_INVALID' });
     expect(prisma.food.findFirst).not.toHaveBeenCalled();
     expect(offLookup.lookup).not.toHaveBeenCalled();
   });

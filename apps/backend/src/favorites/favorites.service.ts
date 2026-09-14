@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { AppNotFoundException } from '../common/errors/app-exceptions';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -23,7 +24,7 @@ export class FavoritesService {
         select: { id: true },
       });
       if (!food) {
-        throw new NotFoundException('Lebensmittel nicht gefunden');
+        throw new AppNotFoundException('Lebensmittel nicht gefunden', 'FOOD_NOT_FOUND');
       }
       await this.prisma.foodFavorite.upsert({
         where: { userId_foodId: { userId, foodId } },
@@ -42,7 +43,7 @@ export class FavoritesService {
         select: { id: true },
       });
       if (!meal) {
-        throw new NotFoundException('Mahlzeit nicht gefunden');
+        throw new AppNotFoundException('Mahlzeit nicht gefunden', 'MEAL_NOT_FOUND');
       }
       await this.prisma.mealFavorite.upsert({
         where: { userId_mealId: { userId, mealId } },

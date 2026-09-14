@@ -43,9 +43,9 @@ describe('UsersService.updateHomeGym — cross-user access', () => {
   it('404s when the gym belongs to a different user', async () => {
     const { service, prisma } = makeService();
 
-    await expect(
-      service.updateHomeGym('user-1', 'gym-1', { name: 'Renamed' }),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    const result = service.updateHomeGym('user-1', 'gym-1', { name: 'Renamed' });
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'HOME_GYM_NOT_FOUND' });
     expect(prisma.homeGym.update).not.toHaveBeenCalled();
   });
 });

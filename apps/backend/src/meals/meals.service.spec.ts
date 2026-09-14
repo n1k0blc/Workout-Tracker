@@ -199,7 +199,9 @@ describe('MealsService.findById — live reference', () => {
 
   it('404s an unknown id', async () => {
     const { service } = makeService({ findUnique: null });
-    await expect(service.findById('nope', 'user-1')).rejects.toBeInstanceOf(NotFoundException);
+    const result = service.findById('nope', 'user-1');
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'MEAL_NOT_FOUND' });
   });
 
   it('resolves a meal created by a different user (reads are shared per ADR-0003)', async () => {
@@ -244,9 +246,9 @@ describe('MealsService.create', () => {
   it('404s when an item references a food that does not exist', async () => {
     const { service, prisma } = makeService({ foodCount: 1 });
 
-    await expect(service.create('user-1', baseCreateDto())).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    const result = service.create('user-1', baseCreateDto());
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'MEAL_ITEM_FOOD_NOT_FOUND' });
     expect(prisma.meal.create).not.toHaveBeenCalled();
   });
 });
@@ -257,9 +259,9 @@ describe('MealsService.update / softDelete — creator only', () => {
       findUnique: mealRow({ createdById: 'user-2' }),
     });
 
-    await expect(service.update('user-1', 'meal-1', baseCreateDto())).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    const result = service.update('user-1', 'meal-1', baseCreateDto());
+    await expect(result).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(result).rejects.toMatchObject({ code: 'MEAL_NOT_OWNER' });
     expect(prisma.meal.update).not.toHaveBeenCalled();
   });
 

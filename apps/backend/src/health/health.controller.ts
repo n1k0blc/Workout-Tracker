@@ -14,6 +14,7 @@ export class HealthController {
         status: 'error',
         timestamp: new Date().toISOString(),
         database: 'unreachable',
+        code: 'DATABASE_UNREACHABLE',
       });
     }
 

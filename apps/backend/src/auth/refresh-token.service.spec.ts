@@ -107,7 +107,9 @@ describe('RefreshTokenService.rotate', () => {
     const { prisma } = makeFakePrisma();
     const service = new RefreshTokenService(prisma as any);
 
-    await expect(service.rotate('never-issued')).rejects.toThrow(UnauthorizedException);
+    const result = service.rotate('never-issued');
+    await expect(result).rejects.toThrow(UnauthorizedException);
+    await expect(result).rejects.toMatchObject({ code: 'REFRESH_TOKEN_INVALID' });
   });
 
   it('rejects an expired token without rotating it', async () => {
@@ -115,7 +117,9 @@ describe('RefreshTokenService.rotate', () => {
     seedToken(rows, { expiresAt: new Date(Date.now() - 1000) });
     const service = new RefreshTokenService(prisma as any);
 
-    await expect(service.rotate('raw-token')).rejects.toThrow('Refresh token expired');
+    const result = service.rotate('raw-token');
+    await expect(result).rejects.toThrow('Refresh token expired');
+    await expect(result).rejects.toMatchObject({ code: 'REFRESH_TOKEN_EXPIRED' });
     expect(rows.get('row-seed')?.revokedAt).toBeNull();
   });
 
@@ -130,7 +134,9 @@ describe('RefreshTokenService.rotate', () => {
     });
     const service = new RefreshTokenService(prisma as any);
 
-    await expect(service.rotate('raw-token')).rejects.toThrow('Refresh token reuse detected');
+    const result = service.rotate('raw-token');
+    await expect(result).rejects.toThrow('Refresh token reuse detected');
+    await expect(result).rejects.toMatchObject({ code: 'REFRESH_TOKEN_REUSE_DETECTED' });
     expect(rows.get('row-older')?.revokedAt).not.toBeNull();
   });
 
@@ -140,7 +146,9 @@ describe('RefreshTokenService.rotate', () => {
     seedToken(rows, { id: 'row-other', tokenHash: 'other-hash' });
     const service = new RefreshTokenService(prisma as any);
 
-    await expect(service.rotate('raw-token')).rejects.toThrow('Refresh token already rotated');
+    const result = service.rotate('raw-token');
+    await expect(result).rejects.toThrow('Refresh token already rotated');
+    await expect(result).rejects.toMatchObject({ code: 'REFRESH_TOKEN_ALREADY_ROTATED' });
     // The other session must survive -- this wasn't treated as theft.
     expect(rows.get('row-other')?.revokedAt).toBeNull();
   });

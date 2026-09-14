@@ -149,6 +149,9 @@ describe('assertContiguousOrder — the workout-tree order rule', () => {
     expect(() => assertContiguousOrder([{ order: 2 }, { order: 1 }])).toThrow(BadRequestException);
     expect(() => assertContiguousOrder([{ order: 1 }, { order: 3 }])).toThrow(BadRequestException);
     expect(() => assertContiguousOrder([{ order: 0 }])).toThrow(BadRequestException);
+    expect(() => assertContiguousOrder([{ order: 0 }])).toThrow(
+      expect.objectContaining({ code: 'MEAL_SLOT_ORDER_INVALID' }),
+    );
   });
 });
 
@@ -261,9 +264,9 @@ describe('MealSlotsService.setArchived — archive semantics', () => {
   it('refuses to archive the last remaining active Abschnitt (409)', async () => {
     const { service, prisma } = makeStore([{ id: 'f', name: 'Frühstück', order: 1 }]);
 
-    await expect(service.setArchived('user-1', 'f', true)).rejects.toBeInstanceOf(
-      ConflictException,
-    );
+    const result = service.setArchived('user-1', 'f', true);
+    await expect(result).rejects.toBeInstanceOf(ConflictException);
+    await expect(result).rejects.toMatchObject({ code: 'MEAL_SLOT_LAST_ACTIVE' });
     expect(prisma.mealSlot.update).not.toHaveBeenCalled();
   });
 
@@ -285,9 +288,9 @@ describe('MealSlotsService.setArchived — archive semantics', () => {
       { id: 'm', name: 'Mittagessen', order: 2 },
     ]);
 
-    await expect(service.setArchived('user-1', 'f', true)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    const result = service.setArchived('user-1', 'f', true);
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'MEAL_SLOT_NOT_FOUND' });
   });
 });
 
@@ -295,12 +298,12 @@ describe('MealSlotsService.reorder — order invariant', () => {
   it('rejects an order that disagrees with array position (400), writes nothing', async () => {
     const { service, prisma } = makeStore(FOUR());
 
-    await expect(
-      service.reorder('user-1', [
-        { id: 'm', order: 1 },
-        { id: 'f', order: 1 }, // should be 2
-      ]),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    const result = service.reorder('user-1', [
+      { id: 'm', order: 1 },
+      { id: 'f', order: 1 }, // should be 2
+    ]);
+    await expect(result).rejects.toBeInstanceOf(BadRequestException);
+    await expect(result).rejects.toMatchObject({ code: 'MEAL_SLOT_ORDER_INVALID' });
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
@@ -308,14 +311,14 @@ describe('MealSlotsService.reorder — order invariant', () => {
     const { service } = makeStore(FOUR());
 
     // missing 's', and includes an unknown id
-    await expect(
-      service.reorder('user-1', [
-        { id: 'f', order: 1 },
-        { id: 'm', order: 2 },
-        { id: 'a', order: 3 },
-        { id: 'ghost', order: 4 },
-      ]),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    const result = service.reorder('user-1', [
+      { id: 'f', order: 1 },
+      { id: 'm', order: 2 },
+      { id: 'a', order: 3 },
+      { id: 'ghost', order: 4 },
+    ]);
+    await expect(result).rejects.toBeInstanceOf(BadRequestException);
+    await expect(result).rejects.toMatchObject({ code: 'MEAL_SLOT_REORDER_SET_MISMATCH' });
   });
 
   it('rejects a duplicate id', async () => {

@@ -65,7 +65,9 @@ describe('toExerciseInputs ordering', () => {
   });
 
   it('rejects 0-based exercise ordering', () => {
-    expect(() => run([exercise(0, [1]), exercise(1, [1])])).toThrow(BadRequestException);
+    const call = () => run([exercise(0, [1]), exercise(1, [1])]);
+    expect(call).toThrow(BadRequestException);
+    expect(call).toThrow(expect.objectContaining({ code: 'WORKOUT_TREE_ORDER_INVALID' }));
   });
 
   it('rejects 0-based set ordering', () => {
@@ -185,21 +187,21 @@ describe('toExerciseInputs per-side shape (#100)', () => {
   });
 
   it('rejects a unilateral set missing one side', () => {
-    expect(() => run([uni({ repsRight: undefined })], { a: { isUnilateral: true } })).toThrow(
-      BadRequestException,
-    );
+    const call = () => run([uni({ repsRight: undefined })], { a: { isUnilateral: true } });
+    expect(call).toThrow(BadRequestException);
+    expect(call).toThrow(expect.objectContaining({ code: 'WORKOUT_SET_MISSING_SIDE_DATA' }));
   });
 
   it('rejects a unilateral set with RIR on only one side', () => {
-    expect(() => run([uni({ rirLeft: 2 })], { a: { isUnilateral: true } })).toThrow(
-      BadRequestException,
-    );
+    const call = () => run([uni({ rirLeft: 2 })], { a: { isUnilateral: true } });
+    expect(call).toThrow(BadRequestException);
+    expect(call).toThrow(expect.objectContaining({ code: 'WORKOUT_SET_RIR_SIDE_MISMATCH' }));
   });
 
   it('rejects a bilateral set that carries per-side data, naming the exercise', () => {
-    expect(() => run([uni()], { a: { isUnilateral: false, name: 'Bench Press' } })).toThrow(
-      /Bench Press/,
-    );
+    const call = () => run([uni()], { a: { isUnilateral: false, name: 'Bench Press' } });
+    expect(call).toThrow(/Bench Press/);
+    expect(call).toThrow(expect.objectContaining({ code: 'WORKOUT_SET_UNEXPECTED_SIDE_DATA' }));
   });
 
   it('leaves a bilateral set with no per-side data untouched', () => {

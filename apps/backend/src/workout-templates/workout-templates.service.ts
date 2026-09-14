@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { AppNotFoundException, AppConflictException } from '../common/errors/app-exceptions';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   WorkoutTreeService,
@@ -43,11 +44,11 @@ export class WorkoutTemplatesService {
     });
 
     if (!template || template.kind !== 'TEMPLATE') {
-      throw new NotFoundException('Workout template not found');
+      throw new AppNotFoundException('Workout template not found', 'WORKOUT_TEMPLATE_NOT_FOUND');
     }
 
     if (template.isCustom && template.userId !== userId) {
-      throw new NotFoundException('Workout template not found');
+      throw new AppNotFoundException('Workout template not found', 'WORKOUT_TEMPLATE_NOT_FOUND');
     }
 
     return this.mapToDto(template);
@@ -59,7 +60,10 @@ export class WorkoutTemplatesService {
     });
 
     if (existing) {
-      throw new ConflictException('A template with this name already exists');
+      throw new AppConflictException(
+        'A template with this name already exists',
+        'TEMPLATE_NAME_TAKEN',
+      );
     }
 
     const exercisesById = await this.exercisesService.validateAccessible(
@@ -97,15 +101,18 @@ export class WorkoutTemplatesService {
     const template = await this.prisma.workout.findUnique({ where: { id } });
 
     if (!template || template.kind !== 'TEMPLATE') {
-      throw new NotFoundException('Workout template not found');
+      throw new AppNotFoundException('Workout template not found', 'WORKOUT_TEMPLATE_NOT_FOUND');
     }
 
     if (template.isCustom && template.userId !== userId) {
-      throw new NotFoundException('Workout template not found');
+      throw new AppNotFoundException('Workout template not found', 'WORKOUT_TEMPLATE_NOT_FOUND');
     }
 
     if (!template.isCustom) {
-      throw new ConflictException('System templates cannot be edited');
+      throw new AppConflictException(
+        'System templates cannot be edited',
+        'SYSTEM_TEMPLATE_NOT_EDITABLE',
+      );
     }
 
     if (updateDto.name && updateDto.name !== template.name) {
@@ -114,7 +121,10 @@ export class WorkoutTemplatesService {
       });
 
       if (existing) {
-        throw new ConflictException('A template with this name already exists');
+        throw new AppConflictException(
+          'A template with this name already exists',
+          'TEMPLATE_NAME_TAKEN',
+        );
       }
     }
 
@@ -153,15 +163,18 @@ export class WorkoutTemplatesService {
     const template = await this.prisma.workout.findUnique({ where: { id } });
 
     if (!template || template.kind !== 'TEMPLATE') {
-      throw new NotFoundException('Workout template not found');
+      throw new AppNotFoundException('Workout template not found', 'WORKOUT_TEMPLATE_NOT_FOUND');
     }
 
     if (template.isCustom && template.userId !== userId) {
-      throw new NotFoundException('Workout template not found');
+      throw new AppNotFoundException('Workout template not found', 'WORKOUT_TEMPLATE_NOT_FOUND');
     }
 
     if (!template.isCustom) {
-      throw new ConflictException('System templates cannot be deleted');
+      throw new AppConflictException(
+        'System templates cannot be deleted',
+        'SYSTEM_TEMPLATE_NOT_DELETABLE',
+      );
     }
 
     await this.prisma.workout.delete({ where: { id } });

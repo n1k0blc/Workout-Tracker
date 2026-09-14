@@ -65,7 +65,9 @@ describe('AnalyticsService', () => {
 
       const filter: AnalyticsFilterDto = { cycleId: 'someone-elses-cycle' } as AnalyticsFilterDto;
 
-      await expect(service.getVolumeAnalytics('user-1', filter)).rejects.toThrow(NotFoundException);
+      const result = service.getVolumeAnalytics('user-1', filter);
+      await expect(result).rejects.toThrow(NotFoundException);
+      await expect(result).rejects.toMatchObject({ code: 'CYCLE_NOT_FOUND' });
       expect(prisma.workoutCycle.findFirst).toHaveBeenCalledWith({
         where: { id: 'someone-elses-cycle', userId: 'user-1' },
         select: { id: true, name: true, startDate: true },

@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { AppNotFoundException, AppBadRequestException } from '../common/errors/app-exceptions';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -121,7 +122,7 @@ export class WorkoutCyclesService {
     });
 
     if (!cycle || cycle.userId !== userId) {
-      throw new NotFoundException('Workout cycle not found');
+      throw new AppNotFoundException('Workout cycle not found', 'CYCLE_NOT_FOUND');
     }
 
     return this.mapCycleToResponse(cycle);
@@ -133,8 +134,9 @@ export class WorkoutCyclesService {
     });
 
     if (existingActiveCycle) {
-      throw new BadRequestException(
+      throw new AppBadRequestException(
         'Es existiert bereits ein aktiver Zyklus. Bitte beende diesen zuerst.',
+        'ACTIVE_CYCLE_ALREADY_EXISTS',
       );
     }
 
@@ -143,8 +145,9 @@ export class WorkoutCyclesService {
     const weekdays = workoutDays.map((day) => day.weekday);
     const duplicateWeekday = weekdays.find((weekday, i) => weekdays.indexOf(weekday) !== i);
     if (duplicateWeekday !== undefined) {
-      throw new BadRequestException(
+      throw new AppBadRequestException(
         `Zwei Trainingstage liegen auf ${WEEKDAY_NAMES[duplicateWeekday]}. Pro Zyklus ist jeder Wochentag nur einmal erlaubt.`,
+        'DUPLICATE_WEEKDAY_IN_CYCLE',
       );
     }
 
@@ -253,12 +256,12 @@ export class WorkoutCyclesService {
     });
 
     if (!workoutDay || workoutDay.cycleId !== cycleId) {
-      throw new NotFoundException('Workout day not found');
+      throw new AppNotFoundException('Workout day not found', 'WORKOUT_DAY_NOT_FOUND');
     }
 
     const blueprint = workoutDay.workouts[0];
     if (!blueprint) {
-      throw new NotFoundException('Blueprint not found');
+      throw new AppNotFoundException('Blueprint not found', 'BLUEPRINT_NOT_FOUND');
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -286,7 +289,7 @@ export class WorkoutCyclesService {
     });
 
     if (!workoutDay || workoutDay.cycleId !== cycleId) {
-      throw new NotFoundException('Workout day not found');
+      throw new AppNotFoundException('Workout day not found', 'WORKOUT_DAY_NOT_FOUND');
     }
 
     // The weekday decides which workout is recommended, so two days in one cycle sharing a
@@ -304,8 +307,9 @@ export class WorkoutCyclesService {
       // A plain move can't land on a taken weekday -- the editor has to ask the user to swap
       // with the specific day that holds it first, and confirm that by passing its id back.
       if (updateWorkoutDayDto.swapWithWorkoutDayId !== conflict.id) {
-        throw new BadRequestException(
+        throw new AppBadRequestException(
           `${WEEKDAY_NAMES[updateWorkoutDayDto.weekday]} ist in diesem Zyklus bereits durch "${conflict.name}" belegt.`,
+          'WORKOUT_DAY_WEEKDAY_TAKEN',
         );
       }
 
@@ -378,13 +382,15 @@ export class WorkoutCyclesService {
       return await write();
     } catch (error) {
       if (weekday !== null && isWeekdayConflict(error)) {
-        throw new BadRequestException(
+        throw new AppBadRequestException(
           `${WEEKDAY_NAMES[weekday]} ist in diesem Zyklus bereits belegt.`,
+          'WORKOUT_DAY_WEEKDAY_TAKEN',
         );
       }
       if (isWeekdayConflict(error) || isOrderConflict(error)) {
-        throw new BadRequestException(
+        throw new AppBadRequestException(
           'Eine andere Änderung an diesem Zyklus ist dazwischengekommen. Bitte versuche es erneut.',
+          'CYCLE_CONCURRENT_MODIFICATION',
         );
       }
       throw error;
@@ -395,7 +401,10 @@ export class WorkoutCyclesService {
     const cycle = await this.findById(id, userId);
 
     if (cycle.status === 'COMPLETED') {
-      throw new BadRequestException('Dieser Zyklus wurde bereits beendet.');
+      throw new AppBadRequestException(
+        'Dieser Zyklus wurde bereits beendet.',
+        'CYCLE_ALREADY_COMPLETED',
+      );
     }
 
     await this.prisma.workoutCycle.update({
@@ -428,7 +437,7 @@ export class WorkoutCyclesService {
     });
 
     if (!cycle || cycle.userId !== userId) {
-      throw new NotFoundException('Zyklus nicht gefunden');
+      throw new AppNotFoundException('Zyklus nicht gefunden', 'CYCLE_NOT_FOUND');
     }
 
     const endDate = new Date(cycle.startDate);

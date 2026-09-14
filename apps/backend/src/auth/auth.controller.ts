@@ -1,14 +1,5 @@
-import {
-  Body,
-  Controller,
-  HttpCode,
-  HttpStatus,
-  Post,
-  Req,
-  Res,
-  UnauthorizedException,
-  UseGuards,
-} from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { AppUnauthorizedException } from '../common/errors/app-exceptions';
 import type { CookieOptions, Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
@@ -65,7 +56,7 @@ export class AuthController {
   ): Promise<{ ok: true }> {
     const currentRefreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
     if (!currentRefreshToken) {
-      throw new UnauthorizedException('No refresh token');
+      throw new AppUnauthorizedException('No refresh token', 'REFRESH_TOKEN_MISSING');
     }
 
     const { accessToken, refreshToken } = await this.authService.refresh(currentRefreshToken);

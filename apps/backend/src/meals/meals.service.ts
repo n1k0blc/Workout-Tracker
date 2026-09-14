@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { AppNotFoundException, AppForbiddenException } from '../common/errors/app-exceptions';
 import { PrismaService } from '../prisma/prisma.service';
 import { FavoritesService } from '../favorites/favorites.service';
 import { scalePer100 } from '../common/utils/nutrition.util';
@@ -126,7 +127,7 @@ export class MealsService {
       this.favorites.favoriteMealIds(userId),
     ]);
     if (!meal) {
-      throw new NotFoundException('Mahlzeit nicht gefunden');
+      throw new AppNotFoundException('Mahlzeit nicht gefunden', 'MEAL_NOT_FOUND');
     }
     return this.toDto(meal, userId, favoriteIds);
   }
@@ -180,7 +181,7 @@ export class MealsService {
       where: { id },
     })) as MealCheckRow | null;
     if (!meal || meal.deletedAt) {
-      throw new NotFoundException('Mahlzeit nicht gefunden');
+      throw new AppNotFoundException('Mahlzeit nicht gefunden', 'MEAL_NOT_FOUND');
     }
     this.assertOwner(meal, userId);
     await this.assertFoodsExist(dto.items);
@@ -205,7 +206,7 @@ export class MealsService {
       where: { id },
     })) as MealCheckRow | null;
     if (!meal || meal.deletedAt) {
-      throw new NotFoundException('Mahlzeit nicht gefunden');
+      throw new AppNotFoundException('Mahlzeit nicht gefunden', 'MEAL_NOT_FOUND');
     }
     this.assertOwner(meal, userId);
     await this.prisma.meal.update({ where: { id }, data: { deletedAt: new Date() } });
@@ -250,7 +251,10 @@ export class MealsService {
 
   private assertOwner(meal: MealCheckRow, userId: string): void {
     if (meal.createdById !== userId) {
-      throw new ForbiddenException('Nur der Ersteller kann diese Mahlzeit ändern');
+      throw new AppForbiddenException(
+        'Nur der Ersteller kann diese Mahlzeit ändern',
+        'MEAL_NOT_OWNER',
+      );
     }
   }
 
@@ -259,7 +263,10 @@ export class MealsService {
     const ids = Array.from(new Set(items.map((i) => i.foodId)));
     const found = await this.prisma.food.count({ where: { id: { in: ids } } });
     if (found !== ids.length) {
-      throw new NotFoundException('Ein Lebensmittel wurde nicht gefunden');
+      throw new AppNotFoundException(
+        'Ein Lebensmittel wurde nicht gefunden',
+        'MEAL_ITEM_FOOD_NOT_FOUND',
+      );
     }
   }
 }

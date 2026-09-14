@@ -88,9 +88,9 @@ describe('ExercisesService.update — isUnilateral toggle guard', () => {
       isUnilateral: false,
     });
 
-    await expect(
-      service.update('exercise-1', 'user-1', baseUpdateDto({ isUnilateral: true })),
-    ).rejects.toBeInstanceOf(ConflictException);
+    const result = service.update('exercise-1', 'user-1', baseUpdateDto({ isUnilateral: true }));
+    await expect(result).rejects.toBeInstanceOf(ConflictException);
+    await expect(result).rejects.toMatchObject({ code: 'EXERCISE_UNILATERAL_CHANGE_BLOCKED' });
 
     expect(prisma.exercise.update).not.toHaveBeenCalled();
   });
@@ -209,9 +209,9 @@ describe('ExercisesService.findById — cross-user access', () => {
   it("404s on another user's custom exercise", async () => {
     const { service } = makeService({ findUnique: OTHER_USER_EXERCISE });
 
-    await expect(service.findById(OTHER_USER_EXERCISE.id, 'user-1')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    const result = service.findById(OTHER_USER_EXERCISE.id, 'user-1');
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'EXERCISE_NOT_FOUND' });
   });
 
   it('remains accessible to any user for a system exercise', async () => {
@@ -249,9 +249,12 @@ describe('ExercisesService.validateAccessible — cross-user access', () => {
   it("rejects when one of the requested ids is another user's custom exercise", async () => {
     const { service } = makeService({ findMany: [SYSTEM_EXERCISE, OTHER_USER_EXERCISE] });
 
-    await expect(
-      service.validateAccessible([SYSTEM_EXERCISE.id, OTHER_USER_EXERCISE.id], 'user-1'),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    const result = service.validateAccessible(
+      [SYSTEM_EXERCISE.id, OTHER_USER_EXERCISE.id],
+      'user-1',
+    );
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'EXERCISES_NOT_FOUND' });
   });
 
   it('accepts system exercises and the same custom exercise for its own owner', async () => {

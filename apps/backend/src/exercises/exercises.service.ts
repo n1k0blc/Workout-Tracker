@@ -1,9 +1,9 @@
+import { Injectable } from '@nestjs/common';
 import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-  BadRequestException,
-} from '@nestjs/common';
+  AppNotFoundException,
+  AppConflictException,
+  AppBadRequestException,
+} from '../common/errors/app-exceptions';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateExerciseDto, FilterExerciseDto, ExerciseDto, UpdateExerciseDto } from './dto';
 import {
@@ -88,7 +88,7 @@ export class ExercisesService {
     const accessibleIds = new Set(accessible.map((e) => e.id));
 
     if (uniqueIds.some((id) => !accessibleIds.has(id))) {
-      throw new NotFoundException('One or more exercises not found');
+      throw new AppNotFoundException('One or more exercises not found', 'EXERCISES_NOT_FOUND');
     }
 
     return new Map(accessible.map((e) => [e.id, { isUnilateral: e.isUnilateral, name: e.name }]));
@@ -142,8 +142,9 @@ export class ExercisesService {
 
     if (sum === 0) {
       if (!dto.primaryMuscle) {
-        throw new BadRequestException(
+        throw new AppBadRequestException(
           'Provide either muscle percentages summing to 100%, or a primaryMuscle',
+          'EXERCISE_MUSCLE_PERCENTAGES_REQUIRED',
         );
       }
       const field = MUSCLE_PERCENT_FIELD[dto.primaryMuscle] as keyof MusclePercentages;
@@ -152,8 +153,9 @@ export class ExercisesService {
     }
 
     if (sum !== 100) {
-      throw new BadRequestException(
+      throw new AppBadRequestException(
         `Muscle group percentages must sum to 100%. Current sum: ${sum}%`,
+        'EXERCISE_MUSCLE_PERCENTAGES_INVALID_SUM',
       );
     }
 
@@ -202,12 +204,12 @@ export class ExercisesService {
     });
 
     if (!exercise || exercise.deletedAt) {
-      throw new NotFoundException('Exercise not found');
+      throw new AppNotFoundException('Exercise not found', 'EXERCISE_NOT_FOUND');
     }
 
     // Check if user has access to this exercise
     if (exercise.isCustom && exercise.userId !== userId) {
-      throw new NotFoundException('Exercise not found');
+      throw new AppNotFoundException('Exercise not found', 'EXERCISE_NOT_FOUND');
     }
 
     return toDto(exercise as ExerciseRow, await this.isInUse(id));
@@ -230,7 +232,10 @@ export class ExercisesService {
     });
 
     if (existingExercise) {
-      throw new ConflictException('You already have a custom exercise with this name');
+      throw new AppConflictException(
+        'You already have a custom exercise with this name',
+        'EXERCISE_NAME_TAKEN',
+      );
     }
 
     const percentages = this.validateAndNormalizeMusclePercentages(createExerciseDto);
@@ -257,17 +262,20 @@ export class ExercisesService {
     });
 
     if (!exercise || exercise.deletedAt) {
-      throw new NotFoundException('Exercise not found');
+      throw new AppNotFoundException('Exercise not found', 'EXERCISE_NOT_FOUND');
     }
 
     // A custom exercise owned by someone else: 404, not 409 -- don't leak that it exists.
     if (exercise.isCustom && exercise.userId !== userId) {
-      throw new NotFoundException('Exercise not found');
+      throw new AppNotFoundException('Exercise not found', 'EXERCISE_NOT_FOUND');
     }
 
     // System exercises are public, read-only data -- this isn't an ownership leak.
     if (!exercise.isCustom) {
-      throw new ConflictException('System exercises cannot be deleted');
+      throw new AppConflictException(
+        'System exercises cannot be deleted',
+        'SYSTEM_EXERCISE_NOT_DELETABLE',
+      );
     }
 
     await this.prisma.exercise.update({
@@ -282,15 +290,18 @@ export class ExercisesService {
     });
 
     if (!exercise || exercise.deletedAt) {
-      throw new NotFoundException('Exercise not found');
+      throw new AppNotFoundException('Exercise not found', 'EXERCISE_NOT_FOUND');
     }
 
     if (exercise.isCustom && exercise.userId !== userId) {
-      throw new NotFoundException('Exercise not found');
+      throw new AppNotFoundException('Exercise not found', 'EXERCISE_NOT_FOUND');
     }
 
     if (!exercise.isCustom) {
-      throw new ConflictException('System exercises cannot be modified');
+      throw new AppConflictException(
+        'System exercises cannot be modified',
+        'SYSTEM_EXERCISE_NOT_EDITABLE',
+      );
     }
 
     const inUse = await this.isInUse(id);
@@ -300,8 +311,9 @@ export class ExercisesService {
       updateDto.isUnilateral !== exercise.isUnilateral &&
       inUse
     ) {
-      throw new ConflictException(
+      throw new AppConflictException(
         'Diese Übung wird bereits in Sätzen verwendet – unilateral lässt sich nicht mehr ändern. Lege dafür eine neue Übung an.',
+        'EXERCISE_UNILATERAL_CHANGE_BLOCKED',
       );
     }
 

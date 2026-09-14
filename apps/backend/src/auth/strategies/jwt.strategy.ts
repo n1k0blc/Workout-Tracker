@@ -1,4 +1,5 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { AppUnauthorizedException } from '../../common/errors/app-exceptions';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
@@ -30,7 +31,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const user = await this.authService.validateUser(payload.sub);
 
     if (!user) {
-      throw new UnauthorizedException();
+      throw new AppUnauthorizedException('Unauthorized', 'SESSION_USER_NOT_FOUND');
     }
 
     return user;

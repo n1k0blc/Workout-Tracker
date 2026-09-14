@@ -10,8 +10,8 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  BadRequestException,
 } from '@nestjs/common';
+import { AppBadRequestException } from '../common/errors/app-exceptions';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ClientToday } from '../common/decorators/client-today.decorator';
@@ -62,7 +62,10 @@ export class NutritionController {
   ): Promise<NutritionDayDto> {
     const localDate = date ?? today.localDate;
     if (!isLocalDate(localDate)) {
-      throw new BadRequestException('date must be a calendar date in YYYY-MM-DD form');
+      throw new AppBadRequestException(
+        'date must be a calendar date in YYYY-MM-DD form',
+        'NUTRITION_DAY_DATE_INVALID',
+      );
     }
     return this.diaryEntries.getDay(user.id, localDate);
   }
@@ -84,7 +87,10 @@ export class NutritionController {
       !isLocalDate(start) ||
       !isLocalDate(end)
     ) {
-      throw new BadRequestException('start und end müssen Kalendertage in YYYY-MM-DD-Form sein');
+      throw new AppBadRequestException(
+        'start und end müssen Kalendertage in YYYY-MM-DD-Form sein',
+        'NUTRITION_ANALYTICS_RANGE_INVALID',
+      );
     }
     return this.nutritionAnalytics.getTrend(user.id, start, end);
   }
@@ -148,7 +154,10 @@ export class NutritionController {
       slot = await this.mealSlots.setArchived(user.id, id, dto.archived);
     }
     if (!slot) {
-      throw new BadRequestException('name oder archived muss angegeben werden');
+      throw new AppBadRequestException(
+        'name oder archived muss angegeben werden',
+        'MEAL_SLOT_UPDATE_EMPTY',
+      );
     }
     return slot;
   }

@@ -1,4 +1,5 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { AppUnauthorizedException } from '../common/errors/app-exceptions';
 import { PrismaService } from '../prisma/prisma.service';
 import { generateOpaqueToken, hashToken } from '../common/utils/token.util';
 
@@ -68,7 +69,7 @@ export class RefreshTokenService {
 
     if (!existing) {
       this.logger.warn(`Refresh rejected: unknown token (hash ${hashPrefix(tokenHash)})`);
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new AppUnauthorizedException('Invalid refresh token', 'REFRESH_TOKEN_INVALID');
     }
 
     const nextRawToken = generateOpaqueToken();
@@ -104,14 +105,17 @@ export class RefreshTokenService {
         this.logger.warn(
           `Refresh rejected: expired token (hash ${hashPrefix(tokenHash)}, user ${existing.userId})`,
         );
-        throw new UnauthorizedException('Refresh token expired');
+        throw new AppUnauthorizedException('Refresh token expired', 'REFRESH_TOKEN_EXPIRED');
       }
 
       if (Date.now() - current.revokedAt.getTime() <= REUSE_GRACE_PERIOD_MS) {
         this.logger.warn(
           `Refresh rejected: superseded token (hash ${hashPrefix(tokenHash)}, user ${existing.userId})`,
         );
-        throw new UnauthorizedException('Refresh token already rotated');
+        throw new AppUnauthorizedException(
+          'Refresh token already rotated',
+          'REFRESH_TOKEN_ALREADY_ROTATED',
+        );
       }
 
       const { count: endedCount } = await tx.refreshToken.updateMany({
@@ -126,7 +130,10 @@ export class RefreshTokenService {
         `Refresh rejected: superseded token reused (hash ${hashPrefix(tokenHash)}, ` +
           `user ${existing.userId}) - ended ${endedCount} session(s)`,
       );
-      throw new UnauthorizedException('Refresh token reuse detected');
+      throw new AppUnauthorizedException(
+        'Refresh token reuse detected',
+        'REFRESH_TOKEN_REUSE_DETECTED',
+      );
     });
 
     return { userId: existing.userId, rawToken: nextRawToken, expiresAt: nextExpiresAt };

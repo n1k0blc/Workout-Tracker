@@ -1,10 +1,10 @@
+import { Injectable } from '@nestjs/common';
 import {
-  Injectable,
-  NotFoundException,
-  ForbiddenException,
-  BadRequestException,
-  ConflictException,
-} from '@nestjs/common';
+  AppNotFoundException,
+  AppForbiddenException,
+  AppBadRequestException,
+  AppConflictException,
+} from '../common/errors/app-exceptions';
 import { PrismaService } from '../prisma/prisma.service';
 import { FavoritesService } from '../favorites/favorites.service';
 import { orderByIds } from '../common/utils/order-by-ids';
@@ -163,7 +163,7 @@ export class FoodsService {
       this.favorites.favoriteFoodIds(userId),
     ]);
     if (!food) {
-      throw new NotFoundException('Lebensmittel nicht gefunden');
+      throw new AppNotFoundException('Lebensmittel nicht gefunden', 'FOOD_NOT_FOUND');
     }
     return toDto(food, userId, favoriteIds);
   }
@@ -241,7 +241,7 @@ export class FoodsService {
   async lookupByBarcode(userId: string, raw: string): Promise<BarcodeLookupDto> {
     const barcode = normalizeBarcode(raw);
     if (!barcode) {
-      throw new BadRequestException('Kein gültiger EAN- oder UPC-Code');
+      throw new AppBadRequestException('Kein gültiger EAN- oder UPC-Code', 'BARCODE_INVALID');
     }
 
     const existing = (await this.prisma.food.findFirst({
@@ -351,7 +351,7 @@ export class FoodsService {
   async update(userId: string, id: string, dto: UpdateFoodDto): Promise<FoodDto> {
     const food = (await this.prisma.food.findUnique({ where: { id } })) as FoodRow | null;
     if (!food || food.deletedAt) {
-      throw new NotFoundException('Lebensmittel nicht gefunden');
+      throw new AppNotFoundException('Lebensmittel nicht gefunden', 'FOOD_NOT_FOUND');
     }
     this.assertEditable(food, userId);
     this.assertPortions(dto.portions);
@@ -383,7 +383,7 @@ export class FoodsService {
   async softDelete(userId: string, id: string): Promise<void> {
     const food = (await this.prisma.food.findUnique({ where: { id } })) as FoodRow | null;
     if (!food || food.deletedAt) {
-      throw new NotFoundException('Lebensmittel nicht gefunden');
+      throw new AppNotFoundException('Lebensmittel nicht gefunden', 'FOOD_NOT_FOUND');
     }
     this.assertEditable(food, userId);
     await this.prisma.food.update({ where: { id }, data: { deletedAt: new Date() } });
@@ -392,10 +392,16 @@ export class FoodsService {
   /** SEED / OPEN_FOOD_FACTS are read-only for everyone; a USER food only for its creator. */
   private assertEditable(food: FoodRow, userId: string): void {
     if (food.source !== 'USER') {
-      throw new ForbiddenException('Seed- und Open-Food-Facts-Einträge sind schreibgeschützt');
+      throw new AppForbiddenException(
+        'Seed- und Open-Food-Facts-Einträge sind schreibgeschützt',
+        'FOOD_READ_ONLY_SOURCE',
+      );
     }
     if (food.createdById !== userId) {
-      throw new ForbiddenException('Nur der Ersteller kann dieses Lebensmittel ändern');
+      throw new AppForbiddenException(
+        'Nur der Ersteller kann dieses Lebensmittel ändern',
+        'FOOD_NOT_OWNER',
+      );
     }
   }
 
@@ -403,18 +409,25 @@ export class FoodsService {
     if (!portions || portions.length === 0) return;
 
     if (portions.some((p) => !p.label.trim() || !(p.grams > 0))) {
-      throw new BadRequestException(
+      throw new AppBadRequestException(
         'Jede Portionsgröße braucht eine Bezeichnung und eine Menge größer als 0',
+        'FOOD_PORTION_INVALID',
       );
     }
     if (portions.filter((p) => p.isDefault).length !== 1) {
-      throw new BadRequestException('Genau eine Portionsgröße muss als Standard markiert sein');
+      throw new AppBadRequestException(
+        'Genau eine Portionsgröße muss als Standard markiert sein',
+        'FOOD_PORTION_DEFAULT_COUNT_INVALID',
+      );
     }
   }
 
   private barcodeConflictOrRethrow(error: unknown): Error {
     if (isUniqueViolation(error)) {
-      return new ConflictException('Ein Lebensmittel mit diesem Barcode existiert bereits');
+      return new AppConflictException(
+        'Ein Lebensmittel mit diesem Barcode existiert bereits',
+        'FOOD_BARCODE_TAKEN',
+      );
     }
     return error as Error;
   }

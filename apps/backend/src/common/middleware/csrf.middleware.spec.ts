@@ -48,9 +48,10 @@ describe('CsrfMiddleware', () => {
 
   it('rejects a mutating request with no CSRF cookie/header at all', () => {
     const next = jest.fn();
-    expect(() =>
-      middleware.use(makeRequest({ method: 'POST', path: '/api/workouts' }), res, next),
-    ).toThrow(ForbiddenException);
+    const run = () =>
+      middleware.use(makeRequest({ method: 'POST', path: '/api/workouts' }), res, next);
+    expect(run).toThrow(ForbiddenException);
+    expect(run).toThrow(expect.objectContaining({ code: 'CSRF_TOKEN_INVALID' }));
     expect(next).not.toHaveBeenCalled();
   });
 

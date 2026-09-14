@@ -67,9 +67,9 @@ describe('FavoritesService.setFoodFavorite', () => {
   it('refuses to star a soft-deleted or missing food, and writes nothing', async () => {
     const { service, prisma } = makeService({ food: null });
 
-    await expect(service.setFoodFavorite('user-1', 'gone', true)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    const result = service.setFoodFavorite('user-1', 'gone', true);
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'FOOD_NOT_FOUND' });
     expect(prisma.foodFavorite.upsert).not.toHaveBeenCalled();
   });
 
@@ -101,9 +101,9 @@ describe('FavoritesService.setMealFavorite', () => {
   it('refuses to star a soft-deleted or missing meal', async () => {
     const { service, prisma } = makeService({ meal: null });
 
-    await expect(service.setMealFavorite('user-1', 'gone', true)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    const result = service.setMealFavorite('user-1', 'gone', true);
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'MEAL_NOT_FOUND' });
     expect(prisma.mealFavorite.upsert).not.toHaveBeenCalled();
   });
 

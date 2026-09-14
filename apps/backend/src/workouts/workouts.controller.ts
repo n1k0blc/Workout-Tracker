@@ -10,8 +10,8 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  BadRequestException,
 } from '@nestjs/common';
+import { AppBadRequestException } from '../common/errors/app-exceptions';
 import { WorkoutsService } from './workouts.service';
 import {
   WorkoutEngineService,
@@ -66,7 +66,7 @@ export class WorkoutsController {
     @Query('excludeWorkoutId') excludeWorkoutId?: string,
   ): Promise<LastPerformanceDto | null> {
     if (!exerciseId) {
-      throw new BadRequestException('exerciseId is required');
+      throw new AppBadRequestException('exerciseId is required', 'EXERCISE_ID_REQUIRED');
     }
     return this.workoutsService.findExerciseLastPerformance(
       user.id,

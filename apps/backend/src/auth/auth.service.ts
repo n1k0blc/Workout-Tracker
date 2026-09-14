@@ -1,10 +1,10 @@
+import { Injectable } from '@nestjs/common';
 import {
-  Injectable,
-  BadRequestException,
-  ConflictException,
-  UnauthorizedException,
-  InternalServerErrorException,
-} from '@nestjs/common';
+  AppBadRequestException,
+  AppConflictException,
+  AppUnauthorizedException,
+  AppInternalServerErrorException,
+} from '../common/errors/app-exceptions';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto, LoginDto, ChangePasswordDto } from './dto';
@@ -57,11 +57,14 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new ConflictException('User with this email already exists');
+      throw new AppConflictException(
+        'User with this email already exists',
+        'EMAIL_ALREADY_REGISTERED',
+      );
     }
 
     if (await this.breachedPasswordService.isBreached(password)) {
-      throw new BadRequestException(BREACHED_PASSWORD_MESSAGE);
+      throw new AppBadRequestException(BREACHED_PASSWORD_MESSAGE, 'PASSWORD_BREACHED');
     }
 
     const passwordHash = await this.passwordService.hash(password);
@@ -93,7 +96,7 @@ export class AuthService {
         select: USER_SELECT,
       });
     } catch {
-      throw new InternalServerErrorException('Failed to create user');
+      throw new AppInternalServerErrorException('Failed to create user', 'USER_CREATION_FAILED');
     }
 
     return this.issueSession(user);
@@ -112,7 +115,7 @@ export class AuthService {
     });
 
     if (!userWithPassword) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new AppUnauthorizedException('Invalid credentials', 'INVALID_CREDENTIALS');
     }
 
     const isPasswordValid = await this.passwordService.verify(
@@ -121,7 +124,7 @@ export class AuthService {
     );
 
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new AppUnauthorizedException('Invalid credentials', 'INVALID_CREDENTIALS');
     }
 
     // Transparent upgrade: a successful legacy-bcrypt verify gets rehashed to argon2id.
@@ -160,7 +163,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException();
+      throw new AppUnauthorizedException('Unauthorized', 'SESSION_USER_NOT_FOUND');
     }
 
     const isCurrentPasswordValid = await this.passwordService.verify(
@@ -168,11 +171,14 @@ export class AuthService {
       user.passwordHash,
     );
     if (!isCurrentPasswordValid) {
-      throw new UnauthorizedException('Current password is incorrect');
+      throw new AppUnauthorizedException(
+        'Current password is incorrect',
+        'CURRENT_PASSWORD_INCORRECT',
+      );
     }
 
     if (await this.breachedPasswordService.isBreached(dto.newPassword)) {
-      throw new BadRequestException(BREACHED_PASSWORD_MESSAGE);
+      throw new AppBadRequestException(BREACHED_PASSWORD_MESSAGE, 'PASSWORD_BREACHED');
     }
 
     const newHash = await this.passwordService.hash(dto.newPassword);
@@ -196,7 +202,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('User not found');
+      throw new AppUnauthorizedException('User not found', 'SESSION_USER_NOT_FOUND');
     }
 
     return user;

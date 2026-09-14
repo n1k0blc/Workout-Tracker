@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { AppNotFoundException } from '../common/errors/app-exceptions';
 import { PrismaService } from '../prisma/prisma.service';
 import { derivePrimaryMuscle } from '../common/muscle.util';
 import { getCurrentDate } from '../common/utils/date.util';
@@ -286,7 +287,7 @@ export class AnalyticsService {
         select: { id: true, name: true, startDate: true },
       });
       if (!found) {
-        throw new NotFoundException('Cycle not found');
+        throw new AppNotFoundException('Cycle not found', 'CYCLE_NOT_FOUND');
       }
       cycle = found;
       where.cycleId = filter.cycleId;
