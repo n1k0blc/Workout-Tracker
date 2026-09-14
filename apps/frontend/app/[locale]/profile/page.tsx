@@ -318,6 +318,13 @@ export default function ProfilePage() {
   // Persists then navigates to the new locale-prefixed URL -- a real navigation, not just
   // local state, since the acceptance criterion is the URL/catalogue actually switching
   // (#179). Middleware/next-intl resync the NEXT_LOCALE cookie once that URL loads.
+  //
+  // A hard navigation (window.location.href), not the locale-aware router: crossing
+  // locales remounts the root layout (it owns <html lang>) purely client-side, and
+  // next-themes' anti-flash inline <script> (part of every ThemeProvider render)
+  // triggers a "script tag while rendering on the client" console error on that remount.
+  // A full page load re-renders it server-side, where the script is part of the initial
+  // HTML and hydration matches it without complaint.
   const handleLocaleChange = async (next: string) => {
     if (next !== 'de' && next !== 'en') return;
 
@@ -326,7 +333,7 @@ export default function ProfilePage() {
 
     try {
       await apiClient.updateProfile({ locale: next });
-      router.push('/profile', { locale: next });
+      window.location.href = `/${next}/profile`;
     } catch (err: any) {
       setError(err.message || t('language.updateError'));
       setLocaleSaving(false);

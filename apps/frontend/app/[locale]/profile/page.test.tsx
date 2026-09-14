@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import messages from '@/messages/de.json';
@@ -10,6 +10,18 @@ beforeAll(() => {
   Element.prototype.setPointerCapture = vi.fn();
   Element.prototype.releasePointerCapture = vi.fn();
   Element.prototype.scrollIntoView = vi.fn();
+});
+
+// The language switch does a hard navigation (window.location.href), not the locale-aware
+// router -- see the comment on handleLocaleChange in page.tsx for why. jsdom's real
+// location.href setter is a no-op ("Not implemented: navigation"), so it must be stubbed
+// to make the assignment observable.
+beforeEach(() => {
+  Object.defineProperty(window, 'location', {
+    value: { href: '' },
+    writable: true,
+    configurable: true,
+  });
 });
 
 const baseUser = {
@@ -94,7 +106,8 @@ describe('ProfilePage language select', () => {
     fireEvent.click(englishOption);
 
     await waitFor(() => expect(updateProfile).toHaveBeenCalledWith({ locale: 'en' }));
-    expect(push).toHaveBeenCalledWith('/profile', { locale: 'en' });
+    expect(window.location.href).toBe('/en/profile');
+    expect(push).not.toHaveBeenCalled();
   });
 
   it('shows an error and does not navigate when persisting the new locale fails', async () => {
@@ -108,6 +121,7 @@ describe('ProfilePage language select', () => {
     fireEvent.click(englishOption);
 
     await waitFor(() => expect(screen.getByText('network down')).toBeTruthy());
+    expect(window.location.href).toBe('');
     expect(push).not.toHaveBeenCalled();
   });
 });

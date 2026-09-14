@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Link, useRouter } from '@/i18n/navigation';
+import { Link } from '@/i18n/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 
 export default function LoginPage() {
-  const router = useRouter();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -23,9 +22,14 @@ export default function LoginPage() {
 
     try {
       // Redirect to the user's *stored* locale, not the one this login form happened to be
-      // submitted under -- so URL and preference never disagree (#179).
+      // submitted under -- so URL and preference never disagree (#179). A hard navigation,
+      // not the locale-aware router: crossing locales remounts the root layout (it owns
+      // <html lang>) purely client-side, and next-themes' anti-flash inline <script> (part
+      // of every ThemeProvider render) triggers a "script tag while rendering on the
+      // client" warning on that remount. A full page load re-renders it server-side, where
+      // the script is part of the initial HTML and hydration matches it without complaint.
       const user = await login({ email, password });
-      router.push('/dashboard', { locale: user.locale });
+      window.location.href = `/${user.locale}/dashboard`;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login fehlgeschlagen');
     } finally {

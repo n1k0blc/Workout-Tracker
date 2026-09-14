@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Link, useRouter } from '@/i18n/navigation';
+import { Link } from '@/i18n/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { IconChevronLeft, IconPlus, IconX } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,6 @@ interface HomeGymInput {
 }
 
 export default function RegisterPage() {
-  const router = useRouter();
   const { register } = useAuth();
   const [step, setStep] = useState<1 | 2>(1);
   const [error, setError] = useState('');
@@ -127,7 +126,9 @@ export default function RegisterPage() {
         weight: parseFloat(weight),
         homeGyms: validGyms,
       });
-      router.push('/dashboard', { locale: user.locale });
+      // Hard navigation, not the locale-aware router -- see the matching comment in
+      // login/page.tsx for why crossing locales needs a full page load.
+      window.location.href = `/${user.locale}/dashboard`;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registrierung fehlgeschlagen');
     } finally {
