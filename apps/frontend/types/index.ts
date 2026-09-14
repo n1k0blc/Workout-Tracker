@@ -14,6 +14,8 @@ export interface User {
   targetCarbs?: number | null;
   targetProtein?: number | null;
   targetFat?: number | null;
+  /** Locale tracer bullet (#179): drives next-intl routing/UI. Always set. */
+  locale: 'de' | 'en';
 }
 
 export interface HomeGym {

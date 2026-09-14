@@ -25,6 +25,13 @@ model User {
   targetCarbs   Int?
   targetProtein Int?
   targetFat     Int?
+  // Locale tracer bullet (#179): three independent preference axes, none derived from
+  // another at render time. `locale` drives next-intl routing/UI; `unitSystem` is seeded
+  // once at registration from the region subtag and never re-derived; `foodMarket` exists
+  // so the concept has a column, but gets no UI until a second market exists.
+  locale        Locale         @default(DE)
+  unitSystem    UnitSystem     @default(METRIC)
+  foodMarket    FoodMarket     @default(DE)
   exercises     Exercise[]
   homeGyms      HomeGym[]
   workouts      Workout[]
@@ -439,4 +446,18 @@ enum SetType {
 enum CycleStatus {
   ACTIVE
   COMPLETED
+}
+
+enum Locale {
+  DE
+  EN
+}
+
+enum UnitSystem {
+  METRIC
+  IMPERIAL
+}
+
+enum FoodMarket {
+  DE
 }

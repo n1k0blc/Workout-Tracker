@@ -13,6 +13,12 @@ import { PasswordService } from './password.service';
 import { BreachedPasswordService } from './breached-password.service';
 import { RefreshTokenService, IssuedRefreshToken } from './refresh-token.service';
 import { defaultMealSlotCreateData } from '../nutrition/meal-slots.service';
+import {
+  resolveRegisterLocale,
+  resolveUnitSystemFromAcceptLanguage,
+  toPrismaLocale,
+  withApiLocale,
+} from '../common/utils/locale.util';
 
 const BREACHED_PASSWORD_MESSAGE =
   'This password has appeared in a known data breach. Please choose a different password.';
@@ -26,6 +32,7 @@ const USER_SELECT = {
   height: true,
   weight: true,
   createdAt: true,
+  locale: true,
   homeGyms: {
     select: { id: true, name: true, createdAt: true },
     orderBy: { name: 'asc' as const },
@@ -48,7 +55,10 @@ export class AuthService {
     private refreshTokenService: RefreshTokenService,
   ) {}
 
-  async register(registerDto: RegisterDto): Promise<AuthSession> {
+  async register(
+    registerDto: RegisterDto,
+    localeSignals: { localeHeader?: string; acceptLanguageHeader?: string } = {},
+  ): Promise<AuthSession> {
     const { email, password, firstName, lastName, dateOfBirth, height, weight, homeGyms } =
       registerDto;
 
@@ -69,9 +79,16 @@ export class AuthService {
 
     const passwordHash = await this.passwordService.hash(password);
 
+    // Locale tracer bullet (#179): no new registration fields. `locale` comes from the
+    // `[locale]` URL segment the form was submitted under (carried on X-Locale, same
+    // header sent with every request); `unitSystem` is seeded once from the browser's
+    // Accept-Language and never re-derived from locale afterward.
+    const locale = resolveRegisterLocale(localeSignals.localeHeader);
+    const unitSystem = resolveUnitSystemFromAcceptLanguage(localeSignals.acceptLanguageHeader);
+
     let user: UserDto;
     try {
-      user = await this.prisma.user.create({
+      const created = await this.prisma.user.create({
         data: {
           email,
           passwordHash,
@@ -80,6 +97,8 @@ export class AuthService {
           dateOfBirth: new Date(dateOfBirth),
           height,
           weight,
+          locale: toPrismaLocale(locale),
+          unitSystem,
           homeGyms: {
             create: homeGyms.map((gym) => ({
               name: gym.name,
@@ -95,6 +114,7 @@ export class AuthService {
         },
         select: USER_SELECT,
       });
+      user = withApiLocale(created);
     } catch {
       throw new AppInternalServerErrorException('Failed to create user', 'USER_CREATION_FAILED');
     }
@@ -136,10 +156,11 @@ export class AuthService {
       });
     }
 
-    const user = await this.prisma.user.findUniqueOrThrow({
+    const storedUser = await this.prisma.user.findUniqueOrThrow({
       where: { id: userWithPassword.id },
       select: USER_SELECT,
     });
+    const user: UserDto = withApiLocale(storedUser);
 
     return this.issueSession(user);
   }

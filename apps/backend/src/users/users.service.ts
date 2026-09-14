@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AppNotFoundException, AppConflictException } from '../common/errors/app-exceptions';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto, UserDto, CreateHomeGymDto, UpdateHomeGymDto, HomeGymDto } from './dto';
+import { toPrismaLocale, withApiLocale } from '../common/utils/locale.util';
 
 const ACTIVE_HOME_GYMS_SELECT = {
   homeGyms: {
@@ -31,6 +32,7 @@ export class UsersService {
         targetProtein: true,
         targetFat: true,
         createdAt: true,
+        locale: true,
         ...ACTIVE_HOME_GYMS_SELECT,
       },
     });
@@ -39,7 +41,7 @@ export class UsersService {
       throw new AppNotFoundException('User not found', 'USER_NOT_FOUND');
     }
 
-    return user;
+    return withApiLocale(user);
   }
 
   async updateUser(userId: string, updateUserDto: UpdateUserDto): Promise<UserDto> {
@@ -59,6 +61,10 @@ export class UsersService {
       data.dateOfBirth = new Date(updateUserDto.dateOfBirth);
     }
 
+    // The DTO's `locale` is the lowercase wire type ('de'/'en'); the naive spread above
+    // would otherwise send that straight to Prisma, which expects the uppercase enum.
+    data.locale = updateUserDto.locale ? toPrismaLocale(updateUserDto.locale) : undefined;
+
     const updatedUser = await this.prisma.user.update({
       where: { id: userId },
       data,
@@ -75,11 +81,12 @@ export class UsersService {
         targetProtein: true,
         targetFat: true,
         createdAt: true,
+        locale: true,
         ...ACTIVE_HOME_GYMS_SELECT,
       },
     });
 
-    return updatedUser;
+    return withApiLocale(updatedUser);
   }
 
   // Home Gym CRUD methods

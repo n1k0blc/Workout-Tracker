@@ -1,7 +1,7 @@
 'use client';
 
 import { type ComponentProps, useCallback, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useWorkout } from '@/lib/workout-context';
 import { Button } from '@/components/ui/button';
@@ -39,7 +39,7 @@ export function LogoutButton({ children, onRequestConfirm, ...props }: LogoutBut
 
   const runLogout = useCallback(async () => {
     await logout(); // best-effort client-side, never rejects
-    router.push('/de/login');
+    router.push('/login');
   }, [logout, router]);
 
   return (

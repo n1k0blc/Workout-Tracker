@@ -22,7 +22,7 @@ function baseRegisterDto(overrides: Partial<RegisterDto> = {}): RegisterDto {
 }
 
 function makeService({ breached }: { breached: boolean }) {
-  const createdUser = { id: 'user-1', email: 'new@example.com' };
+  const createdUser = { id: 'user-1', email: 'new@example.com', locale: 'DE' };
   const prisma = {
     user: {
       findUnique: jest.fn().mockResolvedValue(null),
@@ -111,6 +111,86 @@ describe('AuthService breached-password screening', () => {
 
       expect(prisma.user.update).toHaveBeenCalledTimes(1);
       expect(refreshTokenService.revokeAllForUser).toHaveBeenCalledWith('user-1');
+    });
+  });
+});
+
+/**
+ * Locale tracer bullet (#179): registration derives `locale` from the `X-Locale` header
+ * the frontend sends (the `[locale]` URL segment active at submit time) and seeds
+ * `unitSystem` once from the browser's `Accept-Language` -- two independent signals,
+ * neither a new form field. Both `register()` and `login()` map the Prisma row's
+ * uppercase `locale` enum back to the lowercase wire type before returning.
+ */
+describe('AuthService locale and unitSystem (#179)', () => {
+  describe('register', () => {
+    it('persists the locale carried on X-Locale and maps it back on the returned user', async () => {
+      const { service, prisma } = makeService({ breached: false });
+      prisma.user.create.mockResolvedValue({ id: 'user-1', email: 'new@example.com', locale: 'EN' });
+
+      const session = await service.register(baseRegisterDto(), { localeHeader: 'en' });
+
+      expect(prisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ locale: 'EN' }) }),
+      );
+      expect(session.user.locale).toBe('en');
+    });
+
+    it('falls back to de when no X-Locale header is sent', async () => {
+      const { service, prisma } = makeService({ breached: false });
+
+      await service.register(baseRegisterDto());
+
+      expect(prisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ locale: 'DE' }) }),
+      );
+    });
+
+    it('seeds unitSystem imperial only for an en-US Accept-Language', async () => {
+      const { service, prisma } = makeService({ breached: false });
+
+      await service.register(baseRegisterDto(), { acceptLanguageHeader: 'en-US,en;q=0.9' });
+
+      expect(prisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ unitSystem: 'IMPERIAL' }) }),
+      );
+    });
+
+    it('seeds unitSystem metric for a German or missing Accept-Language', async () => {
+      const { service, prisma } = makeService({ breached: false });
+
+      await service.register(baseRegisterDto(), { acceptLanguageHeader: 'de-DE,de;q=0.9' });
+      expect(prisma.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ unitSystem: 'METRIC' }) }),
+      );
+
+      await service.register(baseRegisterDto());
+      expect(prisma.user.create).toHaveBeenLastCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ unitSystem: 'METRIC' }) }),
+      );
+    });
+  });
+
+  describe('login', () => {
+    it('maps a stored uppercase locale to the lowercase wire type', async () => {
+      const { service, prisma } = makeService({ breached: false });
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        email: 'new@example.com',
+        passwordHash: 'argon2-hash',
+      });
+      prisma.user.findUniqueOrThrow.mockResolvedValue({
+        id: 'user-1',
+        email: 'new@example.com',
+        locale: 'DE',
+      });
+
+      const session = await service.login({
+        email: 'new@example.com',
+        password: 'a-strong-unique-passphrase',
+      });
+
+      expect(session.user.locale).toBe('de');
     });
   });
 });

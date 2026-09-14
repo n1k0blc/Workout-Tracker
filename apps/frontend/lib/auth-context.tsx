@@ -7,8 +7,11 @@ import { apiClient } from '@/lib/api/client';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (credentials: LoginCredentials) => Promise<void>;
-  register: (credentials: RegisterCredentials) => Promise<void>;
+  // Return the signed-in user (not void): the login/register pages need it to redirect
+  // to the user's stored locale (#179), which the state update above can't hand back
+  // synchronously.
+  login: (credentials: LoginCredentials) => Promise<User>;
+  register: (credentials: RegisterCredentials) => Promise<User>;
   logout: () => Promise<void>;
 }
 
@@ -33,11 +36,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (credentials: LoginCredentials) => {
     const response = await apiClient.login(credentials);
     setUser(response.user);
+    return response.user;
   };
 
   const register = async (credentials: RegisterCredentials) => {
     const response = await apiClient.register(credentials);
     setUser(response.user);
+    return response.user;
   };
 
   const logout = async () => {

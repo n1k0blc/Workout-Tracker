@@ -1,0 +1,87 @@
+{
+  "Profile": {
+    "title": "My Profile",
+    "common": {
+      "edit": "Edit",
+      "cancel": "Cancel",
+      "save": "Save"
+    },
+    "targets": {
+      "title": "Daily Targets",
+      "empty": "No daily targets set yet. Without targets, the day view only shows the logged totals.",
+      "kcalLabel": "Calories",
+      "kcalPlaceholder": "e.g. 2400",
+      "perDay": "kcal / day",
+      "carbsLabel": "Carbs",
+      "proteinLabel": "Protein",
+      "fatLabel": "Fat",
+      "gramsPlaceholder": "g",
+      "gramsUnit": "g",
+      "macrosResult": "Macros add up to",
+      "kcalUnit": "kcal",
+      "kcalRangeError": "Calorie target must be a whole number between 1 and {max}",
+      "carbsRangeError": "Carbs target must be a whole number between 1 and {max}",
+      "proteinRangeError": "Protein target must be a whole number between 1 and {max}",
+      "fatRangeError": "Fat target must be a whole number between 1 and {max}",
+      "saved": "Daily targets saved",
+      "saveError": "Failed to save daily targets"
+    },
+    "profileData": {
+      "title": "Profile Data",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "email": "Email",
+      "dateOfBirth": "Date of birth",
+      "dateOfBirthWithAge": "Date of birth ({age, plural, one {# year} other {# years}})",
+      "datePlaceholder": "MM/DD/YYYY",
+      "heightLabel": "Height (cm)",
+      "weightLabel": "Weight (kg)",
+      "heightValue": "{height} cm",
+      "weightValue": "{weight} kg",
+      "empty": "-",
+      "validationAllFields": "Please fill in all fields",
+      "validationInvalidEmail": "Please provide a valid email address",
+      "validationHeightRange": "Height must be between 50 and 300 cm",
+      "validationWeightRange": "Weight must be between 20 and 500 kg",
+      "validationAgeRange": "Age must be between 13 and 120 years",
+      "updated": "Profile updated successfully",
+      "updateError": "Failed to update profile"
+    },
+    "language": {
+      "title": "Language",
+      "german": "Deutsch",
+      "english": "English",
+      "updateError": "Failed to change language"
+    },
+    "gyms": {
+      "title": "My Gyms",
+      "add": "Add gym",
+      "addDialogTitle": "Add a new gym",
+      "nameLabel": "Gym name",
+      "namePlaceholder": "e.g. Downtown Fitness Studio",
+      "addSubmit": "Add",
+      "empty": "No gyms added yet",
+      "editDialogTitle": "Edit gym",
+      "deleteConfirm": "Really delete this gym? This isn't possible if the gym is used in workouts.",
+      "added": "Gym added successfully",
+      "addError": "Failed to add gym",
+      "updated": "Gym updated successfully",
+      "updateError": "Failed to update gym",
+      "deleted": "Gym deleted successfully",
+      "deleteError": "Failed to delete gym. It might still be used in workouts."
+    },
+    "security": {
+      "title": "Security",
+      "changePassword": "Change password",
+      "currentPassword": "Current password",
+      "newPassword": "New password",
+      "confirmNewPassword": "Confirm new password",
+      "warning": "After changing your password you'll be signed out everywhere and need to sign in again.",
+      "validationAllFields": "Please fill in all fields",
+      "validationMinLength": "New password must be at least 8 characters long",
+      "validationMismatch": "Passwords don't match",
+      "changeError": "Failed to change password"
+    },
+    "logout": "Log out"
+  }
+}

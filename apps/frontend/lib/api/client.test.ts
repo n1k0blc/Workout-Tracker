@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from './client';
 
@@ -33,6 +34,30 @@ describe('client timezone header', () => {
     expect(sentHeaders(fetchMock)['X-Timezone']).toBe(
       Intl.DateTimeFormat().resolvedOptions().timeZone,
     );
+  });
+});
+
+describe('client locale header (#179)', () => {
+  afterEach(() => {
+    window.history.pushState({}, '', '/');
+  });
+
+  it('tells the server which [locale] URL segment the request was made under, on every request', async () => {
+    window.history.pushState({}, '', '/de/dashboard');
+    const fetchMock = mockFetch();
+
+    await apiClient.getSuggestedWorkout();
+
+    expect(sentHeaders(fetchMock)['X-Locale']).toBe('de');
+  });
+
+  it('falls back to the routing default when the pathname carries no recognised locale', async () => {
+    window.history.pushState({}, '', '/');
+    const fetchMock = mockFetch();
+
+    await apiClient.getSuggestedWorkout();
+
+    expect(sentHeaders(fetchMock)['X-Locale']).toBe('en');
   });
 });
 

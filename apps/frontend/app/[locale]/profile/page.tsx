@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useTranslations, useFormatter } from 'next-intl';
+import { useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { apiClient } from '@/lib/api/client';
 import { HomeGym } from '@/types';
@@ -28,6 +29,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DatePicker } from '@/components/date-picker';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -38,6 +40,8 @@ import {
 } from '@/components/ui/dialog';
 
 export default function ProfilePage() {
+  const t = useTranslations('Profile');
+  const format = useFormatter();
   const router = useRouter();
   const { user, logout } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -75,6 +79,11 @@ export default function ProfilePage() {
   const [editingGymId, setEditingGymId] = useState<string | null>(null);
   const [editingGymName, setEditingGymName] = useState('');
 
+  // Language (#179) - the only preference axis with UI in this ticket. unitSystem and
+  // foodMarket also exist on User but get none, per the tracer-bullet scope.
+  const [localeValue, setLocaleValue] = useState<'de' | 'en'>('de');
+  const [localeSaving, setLocaleSaving] = useState(false);
+
   useEffect(() => {
     if (user) {
       setEmail(user.email || '');
@@ -87,6 +96,7 @@ export default function ProfilePage() {
       setTargetCarbs(user.targetCarbs?.toString() || '');
       setTargetProtein(user.targetProtein?.toString() || '');
       setTargetFat(user.targetFat?.toString() || '');
+      setLocaleValue(user.locale);
       if (user.homeGyms) {
         setHomeGyms(user.homeGyms);
       }
@@ -124,28 +134,28 @@ export default function ProfilePage() {
     try {
       // Validate
       if (!email || !firstName || !lastName || !dateOfBirth || !height || !weight) {
-        throw new Error('Bitte alle Felder ausfüllen');
+        throw new Error(t('profileData.validationAllFields'));
       }
 
       const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailPattern.test(email)) {
-        throw new Error('Bitte eine gültige Email-Adresse angeben');
+        throw new Error(t('profileData.validationInvalidEmail'));
       }
 
       const heightNum = parseInt(height);
       const weightNum = parseFloat(weight);
 
       if (heightNum < 50 || heightNum > 300) {
-        throw new Error('Größe muss zwischen 50 und 300 cm liegen');
+        throw new Error(t('profileData.validationHeightRange'));
       }
 
       if (weightNum < 20 || weightNum > 500) {
-        throw new Error('Gewicht muss zwischen 20 und 500 kg liegen');
+        throw new Error(t('profileData.validationWeightRange'));
       }
 
       const age = calculateAge(dateOfBirth);
       if (age < 13 || age > 120) {
-        throw new Error('Alter muss zwischen 13 und 120 Jahren liegen');
+        throw new Error(t('profileData.validationAgeRange'));
       }
 
       await apiClient.updateProfile({
@@ -157,25 +167,25 @@ export default function ProfilePage() {
         weight: weightNum,
       });
 
-      setSuccess('Profil erfolgreich aktualisiert');
+      setSuccess(t('profileData.updated'));
       setIsEditingProfile(false);
-      
+
       // Reload user data
       window.location.reload();
     } catch (err: any) {
-      setError(err.message || 'Fehler beim Aktualisieren des Profils');
+      setError(err.message || t('profileData.updateError'));
     } finally {
       setLoading(false);
     }
   };
 
   /** A blank Tagesziel field clears the target (null); otherwise it must be a whole number in range. */
-  const parseTargetField = (raw: string, label: string, max: number): number | null => {
+  const parseTargetField = (raw: string, errorMessage: string, max: number): number | null => {
     const trimmed = raw.trim();
     if (trimmed === '') return null;
     const value = Number(trimmed);
     if (!Number.isInteger(value) || value < 1 || value > max) {
-      throw new Error(`${label} muss eine ganze Zahl zwischen 1 und ${max} sein`);
+      throw new Error(errorMessage);
     }
     return value;
   };
@@ -187,19 +197,23 @@ export default function ProfilePage() {
 
     try {
       const payload = {
-        targetKcal: parseTargetField(targetKcal, 'Kalorienziel', 20000),
-        targetCarbs: parseTargetField(targetCarbs, 'Kohlenhydrate-Ziel', 2000),
-        targetProtein: parseTargetField(targetProtein, 'Protein-Ziel', 2000),
-        targetFat: parseTargetField(targetFat, 'Fett-Ziel', 2000),
+        targetKcal: parseTargetField(targetKcal, t('targets.kcalRangeError', { max: 20000 }), 20000),
+        targetCarbs: parseTargetField(targetCarbs, t('targets.carbsRangeError', { max: 2000 }), 2000),
+        targetProtein: parseTargetField(
+          targetProtein,
+          t('targets.proteinRangeError', { max: 2000 }),
+          2000,
+        ),
+        targetFat: parseTargetField(targetFat, t('targets.fatRangeError', { max: 2000 }), 2000),
       };
 
       await apiClient.updateProfile(payload);
 
-      setSuccess('Tagesziele gespeichert');
+      setSuccess(t('targets.saved'));
       setIsEditingTargets(false);
       window.location.reload();
     } catch (err: any) {
-      setError(err.message || 'Fehler beim Speichern der Tagesziele');
+      setError(err.message || t('targets.saveError'));
     } finally {
       setTargetsLoading(false);
     }
@@ -216,9 +230,9 @@ export default function ProfilePage() {
       const gym = await apiClient.createHomeGym({ name: newGymName.trim() });
       setHomeGyms([...homeGyms, gym]);
       setNewGymName('');
-      setSuccess('Gym erfolgreich hinzugefügt');
+      setSuccess(t('gyms.added'));
     } catch (err: any) {
-      setError(err.message || 'Fehler beim Hinzufügen des Gyms');
+      setError(err.message || t('gyms.addError'));
     } finally {
       setLoading(false);
     }
@@ -236,16 +250,16 @@ export default function ProfilePage() {
       setHomeGyms(homeGyms.map((g) => (g.id === id ? updatedGym : g)));
       setEditingGymId(null);
       setEditingGymName('');
-      setSuccess('Gym erfolgreich aktualisiert');
+      setSuccess(t('gyms.updated'));
     } catch (err: any) {
-      setError(err.message || 'Fehler beim Aktualisieren des Gyms');
+      setError(err.message || t('gyms.updateError'));
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteGym = async (id: string) => {
-    if (!confirm('Gym wirklich löschen? Dies ist nicht möglich, wenn das Gym in Workouts verwendet wird.')) {
+    if (!confirm(t('gyms.deleteConfirm'))) {
       return;
     }
 
@@ -256,9 +270,9 @@ export default function ProfilePage() {
     try {
       await apiClient.deleteHomeGym(id);
       setHomeGyms(homeGyms.filter((g) => g.id !== id));
-      setSuccess('Gym erfolgreich gelöscht');
+      setSuccess(t('gyms.deleted'));
     } catch (err: any) {
-      setError(err.message || 'Fehler beim Löschen des Gyms. Möglicherweise wird es noch in Workouts verwendet.');
+      setError(err.message || t('gyms.deleteError'));
     } finally {
       setLoading(false);
     }
@@ -268,17 +282,17 @@ export default function ProfilePage() {
     setPasswordError('');
 
     if (!currentPassword || !newPassword || !confirmNewPassword) {
-      setPasswordError('Bitte alle Felder ausfüllen');
+      setPasswordError(t('security.validationAllFields'));
       return;
     }
 
     if (newPassword.length < 8) {
-      setPasswordError('Neues Passwort muss mindestens 8 Zeichen lang sein');
+      setPasswordError(t('security.validationMinLength'));
       return;
     }
 
     if (newPassword !== confirmNewPassword) {
-      setPasswordError('Die Passwörter stimmen nicht überein');
+      setPasswordError(t('security.validationMismatch'));
       return;
     }
 
@@ -293,11 +307,29 @@ export default function ProfilePage() {
       setNewPassword('');
       setConfirmNewPassword('');
       await logout();
-      router.push('/de/login');
+      router.push('/login');
     } catch (err: any) {
-      setPasswordError(err.message || 'Fehler beim Ändern des Passworts');
+      setPasswordError(err.message || t('security.changeError'));
     } finally {
       setPasswordLoading(false);
+    }
+  };
+
+  // Persists then navigates to the new locale-prefixed URL -- a real navigation, not just
+  // local state, since the acceptance criterion is the URL/catalogue actually switching
+  // (#179). Middleware/next-intl resync the NEXT_LOCALE cookie once that URL loads.
+  const handleLocaleChange = async (next: string) => {
+    if (next !== 'de' && next !== 'en') return;
+
+    setError('');
+    setLocaleSaving(true);
+
+    try {
+      await apiClient.updateProfile({ locale: next });
+      router.push('/profile', { locale: next });
+    } catch (err: any) {
+      setError(err.message || t('language.updateError'));
+      setLocaleSaving(false);
     }
   };
 
@@ -326,7 +358,7 @@ export default function ProfilePage() {
                 {user?.firstName?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || 'U'}
               </AvatarFallback>
             </Avatar>
-            Mein Profil
+            {t('title')}
           </h1>
         </div>
 
@@ -345,11 +377,11 @@ export default function ProfilePage() {
         {/* Tagesziele Section (#152) */}
         <Card className="mb-6">
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-y-2">
-            <CardTitle>Tagesziele</CardTitle>
+            <CardTitle>{t('targets.title')}</CardTitle>
             {!isEditingTargets ? (
               <Button variant="outline" onClick={() => setIsEditingTargets(true)}>
                 <IconEdit className="mr-2 size-4" />
-                Bearbeiten
+                {t('common.edit')}
               </Button>
             ) : (
               <div className="flex gap-2">
@@ -364,11 +396,11 @@ export default function ProfilePage() {
                     setTargetFat(user?.targetFat?.toString() || '');
                   }}
                 >
-                  Abbrechen
+                  {t('common.cancel')}
                 </Button>
                 <Button size="sm" onClick={handleUpdateTargets} disabled={targetsLoading}>
                   <IconCheck className="mr-2 size-4" />
-                  Speichern
+                  {t('common.save')}
                 </Button>
               </div>
             )}
@@ -376,14 +408,11 @@ export default function ProfilePage() {
 
           <CardContent>
             {!isEditingTargets && !anyTargetSet ? (
-              <p className="text-sm text-muted-foreground">
-                Noch keine Tagesziele festgelegt. Ohne Ziele zeigt die Tagesansicht nur die
-                erfassten Summen.
-              </p>
+              <p className="text-sm text-muted-foreground">{t('targets.empty')}</p>
             ) : (
               <div className="space-y-5">
                 <Field>
-                  <FieldLabel>Kalorien</FieldLabel>
+                  <FieldLabel>{t('targets.kcalLabel')}</FieldLabel>
                   {isEditingTargets ? (
                     <Input
                       type="number"
@@ -392,23 +421,23 @@ export default function ProfilePage() {
                       onChange={(e) => setTargetKcal(e.target.value)}
                       min="1"
                       max="20000"
-                      placeholder="z.B. 2400"
+                      placeholder={t('targets.kcalPlaceholder')}
                     />
                   ) : (
                     <p className="flex items-baseline gap-1.5 py-2">
                       <span className="text-2xl font-bold">
                         {targetKcal.trim() ? formatKcal(Number(targetKcal)) : '–'}
                       </span>
-                      <span className="text-sm text-muted-foreground">kcal / Tag</span>
+                      <span className="text-sm text-muted-foreground">{t('targets.perDay')}</span>
                     </p>
                   )}
                 </Field>
 
                 <div className="grid grid-cols-3 gap-3">
                   {[
-                    { label: 'Kohlenh.', value: targetCarbs, set: setTargetCarbs },
-                    { label: 'Protein', value: targetProtein, set: setTargetProtein },
-                    { label: 'Fett', value: targetFat, set: setTargetFat },
+                    { label: t('targets.carbsLabel'), value: targetCarbs, set: setTargetCarbs },
+                    { label: t('targets.proteinLabel'), value: targetProtein, set: setTargetProtein },
+                    { label: t('targets.fatLabel'), value: targetFat, set: setTargetFat },
                   ].map((f) => (
                     <Field key={f.label}>
                       <FieldLabel>{f.label}</FieldLabel>
@@ -420,14 +449,14 @@ export default function ProfilePage() {
                           onChange={(e) => f.set(e.target.value)}
                           min="1"
                           max="2000"
-                          placeholder="g"
+                          placeholder={t('targets.gramsPlaceholder')}
                         />
                       ) : (
                         <p className="py-2">
                           <span className="text-base font-semibold">
                             {f.value.trim() ? Number(f.value) : '–'}
                           </span>
-                          <span className="text-xs text-muted-foreground"> g</span>
+                          <span className="text-xs text-muted-foreground"> {t('targets.gramsUnit')}</span>
                         </p>
                       )}
                     </Field>
@@ -437,9 +466,9 @@ export default function ProfilePage() {
                 {(isEditingTargets || anyTargetSet) && (
                   <div className="border-t pt-3.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Makros ergeben</span>
+                      <span className="text-xs text-muted-foreground">{t('targets.macrosResult')}</span>
                       <span className="text-[13px] font-semibold">
-                        {formatKcal(targetMacroKcal)} kcal
+                        {formatKcal(targetMacroKcal)} {t('targets.kcalUnit')}
                       </span>
                     </div>
                     <MacroProgressBar percent={targetBarPercent} className="mt-2.5" />
@@ -456,14 +485,14 @@ export default function ProfilePage() {
         {/* Profile Section */}
         <Card className="mb-6">
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-y-2">
-            <CardTitle>Profildaten</CardTitle>
+            <CardTitle>{t('profileData.title')}</CardTitle>
             {!isEditingProfile ? (
               <Button
                 variant="outline"
                 onClick={() => setIsEditingProfile(true)}
               >
                 <IconEdit className="mr-2 size-4" />
-                Bearbeiten
+                {t('common.edit')}
               </Button>
             ) : (
               <div className="flex gap-2">
@@ -472,7 +501,7 @@ export default function ProfilePage() {
                   size="sm"
                   onClick={() => setIsEditingProfile(false)}
                 >
-                  Abbrechen
+                  {t('common.cancel')}
                 </Button>
                 <Button
                   size="sm"
@@ -480,7 +509,7 @@ export default function ProfilePage() {
                   disabled={loading}
                 >
                   <IconCheck className="mr-2 size-4" />
-                  Speichern
+                  {t('common.save')}
                 </Button>
               </div>
             )}
@@ -490,32 +519,32 @@ export default function ProfilePage() {
             <FieldGroup>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Field>
-                  <FieldLabel>Vorname</FieldLabel>
+                  <FieldLabel>{t('profileData.firstName')}</FieldLabel>
                   {isEditingProfile ? (
                     <Input
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
                     />
                   ) : (
-                    <p className="text-foreground py-2">{firstName || '-'}</p>
+                    <p className="text-foreground py-2">{firstName || t('profileData.empty')}</p>
                   )}
                 </Field>
 
                 <Field>
-                  <FieldLabel>Nachname</FieldLabel>
+                  <FieldLabel>{t('profileData.lastName')}</FieldLabel>
                   {isEditingProfile ? (
                     <Input
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
                     />
                   ) : (
-                    <p className="text-foreground py-2">{lastName || '-'}</p>
+                    <p className="text-foreground py-2">{lastName || t('profileData.empty')}</p>
                   )}
                 </Field>
               </div>
 
               <Field>
-                <FieldLabel>Email</FieldLabel>
+                <FieldLabel>{t('profileData.email')}</FieldLabel>
                 {isEditingProfile ? (
                   <Input
                     type="email"
@@ -529,24 +558,26 @@ export default function ProfilePage() {
 
               <Field>
                 <FieldLabel>
-                  Geburtsdatum {dateOfBirth && `(${calculateAge(dateOfBirth)} Jahre)`}
+                  {dateOfBirth
+                    ? t('profileData.dateOfBirthWithAge', { age: calculateAge(dateOfBirth) })
+                    : t('profileData.dateOfBirth')}
                 </FieldLabel>
                 {isEditingProfile ? (
                   <DatePicker
                     date={dateOfBirth}
                     onSelect={setDateOfBirth}
-                    placeholder="TT.MM.JJJJ"
+                    placeholder={t('profileData.datePlaceholder')}
                   />
                 ) : (
                   <p className="text-foreground py-2">
-                    {dateOfBirth ? dateOfBirth.toLocaleDateString('de-DE') : '-'}
+                    {dateOfBirth ? format.dateTime(dateOfBirth) : t('profileData.empty')}
                   </p>
                 )}
               </Field>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Field>
-                  <FieldLabel>Größe (cm)</FieldLabel>
+                  <FieldLabel>{t('profileData.heightLabel')}</FieldLabel>
                   {isEditingProfile ? (
                     <Input
                       type="number"
@@ -556,12 +587,14 @@ export default function ProfilePage() {
                       max="300"
                     />
                   ) : (
-                    <p className="text-foreground py-2">{height ? `${height} cm` : '-'}</p>
+                    <p className="text-foreground py-2">
+                      {height ? t('profileData.heightValue', { height }) : t('profileData.empty')}
+                    </p>
                   )}
                 </Field>
 
                 <Field>
-                  <FieldLabel>Gewicht (kg)</FieldLabel>
+                  <FieldLabel>{t('profileData.weightLabel')}</FieldLabel>
                   {isEditingProfile ? (
                     <Input
                       type="number"
@@ -572,7 +605,9 @@ export default function ProfilePage() {
                       step="0.1"
                     />
                   ) : (
-                    <p className="text-foreground py-2">{weight ? `${weight} kg` : '-'}</p>
+                    <p className="text-foreground py-2">
+                      {weight ? t('profileData.weightValue', { weight }) : t('profileData.empty')}
+                    </p>
                   )}
                 </Field>
               </div>
@@ -580,29 +615,47 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
+        {/* Language Section (#179): the only preference axis with UI in this ticket */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>{t('language.title')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value={localeValue} onValueChange={handleLocaleChange} disabled={localeSaving}>
+              <SelectTrigger className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="de">{t('language.german')}</SelectItem>
+                <SelectItem value="en">{t('language.english')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+
         {/* HomeGyms Section */}
         <Card className="mb-6">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Meine Gyms</CardTitle>
+              <CardTitle>{t('gyms.title')}</CardTitle>
               <Dialog>
                 <DialogTrigger asChild>
                   <Button>
                     <IconPlus className="mr-2 size-4" />
-                    Gym hinzufügen
+                    {t('gyms.add')}
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Neues Gym hinzufügen</DialogTitle>
+                    <DialogTitle>{t('gyms.addDialogTitle')}</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 py-4">
                     <Field>
-                      <FieldLabel>Gym-Name</FieldLabel>
+                      <FieldLabel>{t('gyms.nameLabel')}</FieldLabel>
                       <Input
                         value={newGymName}
                         onChange={(e) => setNewGymName(e.target.value)}
-                        placeholder="z.B. Fitness Studio Mitte"
+                        placeholder={t('gyms.namePlaceholder')}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') handleAddGym();
                         }}
@@ -614,7 +667,7 @@ export default function ProfilePage() {
                       onClick={handleAddGym}
                       disabled={loading || !newGymName.trim()}
                     >
-                      Hinzufügen
+                      {t('gyms.addSubmit')}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -624,9 +677,7 @@ export default function ProfilePage() {
 
           <CardContent>
             {homeGyms.length === 0 ? (
-              <p className="text-muted-foreground text-center py-4">
-                Noch keine Gyms hinzugefügt
-              </p>
+              <p className="text-muted-foreground text-center py-4">{t('gyms.empty')}</p>
             ) : (
               <div className="divide-y rounded-md border">
                 {homeGyms.map((gym) => (
@@ -667,11 +718,11 @@ export default function ProfilePage() {
         <Dialog open={!!editingGymId} onOpenChange={(open) => !open && setEditingGymId(null)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Gym bearbeiten</DialogTitle>
+              <DialogTitle>{t('gyms.editDialogTitle')}</DialogTitle>
             </DialogHeader>
             <div className="py-4">
               <Field>
-                <FieldLabel>Gym-Name</FieldLabel>
+                <FieldLabel>{t('gyms.nameLabel')}</FieldLabel>
                 <Input
                   value={editingGymName}
                   onChange={(e) => setEditingGymName(e.target.value)}
@@ -685,13 +736,13 @@ export default function ProfilePage() {
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setEditingGymId(null)}>
-                Abbrechen
+                {t('common.cancel')}
               </Button>
               <Button
                 onClick={() => editingGymId && handleUpdateGym(editingGymId)}
                 disabled={loading || !editingGymName.trim()}
               >
-                Speichern
+                {t('common.save')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -701,7 +752,7 @@ export default function ProfilePage() {
         <Card className="mb-6">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Sicherheit</CardTitle>
+              <CardTitle>{t('security.title')}</CardTitle>
               <Dialog
                 open={isPasswordDialogOpen}
                 onOpenChange={(open) => {
@@ -717,12 +768,12 @@ export default function ProfilePage() {
                 <DialogTrigger asChild>
                   <Button variant="outline">
                     <IconLock className="mr-2 size-4" />
-                    Passwort ändern
+                    {t('security.changePassword')}
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Passwort ändern</DialogTitle>
+                    <DialogTitle>{t('security.changePassword')}</DialogTitle>
                   </DialogHeader>
 
                   {passwordError && (
@@ -733,7 +784,7 @@ export default function ProfilePage() {
 
                   <div className="space-y-4 py-4">
                     <Field>
-                      <FieldLabel>Aktuelles Passwort</FieldLabel>
+                      <FieldLabel>{t('security.currentPassword')}</FieldLabel>
                       <Input
                         type="password"
                         value={currentPassword}
@@ -742,7 +793,7 @@ export default function ProfilePage() {
                       />
                     </Field>
                     <Field>
-                      <FieldLabel>Neues Passwort</FieldLabel>
+                      <FieldLabel>{t('security.newPassword')}</FieldLabel>
                       <Input
                         type="password"
                         value={newPassword}
@@ -751,7 +802,7 @@ export default function ProfilePage() {
                       />
                     </Field>
                     <Field>
-                      <FieldLabel>Neues Passwort bestätigen</FieldLabel>
+                      <FieldLabel>{t('security.confirmNewPassword')}</FieldLabel>
                       <Input
                         type="password"
                         value={confirmNewPassword}
@@ -770,10 +821,10 @@ export default function ProfilePage() {
                       onClick={() => setIsPasswordDialogOpen(false)}
                       disabled={passwordLoading}
                     >
-                      Abbrechen
+                      {t('common.cancel')}
                     </Button>
                     <Button onClick={handleChangePassword} disabled={passwordLoading}>
-                      Passwort ändern
+                      {t('security.changePassword')}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -781,9 +832,7 @@ export default function ProfilePage() {
             </div>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Nach dem Ändern deines Passworts wirst du überall abgemeldet und musst dich erneut anmelden.
-            </p>
+            <p className="text-sm text-muted-foreground">{t('security.warning')}</p>
           </CardContent>
         </Card>
 
@@ -791,7 +840,7 @@ export default function ProfilePage() {
         <Card>
           <CardContent className="pt-6">
             <LogoutButton variant="destructive" className="w-full" size="lg">
-              Abmelden
+              {t('logout')}
             </LogoutButton>
           </CardContent>
         </Card>

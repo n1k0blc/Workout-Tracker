@@ -1,8 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -23,8 +22,10 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      await login({ email, password });
-      router.push('/de/dashboard');
+      // Redirect to the user's *stored* locale, not the one this login form happened to be
+      // submitted under -- so URL and preference never disagree (#179).
+      const user = await login({ email, password });
+      router.push('/dashboard', { locale: user.locale });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login fehlgeschlagen');
     } finally {
@@ -42,7 +43,7 @@ export default function LoginPage() {
           <p className="mt-2 text-center text-sm text-muted-foreground">
             Oder{' '}
             <Link
-              href="/de/register"
+              href="/register"
               className="font-medium text-foreground hover:underline"
             >
               erstelle einen neuen Account

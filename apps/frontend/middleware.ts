@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import createMiddleware from "next-intl/middleware";
+import { routing } from "./i18n/routing";
 
 // Content-Security-Policy, phase 2: enforcing.
 //
@@ -65,16 +67,18 @@ export function buildCsp(nonce: string): string {
   ].join("; ");
 }
 
-// Locale is hardcoded until real i18n lands (#176) -- this ticket is a pure
-// structural prefactor moving routes under app/[locale]/. Only "/" needs a
-// redirect: every other route already carries the /de prefix in its links.
-const DEFAULT_LOCALE = "de";
+// Real i18n (#179): locale negotiation (profile setting -> URL -> cookie ->
+// Accept-Language -> en) is delegated to next-intl, composed ahead of the CSP
+// nonce logic below. "Profile setting" isn't resolvable here -- an edge-middleware
+// DB lookup per request is the wrong cost for a 1-prod-user app with no feature
+// flag -- so it's enforced instead at the two points the ticket names: the
+// post-login redirect to the user's stored locale, and the Profil page's language
+// select doing a full navigation after persisting. Both land the browser back on
+// a URL next-intl resyncs its NEXT_LOCALE cookie to, so URL/cookie never disagree
+// for long. See lib/middleware.test.ts for the negotiation-order coverage.
+const handleI18nRouting = createMiddleware(routing);
 
 export function middleware(request: NextRequest) {
-  if (request.nextUrl.pathname === "/") {
-    return NextResponse.redirect(new URL(`/${DEFAULT_LOCALE}`, request.url));
-  }
-
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const csp = buildCsp(nonce);
 
@@ -84,7 +88,18 @@ export function middleware(request: NextRequest) {
   // onto the scripts it injects.
   requestHeaders.set("Content-Security-Policy", csp);
 
-  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  // next-intl's own NextResponse.next({ request: { headers } }) call (the one that
+  // actually reaches layout.tsx's headers()) copies headers off the *request* object
+  // it receives, not off our response -- so the nonce/CSP must already be there
+  // before handleI18nRouting runs, via a fresh NextRequest wrapping the mutated
+  // headers rather than mutating the response afterward.
+  const requestWithNonce = new NextRequest(request, { headers: requestHeaders });
+  const response = handleI18nRouting(requestWithNonce);
+
+  // Attached unconditionally -- whether next-intl returned a locale redirect or a
+  // pass-through -- so this stays one code path regardless of which routes redirect
+  // as next-intl's own negotiation evolves. Security headers are harmless on a
+  // redirect (no body, no scripts to gate).
   response.headers.set("Content-Security-Policy", csp);
   const reportPath = `${getApiBase()}/security/csp-report`;
   response.headers.set(
@@ -95,8 +110,12 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // HTML documents only — skip build assets and static files (a cached nonce is a wrong nonce).
+  // HTML documents only — skip build assets, static files (a cached nonce is a wrong
+  // nonce), and /api. The last exclusion matters in the dev:https/dev:mobile proxy modes
+  // (next.config.ts rewrites /api/:path* to the backend): without it, next-intl's
+  // localePrefix:"always" 307-redirects every unprefixed /api/* call to /en/api/*,
+  // which no longer matches that rewrite and silently breaks every request (#179).
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml|woff2?)$).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml|woff2?)$).*)",
   ],
 };

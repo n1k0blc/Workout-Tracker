@@ -1,0 +1,87 @@
+{
+  "Profile": {
+    "title": "Mein Profil",
+    "common": {
+      "edit": "Bearbeiten",
+      "cancel": "Abbrechen",
+      "save": "Speichern"
+    },
+    "targets": {
+      "title": "Tagesziele",
+      "empty": "Noch keine Tagesziele festgelegt. Ohne Ziele zeigt die Tagesansicht nur die erfassten Summen.",
+      "kcalLabel": "Kalorien",
+      "kcalPlaceholder": "z.B. 2400",
+      "perDay": "kcal / Tag",
+      "carbsLabel": "Kohlenh.",
+      "proteinLabel": "Protein",
+      "fatLabel": "Fett",
+      "gramsPlaceholder": "g",
+      "gramsUnit": "g",
+      "macrosResult": "Makros ergeben",
+      "kcalUnit": "kcal",
+      "kcalRangeError": "Kalorienziel muss eine ganze Zahl zwischen 1 und {max} sein",
+      "carbsRangeError": "Kohlenhydrate-Ziel muss eine ganze Zahl zwischen 1 und {max} sein",
+      "proteinRangeError": "Protein-Ziel muss eine ganze Zahl zwischen 1 und {max} sein",
+      "fatRangeError": "Fett-Ziel muss eine ganze Zahl zwischen 1 und {max} sein",
+      "saved": "Tagesziele gespeichert",
+      "saveError": "Fehler beim Speichern der Tagesziele"
+    },
+    "profileData": {
+      "title": "Profildaten",
+      "firstName": "Vorname",
+      "lastName": "Nachname",
+      "email": "Email",
+      "dateOfBirth": "Geburtsdatum",
+      "dateOfBirthWithAge": "Geburtsdatum ({age, plural, one {# Jahr} other {# Jahre}})",
+      "datePlaceholder": "TT.MM.JJJJ",
+      "heightLabel": "Größe (cm)",
+      "weightLabel": "Gewicht (kg)",
+      "heightValue": "{height} cm",
+      "weightValue": "{weight} kg",
+      "empty": "-",
+      "validationAllFields": "Bitte alle Felder ausfüllen",
+      "validationInvalidEmail": "Bitte eine gültige Email-Adresse angeben",
+      "validationHeightRange": "Größe muss zwischen 50 und 300 cm liegen",
+      "validationWeightRange": "Gewicht muss zwischen 20 und 500 kg liegen",
+      "validationAgeRange": "Alter muss zwischen 13 und 120 Jahren liegen",
+      "updated": "Profil erfolgreich aktualisiert",
+      "updateError": "Fehler beim Aktualisieren des Profils"
+    },
+    "language": {
+      "title": "Sprache",
+      "german": "Deutsch",
+      "english": "English",
+      "updateError": "Fehler beim Ändern der Sprache"
+    },
+    "gyms": {
+      "title": "Meine Gyms",
+      "add": "Gym hinzufügen",
+      "addDialogTitle": "Neues Gym hinzufügen",
+      "nameLabel": "Gym-Name",
+      "namePlaceholder": "z.B. Fitness Studio Mitte",
+      "addSubmit": "Hinzufügen",
+      "empty": "Noch keine Gyms hinzugefügt",
+      "editDialogTitle": "Gym bearbeiten",
+      "deleteConfirm": "Gym wirklich löschen? Dies ist nicht möglich, wenn das Gym in Workouts verwendet wird.",
+      "added": "Gym erfolgreich hinzugefügt",
+      "addError": "Fehler beim Hinzufügen des Gyms",
+      "updated": "Gym erfolgreich aktualisiert",
+      "updateError": "Fehler beim Aktualisieren des Gyms",
+      "deleted": "Gym erfolgreich gelöscht",
+      "deleteError": "Fehler beim Löschen des Gyms. Möglicherweise wird es noch in Workouts verwendet."
+    },
+    "security": {
+      "title": "Sicherheit",
+      "changePassword": "Passwort ändern",
+      "currentPassword": "Aktuelles Passwort",
+      "newPassword": "Neues Passwort",
+      "confirmNewPassword": "Neues Passwort bestätigen",
+      "warning": "Nach dem Ändern deines Passworts wirst du überall abgemeldet und musst dich erneut anmelden.",
+      "validationAllFields": "Bitte alle Felder ausfüllen",
+      "validationMinLength": "Neues Passwort muss mindestens 8 Zeichen lang sein",
+      "validationMismatch": "Die Passwörter stimmen nicht überein",
+      "changeError": "Fehler beim Ändern des Passworts"
+    },
+    "logout": "Abmelden"
+  }
+}

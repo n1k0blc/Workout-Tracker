@@ -20,6 +20,7 @@ onlyBuiltDependencies:
   - '@parcel/watcher'
   - '@prisma/client'
   - '@prisma/engines'
+  - '@swc/core'
   - argon2
   - bcrypt
   - prisma
@@ -30,6 +31,7 @@ allowBuilds:
   '@parcel/watcher': true
   '@prisma/client': true
   '@prisma/engines': true
+  '@swc/core': true
   argon2: true
   bcrypt: true
   prisma: true

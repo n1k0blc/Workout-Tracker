@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import { execFileSync } from "node:child_process";
 import { networkInterfaces } from "node:os";
+import createNextIntlPlugin from "next-intl/plugin";
 
 // Security response headers that carry no risk of breaking the running app.
 // Content-Security-Policy is deliberately excluded here — it needs a per-request
@@ -77,4 +78,6 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
+
+export default withNextIntl(nextConfig);

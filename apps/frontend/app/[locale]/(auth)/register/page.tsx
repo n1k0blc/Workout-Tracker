@@ -1,8 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { IconChevronLeft, IconPlus, IconX } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
@@ -116,7 +115,9 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      await register({
+      // The submitted locale is derived server-side from the X-Locale header (#179), not
+      // sent as a form field -- the user's own locale comes back on the response.
+      const user = await register({
         email,
         password,
         firstName,
@@ -126,7 +127,7 @@ export default function RegisterPage() {
         weight: parseFloat(weight),
         homeGyms: validGyms,
       });
-      router.push('/de/dashboard');
+      router.push('/dashboard', { locale: user.locale });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registrierung fehlgeschlagen');
     } finally {
@@ -147,7 +148,7 @@ export default function RegisterPage() {
           {step === 1 && (
             <p className="mt-1 text-center text-sm text-muted-foreground">
               Oder{' '}
-              <Link href="/de/login" className="font-medium text-primary hover:underline">
+              <Link href="/login" className="font-medium text-primary hover:underline">
                 melde dich mit bestehendem Account an
               </Link>
             </p>

@@ -1,4 +1,14 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Req, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Headers,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { AppUnauthorizedException } from '../common/errors/app-exceptions';
 import type { CookieOptions, Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
@@ -8,6 +18,7 @@ import { UserDto } from '../users/dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { generateOpaqueToken } from '../common/utils/token.util';
+import { LOCALE_HEADER } from '../common/utils/locale.util';
 import { IssuedRefreshToken } from './refresh-token.service';
 
 // Brute-force protection: 5 attempts per minute per client, well below the global default.
@@ -29,9 +40,14 @@ export class AuthController {
   @Throttle(AUTH_THROTTLE)
   async register(
     @Body() registerDto: RegisterDto,
+    @Headers(LOCALE_HEADER) localeHeader: string | undefined,
+    @Headers('accept-language') acceptLanguageHeader: string | undefined,
     @Res({ passthrough: true }) res: Response,
   ): Promise<AuthResponseDto> {
-    const { user, accessToken, refreshToken } = await this.authService.register(registerDto);
+    const { user, accessToken, refreshToken } = await this.authService.register(registerDto, {
+      localeHeader,
+      acceptLanguageHeader,
+    });
     this.setAuthCookies(res, accessToken, refreshToken);
     return { user };
   }

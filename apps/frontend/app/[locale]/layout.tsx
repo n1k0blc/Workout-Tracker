@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import { notFound } from "next/navigation";
 import { Geist, Geist_Mono, Oxanium } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
@@ -9,6 +10,9 @@ import { ActiveWorkoutOverlay } from "@/components/workout/active-workout-overla
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "next-themes";
 import { cn } from "@/lib/utils";
+import { hasLocale, NextIntlClientProvider } from "next-intl";
+import { setRequestLocale } from "next-intl/server";
+import { routing } from "@/i18n/routing";
 
 // The CSP (issue #125) uses a per-request nonce with strict-dynamic. Next only
 // stamps that nonce onto its scripts when a route is rendered per request, so
@@ -40,36 +44,47 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({
   children,
+  params,
 }: Readonly<{
   children: React.ReactNode;
+  params: Promise<{ locale: string }>;
 }>) {
+  const { locale } = await params;
+  if (!hasLocale(routing.locales, locale)) notFound();
+  // Scopes next-intl's server-side APIs (getMessages, getTranslations, etc.) to this
+  // request's locale. No generateStaticParams: `force-dynamic` below already rules out
+  // static prerendering, so pre-computing locale params would be dead code.
+  setRequestLocale(locale);
+
   // Per-request CSP nonce (set by middleware.ts). next-themes injects an inline
   // <script>, so it needs the nonce to survive strict-dynamic once enforced.
   const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   return (
     <html
-      lang="de"
+      lang={locale}
       className={cn("h-full", "antialiased", geistSans.variable, geistMono.variable, "font-sans", oxanium.variable)}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-          nonce={nonce}
-        >
-          <AuthProvider>
-            <WorkoutProvider>
-              <Toaster />
-              <MobileNav />
-              {children}
-              <ActiveWorkoutOverlay />
-            </WorkoutProvider>
-          </AuthProvider>
-        </ThemeProvider>
+        <NextIntlClientProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+            nonce={nonce}
+          >
+            <AuthProvider>
+              <WorkoutProvider>
+                <Toaster />
+                <MobileNav />
+                {children}
+                <ActiveWorkoutOverlay />
+              </WorkoutProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

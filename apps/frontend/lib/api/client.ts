@@ -54,6 +54,7 @@ import {
   PickerList,
 } from '@/types';
 import { clientTimeZone } from '@/lib/local-date';
+import { clientLocale } from '@/lib/client-locale';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
@@ -113,6 +114,10 @@ class ApiClient {
       // The client is the only party that knows the user's zone, and "today" decides which
       // workout is recommended. Without it the server falls back to its pinned zone.
       'X-Timezone': clientTimeZone(),
+      // The active [locale] URL segment (#179). Registration reads this to persist the
+      // locale the form was submitted in, with no new form field; sent on every request
+      // (not just register) to mirror the X-Timezone precedent above.
+      'X-Locale': clientLocale(),
     };
 
     if (options.headers) {
@@ -153,7 +158,7 @@ class ApiClient {
         !this.redirecting
       ) {
         this.redirecting = true;
-        window.location.href = '/de/login';
+        window.location.href = `/${clientLocale()}/login`;
       }
       throw new Error('Unauthorized');
     }
@@ -244,6 +249,7 @@ class ApiClient {
     targetCarbs?: number | null;
     targetProtein?: number | null;
     targetFat?: number | null;
+    locale?: 'de' | 'en';
   }): Promise<User> {
     return this.request<User>('/users/me', {
       method: 'PATCH',

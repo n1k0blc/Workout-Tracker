@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
-import { buildCsp, middleware } from "../middleware";
+import { buildCsp, config, middleware } from "../middleware";
 
-function run(url = "https://workout.nikobjelic.com/dashboard") {
-  return middleware(new NextRequest(new URL(url)));
+function run(
+  url = "https://workout.nikobjelic.com/de/dashboard",
+  init?: ConstructorParameters<typeof NextRequest>[1],
+) {
+  return middleware(new NextRequest(new URL(url), init));
 }
 
 function withApiUrl<T>(apiUrl: string | undefined, fn: () => T): T {
@@ -117,17 +120,62 @@ describe("CSP connect-src covers the configured API origin", () => {
   });
 });
 
-describe("locale redirect (issue #177): composed ahead of the CSP logic", () => {
-  it("redirects / to /de without computing a CSP", () => {
+describe("locale negotiation (issue #179): composed ahead of the CSP logic", () => {
+  it("falls back to /en with no cookie and no Accept-Language -- en is the fallback, not the common case", () => {
     const res = run("https://workout.nikobjelic.com/");
     expect(res.status).toBe(307);
-    expect(res.headers.get("location")).toBe("https://workout.nikobjelic.com/de");
-    expect(res.headers.get("content-security-policy")).toBeNull();
+    expect(res.headers.get("location")).toBe("https://workout.nikobjelic.com/en");
   });
 
-  it("leaves every other route, including under /de, un-redirected with the enforcing CSP intact", () => {
+  it("honors a German Accept-Language over the en default -- a German browser still lands on German", () => {
+    const res = run("https://workout.nikobjelic.com/", {
+      headers: { "Accept-Language": "de" },
+    });
+    expect(res.headers.get("location")).toBe("https://workout.nikobjelic.com/de");
+  });
+
+  it("maps en-US Accept-Language to /en", () => {
+    const res = run("https://workout.nikobjelic.com/", {
+      headers: { "Accept-Language": "en-US" },
+    });
+    expect(res.headers.get("location")).toBe("https://workout.nikobjelic.com/en");
+  });
+
+  it("prefers the NEXT_LOCALE cookie over Accept-Language", () => {
+    const res = run("https://workout.nikobjelic.com/", {
+      headers: { "Accept-Language": "en-US", Cookie: "NEXT_LOCALE=de" },
+    });
+    expect(res.headers.get("location")).toBe("https://workout.nikobjelic.com/de");
+  });
+
+  it("attaches CSP even on a locale redirect -- security headers are harmless on a redirect, and a single code path stays correct as next-intl's own redirect conditions evolve", () => {
+    const res = run("https://workout.nikobjelic.com/");
+    expect(res.headers.get("content-security-policy")).toBeTruthy();
+  });
+
+  it("leaves a URL that already carries a known locale un-redirected with the enforcing CSP intact", () => {
     const res = run("https://workout.nikobjelic.com/de/dashboard");
     expect(res.headers.get("location")).toBeNull();
     expect(res.headers.get("content-security-policy")).toBeTruthy();
+  });
+
+  it("also serves /en un-redirected with CSP intact", () => {
+    const res = run("https://workout.nikobjelic.com/en/dashboard");
+    expect(res.headers.get("location")).toBeNull();
+    expect(res.headers.get("content-security-policy")).toBeTruthy();
+  });
+});
+
+describe("matcher excludes /api (#179)", () => {
+  // config.matcher is Next's own routing config, compiled to a real matcher at build
+  // time by Next itself (see next/dist/shared/lib/router/utils/middleware-route-matcher.js)
+  // -- a hand-rolled `new RegExp(config.matcher[0]).test(path)` does NOT reproduce that
+  // compilation (no anchoring, among other differences) and gives false results, so this
+  // only asserts the source pattern names the exclusion; the actual routing behavior is
+  // verified by running the dev server and confirming a proxied /api/* request (used by
+  // the dev:https/dev:mobile flows, via next.config.ts's /api/:path* rewrite) is not
+  // 307-redirected to /en/api/* by next-intl's localePrefix:"always".
+  it("names /api in its exclusion lookahead", () => {
+    expect(config.matcher[0]).toContain("(?!api|");
   });
 });

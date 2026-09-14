@@ -61,3 +61,55 @@ describe('UsersService.deleteHomeGym — cross-user access', () => {
     expect(prisma.homeGym.update).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * Locale tracer bullet (#179): the Profil language select persists via `PATCH /users/me`,
+ * which spreads `UpdateUserDto` straight into the Prisma `data` object -- so the lowercase
+ * wire-type `locale` must be explicitly converted to the uppercase Prisma enum rather than
+ * passed through, and mapped back on the way out.
+ */
+describe('UsersService locale (#179)', () => {
+  describe('findById', () => {
+    it('maps the stored uppercase locale to the lowercase wire type', async () => {
+      const { service, prisma } = makeService();
+      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', email: 'a@b.com', locale: 'DE' });
+
+      const user = await service.findById('user-1');
+
+      expect(user.locale).toBe('de');
+    });
+  });
+
+  describe('updateUser', () => {
+    it('converts the lowercase locale to the Prisma enum before writing', async () => {
+      const { service, prisma } = makeService();
+      prisma.user.update.mockResolvedValue({ id: 'user-1', email: 'a@b.com', locale: 'EN' });
+
+      await service.updateUser('user-1', { locale: 'en' } as never);
+
+      expect(prisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ locale: 'EN' }) }),
+      );
+    });
+
+    it('maps the returned uppercase locale back to the lowercase wire type', async () => {
+      const { service, prisma } = makeService();
+      prisma.user.update.mockResolvedValue({ id: 'user-1', email: 'a@b.com', locale: 'EN' });
+
+      const user = await service.updateUser('user-1', { locale: 'en' } as never);
+
+      expect(user.locale).toBe('en');
+    });
+
+    it('leaves locale untouched when not part of the update', async () => {
+      const { service, prisma } = makeService();
+      prisma.user.update.mockResolvedValue({ id: 'user-1', email: 'a@b.com', locale: 'DE' });
+
+      await service.updateUser('user-1', { firstName: 'Sam' } as never);
+
+      expect(prisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ locale: undefined }) }),
+      );
+    });
+  });
+});

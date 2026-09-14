@@ -42,7 +42,14 @@ async function bootstrap() {
       origin: explicitOrigins,
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-CSRF-Token', 'X-Timezone'],
+      allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'Accept',
+        'X-CSRF-Token',
+        'X-Timezone',
+        'X-Locale',
+      ],
       exposedHeaders: ['Content-Range', 'X-Content-Range'],
       maxAge: 3600,
     });
@@ -67,7 +74,14 @@ async function bootstrap() {
       },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-CSRF-Token', 'X-Timezone'],
+      allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'Accept',
+        'X-CSRF-Token',
+        'X-Timezone',
+        'X-Locale',
+      ],
       exposedHeaders: ['Content-Range', 'X-Content-Range'],
       maxAge: 3600,
     });
