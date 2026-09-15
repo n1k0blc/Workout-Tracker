@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter } from '@/i18n/navigation';
+import { routing } from '@/i18n/routing';
 import { useWorkout } from '@/lib/workout-context';
 import { Workout, PersonalRecord } from '@/types';
 import ActiveWorkoutScreen from '@/components/workout/active-workout-screen';
@@ -22,6 +23,19 @@ const EXPANDED_TRANSFORM = `translateY(-${BAR_HEIGHT}px)`;
 const MINIMIZED_TRANSFORM = `translateY(calc(100dvh - ${BAR_HEIGHT}px))`;
 const RESTING_TRANSITION =
   'transition-transform duration-[320ms] ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none';
+
+/**
+ * Strips a locale prefix off a raw `window.location.pathname` (unlike `usePathname` from
+ * `@/i18n/navigation`, which already returns the locale-agnostic path but lags a tick behind
+ * a just-completed popstate navigation -- see the `onPopState` handler below).
+ */
+function stripLocalePrefix(pathname: string): string {
+  for (const locale of routing.locales) {
+    if (pathname === `/${locale}`) return '/';
+    if (pathname.startsWith(`/${locale}/`)) return pathname.slice(1 + locale.length);
+  }
+  return pathname;
+}
 
 /**
  * The persistent home of a live workout (ADR-0001, issue #129). Mounted in the root
@@ -46,11 +60,11 @@ export function ActiveWorkoutOverlay() {
 
   // Where a minimize from the /workout route should drop the user. Tracks the last
   // real page they were reading; defaults to the dashboard on the very first minimize.
-  const lastNonWorkoutRoute = useRef('/de/dashboard');
+  const lastNonWorkoutRoute = useRef('/dashboard');
   useEffect(() => {
     if (!pathname) return;
-    if (pathname.startsWith('/de/workout')) return;
-    if (['/de', '/de/login', '/de/register'].includes(pathname)) return;
+    if (pathname.startsWith('/workout')) return;
+    if (['/', '/login', '/register'].includes(pathname)) return;
     lastNonWorkoutRoute.current = pathname;
   }, [pathname]);
 
@@ -72,7 +86,7 @@ export function ActiveWorkoutOverlay() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const markerOnStack = window.history.state?.[EXPANDED_MARKER] === true;
-    const onWorkoutRoute = pathname?.startsWith('/de/workout') ?? false;
+    const onWorkoutRoute = pathname?.startsWith('/workout') ?? false;
     const { hasEntry, effect } = reconcileCollapseEntry(
       collapseEntryRef.current,
       expandedOnScreen,
@@ -112,7 +126,7 @@ export function ActiveWorkoutOverlay() {
         minimizeWorkout();
         // The browser already popped our marker; if that left the guard screen
         // showing, swap it for the page to return to.
-        if (window.location.pathname.startsWith('/de/workout')) leaveWorkoutRoute();
+        if (stripLocalePrefix(window.location.pathname).startsWith('/workout')) leaveWorkoutRoute();
       }
     };
     window.addEventListener('popstate', onPopState);

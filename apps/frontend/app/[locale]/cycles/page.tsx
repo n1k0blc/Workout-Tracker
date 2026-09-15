@@ -1,7 +1,7 @@
 'use client';
 
 import { ProtectedRoute } from '@/components/protected-route';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
 import { WorkoutCycle } from '@/types';
@@ -61,7 +61,7 @@ export default function CyclesPage() {
       if (hasActiveCycle) {
         alert('Es existiert bereits ein aktiver Zyklus. Bitte beende diesen zuerst.');
       } else {
-        router.push('/de/cycles/new');
+        router.push('/cycles/new');
       }
     } catch (error) {
       console.error('Failed to check active cycles:', error);
@@ -156,7 +156,7 @@ export default function CyclesPage() {
                         <Card
                           key={cycle.id}
                           className="cursor-pointer hover:shadow-sm transition-shadow"
-                          onClick={() => router.push(`/de/cycles/${cycle.id}`)}
+                          onClick={() => router.push(`/cycles/${cycle.id}`)}
                         >
                           <CardContent className="p-6">
                             <div className="flex items-start justify-between">
@@ -215,7 +215,7 @@ export default function CyclesPage() {
                                     onClick={(e) => {
                                       if (day.blueprint) {
                                         e.stopPropagation();
-                                        router.push(`/de/cycles/${cycle.id}/edit/${day.id}`);
+                                        router.push(`/cycles/${cycle.id}/edit/${day.id}`);
                                       }
                                     }}
                                     className={`rounded-lg border border-border p-3 ${day.blueprint ? 'bg-card cursor-pointer hover:bg-accent active:bg-accent/80 transition-colors' : 'bg-muted/30'}`}
@@ -265,7 +265,7 @@ export default function CyclesPage() {
                             <Card
                               key={cycle.id}
                               className="opacity-75 cursor-pointer hover:opacity-100 hover:shadow-sm transition-all"
-                              onClick={() => router.push(`/de/cycles/${cycle.id}`)}
+                              onClick={() => router.push(`/cycles/${cycle.id}`)}
                             >
                               <CardContent className="p-6">
                                 <div className="flex items-start justify-between">

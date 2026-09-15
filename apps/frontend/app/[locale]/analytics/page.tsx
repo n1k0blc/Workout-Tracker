@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- Analytics data layer uses flexible any for API responses and recharts data (pre-existing, preserved during UI refactor) */
 
 import { ProtectedRoute } from '@/components/protected-route';
-import Link from 'next/link';
+import { Link } from '@/i18n/navigation';
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
 import {
@@ -1880,7 +1880,7 @@ export default function AnalyticsPage() {
                         vorhanden.
                       </p>
                       <Link
-                        href="/de/workout"
+                        href="/workout"
                         className="mt-4 inline-block text-primary hover:underline"
                       >
                         Zum Workout →

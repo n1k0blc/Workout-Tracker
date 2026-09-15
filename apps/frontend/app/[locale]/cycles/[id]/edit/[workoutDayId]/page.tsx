@@ -1,7 +1,8 @@
 'use client';
 
 import { ProtectedRoute } from '@/components/protected-route';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
@@ -135,7 +136,7 @@ export default function EditBlueprintPage() {
     } catch (error) {
       console.error('Failed to load data:', error);
       alert('Fehler beim Laden der Daten');
-      router.push('/de/cycles');
+      router.push('/cycles');
     } finally {
       setLoading(false);
     }
@@ -262,7 +263,7 @@ export default function EditBlueprintPage() {
       };
 
       await apiClient.updateBlueprint(cycleId, workoutDayId, blueprintData);
-      router.push('/de/cycles');
+      router.push('/cycles');
     } catch (error) {
       console.error('Failed to save blueprint:', error);
       alert('Fehler beim Speichern des Blueprints');
@@ -280,7 +281,7 @@ export default function EditBlueprintPage() {
   };
 
   const handleCancel = () => {
-    router.push('/de/cycles');
+    router.push('/cycles');
   };
 
   const handleSaveAsTemplate = async () => {

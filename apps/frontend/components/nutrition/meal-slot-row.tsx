@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { Link } from '@/i18n/navigation';
 import { IconChevronRight, IconPlus } from '@tabler/icons-react';
 import { NutritionDaySlot } from '@/types';
 import { Button } from '@/components/ui/button';
@@ -33,7 +33,7 @@ export function MealSlotRow({
       </div>
 
       <Link
-        href={`/de/nutrition/slots/${slot.id}?date=${date}`}
+        href={`/nutrition/slots/${slot.id}?date=${date}`}
         className="min-w-0 flex-1"
       >
         <div className="flex items-center gap-1.5">

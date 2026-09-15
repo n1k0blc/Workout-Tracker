@@ -1,7 +1,8 @@
 'use client';
 
 import { ProtectedRoute } from '@/components/protected-route';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
 import { useExerciseLabels } from '@/hooks/useExerciseLabels';
@@ -519,7 +520,7 @@ export default function CycleDetailPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => router.push('/de/cycles')}
+                onClick={() => router.push('/cycles')}
                 className="flex items-center gap-2 mb-4 px-0 text-muted-foreground hover:text-foreground"
               >
                 <IconArrowLeft className="size-4" />
@@ -1061,7 +1062,7 @@ export default function CycleDetailPage() {
                   <Card
                     key={workout.id}
                     className="hover:shadow-sm transition-shadow cursor-pointer"
-                    onClick={() => router.push(`/de/history/${workout.id}/edit?from=cycle&cycleId=${cycleId}`)}
+                    onClick={() => router.push(`/history/${workout.id}/edit?from=cycle&cycleId=${cycleId}`)}
                   >
                     <CardContent className="p-6">
                       <div className="flex items-start justify-between">
@@ -1115,7 +1116,7 @@ export default function CycleDetailPage() {
             {cycleDetails.status === 'COMPLETED' && (
               <div className="flex justify-center mt-8">
                 <Button
-                  onClick={() => router.push('/de/cycles/new')}
+                  onClick={() => router.push('/cycles/new')}
                   className="px-6 py-3"
                 >
                   Neuen Zyklus anlegen

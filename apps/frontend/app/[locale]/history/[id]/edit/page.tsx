@@ -1,7 +1,8 @@
 'use client';
 
 import { ProtectedRoute } from '@/components/protected-route';
-import { useRouter, useParams, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/lib/api';
 import { ExerciseLog, SetLog, Workout, WorkoutExercise } from '@/types';
@@ -55,9 +56,9 @@ export default function EditWorkoutPage() {
 
   const navigateBack = () => {
     if (fromCycle && cycleId) {
-      router.push(`/de/cycles/${cycleId}`);
+      router.push(`/cycles/${cycleId}`);
     } else {
-      router.push('/de/history');
+      router.push('/history');
     }
   };
 
@@ -74,9 +75,9 @@ export default function EditWorkoutPage() {
       console.error('Failed to load workout:', error);
       alert('Fehler beim Laden des Workouts');
       if (fromCycle && cycleId) {
-        router.push(`/de/cycles/${cycleId}`);
+        router.push(`/cycles/${cycleId}`);
       } else {
-        router.push('/de/history');
+        router.push('/history');
       }
     } finally {
       setLoading(false);

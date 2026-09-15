@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
 import { IconChevronRight, IconPlus } from '@tabler/icons-react';
 import { apiClient } from '@/lib/api';
 import { MealListItem } from '@/types';
@@ -57,7 +57,7 @@ export default function MealsTab() {
           {total.toLocaleString('de-DE')} {total === 1 ? 'Mahlzeit' : 'Mahlzeiten'} ·{' '}
           {mineTotal} eigene
         </p>
-        <Button size="sm" onClick={() => router.push('/de/templates/meals/new')}>
+        <Button size="sm" onClick={() => router.push('/templates/meals/new')}>
           <IconPlus data-icon="inline-start" />
           Neu
         </Button>
@@ -90,7 +90,7 @@ export default function MealsTab() {
             <div key={meal.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50">
               <button
                 type="button"
-                onClick={() => router.push(`/de/templates/meals/${meal.id}/edit`)}
+                onClick={() => router.push(`/templates/meals/${meal.id}/edit`)}
                 className="flex min-w-0 flex-1 items-center gap-3 text-left"
               >
                 <div className="min-w-0 flex-1">

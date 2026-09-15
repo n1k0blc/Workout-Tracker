@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
 import { apiClient } from '@/lib/api';
 import { SetType } from '@/types';
 import BasicInfoStep from './basic-info-step';
@@ -110,7 +110,7 @@ export default function CycleWizard() {
       };
 
       await apiClient.createCycle(payload);
-      router.push('/de/cycles');
+      router.push('/cycles');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Fehler beim Erstellen des Zyklus');
     } finally {
@@ -147,7 +147,7 @@ export default function CycleWizard() {
             </div>
             <Button
               variant="ghost"
-              onClick={() => router.push('/de/cycles')}
+              onClick={() => router.push('/cycles')}
             >
               Abbrechen
             </Button>

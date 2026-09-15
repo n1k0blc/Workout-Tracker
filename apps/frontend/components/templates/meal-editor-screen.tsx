@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
 import { toast } from 'sonner';
 import {
   IconArrowLeft,
@@ -66,7 +66,7 @@ import { usePickerLists } from '@/hooks/usePickerLists';
 import { ScanFlow } from '@/components/nutrition/scan-flow';
 
 /** Where Speichern, Abbrechen and Löschen all return to. */
-const MEALS_TAB = '/de/templates?tab=meals';
+const MEALS_TAB = '/templates?tab=meals';
 
 /** An ingredient being edited: the food's live nutrients plus the chosen amount. */
 interface EditorItem {

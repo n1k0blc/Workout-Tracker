@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { Link } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 
 export default function Home() {
@@ -13,10 +13,10 @@ export default function Home() {
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Button asChild size="lg" className="px-8">
-            <Link href="/de/login">Anmelden</Link>
+            <Link href="/login">Anmelden</Link>
           </Button>
           <Button asChild variant="outline" size="lg" className="px-8">
-            <Link href="/de/register">Registrieren</Link>
+            <Link href="/register">Registrieren</Link>
           </Button>
         </div>
       </div>

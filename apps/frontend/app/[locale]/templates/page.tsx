@@ -1,6 +1,7 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
 import { ProtectedRoute } from '@/components/protected-route';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ExercisesTab from '@/components/templates/exercises-tab';
@@ -38,7 +39,7 @@ export default function TemplatesPage() {
               onValueChange={(next) =>
                 // `replace`, not `push`: switching tabs should not build up history that the
                 // back button then has to walk through.
-                router.replace(next === 'exercises' ? '/de/templates' : `/de/templates?tab=${next}`)
+                router.replace(next === 'exercises' ? '/templates' : `/templates?tab=${next}`)
               }
               className="space-y-4"
             >

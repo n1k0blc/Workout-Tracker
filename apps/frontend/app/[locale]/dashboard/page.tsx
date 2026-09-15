@@ -1,9 +1,8 @@
 'use client';
 
 import { ProtectedRoute } from '@/components/protected-route';
-import Link from 'next/link';
+import { Link, useRouter } from '@/i18n/navigation';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { fromLocalDateString } from '@/lib/local-date';
 import { WEEKDAY_NAMES } from '@/lib/weekday';
@@ -201,7 +200,7 @@ export default function DashboardPage() {
                         <div 
                           onClick={() => {
                             localStorage.setItem(`cycle-${completedCycle.id}-acknowledged`, 'true');
-                            router.push(`/de/cycles/${completedCycle.id}?celebration=true`);
+                            router.push(`/cycles/${completedCycle.id}?celebration=true`);
                           }}
                           className="rounded-lg bg-primary text-primary-foreground p-6 cursor-pointer hover:opacity-90 transition-all"
                         >
@@ -237,7 +236,7 @@ export default function DashboardPage() {
                             Kein aktiver Zyklus
                           </div>
                           <Button
-                            onClick={() => router.push('/de/cycles/new')}
+                            onClick={() => router.push('/cycles/new')}
                             size="sm"
                           >
                             Neuen Zyklus anlegen
@@ -277,7 +276,7 @@ export default function DashboardPage() {
 
                 {/* Quick Actions */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <Link href="/de/workout" className="block">
+                  <Link href="/workout" className="block">
                     <Card className="h-full hover:shadow-md transition-shadow bg-primary text-primary-foreground">
                       <CardContent className="p-6">
                         <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
@@ -291,7 +290,7 @@ export default function DashboardPage() {
                     </Card>
                   </Link>
 
-                  <Link href="/de/cycles" className="block">
+                  <Link href="/cycles" className="block">
                     <Card className="h-full hover:shadow-md transition-shadow">
                       <CardContent className="p-6">
                         <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
@@ -305,7 +304,7 @@ export default function DashboardPage() {
                     </Card>
                   </Link>
 
-                  <Link href="/de/analytics" className="block">
+                  <Link href="/analytics" className="block">
                     <Card className="h-full hover:shadow-md transition-shadow">
                       <CardContent className="p-6">
                         <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
@@ -333,7 +332,7 @@ export default function DashboardPage() {
                           {weekWorkouts.map((workout) => (
                             <div
                               key={workout.id}
-                              onClick={() => router.push(`/de/history/${workout.id}`)}
+                              onClick={() => router.push(`/history/${workout.id}`)}
                               className="flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors cursor-pointer"
                             >
                               <div>
@@ -400,7 +399,7 @@ export default function DashboardPage() {
                             Kein aktiver Zyklus
                           </div>
                           <Link
-                            href="/de/cycles"
+                            href="/cycles"
                             className="inline-block text-sm text-primary hover:underline font-medium"
                           >
                             Zyklus erstellen →
@@ -431,7 +430,7 @@ export default function DashboardPage() {
                         </p>
                       )}
                       <Link
-                        href="/de/analytics"
+                        href="/analytics"
                         className="block mt-4 text-center text-sm text-primary hover:underline font-medium"
                       >
                         Alle PRs ansehen →

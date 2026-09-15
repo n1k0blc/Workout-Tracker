@@ -1,8 +1,8 @@
 'use client';
 
 import { ProtectedRoute } from '@/components/protected-route';
-import { useParams, useSearchParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { useParams, useSearchParams } from 'next/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
 import { Workout, WorkoutExercise, ExerciseLog } from '@/types';
@@ -92,9 +92,9 @@ export default function WorkoutDetailPage() {
     try {
       await apiClient.deleteWorkout(workoutId);
       if (fromCycle && cycleId) {
-        router.push(`/de/cycles/${cycleId}`);
+        router.push(`/cycles/${cycleId}`);
       } else {
-        router.push('/de/history');
+        router.push('/history');
       }
     } catch (error) {
       console.error('Failed to delete workout:', error);
@@ -154,14 +154,14 @@ export default function WorkoutDetailPage() {
                 {fromCycle && cycleId ? (
                   <Button
                     variant="ghost"
-                    onClick={() => router.push(`/de/cycles/${cycleId}`)}
+                    onClick={() => router.push(`/cycles/${cycleId}`)}
                     className="flex items-center gap-2 -ml-2"
                   >
                     <IconChevronLeft className="size-4" />
                     Zurück zu Zyklusdetails
                   </Button>
                 ) : (
-                  <Link href="/de/history">
+                  <Link href="/history">
                     <Button variant="ghost" className="flex items-center gap-2 -ml-2">
                       <IconChevronLeft className="size-4" />
                       Zurück zum Verlauf
@@ -195,8 +195,8 @@ export default function WorkoutDetailPage() {
                           size="sm"
                           onClick={() => {
                             const editUrl = fromCycle && cycleId
-                              ? `/de/history/${workoutId}/edit?from=cycle&cycleId=${cycleId}`
-                              : `/de/history/${workoutId}/edit`;
+                              ? `/history/${workoutId}/edit?from=cycle&cycleId=${cycleId}`
+                              : `/history/${workoutId}/edit`;
                             router.push(editUrl);
                           }}
                         >
@@ -278,12 +278,12 @@ export default function WorkoutDetailPage() {
                   {fromCycle && cycleId ? (
                     <Button
                       variant="outline"
-                      onClick={() => router.push(`/de/cycles/${cycleId}`)}
+                      onClick={() => router.push(`/cycles/${cycleId}`)}
                     >
                       Zurück zu Zyklusdetails
                     </Button>
                   ) : (
-                    <Link href="/de/history">
+                    <Link href="/history">
                       <Button variant="outline">Zurück zum Verlauf</Button>
                     </Link>
                   )}

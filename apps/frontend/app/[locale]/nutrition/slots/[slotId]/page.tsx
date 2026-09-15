@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import { Link } from '@/i18n/navigation';
 import { useParams, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { IconArrowLeft, IconCopy, IconPencil, IconPlus } from '@tabler/icons-react';
@@ -184,7 +184,7 @@ export default function AbschnittPage() {
       <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col">
         <header className="relative flex h-16 items-center justify-between border-b px-2">
           <Button variant="ghost" size="icon" asChild aria-label="Zurück">
-            <Link href={`/de/nutrition?date=${date}`}>
+            <Link href={`/nutrition?date=${date}`}>
               <IconArrowLeft />
             </Link>
           </Button>
@@ -267,7 +267,7 @@ export default function AbschnittPage() {
             </p>
             {!loading && (
               <Button variant="outline" asChild>
-                <Link href={`/de/nutrition?date=${date}`}>Zur Tagesansicht</Link>
+                <Link href={`/nutrition?date=${date}`}>Zur Tagesansicht</Link>
               </Button>
             )}
           </div>

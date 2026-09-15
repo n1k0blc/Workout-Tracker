@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
 import { ProtectedRoute } from '@/components/protected-route';
 import { useWorkout } from '@/lib/workout-context';
 import WorkoutStartScreen from '@/components/workout/start-screen';
@@ -29,7 +29,7 @@ export default function WorkoutPage() {
 
   const handleCompletionModalClose = () => {
     setShowCompletionModal(false);
-    router.push('/de/dashboard');
+    router.push('/dashboard');
   };
 
   const liveSession = activeWorkout && !isPastWorkout;

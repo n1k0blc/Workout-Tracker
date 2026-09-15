@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
 import { useWorkout } from '@/lib/workout-context';
 import { apiClient } from '@/lib/api';
 import { SuggestedWorkout } from '@/types';
@@ -269,7 +269,7 @@ export default function WorkoutStartScreen() {
             </h1>
             <Button
               variant="ghost"
-              onClick={() => router.push('/de/dashboard')}
+              onClick={() => router.push('/dashboard')}
             >
               <IconX className="mr-2 size-4" />
               Abbrechen

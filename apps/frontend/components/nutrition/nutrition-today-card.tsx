@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { Link } from '@/i18n/navigation';
 import { IconChevronRight } from '@tabler/icons-react';
 import { MacroTargets, MacroTotals } from '@/types';
 import {
@@ -30,7 +30,7 @@ export function NutritionTodayCard({
         <div className="flex items-start justify-between gap-3">
           <div className="text-sm font-medium text-muted-foreground">Ernährung heute</div>
           <Link
-            href="/de/nutrition"
+            href="/nutrition"
             className="flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.12em] text-foreground hover:underline"
           >
             Details

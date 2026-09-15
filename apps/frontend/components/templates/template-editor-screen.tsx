@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/i18n/navigation';
 import { apiClient } from '@/lib/api';
 import { Exercise, HomeGym, ExerciseLog, SetType } from '@/types';
 import { ProtectedRoute } from '@/components/protected-route';
@@ -185,7 +185,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
     } catch (error) {
       console.error('Failed to load data for template editor:', error);
       alert('Fehler beim Laden der Daten.');
-      router.push('/de/templates');
+      router.push('/templates');
     } finally {
       setLoading(false);
     }
@@ -249,7 +249,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
         await apiClient.createWorkoutTemplate(payload);
       }
 
-      router.push('/de/templates');
+      router.push('/templates');
     } catch (error) {
       console.error('Failed to save template:', error);
       alert('Fehler beim Speichern der Vorlage.');
@@ -276,7 +276,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
             {/* Back Button */}
             <Button
               variant="ghost"
-              onClick={() => router.push('/de/templates')}
+              onClick={() => router.push('/templates')}
               className="flex items-center gap-2 -ml-2"
             >
               <IconChevronLeft className="size-4" />
@@ -453,7 +453,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
               <div className="flex gap-3">
                 <Button
                   variant="outline"
-                  onClick={() => router.push('/de/templates')}
+                  onClick={() => router.push('/templates')}
                   disabled={saving}
                   className="flex-1"
                 >
