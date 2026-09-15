@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { Link, usePathname } from '@/i18n/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useWorkout } from '@/lib/workout-context';
 import {
@@ -49,7 +48,7 @@ function WorkoutNavEntry({
 }) {
   const { activeWorkout, expandWorkout } = useWorkout();
 
-  if (href === '/de/workout' && activeWorkout) {
+  if (href === '/workout' && activeWorkout) {
     return (
       <button
         type="button"
@@ -94,23 +93,23 @@ export function MobileNav() {
   // point of the overlay (issue #129). A workout in the context always means a live or
   // past session now, never a history edit (issue #126).
   if (
-    pathname === '/de' ||
-    pathname === '/de/login' ||
-    pathname === '/de/register' ||
-    pathname?.startsWith('/de/workout') ||
+    pathname === '/' ||
+    pathname === '/login' ||
+    pathname === '/register' ||
+    pathname?.startsWith('/workout') ||
     (activeWorkout && !isMinimized)
   ) {
     return null;
   }
 
   const navigationLinks = [
-    { href: '/de/dashboard', label: 'Dashboard', icon: IconHome },
-    { href: '/de/workout', label: 'Workout', icon: IconBarbell },
-    { href: '/de/cycles', label: 'Zyklen', icon: IconRefresh },
-    { href: '/de/templates', label: 'Vorlagen', icon: IconListCheck },
-    { href: '/de/history', label: 'Verlauf', icon: IconHistory },
-    { href: '/de/nutrition', label: 'Ernährung', icon: IconApple },
-    { href: '/de/analytics', label: 'Analytics', icon: IconChartBar },
+    { href: '/dashboard', label: 'Dashboard', icon: IconHome },
+    { href: '/workout', label: 'Workout', icon: IconBarbell },
+    { href: '/cycles', label: 'Zyklen', icon: IconRefresh },
+    { href: '/templates', label: 'Vorlagen', icon: IconListCheck },
+    { href: '/history', label: 'Verlauf', icon: IconHistory },
+    { href: '/nutrition', label: 'Ernährung', icon: IconApple },
+    { href: '/analytics', label: 'Analytics', icon: IconChartBar },
   ];
 
   return (
@@ -195,7 +194,7 @@ export function MobileNav() {
             Workout Tracker
           </h1>
 
-          <Link href="/de/profile" aria-label="Profil">
+          <Link href="/profile" aria-label="Profil">
             <Button variant="ghost" size="icon" className="rounded-full h-12 w-12" aria-label="Profil">
               <Avatar className="h-10 w-10">
                 <AvatarFallback className="text-sm">
@@ -212,7 +211,7 @@ export function MobileNav() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center gap-8">
-              <Link href="/de/dashboard" className="text-xl font-semibold tracking-tight">
+              <Link href="/dashboard" className="text-xl font-semibold tracking-tight">
                 Workout Tracker
               </Link>
 
@@ -235,7 +234,7 @@ export function MobileNav() {
               </div>
             </div>
 
-            <Link href="/de/profile" aria-label="Profil">
+            <Link href="/profile" aria-label="Profil">
               <Button variant="ghost" size="icon" className="rounded-full">
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="text-xs">
