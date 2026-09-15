@@ -1,3 +1,6 @@
+'use client';
+
+import { useTranslations } from 'next-intl';
 import { IconBarbell } from '@tabler/icons-react';
 
 interface ExercisesSlideProps {
@@ -5,6 +8,7 @@ interface ExercisesSlideProps {
 }
 
 export function ExercisesSlide({ count }: ExercisesSlideProps) {
+  const t = useTranslations('WorkoutCompletion.exercises');
   return (
     <div className="text-center space-y-6 animate-fadeIn">
       <div className="flex justify-center">
@@ -12,22 +16,22 @@ export function ExercisesSlide({ count }: ExercisesSlideProps) {
           <IconBarbell className="h-12 w-12 text-primary" />
         </div>
       </div>
-      
+
       <h2 className="text-2xl font-semibold text-foreground">
-        Übungen absolviert
+        {t('title')}
       </h2>
-      
+
       <div className="space-y-2">
         <div className="text-6xl font-bold text-primary">
           {count}
         </div>
         <div className="text-xl text-muted-foreground">
-          {count === 1 ? 'Übung' : 'Übungen'}
+          {t('count', { count })}
         </div>
       </div>
-      
+
       <p className="text-muted-foreground max-w-md mx-auto">
-        Verschiedene Übungen in diesem Workout trainiert
+        {t('description')}
       </p>
     </div>
   );

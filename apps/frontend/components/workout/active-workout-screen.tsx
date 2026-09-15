@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { useWorkout } from '@/lib/workout-context';
 import { apiClient } from '@/lib/api';
 import { Workout, PersonalRecord, SaveAsTemplateMode } from '@/types';
@@ -55,6 +56,7 @@ interface ActiveWorkoutScreenProps {
 type TemplateAction = 'none' | 'overwrite' | 'new';
 
 export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active', showBottomBar = true, showHeader = true, headerTop = 'top-0' }: ActiveWorkoutScreenProps) {
+  const t = useTranslations('ActiveWorkout');
   const {
     activeWorkout,
     completeWorkout,
@@ -142,12 +144,9 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
     );
 
     if (isDuplicate) {
-      toast.error(
-        'Diese Übung ist bereits im Workout. Füge stattdessen Sätze zur bestehenden Übung hinzu.',
-        {
-          duration: 4000,
-        }
-      );
+      toast.error(t('duplicateExerciseError'), {
+        duration: 4000,
+      });
       return; // Don't add, keep modal open
     }
 
@@ -157,7 +156,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
       setShowExerciseModal(false);
     } catch (error) {
       console.error('Failed to add exercise:', error);
-      toast.error('Fehler beim Hinzufügen der Übung');
+      toast.error(t('addExerciseError'));
     }
   };
 
@@ -222,7 +221,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
 
     } catch (error) {
       console.error('Failed to complete workout:', error);
-      toast.error('Fehler beim Speichern des Workouts');
+      toast.error(t('saveError'));
     }
   };
 
@@ -259,8 +258,8 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
                 <div>
                   <h1 className="text-2xl font-bold text-foreground">
                     {activeWorkout.isFreeWorkout
-                      ? activeWorkout.originTemplateName || 'Freies Workout'
-                      : activeWorkout.workoutDayName || 'Workout'}
+                      ? activeWorkout.originTemplateName || t('freeWorkoutName')
+                      : activeWorkout.workoutDayName || t('defaultName')}
                   </h1>
                 </div>
                 <div className="flex items-center gap-3">
@@ -277,7 +276,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
                         variant="ghost"
                         size="icon"
                         onClick={togglePause}
-                        title={isPaused ? 'Training fortsetzen' : 'Training pausieren'}
+                        title={isPaused ? t('resume') : t('pause')}
                       >
                         {isPaused ? (
                           <IconPlayerPlay className="size-6" />
@@ -288,7 +287,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
                     </>
                   ) : isPastWorkout ? (
                     <div className="flex items-center gap-2">
-                      <Label className="text-sm">Dauer (Min):</Label>
+                      <Label className="text-sm">{t('durationMinutesLabel')}</Label>
                       <Input
                         type="number"
                         inputMode="numeric"
@@ -339,14 +338,14 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
             <Card>
               <CardContent className="p-8 flex flex-col items-center gap-4 text-center">
                 <p className="text-muted-foreground">
-                  Noch keine Übungen hinzugefügt
+                  {t('empty')}
                 </p>
                 {/* Large centered square + icon as primary CTA (eckig, mittig) */}
                 <Button
                   variant="outline"
                   onClick={() => setShowExerciseModal(true)}
                   className="h-16 w-16 rounded-lg p-0 flex items-center justify-center"
-                  aria-label="Erste Übung hinzufügen"
+                  aria-label={t('addFirstExerciseAria')}
                 >
                   <IconPlus className="size-8" />
                 </Button>
@@ -361,7 +360,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
                 variant="outline"
                 onClick={() => setShowExerciseModal(true)}
                 className="h-14 w-14 rounded-lg p-0 flex items-center justify-center"
-                aria-label="Übung hinzufügen"
+                aria-label={t('addExerciseAria')}
               >
                 <IconPlus className="size-7" />
               </Button>
@@ -380,14 +379,14 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
               disabled={loading}
               className="flex-1"
             >
-              Verwerfen
+              {t('discard')}
             </Button>
             <Button
               onClick={() => setShowCompleteConfirm(true)}
               disabled={loading || !canFinishWorkout()}
               className="flex-1"
             >
-              Workout beenden
+              {t('finish')}
             </Button>
           </div>
         </div>
@@ -411,9 +410,11 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
       }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Workout beenden?</DialogTitle>
+            <DialogTitle>{t('finishDialog.title')}</DialogTitle>
             <DialogDescription>
-              Dein Workout wird mit {formatTime(isPastWorkout ? pastWorkoutDuration : workoutDuration)} Dauer gespeichert.
+              {t('finishDialog.description', {
+                duration: formatTime(isPastWorkout ? pastWorkoutDuration : workoutDuration),
+              })}
             </DialogDescription>
           </DialogHeader>
 
@@ -430,11 +431,10 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
                   />
                   <div>
                     <div className="font-medium text-foreground">
-                      Blueprint aktualisieren
+                      {t('finishDialog.updateBlueprint.label')}
                     </div>
                     <div className="text-sm text-muted-foreground mt-1">
-                      Überschreibe den Blueprint mit den heutigen Werten (Gewicht, Wiederholungen, RIR).
-                      Diese werden beim nächsten Training vorgeschlagen.
+                      {t('finishDialog.updateBlueprint.description')}
                     </div>
                   </div>
                 </label>
@@ -445,7 +445,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
           {/* Template Option (§3.4: auto-detected overwrite target, no selector) */}
           <Card className="bg-muted/50 border">
             <CardContent className="p-4 space-y-3">
-              <div className="font-medium text-foreground">Vorlage</div>
+              <div className="font-medium text-foreground">{t('finishDialog.templateSection.title')}</div>
 
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
@@ -454,7 +454,9 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
                   onChange={() => setTemplateAction('none')}
                   className="mt-1 size-4 accent-primary"
                 />
-                <div className="text-sm text-muted-foreground">Nicht als Vorlage speichern</div>
+                <div className="text-sm text-muted-foreground">
+                  {t('finishDialog.templateSection.none')}
+                </div>
               </label>
 
               {canOverwriteTemplate && (
@@ -467,10 +469,12 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
                   />
                   <div>
                     <div className="text-sm text-foreground font-medium">
-                      &quot;{activeWorkout.originTemplateName}&quot; überschreiben
+                      {t('finishDialog.templateSection.overwrite', {
+                        name: activeWorkout.originTemplateName ?? '',
+                      })}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      Ersetzt die Vorlage dauerhaft mit den heutigen Werten.
+                      {t('finishDialog.templateSection.overwriteDescription')}
                     </div>
                   </div>
                 </label>
@@ -484,12 +488,14 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
                   className="mt-1 size-4 accent-primary"
                 />
                 <div className="flex-1">
-                  <div className="text-sm text-foreground font-medium">Als neue Vorlage speichern</div>
+                  <div className="text-sm text-foreground font-medium">
+                    {t('finishDialog.templateSection.saveNew')}
+                  </div>
                   {templateAction === 'new' && (
                     <Input
                       value={newTemplateName}
                       onChange={(e) => setNewTemplateName(e.target.value)}
-                      placeholder="z.B. Mein starkes Push Workout"
+                      placeholder={t('finishDialog.templateSection.namePlaceholder')}
                       className="mt-2"
                       autoFocus
                     />
@@ -510,14 +516,14 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
               }}
               className="flex-1 h-14 text-base py-2"
             >
-              Abbrechen
+              {t('common.cancel')}
             </Button>
             <Button
               onClick={handleComplete}
               disabled={loading || (templateAction === 'new' && !newTemplateName.trim())}
               className="flex-1 h-14 text-base py-2"
             >
-              {loading ? 'Wird gespeichert...' : 'Beenden'}
+              {loading ? t('finishing') : t('finishDialog.confirm')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -527,10 +533,9 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
       <Dialog open={showDiscardConfirm} onOpenChange={(open) => !open && setShowDiscardConfirm(false)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Workout verwerfen?</DialogTitle>
+            <DialogTitle>{t('discardDialog.title')}</DialogTitle>
             <DialogDescription>
-              Alle nicht gespeicherten Daten gehen verloren. Dies kann nicht
-              rückgängig gemacht werden.
+              {t('discardDialog.description')}
             </DialogDescription>
           </DialogHeader>
 
@@ -540,7 +545,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
               onClick={() => setShowDiscardConfirm(false)}
               className="flex-1 h-14 text-base py-2"
             >
-              Abbrechen
+              {t('common.cancel')}
             </Button>
             <Button
               variant="outline"
@@ -548,7 +553,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
               disabled={loading}
               className="flex-1 h-14 text-base py-2 border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive"
             >
-              {loading ? 'Wird verworfen...' : 'Verwerfen'}
+              {loading ? t('discarding') : t('discardDialog.confirm')}
             </Button>
           </DialogFooter>
         </DialogContent>

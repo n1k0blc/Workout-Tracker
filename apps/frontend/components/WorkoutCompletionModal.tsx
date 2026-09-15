@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import Confetti from 'react-confetti';
 import { useSwipe } from '@/hooks/useSwipe';
 import { Workout, PersonalRecord } from '@/types';
@@ -39,6 +40,7 @@ export function WorkoutCompletionModal({
   personalRecords = [],
   onClose,
 }: WorkoutCompletionModalProps) {
+  const t = useTranslations('WorkoutCompletion');
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showConfetti, setShowConfetti] = useState(false);
   const [windowSize, setWindowSize] = useState({ width: 0, height: 0 });
@@ -167,7 +169,7 @@ export function WorkoutCompletionModal({
           />
         )}
         <VisuallyHidden.Root>
-          <DialogTitle>Workout-Statistiken</DialogTitle>
+          <DialogTitle>{t('statsTitle')}</DialogTitle>
         </VisuallyHidden.Root>
         {/* Close / Skip Button (top right, no default X) */}
         <Button
@@ -175,7 +177,7 @@ export function WorkoutCompletionModal({
           size="icon"
           onClick={handleClose}
           className="absolute top-4 right-4 z-10 h-9 w-9 rounded-lg bg-muted/80 hover:bg-muted"
-          aria-label="Überspringen"
+          aria-label={t('skipAria')}
         >
           <IconX className="h-4 w-4" />
         </Button>
@@ -200,7 +202,7 @@ export function WorkoutCompletionModal({
                     ? 'w-8 bg-primary'
                     : 'w-2 bg-muted hover:bg-muted-foreground/30'
                 }`}
-                aria-label={`Zu Slide ${index + 1} gehen`}
+                aria-label={t('slideAria', { number: index + 1 })}
               />
             ))}
           </div>
@@ -216,7 +218,7 @@ export function WorkoutCompletionModal({
               className={`hidden md:flex items-center gap-2 ${currentSlide === 0 ? 'opacity-0 pointer-events-none' : ''}`}
             >
               <IconChevronLeft className="h-4 w-4" />
-              Zurück
+              {t('back')}
             </Button>
 
             {/* Finish or Skip Button */}
@@ -225,7 +227,7 @@ export function WorkoutCompletionModal({
                 onClick={handleClose}
                 className="mx-auto px-8 py-3"
               >
-                Fertig
+                {t('finish')}
               </Button>
             ) : (
               <Button
@@ -233,7 +235,7 @@ export function WorkoutCompletionModal({
                 onClick={handleClose}
                 className="mx-auto"
               >
-                Überspringen
+                {t('skip')}
               </Button>
             )}
 
@@ -245,7 +247,7 @@ export function WorkoutCompletionModal({
               disabled={isLastSlide}
               className={`hidden md:flex items-center gap-2 ${isLastSlide ? 'opacity-0 pointer-events-none' : ''}`}
             >
-              Weiter
+              {t('next')}
               <IconChevronRight className="h-4 w-4" />
             </Button>
           </div>

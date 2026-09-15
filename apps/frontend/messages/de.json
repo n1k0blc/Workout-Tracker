@@ -108,5 +108,180 @@
       "SMITH_MACHINE": "Smith-Maschine",
       "EZ_BAR": "SZ-Stange"
     }
+  },
+  "WorkoutStart": {
+    "common": {
+      "cancel": "Abbrechen",
+      "back": "Zurück",
+      "recommendedToday": "Heute empfohlen"
+    },
+    "header": {
+      "title": "Neues Workout"
+    },
+    "loading": "Lädt...",
+    "loadingSuggestion": "Lade Workout-Vorschlag...",
+    "suggestionError": "Kein vorgeschlagenes Workout verfügbar. Starte ein freies Workout.",
+    "startError": "Fehler beim Starten des Workouts",
+    "templateStartError": "Fehler beim Starten des Vorlagen-Workouts",
+    "suggested": {
+      "title": "Vorgeschlagenes Workout",
+      "cycleAndDay": "{cycleName} • {workoutDayName}",
+      "start": "Vorgeschlagenes Workout starten",
+      "starting": "Wird gestartet...",
+      "empty": "Keine Übungen im vorgeschlagenen Workout."
+    },
+    "free": {
+      "title": "Freies Workout",
+      "description": "Starte ein Workout ohne Vorlage und füge Übungen nach Belieben hinzu.",
+      "start": "Freies Workout starten"
+    },
+    "template": {
+      "title": "Vorlagenworkout starten",
+      "description": "Wähle eine gespeicherte Workout-Vorlage und starte direkt mit vorausgefüllten Übungen und Werten.",
+      "choose": "Vorlage wählen"
+    },
+    "cycleOption": {
+      "title": "Andere Workouts aus dem Zyklus",
+      "description": "Wähle ein beliebiges Workout aus deinem aktuellen Trainingszyklus.",
+      "choose": "Workout aus Zyklus wählen"
+    },
+    "past": {
+      "title": "Vergangenes Workout tracken",
+      "description": "Trage ein bereits durchgeführtes Workout nachträglich ein.",
+      "start": "Vergangenes Workout tracken"
+    },
+    "pastDetails": {
+      "title": "Workout-Details",
+      "description": "Gib Datum und ungefähre Dauer des vergangenen Workouts ein.",
+      "dateLabel": "Workout-Datum",
+      "durationLabel": "Workout-Dauer (Minuten)",
+      "next": "Weiter zur Gym Auswahl"
+    },
+    "cycleModal": {
+      "title": "Workout aus aktuellem Zyklus wählen",
+      "loading": "Lädt Workouts...",
+      "empty": "Keine Workouts im aktuellen Zyklus verfügbar",
+      "exerciseCount": "{count, plural, one {# Übung} other {# Übungen}}",
+      "next": "Weiter zu Workout Details"
+    },
+    "templateModal": {
+      "title": "Workout-Vorlage wählen",
+      "filterAll": "Alle ({count})",
+      "filterSystem": "System ({count})",
+      "filterCustom": "Benutzerdefiniert ({count})",
+      "loading": "Lädt Vorlagen...",
+      "empty": "Keine Vorlagen gefunden",
+      "systemBadge": "System",
+      "exerciseCount": "{count, plural, one {# Übung} other {# Übungen}}",
+      "setCount": "{count, plural, one {# Satz} other {# Sätze}}",
+      "recommendedGym": "Empfohlenes Gym: {name}",
+      "next": "Weiter zu Workout Details"
+    },
+    "gymModal": {
+      "title": "Wo trainierst du heute?",
+      "description": "Wähle dein Trainingsort aus",
+      "otherGym": "Anderes Gym",
+      "prHint": "PRs werden nur von Home Gym Workouts gezählt"
+    },
+    "pastSetupModal": {
+      "title": "Vergangenes Workout tracken",
+      "description": "Wähle den Workout-Typ aus",
+      "free": "Freies Workout",
+      "cycle": "Zyklus-Workout",
+      "template": "Vorlagen-Workout"
+    },
+    "guard": {
+      "title": "Ein Workout läuft bereits",
+      "description": "Du hast eine laufende Trainingseinheit. Öffne sie, um weiterzumachen oder sie zu beenden.",
+      "open": "Workout öffnen"
+    }
+  },
+  "ActiveWorkout": {
+    "common": {
+      "cancel": "Abbrechen"
+    },
+    "defaultName": "Workout",
+    "freeWorkoutName": "Freies Workout",
+    "duration": "Dauer",
+    "durationMinutesLabel": "Dauer (Min):",
+    "pause": "Training pausieren",
+    "resume": "Training fortsetzen",
+    "openAria": "Workout öffnen",
+    "minimizeAria": "Workout minimieren",
+    "restTimer": {
+      "label": "Pause",
+      "pause": "Satzpause anhalten",
+      "resume": "Satzpause fortsetzen"
+    },
+    "empty": "Noch keine Übungen hinzugefügt",
+    "addFirstExerciseAria": "Erste Übung hinzufügen",
+    "addExerciseAria": "Übung hinzufügen",
+    "duplicateExerciseError": "Diese Übung ist bereits im Workout. Füge stattdessen Sätze zur bestehenden Übung hinzu.",
+    "addExerciseError": "Fehler beim Hinzufügen der Übung",
+    "saveError": "Fehler beim Speichern des Workouts",
+    "discard": "Verwerfen",
+    "discarding": "Wird verworfen...",
+    "finish": "Workout beenden",
+    "finishing": "Wird gespeichert...",
+    "finishDialog": {
+      "title": "Workout beenden?",
+      "description": "Dein Workout wird mit {duration} Dauer gespeichert.",
+      "updateBlueprint": {
+        "label": "Blueprint aktualisieren",
+        "description": "Überschreibe den Blueprint mit den heutigen Werten (Gewicht, Wiederholungen, RIR). Diese werden beim nächsten Training vorgeschlagen."
+      },
+      "templateSection": {
+        "title": "Vorlage",
+        "none": "Nicht als Vorlage speichern",
+        "overwrite": "\"{name}\" überschreiben",
+        "overwriteDescription": "Ersetzt die Vorlage dauerhaft mit den heutigen Werten.",
+        "saveNew": "Als neue Vorlage speichern",
+        "namePlaceholder": "z.B. Mein starkes Push Workout"
+      },
+      "confirm": "Beenden"
+    },
+    "discardDialog": {
+      "title": "Workout verwerfen?",
+      "description": "Alle nicht gespeicherten Daten gehen verloren. Dies kann nicht rückgängig gemacht werden.",
+      "confirm": "Verwerfen"
+    }
+  },
+  "WorkoutCompletion": {
+    "statsTitle": "Workout-Statistiken",
+    "skipAria": "Überspringen",
+    "back": "Zurück",
+    "next": "Weiter",
+    "finish": "Fertig",
+    "skip": "Überspringen",
+    "slideAria": "Zu Slide {number} gehen",
+    "volume": {
+      "title": "Gesamtvolumen",
+      "unit": "kg bewegt",
+      "description": "Das ist die Summe aller Wiederholungen × Gewicht in diesem Workout"
+    },
+    "duration": {
+      "title": "Workout-Dauer",
+      "minSec": "({minutes} Min {seconds} Sek)",
+      "description": "Zeit von Start bis Abschluss deines Workouts"
+    },
+    "exercises": {
+      "title": "Übungen absolviert",
+      "count": "{count, plural, one {Übung} other {Übungen}}",
+      "description": "Verschiedene Übungen in diesem Workout trainiert"
+    },
+    "sets": {
+      "title": "Arbeitssätze",
+      "count": "{count, plural, one {Satz} other {Sätze}}",
+      "description": "Arbeitssätze absolviert (ohne Aufwärmsätze)"
+    },
+    "prs": {
+      "title": "Neue Personal Records!",
+      "praise": "Hervorragende Leistung!"
+    },
+    "summary": {
+      "title": "Workout-Übersicht",
+      "warmup": "Aufwärmen",
+      "work": "Arbeit"
+    }
   }
 }

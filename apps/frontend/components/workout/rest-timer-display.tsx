@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useWorkout } from '@/lib/workout-context';
 import { cn } from '@/lib/utils';
 
@@ -14,6 +15,7 @@ interface RestTimerDisplayProps {
 }
 
 export function RestTimerDisplay({ variant = 'default', className }: RestTimerDisplayProps) {
+  const t = useTranslations('ActiveWorkout.restTimer');
   const { restTimer, restTimerTarget, isRestTimerPaused, toggleRestTimerPause, isPastWorkout } = useWorkout();
 
   // Never show live rest timer during past workout tracking (historical data entry only).
@@ -57,11 +59,11 @@ export function RestTimerDisplay({ variant = 'default', className }: RestTimerDi
         toneClass,
         className,
       )}
-      title={isRestTimerPaused ? 'Satzpause fortsetzen' : 'Satzpause anhalten'}
+      title={isRestTimerPaused ? t('resume') : t('pause')}
     >
       <div className="flex items-center gap-2">
         <div className="text-xs font-medium">
-          Pause
+          {t('label')}
         </div>
         <div className="text-lg font-bold tabular-nums">
           {minutes}:{seconds.toString().padStart(2, '0')}

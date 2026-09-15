@@ -1,3 +1,6 @@
+'use client';
+
+import { useTranslations } from 'next-intl';
 import { Workout, SetType } from '@/types';
 import { IconClipboardList, IconFlame, IconBarbell } from '@tabler/icons-react';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +11,7 @@ interface SummarySlideProps {
 }
 
 export function SummarySlide({ workout }: SummarySlideProps) {
+  const t = useTranslations('WorkoutCompletion.summary');
   return (
     <div className="space-y-6 animate-fadeIn max-h-[400px] overflow-y-auto">
       <div className="text-center mb-6">
@@ -17,7 +21,7 @@ export function SummarySlide({ workout }: SummarySlideProps) {
           </div>
         </div>
         <h2 className="text-2xl font-semibold text-foreground">
-          Workout-Übersicht
+          {t('title')}
         </h2>
       </div>
 
@@ -53,11 +57,11 @@ export function SummarySlide({ workout }: SummarySlideProps) {
                       <Badge variant={isWarmup ? 'outline' : 'default'} className="text-xs px-1.5 py-0.5 shrink-0">
                         {isWarmup ? (
                           <>
-                            <IconFlame className="size-3 mr-1" /> Aufwärmen
+                            <IconFlame className="size-3 mr-1" /> {t('warmup')}
                           </>
                         ) : (
                           <>
-                            <IconBarbell className="size-3 mr-1" /> Arbeit
+                            <IconBarbell className="size-3 mr-1" /> {t('work')}
                           </>
                         )}
                       </Badge>

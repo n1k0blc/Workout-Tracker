@@ -1,3 +1,6 @@
+'use client';
+
+import { useTranslations } from 'next-intl';
 import { formatDuration } from '@/lib/workoutStats';
 import { IconClock } from '@tabler/icons-react';
 
@@ -6,9 +9,10 @@ interface DurationSlideProps {
 }
 
 export function DurationSlide({ duration }: DurationSlideProps) {
+  const t = useTranslations('WorkoutCompletion.duration');
   const minutes = Math.floor(duration / 60);
   const seconds = duration % 60;
-  
+
   return (
     <div className="text-center space-y-6 animate-fadeIn">
       <div className="flex justify-center">
@@ -16,24 +20,24 @@ export function DurationSlide({ duration }: DurationSlideProps) {
           <IconClock className="h-12 w-12 text-primary" />
         </div>
       </div>
-      
+
       <h2 className="text-2xl font-semibold text-foreground">
-        Workout-Dauer
+        {t('title')}
       </h2>
-      
+
       <div className="space-y-2">
         <div className="text-6xl font-bold text-primary">
           {formatDuration(duration)}
         </div>
         {seconds > 0 && (
           <div className="text-lg text-muted-foreground">
-            ({minutes} Min {seconds} Sek)
+            {t('minSec', { minutes, seconds })}
           </div>
         )}
       </div>
-      
+
       <p className="text-muted-foreground max-w-md mx-auto">
-        Zeit von Start bis Abschluss deines Workouts
+        {t('description')}
       </p>
     </div>
   );

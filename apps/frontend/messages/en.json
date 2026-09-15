@@ -108,5 +108,180 @@
       "SMITH_MACHINE": "Smith Machine",
       "EZ_BAR": "EZ Bar"
     }
+  },
+  "WorkoutStart": {
+    "common": {
+      "cancel": "Cancel",
+      "back": "Back",
+      "recommendedToday": "Recommended today"
+    },
+    "header": {
+      "title": "New Workout"
+    },
+    "loading": "Loading...",
+    "loadingSuggestion": "Loading workout suggestion...",
+    "suggestionError": "No suggested workout available. Start a free workout instead.",
+    "startError": "Failed to start workout",
+    "templateStartError": "Failed to start template workout",
+    "suggested": {
+      "title": "Suggested Workout",
+      "cycleAndDay": "{cycleName} • {workoutDayName}",
+      "start": "Start suggested workout",
+      "starting": "Starting...",
+      "empty": "No exercises in the suggested workout."
+    },
+    "free": {
+      "title": "Free Workout",
+      "description": "Start a workout without a template and add exercises as you go.",
+      "start": "Start free workout"
+    },
+    "template": {
+      "title": "Start template workout",
+      "description": "Pick a saved workout template and start right away with prefilled exercises and values.",
+      "choose": "Choose template"
+    },
+    "cycleOption": {
+      "title": "Other workouts from the cycle",
+      "description": "Pick any workout from your current training cycle.",
+      "choose": "Choose workout from cycle"
+    },
+    "past": {
+      "title": "Track a past workout",
+      "description": "Log a workout you already did after the fact.",
+      "start": "Track a past workout"
+    },
+    "pastDetails": {
+      "title": "Workout Details",
+      "description": "Enter the date and approximate duration of the past workout.",
+      "dateLabel": "Workout date",
+      "durationLabel": "Workout duration (minutes)",
+      "next": "Continue to gym selection"
+    },
+    "cycleModal": {
+      "title": "Choose a workout from the current cycle",
+      "loading": "Loading workouts...",
+      "empty": "No workouts available in the current cycle",
+      "exerciseCount": "{count, plural, one {# exercise} other {# exercises}}",
+      "next": "Continue to workout details"
+    },
+    "templateModal": {
+      "title": "Choose a workout template",
+      "filterAll": "All ({count})",
+      "filterSystem": "System ({count})",
+      "filterCustom": "Custom ({count})",
+      "loading": "Loading templates...",
+      "empty": "No templates found",
+      "systemBadge": "System",
+      "exerciseCount": "{count, plural, one {# exercise} other {# exercises}}",
+      "setCount": "{count, plural, one {# set} other {# sets}}",
+      "recommendedGym": "Recommended gym: {name}",
+      "next": "Continue to workout details"
+    },
+    "gymModal": {
+      "title": "Where are you training today?",
+      "description": "Choose your training location",
+      "otherGym": "Other gym",
+      "prHint": "PRs only count for home gym workouts"
+    },
+    "pastSetupModal": {
+      "title": "Track a past workout",
+      "description": "Choose the workout type",
+      "free": "Free workout",
+      "cycle": "Cycle workout",
+      "template": "Template workout"
+    },
+    "guard": {
+      "title": "A workout is already running",
+      "description": "You have an active training session. Open it to keep going or finish it.",
+      "open": "Open workout"
+    }
+  },
+  "ActiveWorkout": {
+    "common": {
+      "cancel": "Cancel"
+    },
+    "defaultName": "Workout",
+    "freeWorkoutName": "Free Workout",
+    "duration": "Duration",
+    "durationMinutesLabel": "Duration (min):",
+    "pause": "Pause training",
+    "resume": "Resume training",
+    "openAria": "Open workout",
+    "minimizeAria": "Minimize workout",
+    "restTimer": {
+      "label": "Rest",
+      "pause": "Pause rest timer",
+      "resume": "Resume rest timer"
+    },
+    "empty": "No exercises added yet",
+    "addFirstExerciseAria": "Add first exercise",
+    "addExerciseAria": "Add exercise",
+    "duplicateExerciseError": "This exercise is already in the workout. Add sets to the existing exercise instead.",
+    "addExerciseError": "Failed to add exercise",
+    "saveError": "Failed to save workout",
+    "discard": "Discard",
+    "discarding": "Discarding...",
+    "finish": "Finish workout",
+    "finishing": "Saving...",
+    "finishDialog": {
+      "title": "Finish workout?",
+      "description": "Your workout will be saved with a duration of {duration}.",
+      "updateBlueprint": {
+        "label": "Update blueprint",
+        "description": "Overwrite the blueprint with today's values (weight, reps, RIR). These will be suggested next time you train."
+      },
+      "templateSection": {
+        "title": "Template",
+        "none": "Don't save as a template",
+        "overwrite": "Overwrite \"{name}\"",
+        "overwriteDescription": "Permanently replaces the template with today's values.",
+        "saveNew": "Save as a new template",
+        "namePlaceholder": "e.g. My strong push workout"
+      },
+      "confirm": "Finish"
+    },
+    "discardDialog": {
+      "title": "Discard workout?",
+      "description": "All unsaved data will be lost. This cannot be undone.",
+      "confirm": "Discard"
+    }
+  },
+  "WorkoutCompletion": {
+    "statsTitle": "Workout Statistics",
+    "skipAria": "Skip",
+    "back": "Back",
+    "next": "Next",
+    "finish": "Done",
+    "skip": "Skip",
+    "slideAria": "Go to slide {number}",
+    "volume": {
+      "title": "Total Volume",
+      "unit": "kg moved",
+      "description": "This is the sum of all reps × weight in this workout"
+    },
+    "duration": {
+      "title": "Workout Duration",
+      "minSec": "({minutes} min {seconds} sec)",
+      "description": "Time from start to finish of your workout"
+    },
+    "exercises": {
+      "title": "Exercises Completed",
+      "count": "{count, plural, one {exercise} other {exercises}}",
+      "description": "Different exercises trained in this workout"
+    },
+    "sets": {
+      "title": "Working Sets",
+      "count": "{count, plural, one {set} other {sets}}",
+      "description": "Working sets completed (excluding warmup sets)"
+    },
+    "prs": {
+      "title": "New Personal Records!",
+      "praise": "Outstanding performance!"
+    },
+    "summary": {
+      "title": "Workout Overview",
+      "warmup": "Warmup",
+      "work": "Work"
+    }
   }
 }

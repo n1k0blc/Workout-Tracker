@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Dialog,
   DialogContent,
@@ -28,6 +29,7 @@ export default function PastWorkoutSetupModal({
   onChooseCycle,
   onChooseTemplate,
 }: PastWorkoutSetupModalProps) {
+  const t = useTranslations('WorkoutStart.pastSetupModal');
   const handleTypeSelection = (type: 'free' | 'cycle' | 'template') => {
     if (type === 'free') {
       onChooseFree();
@@ -42,9 +44,9 @@ export default function PastWorkoutSetupModal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-center text-2xl">Vergangenes Workout tracken</DialogTitle>
+          <DialogTitle className="text-center text-2xl">{t('title')}</DialogTitle>
           <DialogDescription className="text-center">
-            Wähle den Workout-Typ aus
+            {t('description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -55,7 +57,7 @@ export default function PastWorkoutSetupModal({
             variant="default"
           >
             <IconDumbbell className="size-6" />
-            <span>Freies Workout</span>
+            <span>{t('free')}</span>
           </Button>
 
           <Button
@@ -63,7 +65,7 @@ export default function PastWorkoutSetupModal({
             className="w-full h-auto py-5 flex flex-col items-center gap-2 text-base"
           >
             <IconCalendar className="size-6" />
-            <span>Zyklus-Workout</span>
+            <span>{t('cycle')}</span>
           </Button>
 
           <Button
@@ -71,7 +73,7 @@ export default function PastWorkoutSetupModal({
             className="w-full h-auto py-5 flex flex-col items-center gap-2 text-base"
           >
             <IconTemplate className="size-6" />
-            <span>Vorlagen-Workout</span>
+            <span>{t('template')}</span>
           </Button>
         </div>
       </DialogContent>

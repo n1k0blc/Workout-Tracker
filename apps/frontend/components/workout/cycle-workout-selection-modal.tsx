@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations, useFormatter } from 'next-intl';
 import { apiClient } from '@/lib/api';
 import {
   Dialog,
@@ -38,6 +39,8 @@ export default function CycleWorkoutSelectionModal({
   onSelect,
   onProceedToDetails,
 }: CycleWorkoutSelectionModalProps) {
+  const t = useTranslations('WorkoutStart');
+  const format = useFormatter();
   const [cycleWorkouts, setCycleWorkouts] = useState<CurrentCycleWorkouts | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedWorkoutDayId, setSelectedWorkoutDayId] = useState<string | null>(null);
@@ -57,17 +60,20 @@ export default function CycleWorkoutSelectionModal({
     loadCycleWorkouts();
   }, []);
 
-  const getWeekdayName = (weekday: number): string => {
-    const days = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-    return days[weekday];
-  };
+  // Locale-aware weekday name via a reference date (2024-01-07 was a Sunday, matching
+  // JS's Date#getDay() convention) rather than a hardcoded German name list.
+  const getWeekdayName = (weekday: number): string =>
+    format.dateTime(new Date(Date.UTC(2024, 0, 7 + weekday)), {
+      weekday: 'long',
+      timeZone: 'UTC',
+    });
 
   return (
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-0">
         {/* Header */}
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
-          <DialogTitle>Workout aus aktuellem Zyklus wählen</DialogTitle>
+          <DialogTitle>{t('cycleModal.title')}</DialogTitle>
           {cycleWorkouts && (
             <p className="text-sm text-muted-foreground mt-1">
               {cycleWorkouts.cycleName}
@@ -79,7 +85,7 @@ export default function CycleWorkoutSelectionModal({
         <div className="flex-1 overflow-y-auto p-6">
           {loading ? (
             <div className="text-center py-8 text-muted-foreground">
-              Lädt Workouts...
+              {t('cycleModal.loading')}
             </div>
           ) : cycleWorkouts && cycleWorkouts.workoutDays.length > 0 ? (
             <div className="space-y-3">
@@ -112,12 +118,13 @@ export default function CycleWorkoutSelectionModal({
                           </h3>
                           {workoutDay.isSuggested && (
                             <Badge variant="default" className="text-xs">
-                              Heute empfohlen
+                              {t('common.recommendedToday')}
                             </Badge>
                           )}
                         </div>
                         <div className="text-sm text-muted-foreground mt-1">
-                          {getWeekdayName(workoutDay.weekday)} • {workoutDay.exerciseCount} Übungen
+                          {getWeekdayName(workoutDay.weekday)} •{' '}
+                          {t('cycleModal.exerciseCount', { count: workoutDay.exerciseCount })}
                         </div>
                       </div>
                       <IconChevronRight className="size-5 text-muted-foreground flex-shrink-0 mt-1" />
@@ -128,7 +135,7 @@ export default function CycleWorkoutSelectionModal({
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
-              Keine Workouts im aktuellen Zyklus verfügbar
+              {t('cycleModal.empty')}
             </div>
           )}
         </div>
@@ -138,7 +145,7 @@ export default function CycleWorkoutSelectionModal({
           {onProceedToDetails ? (
             <div className="flex gap-3">
               <Button variant="outline" onClick={onClose} className="flex-1">
-                Zurück
+                {t('common.back')}
               </Button>
               <Button
                 onClick={() => {
@@ -149,12 +156,12 @@ export default function CycleWorkoutSelectionModal({
                 disabled={!selectedWorkoutDayId}
                 className="flex-1"
               >
-                Weiter zu Workout Details
+                {t('cycleModal.next')}
               </Button>
             </div>
           ) : (
             <Button variant="outline" onClick={onClose} className="w-full">
-              Abbrechen
+              {t('common.cancel')}
             </Button>
           )}
         </div>

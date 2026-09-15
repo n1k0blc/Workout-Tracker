@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { useWorkout } from '@/lib/workout-context';
 import { apiClient } from '@/lib/api';
@@ -33,6 +34,7 @@ import PastWorkoutSetupModal from './past-workout-setup-modal';
 import TemplateSelectionModal from './template-selection-modal';
 
 export default function WorkoutStartScreen() {
+  const t = useTranslations('WorkoutStart');
   const router = useRouter();
   const { startWorkout, startWorkoutFromTemplate, loading } = useWorkout();
   const [suggestedWorkout, setSuggestedWorkout] = useState<SuggestedWorkout | null>(
@@ -68,9 +70,7 @@ export default function WorkoutStartScreen() {
         setSuggestedWorkout(workout);
       } catch (err) {
         console.error('Failed to load suggested workout:', err);
-        setError(
-          'Kein vorgeschlagenes Workout verfügbar. Starte ein freies Workout.'
-        );
+        setError(t('suggestionError'));
       } finally {
         setLoadingSuggestion(false);
       }
@@ -147,7 +147,7 @@ export default function WorkoutStartScreen() {
       });
       setPendingWorkoutData(null);
     } catch (err) {
-      setError('Fehler beim Starten des Workouts');
+      setError(t('startError'));
       console.error('Failed to start workout:', err);
     }
   };
@@ -243,7 +243,7 @@ export default function WorkoutStartScreen() {
       setTemplateRecommendedGymId(undefined);
       setPendingWorkoutData(null);
     } catch (err) {
-      setError('Fehler beim Starten des Vorlagen-Workouts');
+      setError(t('templateStartError'));
       console.error('Failed to start template workout:', err);
     }
   };
@@ -252,7 +252,7 @@ export default function WorkoutStartScreen() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="text-lg text-muted-foreground">
-          Lade Workout-Vorschlag...
+          {t('loadingSuggestion')}
         </div>
       </div>
     );
@@ -265,14 +265,14 @@ export default function WorkoutStartScreen() {
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-foreground">
-              Neues Workout
+              {t('header.title')}
             </h1>
             <Button
               variant="ghost"
               onClick={() => router.push('/dashboard')}
             >
               <IconX className="mr-2 size-4" />
-              Abbrechen
+              {t('common.cancel')}
             </Button>
           </div>
         </div>
@@ -294,11 +294,14 @@ export default function WorkoutStartScreen() {
                 <IconTarget className="mt-1 size-5 text-muted-foreground flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <h2 className="text-lg font-semibold text-foreground mb-2">
-                    Vorgeschlagenes Workout
+                    {t('suggested.title')}
                   </h2>
                   {suggestedWorkout.cycleName && (
                     <p className="text-muted-foreground text-sm mb-4">
-                      {suggestedWorkout.cycleName} • {suggestedWorkout.workoutDayName}
+                      {t('suggested.cycleAndDay', {
+                        cycleName: suggestedWorkout.cycleName,
+                        workoutDayName: suggestedWorkout.workoutDayName,
+                      })}
                     </p>
                   )}
 
@@ -347,12 +350,12 @@ export default function WorkoutStartScreen() {
                         className="w-full"
                         size="lg"
                       >
-                        {loading ? 'Wird gestartet...' : 'Vorgeschlagenes Workout starten'}
+                        {loading ? t('suggested.starting') : t('suggested.start')}
                       </Button>
                     </>
                   ) : (
                     <p className="text-muted-foreground">
-                      Keine Übungen im vorgeschlagenen Workout.
+                      {t('suggested.empty')}
                     </p>
                   )}
                 </div>
@@ -368,17 +371,17 @@ export default function WorkoutStartScreen() {
               <IconDumbbell className="mt-1 size-5 text-muted-foreground flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <h2 className="text-lg font-semibold text-foreground mb-2">
-                  Freies Workout
+                  {t('free.title')}
                 </h2>
                 <p className="text-muted-foreground text-sm mb-4">
-                  Starte ein Workout ohne Vorlage und füge Übungen nach Belieben hinzu.
+                  {t('free.description')}
                 </p>
                 <Button
                   onClick={handleStartFree}
                   disabled={loading}
                   className="w-full"
                 >
-                  Freies Workout starten
+                  {t('free.start')}
                 </Button>
               </div>
             </div>
@@ -392,17 +395,17 @@ export default function WorkoutStartScreen() {
               <IconTemplate className="mt-1 size-5 text-muted-foreground flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <h2 className="text-lg font-semibold text-foreground mb-2">
-                  Vorlagenworkout starten
+                  {t('template.title')}
                 </h2>
                 <p className="text-muted-foreground text-sm mb-4">
-                  Wähle eine gespeicherte Workout-Vorlage und starte direkt mit vorausgefüllten Übungen und Werten.
+                  {t('template.description')}
                 </p>
                 <Button
                   onClick={() => setShowTemplateModal(true)}
                   disabled={loading}
                   className="w-full"
                 >
-                  Vorlage wählen
+                  {t('template.choose')}
                 </Button>
               </div>
             </div>
@@ -417,17 +420,17 @@ export default function WorkoutStartScreen() {
                 <IconCalendar className="mt-1 size-5 text-muted-foreground flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <h2 className="text-lg font-semibold text-foreground mb-2">
-                    Andere Workouts aus dem Zyklus
+                    {t('cycleOption.title')}
                   </h2>
                   <p className="text-muted-foreground text-sm mb-4">
-                    Wähle ein beliebiges Workout aus deinem aktuellen Trainingszyklus.
+                    {t('cycleOption.description')}
                   </p>
                   <Button
                     onClick={() => setShowCycleWorkoutModal(true)}
                     disabled={loading}
                     className="w-full"
                   >
-                    Workout aus Zyklus wählen
+                    {t('cycleOption.choose')}
                   </Button>
                 </div>
               </div>
@@ -442,17 +445,17 @@ export default function WorkoutStartScreen() {
               <IconHistory className="mt-1 size-5 text-muted-foreground flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <h2 className="text-lg font-semibold text-foreground mb-2">
-                  Vergangenes Workout tracken
+                  {t('past.title')}
                 </h2>
                 <p className="text-muted-foreground text-sm mb-4">
-                  Trage ein bereits durchgeführtes Workout nachträglich ein.
+                  {t('past.description')}
                 </p>
                 <Button
                   onClick={handleStartPastWorkout}
                   disabled={loading}
                   className="w-full"
                 >
-                  Vergangenes Workout tracken
+                  {t('past.start')}
                 </Button>
               </div>
             </div>
@@ -529,15 +532,15 @@ export default function WorkoutStartScreen() {
       <Dialog open={showPastWorkoutDetails} onOpenChange={(open) => !open && handlePastWorkoutDetailsBack()}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Workout-Details</DialogTitle>
+            <DialogTitle>{t('pastDetails.title')}</DialogTitle>
             <DialogDescription>
-              Gib Datum und ungefähre Dauer des vergangenen Workouts ein.
+              {t('pastDetails.description')}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <div>
-              <Label>Workout-Datum</Label>
+              <Label>{t('pastDetails.dateLabel')}</Label>
               <Input
                 type="date"
                 value={pastDetailsDate}
@@ -547,7 +550,7 @@ export default function WorkoutStartScreen() {
             </div>
 
             <div>
-              <Label>Workout-Dauer (Minuten)</Label>
+              <Label>{t('pastDetails.durationLabel')}</Label>
               <Input
                 type="number"
                 inputMode="numeric"
@@ -561,14 +564,14 @@ export default function WorkoutStartScreen() {
 
           <DialogFooter className="flex gap-3">
             <Button variant="outline" onClick={handlePastWorkoutDetailsBack} className="flex-1">
-              Zurück
+              {t('common.back')}
             </Button>
             <Button
               onClick={handlePastWorkoutDetailsConfirm}
               disabled={!pastDetailsDate || pastDetailsDuration < 1}
               className="flex-1"
             >
-              Weiter zur Gym Auswahl
+              {t('pastDetails.next')}
             </Button>
           </DialogFooter>
         </DialogContent>

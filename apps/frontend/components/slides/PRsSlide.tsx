@@ -1,3 +1,6 @@
+'use client';
+
+import { useTranslations } from 'next-intl';
 import { PersonalRecord } from '@/types';
 import { PersonalRecordCard } from '@/components/PersonalRecordCard';
 import { IconAward, IconTrendingUp } from '@tabler/icons-react';
@@ -7,6 +10,7 @@ interface PRsSlideProps {
 }
 
 export function PRsSlide({ personalRecords }: PRsSlideProps) {
+  const t = useTranslations('WorkoutCompletion.prs');
   return (
     <div className="text-center space-y-6 animate-fadeIn">
       <div className="flex justify-center">
@@ -16,7 +20,7 @@ export function PRsSlide({ personalRecords }: PRsSlideProps) {
       </div>
 
       <h2 className="text-2xl font-semibold text-foreground">
-        Neue Personal Records!
+        {t('title')}
       </h2>
 
       <div className="space-y-3 max-w-lg mx-auto max-h-[400px] overflow-y-auto pr-2">
@@ -32,7 +36,7 @@ export function PRsSlide({ personalRecords }: PRsSlideProps) {
 
       <div className="flex items-center justify-center gap-2 text-muted-foreground">
         <IconTrendingUp className="h-5 w-5" />
-        <span>Hervorragende Leistung!</span>
+        <span>{t('praise')}</span>
       </div>
     </div>
   );

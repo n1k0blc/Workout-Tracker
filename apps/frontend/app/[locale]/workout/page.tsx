@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { ProtectedRoute } from '@/components/protected-route';
 import { useWorkout } from '@/lib/workout-context';
@@ -11,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Workout, PersonalRecord } from '@/types';
 
 export default function WorkoutPage() {
+  const t = useTranslations('WorkoutStart');
   const router = useRouter();
   const { activeWorkout, loading, isPastWorkout, expandWorkout } = useWorkout();
 
@@ -39,7 +41,7 @@ export default function WorkoutPage() {
       <div className="min-h-screen bg-background">
         {loading && !activeWorkout ? (
           <div className="flex items-center justify-center min-h-screen">
-            <div className="text-lg text-muted-foreground">Lädt...</div>
+            <div className="text-lg text-muted-foreground">{t('loading')}</div>
           </div>
         ) : isPastWorkout && activeWorkout ? (
           <ActiveWorkoutScreen mode="edit" onWorkoutComplete={handleWorkoutComplete} />
@@ -48,12 +50,11 @@ export default function WorkoutPage() {
           // what the user sees, so it must not offer the start screen — that would
           // let a second workout start straight over the running one (ADR-0001).
           <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
-            <h1 className="text-2xl font-bold text-foreground">Ein Workout läuft bereits</h1>
+            <h1 className="text-2xl font-bold text-foreground">{t('guard.title')}</h1>
             <p className="max-w-sm text-sm text-muted-foreground">
-              Du hast eine laufende Trainingseinheit. Öffne sie, um weiterzumachen oder sie zu
-              beenden.
+              {t('guard.description')}
             </p>
-            <Button onClick={() => expandWorkout()}>Workout öffnen</Button>
+            <Button onClick={() => expandWorkout()}>{t('guard.open')}</Button>
           </div>
         ) : (
           <WorkoutStartScreen />

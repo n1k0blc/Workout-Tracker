@@ -1,3 +1,7 @@
+'use client';
+
+import { useTranslations } from 'next-intl';
+
 interface WorkoutTimerProps {
   workoutDuration: number;
 }
@@ -5,6 +9,7 @@ interface WorkoutTimerProps {
 export default function WorkoutTimer({
   workoutDuration,
 }: WorkoutTimerProps) {
+  const t = useTranslations('ActiveWorkout');
   const formatTime = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
@@ -20,7 +25,7 @@ export default function WorkoutTimer({
 
   return (
     <div className="flex flex-col items-end">
-      <div className="text-sm text-muted-foreground">Dauer</div>
+      <div className="text-sm text-muted-foreground">{t('duration')}</div>
       <div className="text-2xl font-bold text-foreground tabular-nums">
         {formatTime(workoutDuration)}
       </div>
