@@ -283,5 +283,39 @@
       "warmup": "Warmup",
       "work": "Work"
     }
+  },
+  "ExerciseCard": {
+    "setLabel": "Set {number}",
+    "setLabelWarmup": "Set {number} (warmup)",
+    "setLabelLogged": "Set {number} logged",
+    "setLabelWarmupLogged": "Set {number} (warmup) logged",
+    "swapSides": "Start with right",
+    "unswapSides": "Start with left again",
+    "replaceExercise": "Replace exercise",
+    "replaceExerciseDisabled": "Exercise cannot be replaced once sets have been logged",
+    "removeExercise": "Remove exercise",
+    "columnWeight": "Weight",
+    "columnWeightDouble": "Weight (2x)",
+    "columnReps": "Reps",
+    "columnRir": "RIR",
+    "columnSides": "Left / Right",
+    "sideLeft": "L",
+    "sideRight": "R",
+    "setTypeWarmup": "Warmup",
+    "setTypeWorking": "Work",
+    "logSet": "Log set (or swipe LTR)",
+    "logSetWaitingForSides": "Fill in both sides to log the set",
+    "sidesIncompleteHint": "Fill in weight and reps for both sides to log the set",
+    "loggedTitle": "Logged (cannot be unlogged; swipe RTL to delete)",
+    "rirLabel": "RIR {rir}",
+    "addSet": "Add set",
+    "noSetsLogged": "No sets logged yet",
+    "deleteDialog": {
+      "title": "Remove exercise?",
+      "description": "Do you want to remove <strong>{name}</strong> and all its sets?",
+      "cancel": "Cancel",
+      "confirm": "Remove",
+      "confirming": "Removing..."
+    }
   }
 }

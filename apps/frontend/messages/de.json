@@ -283,5 +283,39 @@
       "warmup": "Aufwärmen",
       "work": "Arbeit"
     }
+  },
+  "ExerciseCard": {
+    "setLabel": "Satz {number}",
+    "setLabelWarmup": "Satz {number} (Aufwärmen)",
+    "setLabelLogged": "Satz {number} geloggt",
+    "setLabelWarmupLogged": "Satz {number} (Aufwärmen) geloggt",
+    "swapSides": "Mit rechts beginnen",
+    "unswapSides": "Wieder mit links beginnen",
+    "replaceExercise": "Übung austauschen",
+    "replaceExerciseDisabled": "Übung kann nicht ausgetauscht werden, wenn bereits Sätze geloggt wurden",
+    "removeExercise": "Übung entfernen",
+    "columnWeight": "Gewicht",
+    "columnWeightDouble": "Gewicht (2x)",
+    "columnReps": "Wdh",
+    "columnRir": "RIR",
+    "columnSides": "Links / Rechts",
+    "sideLeft": "L",
+    "sideRight": "R",
+    "setTypeWarmup": "Aufwärmen",
+    "setTypeWorking": "Arbeit",
+    "logSet": "Satz loggen (oder Swipe LTR)",
+    "logSetWaitingForSides": "Beide Seiten ausfüllen, um den Satz zu loggen",
+    "sidesIncompleteHint": "Beide Seiten mit Gewicht und Wdh ausfüllen, um den Satz zu loggen",
+    "loggedTitle": "Geloggt (nicht entloggen möglich; Swipe RTL zum Löschen)",
+    "rirLabel": "RIR {rir}",
+    "addSet": "Satz hinzufügen",
+    "noSetsLogged": "Noch keine Sätze geloggt",
+    "deleteDialog": {
+      "title": "Übung entfernen?",
+      "description": "Möchtest du <strong>{name}</strong> und alle zugehörigen Sätze entfernen?",
+      "cancel": "Abbrechen",
+      "confirm": "Entfernen",
+      "confirming": "Wird entfernt..."
+    }
   }
 }
