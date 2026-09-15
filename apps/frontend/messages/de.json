@@ -999,5 +999,18 @@
     "workout": "Workout",
     "exercisesCount": "{count, plural, one {# Übung} other {# Übungen}}",
     "createNewCycle": "Neuen Zyklus anlegen"
+  },
+  "MobileNav": {
+    "dashboard": "Dashboard",
+    "workout": "Workout",
+    "cycles": "Zyklen",
+    "templates": "Vorlagen",
+    "history": "Verlauf",
+    "nutrition": "Ernährung",
+    "analytics": "Analytics",
+    "openMenu": "Menü öffnen",
+    "menu": "Menü",
+    "logout": "Abmelden",
+    "profile": "Profil"
   }
 }

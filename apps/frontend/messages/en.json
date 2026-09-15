@@ -999,5 +999,18 @@
     "workout": "Workout",
     "exercisesCount": "{count, plural, one {# exercise} other {# exercises}}",
     "createNewCycle": "Create New Cycle"
+  },
+  "MobileNav": {
+    "dashboard": "Dashboard",
+    "workout": "Workout",
+    "cycles": "Cycles",
+    "templates": "Templates",
+    "history": "History",
+    "nutrition": "Nutrition",
+    "analytics": "Analytics",
+    "openMenu": "Open menu",
+    "menu": "Menu",
+    "logout": "Log out",
+    "profile": "Profile"
   }
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { Link, usePathname } from '@/i18n/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useWorkout } from '@/lib/workout-context';
@@ -71,6 +72,7 @@ function WorkoutNavEntry({
 }
 
 export function MobileNav() {
+  const t = useTranslations('MobileNav');
   const [isOpen, setIsOpen] = useState(false);
   const pathname = usePathname();
   const { user } = useAuth();
@@ -103,13 +105,13 @@ export function MobileNav() {
   }
 
   const navigationLinks = [
-    { href: '/dashboard', label: 'Dashboard', icon: IconHome },
-    { href: '/workout', label: 'Workout', icon: IconBarbell },
-    { href: '/cycles', label: 'Zyklen', icon: IconRefresh },
-    { href: '/templates', label: 'Vorlagen', icon: IconListCheck },
-    { href: '/history', label: 'Verlauf', icon: IconHistory },
-    { href: '/nutrition', label: 'Ernährung', icon: IconApple },
-    { href: '/analytics', label: 'Analytics', icon: IconChartBar },
+    { href: '/dashboard', label: t('dashboard'), icon: IconHome },
+    { href: '/workout', label: t('workout'), icon: IconBarbell },
+    { href: '/cycles', label: t('cycles'), icon: IconRefresh },
+    { href: '/templates', label: t('templates'), icon: IconListCheck },
+    { href: '/history', label: t('history'), icon: IconHistory },
+    { href: '/nutrition', label: t('nutrition'), icon: IconApple },
+    { href: '/analytics', label: t('analytics'), icon: IconChartBar },
   ];
 
   return (
@@ -123,7 +125,7 @@ export function MobileNav() {
                 variant="ghost"
                 size="icon"
                 className="md:hidden h-12 w-12"
-                aria-label="Menü öffnen"
+                aria-label={t('openMenu')}
               >
                 <IconMenu2 className="size-8" />
               </Button>
@@ -142,7 +144,7 @@ export function MobileNav() {
               overlayClassName={cn(isMinimized && 'bottom-[72px]')}
             >
               <DrawerHeader className="text-left">
-                <DrawerTitle>Menü</DrawerTitle>
+                <DrawerTitle>{t('menu')}</DrawerTitle>
               </DrawerHeader>
 
               <div className="px-4 pb-6">
@@ -183,7 +185,7 @@ export function MobileNav() {
                     onRequestConfirm={() => setIsOpen(false)}
                   >
                     <IconLogout data-icon="inline-start" />
-                    Abmelden
+                    {t('logout')}
                   </LogoutButton>
                 </div>
               </div>
@@ -194,8 +196,8 @@ export function MobileNav() {
             Workout Tracker
           </h1>
 
-          <Link href="/profile" aria-label="Profil">
-            <Button variant="ghost" size="icon" className="rounded-full h-12 w-12" aria-label="Profil">
+          <Link href="/profile" aria-label={t('profile')}>
+            <Button variant="ghost" size="icon" className="rounded-full h-12 w-12" aria-label={t('profile')}>
               <Avatar className="h-10 w-10">
                 <AvatarFallback className="text-sm">
                   {getUserInitial()}
@@ -234,7 +236,7 @@ export function MobileNav() {
               </div>
             </div>
 
-            <Link href="/profile" aria-label="Profil">
+            <Link href="/profile" aria-label={t('profile')}>
               <Button variant="ghost" size="icon" className="rounded-full">
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="text-xs">
