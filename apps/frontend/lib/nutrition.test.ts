@@ -26,7 +26,6 @@ import {
   formatMetricValue,
   nutritionDailyAverage,
   nutritionTargetReached,
-  nutritionRangeLabel,
 } from './nutrition';
 import type { NutritionTrendDay } from '@/types';
 
@@ -542,13 +541,6 @@ describe('Ernährungs-Analytics helpers (#153)', () => {
     it('returns null when the metric has no positive target', () => {
       expect(nutritionTargetReached(series, 'kcal', null)).toBeNull();
       expect(nutritionTargetReached(series, 'kcal', 0)).toBeNull();
-    });
-  });
-
-  describe('nutritionRangeLabel', () => {
-    it('phrases the range for the legend line', () => {
-      expect(nutritionRangeLabel(7)).toBe('letzte 7 Tage');
-      expect(nutritionRangeLabel(30)).toBe('letzte 30 Tage');
     });
   });
 });

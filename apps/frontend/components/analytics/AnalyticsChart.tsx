@@ -47,6 +47,11 @@ interface AnalyticsChartProps {
   // Pass through additional Recharts props if needed
   children?: React.ReactNode; // for custom series if needed
   footer?: React.ReactNode; // optional content after the chart (e.g. totals)
+  // Optional locale-awareness (analytics page only): when omitted, every default formatter
+  // below falls back to exactly the previous hardcoded-German behavior, so the cycle detail
+  // page's existing calls (which pass neither) are unaffected.
+  locale?: string;
+  formatWorkoutCount?: (count: number) => string;
 }
 
 /**
@@ -75,6 +80,8 @@ export default function AnalyticsChart({
   tooltipFormatter,
   children,
   footer,
+  locale,
+  formatWorkoutCount,
 }: AnalyticsChartProps) {
   const ChartComponent = chartType === 'bar' ? BarChart : LineChart;
   // Note: SeriesComponent is currently unused (renderSeries handles series directly)
@@ -82,12 +89,12 @@ export default function AnalyticsChart({
   const defaultXTickFormatter = (value: any, index: number) => {
     if (xTickFormatter) return xTickFormatter(value, index);
     const entry = data[index] || {};
-    return formatXAxisLabel(entry);
+    return formatXAxisLabel(entry, locale);
   };
 
   const defaultTooltipFormatter = (value: any, name?: string | number) => {
     if (tooltipFormatter) return tooltipFormatter(value, name);
-    return [`${formatNumber(value as number)}`, String(name || '')];
+    return [`${formatNumber(value as number, locale)}`, String(name || '')];
   };
 
   // Compute effective axis labels for both single and comparison modes
@@ -169,7 +176,7 @@ export default function AnalyticsChart({
               tickCount={8}
               interval={0}
               minTickGap={5}
-              tickFormatter={yAxisTickFormatter || ((value) => `${formatNumber(value)}`)}
+              tickFormatter={yAxisTickFormatter || ((value) => `${formatNumber(value, locale)}`)}
               label={
                 leftAxisLabel
                   ? { value: leftAxisLabel, angle: -90, position: 'insideLeft' }
@@ -186,7 +193,7 @@ export default function AnalyticsChart({
                 tickCount={8}
                 interval={0}
                 minTickGap={5}
-                tickFormatter={yAxisTickFormatter || ((value) => `${formatNumber(value)}`)}
+                tickFormatter={yAxisTickFormatter || ((value) => `${formatNumber(value, locale)}`)}
                 label={
                   rightAxisLabel
                     ? { value: rightAxisLabel, angle: -90, position: 'insideRight' }
@@ -202,9 +209,9 @@ export default function AnalyticsChart({
               formatter={defaultTooltipFormatter}
               labelFormatter={(label, payload) => {
                 if (payload && payload.length > 0) {
-                  return formatTooltipLabel(payload[0].payload);
+                  return formatTooltipLabel(payload[0].payload, locale, formatWorkoutCount);
                 }
-                return formatDate(label as string);
+                return formatDate(label as string, locale);
               }}
             />
             <Legend />

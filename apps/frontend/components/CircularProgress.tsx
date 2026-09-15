@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useTranslations, useFormatter } from 'next-intl';
 
 interface CircularProgressProps {
   current: number;
@@ -17,6 +18,8 @@ export default function CircularProgress({
   strokeWidth = 8,
   className = '',
 }: CircularProgressProps) {
+  const t = useTranslations('CircularProgress');
+  const format = useFormatter();
   const percentage = Math.min((current / total) * 100, 100);
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
@@ -51,9 +54,9 @@ export default function CircularProgress({
       {/* Center text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <div className="text-2xl font-bold text-foreground">
-          {current}/{total}
+          {format.number(current)}/{format.number(total)}
         </div>
-        <div className="text-xs text-muted-foreground mt-1">Woche</div>
+        <div className="text-xs text-muted-foreground mt-1">{t('week')}</div>
       </div>
     </div>
   );

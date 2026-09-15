@@ -5,6 +5,7 @@
 import { ProtectedRoute } from '@/components/protected-route';
 import { Link } from '@/i18n/navigation';
 import { useState, useEffect } from 'react';
+import { useTranslations, useLocale, useFormatter } from 'next-intl';
 import { apiClient } from '@/lib/api';
 import {
   VolumeAnalytics,
@@ -52,7 +53,7 @@ import { PersonalRecordCard } from '@/components/PersonalRecordCard';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { NutritionTrend } from '@/types';
-import { addDays, nutritionRangeLabel } from '@/lib/nutrition';
+import { addDays } from '@/lib/nutrition';
 import { toLocalDateString } from '@/lib/local-date';
 
 // The range selector drives the nutrition chart's window. "Alle" has no natural start for a
@@ -95,24 +96,32 @@ function nutritionRangeFor(
 /**
  * The chart legend's range phrase: the selected cycle's own span in Zyklus-Modus (same
  * "DD.MM. - DD.MM." wording as the cycle navigation header above), otherwise the shared range
- * selector's "letzte N Tage".
+ * selector's "letzte N Tage". `t` and `locale` are threaded in from the component (a plain
+ * helper called during render, not a hook) so the phrase resolves from the message catalogue.
  */
 function nutritionRangeLabelFor(
   cycleMode: boolean,
   selectedCycle: CycleSpan | undefined,
   timeFilter: string,
+  t: (key: string, values?: Record<string, string | number | Date>) => string,
+  locale: string,
 ): string {
   if (cycleMode) {
     if (!selectedCycle) return '';
-    const start = formatDate(selectedCycle.startDate);
+    const start = formatDate(selectedCycle.startDate, locale);
     return selectedCycle.completedAt
-      ? `${start} - ${formatDate(selectedCycle.completedAt)}`
-      : `${start} - heute`;
+      ? `${start} - ${formatDate(selectedCycle.completedAt, locale)}`
+      : `${start} - ${t('today')}`;
   }
-  return nutritionRangeLabel(nutritionRangeDaysFor(timeFilter));
+  return t('lastNDays', { count: nutritionRangeDaysFor(timeFilter) });
 }
 
 export default function AnalyticsPage() {
+  const t = useTranslations('AnalyticsPage');
+  const tChart = useTranslations('AnalyticsChart');
+  const locale = useLocale();
+  const format = useFormatter();
+
   // Data states
   const [volumeData, setVolumeData] = useState<VolumeAnalytics | null>(null);
   const [rirData, setRirData] = useState<RIRAnalytics | null>(null);
@@ -300,26 +309,29 @@ export default function AnalyticsPage() {
 
   const { translateMuscleGroup, translateEquipment } = useExerciseLabels();
 
+  // Chart legend/axis vocabulary (Volumen, RIR, Dauer, Pause, Wdh, Sätze, Intensität), shared
+  // by generateLineName and getViewConfig below -- both plain helpers (not hooks), so the
+  // already-resolved map is built here in the component body and passed in.
+  const viewNames: Record<string, string> = {
+    volume: tChart('volume'),
+    rir: 'RIR', // initialism, kept as-is
+    duration: tChart('duration'),
+    restTime: tChart('restTime'),
+    reps: tChart('reps'),
+    sets: tChart('sets'),
+    intensity: tChart('intensity'),
+  };
+
   // Helper function to generate line name
   const generateLineName = (
     view: string,
     muscle?: MuscleGroup,
     equipment?: Equipment
   ): string => {
-    const viewNames: Record<string, string> = {
-      volume: 'Volumen',
-      rir: 'RIR',
-      duration: 'Dauer',
-      restTime: 'Pause',
-      reps: 'Wdh',
-      sets: 'Sätze',
-      intensity: 'Intensität',
-    };
-
     const parts = [viewNames[view] || view];
     if (muscle) parts.push(translateMuscleGroup(muscle));
     if (equipment) parts.push(translateEquipment(equipment));
-    
+
     return parts.join(' - ');
   };
 
@@ -330,8 +342,8 @@ export default function AnalyticsPage() {
       rir: { unit: 'RIR', yAxisId: 'left' },
       duration: { unit: 'min', yAxisId: 'left' },
       restTime: { unit: 's', yAxisId: 'left' },
-      reps: { unit: 'Wdh', yAxisId: 'left' },
-      sets: { unit: 'Sätze', yAxisId: 'left' },
+      reps: { unit: viewNames.reps, yAxisId: 'left' },
+      sets: { unit: viewNames.sets, yAxisId: 'left' },
       intensity: { unit: '%', yAxisId: 'left' },
     };
     return configs[view] || { unit: '', yAxisId: 'left' };
@@ -961,7 +973,7 @@ export default function AnalyticsPage() {
           <div className="px-4 py-6 sm:px-0">
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-foreground mb-4">
-                Trainingsanalyse
+                {t('heading')}
               </h2>
 
               {/* Filter Section - ALWAYS ON TOP (shadcn) */}
@@ -978,27 +990,27 @@ export default function AnalyticsPage() {
                       setSelectedViews(['volume']); // Reset to volume when switching modes
                     }}
                   >
-                    Zyklus-Modus
+                    {t('cycleMode')}
                   </Button>
 
                   {/* Time Filter (only in Time Mode) */}
                   {!cycleMode && (
                     <div className="flex items-center gap-2">
                       <label className="text-sm font-medium text-muted-foreground">
-                        Zeitraum:
+                        {t('timeRange')}
                       </label>
                       <select
                         value={timeFilter}
                         onChange={(e) => setTimeFilter(e.target.value)}
                         className="px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                       >
-                        <option value="7">7 Tage</option>
-                        <option value="14">14 Tage</option>
-                        <option value="30">30 Tage</option>
-                        <option value="90">90 Tage</option>
-                        <option value="180">180 Tage</option>
-                        <option value="365">1 Jahr</option>
-                        <option value="all">Alle</option>
+                        <option value="7">{t('days', { count: 7 })}</option>
+                        <option value="14">{t('days', { count: 14 })}</option>
+                        <option value="30">{t('days', { count: 30 })}</option>
+                        <option value="90">{t('days', { count: 90 })}</option>
+                        <option value="180">{t('days', { count: 180 })}</option>
+                        <option value="365">{t('oneYear')}</option>
+                        <option value="all">{t('allTime')}</option>
                       </select>
                     </div>
                   )}
@@ -1006,20 +1018,20 @@ export default function AnalyticsPage() {
                   {/* Gym Filter */}
                   <div className="flex items-center gap-2">
                     <label className="text-sm font-medium text-muted-foreground">
-                      Gym:
+                      {t('gym')}
                     </label>
                     <select
                       value={gymFilter}
                       onChange={(e) => setGymFilter(e.target.value)}
                       className="px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     >
-                      <option value="alle">Alle</option>
+                      <option value="alle">{t('all')}</option>
                       {homeGyms.map((gym) => (
                         <option key={gym.id} value={gym.id}>
                           {gym.name}
                         </option>
                       ))}
-                      <option value="andere">Andere Gyms</option>
+                      <option value="andere">{t('otherGyms')}</option>
                     </select>
                   </div>
                 </div>
@@ -1042,14 +1054,14 @@ export default function AnalyticsPage() {
                         {selectedCycle?.name}
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {formatDate(selectedCycle?.startDate || '')}
-                        {selectedCycle?.completedAt && ` - ${formatDate(selectedCycle.completedAt)}`}
+                        {formatDate(selectedCycle?.startDate || '', locale)}
+                        {selectedCycle?.completedAt && ` - ${formatDate(selectedCycle.completedAt, locale)}`}
                         <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
-                          isActiveCycle 
-                            ? 'bg-foreground text-background' 
+                          isActiveCycle
+                            ? 'bg-foreground text-background'
                             : 'bg-muted text-muted-foreground'
                         }`}>
-                          {isActiveCycle ? 'Aktiv' : 'Abgeschlossen'}
+                          {isActiveCycle ? t('active') : t('completed')}
                         </span>
                       </div>
                     </div>
@@ -1069,7 +1081,7 @@ export default function AnalyticsPage() {
                 {/* Row 3: Aggregation Mode Toggle */}
                 <div>
                   <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                    Aggregation:
+                    {t('aggregation')}
                   </label>
                   <div className="flex gap-2">
                     <Button
@@ -1077,14 +1089,14 @@ export default function AnalyticsPage() {
                       size="sm"
                       onClick={() => setAggregationMode('day')}
                     >
-                      Tage
+                      {t('daysToggle')}
                     </Button>
                     <Button
                       variant={aggregationMode === 'week' ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setAggregationMode('week')}
                     >
-                      Wochen
+                      {t('weeksToggle')}
                     </Button>
                   </div>
                 </div>
@@ -1094,7 +1106,7 @@ export default function AnalyticsPage() {
                   {/* View Mode Buttons */}
                   <div>
                     <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                      Ansicht (max. 2):
+                      {t('viewMax2')}
                     </label>
                     <div className="flex flex-wrap gap-2">
                       <Button
@@ -1106,14 +1118,14 @@ export default function AnalyticsPage() {
                           selectedViews.length >= calculateMaxAllowed('view')
                         }
                       >
-                        Volumen
+                        {viewNames.volume}
                       </Button>
                       <Button
                         variant={selectedViews.includes('rir') ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => toggleView('rir')}
                       >
-                        RIR
+                        {viewNames.rir}
                       </Button>
                       <Button
                         variant={selectedViews.includes('duration') ? 'default' : 'outline'}
@@ -1121,44 +1133,44 @@ export default function AnalyticsPage() {
                         onClick={() => toggleView('duration')}
                         disabled={
                           (!selectedViews.includes('duration') && selectedViews.length >= calculateMaxAllowed('view')) ||
-                          !selectedMuscles.includes('ALL') || 
+                          !selectedMuscles.includes('ALL') ||
                           !selectedEquipment.includes('ALL')
                         }
                       >
-                        Dauer
+                        {viewNames.duration}
                       </Button>
                       <Button
                         variant={selectedViews.includes('restTime') ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => toggleView('restTime')}
                         disabled={
-                          !selectedViews.includes('restTime') && 
+                          !selectedViews.includes('restTime') &&
                           selectedViews.length >= calculateMaxAllowed('view')
                         }
                       >
-                        Satzpause
+                        {t('restTimeView')}
                       </Button>
                       <Button
                         variant={selectedViews.includes('reps') ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => toggleView('reps')}
                         disabled={
-                          !selectedViews.includes('reps') && 
+                          !selectedViews.includes('reps') &&
                           selectedViews.length >= calculateMaxAllowed('view')
                         }
                       >
-                        Wiederholungen
+                        {t('repsView')}
                       </Button>
                       <Button
                         variant={selectedViews.includes('sets') ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => toggleView('sets')}
                         disabled={
-                          !selectedViews.includes('sets') && 
+                          !selectedViews.includes('sets') &&
                           selectedViews.length >= calculateMaxAllowed('view')
                         }
                       >
-                        Sätze
+                        {viewNames.sets}
                       </Button>
                       <Button
                         variant={selectedViews.includes('intensity') ? 'default' : 'outline'}
@@ -1169,7 +1181,7 @@ export default function AnalyticsPage() {
                           selectedViews.length >= calculateMaxAllowed('view')
                         }
                       >
-                        Intensität
+                        {viewNames.intensity}
                       </Button>
                     </div>
                   </div>
@@ -1177,7 +1189,7 @@ export default function AnalyticsPage() {
                   {/* Muscle Group Buttons */}
                   <div>
                     <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                      Muskelgruppe:
+                      {t('muscleGroup')}
                     </label>
                     <div className="flex flex-wrap gap-2">
                       <Button
@@ -1185,7 +1197,7 @@ export default function AnalyticsPage() {
                         size="sm"
                         onClick={() => toggleMuscle('ALL')}
                       >
-                        Alle
+                        {t('all')}
                       </Button>
                       {muscleGroups.map((mg) => {
                         const isSelected = selectedMuscles.includes(mg);
@@ -1206,7 +1218,7 @@ export default function AnalyticsPage() {
                   {/* Equipment Buttons */}
                   <div>
                     <label className="text-sm font-medium text-muted-foreground mb-2 block">
-                      Equipment:
+                      {t('equipment')}
                     </label>
                     <div className="flex flex-wrap gap-2">
                       <Button
@@ -1214,7 +1226,7 @@ export default function AnalyticsPage() {
                         size="sm"
                         onClick={() => toggleEquipment('ALL')}
                       >
-                        Alle
+                        {t('all')}
                       </Button>
                       {equipments.map((eq) => {
                         const isSelected = selectedEquipment.includes(eq);
@@ -1235,7 +1247,7 @@ export default function AnalyticsPage() {
                   {/* Exercise Filter - Alternative to Muscle/Equipment (shadcn + large + icon) */}
                   <div className="border-t border-border pt-4">
                     <div className="text-center mb-3">
-                      <span className="text-sm text-muted-foreground italic">ODER</span>
+                      <span className="text-sm text-muted-foreground italic">{t('or')}</span>
                     </div>
                     
                     {selectedExercise ? (
@@ -1250,7 +1262,7 @@ export default function AnalyticsPage() {
                           variant="outline"
                           onClick={() => setShowExerciseModal(true)}
                           className="h-14 w-14 rounded-lg p-0"
-                          aria-label="Übung zum Filtern hinzufügen"
+                          aria-label={t('addExerciseFilter')}
                         >
                           <IconPlus className="size-7" />
                         </Button>
@@ -1263,7 +1275,7 @@ export default function AnalyticsPage() {
 
             {loading ? (
               <div className="flex items-center justify-center py-12">
-                <div className="text-lg text-muted-foreground">Lädt Analytics...</div>
+                <div className="text-lg text-muted-foreground">{t('loading')}</div>
               </div>
             ) : (
               <div className="space-y-6">
@@ -1271,32 +1283,36 @@ export default function AnalyticsPage() {
                 {selectedViews.length > 1 && mergedChartData.length > 0 && chartLineConfigs.length > 0 && (
                   <AnalyticsChart
                     data={mergedChartData}
-                    title="Vergleichsansicht"
+                    title={t('comparisonView')}
                     height={400}
                     isComparison={true}
                     lineConfigs={chartLineConfigs}
+                    locale={locale}
+                    formatWorkoutCount={(count) => t('workoutCount', { count })}
                   />
                 )}
-                
+
                 {/* Volume Chart - using central AnalyticsChart */}
                 {selectedViews.length === 1 && selectedViews.includes('volume') && volumeData && volumeData.dataPoints.length > 0 && (
                   <AnalyticsChart
                     data={volumeData.dataPoints}
-                    title="Volumen-Entwicklung"
+                    title={t('volumeProgression')}
                     height={300}
                     chartType="line"
                     dataKey="volume"
-                    name="Volumen"
+                    name={viewNames.volume}
                     stroke={CHART_ACCENT}
-                    yAxisTickFormatter={(value) => `${formatNumber(value)}`}
+                    yAxisTickFormatter={(value) => `${formatNumber(value, locale)}`}
                     yAxisLabel="kg"
+                    locale={locale}
+                    formatWorkoutCount={(count) => t('workoutCount', { count })}
                     footer={
                       <div className="mt-4 text-center">
                         <div className="text-sm text-muted-foreground">
-                          Gesamtes Volumen
+                          {t('totalVolume')}
                         </div>
                         <div className="text-2xl font-bold text-foreground">
-                          {formatNumber(volumeData.totalVolume)} kg
+                          {formatNumber(volumeData.totalVolume, locale)} kg
                         </div>
                       </div>
                     }
@@ -1309,10 +1325,12 @@ export default function AnalyticsPage() {
                     {rirData && rirData.dataPoints.length > 0 ? (
                       <AnalyticsChart
                         data={rirData.dataPoints}
-                        title="RIR-Verteilung"
+                        title={t('rirDistribution')}
                         height={300}
                         chartType="bar"
-                        yAxisLabel="Anzahl"
+                        yAxisLabel={t('count')}
+                        locale={locale}
+                        formatWorkoutCount={(count) => t('workoutCount', { count })}
                         children={
                           <>
                             <Bar dataKey="rir0Count" fill={getRIRBarFill(0)} name="RIR 0" />
@@ -1323,10 +1341,10 @@ export default function AnalyticsPage() {
                         footer={
                           <div className="mt-4 text-center">
                             <div className="text-sm text-muted-foreground">
-                              Gesamte Sets
+                              {t('totalSetsCycle')}
                             </div>
                             <div className="text-2xl font-bold text-foreground">
-                              {rirData.totalSets}
+                              {format.number(rirData.totalSets)}
                             </div>
                           </div>
                         }
@@ -1334,7 +1352,7 @@ export default function AnalyticsPage() {
                     ) : (
                       <div className="text-center py-12">
                         <p className="text-muted-foreground">
-                          Keine RIR Daten verfügbar für die ausgewählten Filter.
+                          {t('noRirData')}
                         </p>
                       </div>
                     )}
@@ -1347,10 +1365,12 @@ export default function AnalyticsPage() {
                     {rirData && rirData.dataPoints.length > 0 ? (
                       <AnalyticsChart
                         data={rirData.dataPoints}
-                        title="RIR-Verteilung"
+                        title={t('rirDistribution')}
                         height={300}
                         chartType="bar"
-                        yAxisLabel="Anzahl"
+                        yAxisLabel={t('count')}
+                        locale={locale}
+                        formatWorkoutCount={(count) => t('workoutCount', { count })}
                         children={
                           <>
                             <Bar dataKey="rir0Count" fill={getRIRBarFill(0)} name="RIR 0" />
@@ -1361,10 +1381,10 @@ export default function AnalyticsPage() {
                         footer={
                           <div className="mt-4 text-center">
                             <div className="text-sm text-muted-foreground">
-                              Gesamte Sätze
+                              {t('totalSets')}
                             </div>
                             <div className="text-2xl font-bold text-foreground">
-                              {rirData.totalSets}
+                              {format.number(rirData.totalSets)}
                             </div>
                           </div>
                         }
@@ -1372,7 +1392,7 @@ export default function AnalyticsPage() {
                     ) : (
                       <div className="text-center py-12">
                         <p className="text-muted-foreground">
-                          Keine RIR Daten verfügbar für die ausgewählten Filter.
+                          {t('noRirData')}
                         </p>
                       </div>
                     )}
@@ -1385,33 +1405,35 @@ export default function AnalyticsPage() {
                     {!selectedMuscles.includes('ALL') || !selectedEquipment.includes('ALL') ? (
                       <div className="text-center py-12">
                         <p className="text-muted-foreground">
-                          Workout-Dauer bezieht sich auf das gesamte Training.
+                          {t('durationWholeWorkout')}
                         </p>
                         <p className="text-sm text-muted-foreground mt-2">
-                          Bitte wähle &apos;Alle&apos; bei Muskelgruppe und Equipment aus.
+                          {t('selectAllMuscleEquipment')}
                         </p>
                       </div>
                     ) : durationData && durationData.dataPoints.length > 0 ? (
                       <AnalyticsChart
                         data={durationData.dataPoints}
-                        title="Workout-Dauer"
+                        title={t('workoutDuration')}
                         height={300}
                         chartType="line"
                         dataKey="duration"
-                        name="Dauer"
+                        name={viewNames.duration}
                         stroke={CHART_ACCENT}
                         yAxisTickFormatter={(value) => `${value}`}
-                        yAxisLabel="Minuten"
+                        yAxisLabel={t('minutes')}
+                        locale={locale}
+                        formatWorkoutCount={(count) => t('workoutCount', { count })}
                         footer={
                           <div className="mt-4 text-center">
                             <div className="text-sm text-muted-foreground">
-                              Durchschnittliche Dauer
+                              {t('averageDuration')}
                             </div>
                             <div className="text-2xl font-bold text-foreground">
-                              {Math.round(
+                              {format.number(Math.round(
                                 durationData.dataPoints.reduce((sum, point) => sum + point.duration, 0) /
                                   durationData.dataPoints.length
-                              )} min
+                              ))} min
                             </div>
                           </div>
                         }
@@ -1419,7 +1441,7 @@ export default function AnalyticsPage() {
                     ) : (
                       <div className="text-center py-12">
                         <p className="text-muted-foreground">
-                          Keine Dauer-Daten verfügbar für die ausgewählten Filter.
+                          {t('noDurationData')}
                         </p>
                       </div>
                     )}
@@ -1432,33 +1454,35 @@ export default function AnalyticsPage() {
                     {!selectedMuscles.includes('ALL') || !selectedEquipment.includes('ALL') ? (
                       <div className="text-center py-12">
                         <p className="text-muted-foreground">
-                          Workout-Dauer bezieht sich auf das gesamte Training.
+                          {t('durationWholeWorkout')}
                         </p>
                         <p className="text-sm text-muted-foreground mt-2">
-                          Bitte wähle &apos;Alle&apos; bei Muskelgruppe und Equipment aus.
+                          {t('selectAllMuscleEquipment')}
                         </p>
                       </div>
                     ) : durationData && durationData.dataPoints.length > 0 ? (
                       <AnalyticsChart
                         data={durationData.dataPoints}
-                        title="Workout-Dauer"
+                        title={t('workoutDuration')}
                         height={300}
                         chartType="line"
                         dataKey="duration"
-                        name="Dauer"
+                        name={viewNames.duration}
                         stroke={CHART_ACCENT}
                         yAxisTickFormatter={(value) => `${value}`}
-                        yAxisLabel="Minuten"
+                        yAxisLabel={t('minutes')}
+                        locale={locale}
+                        formatWorkoutCount={(count) => t('workoutCount', { count })}
                         footer={
                           <div className="mt-4 text-center">
                             <div className="text-sm text-muted-foreground">
-                              Durchschnittliche Dauer
+                              {t('averageDuration')}
                             </div>
                             <div className="text-2xl font-bold text-foreground">
-                              {Math.round(
+                              {format.number(Math.round(
                                 durationData.dataPoints.reduce((sum, point) => sum + point.duration, 0) /
                                   durationData.dataPoints.length
-                              )} min
+                              ))} min
                             </div>
                           </div>
                         }
@@ -1466,7 +1490,7 @@ export default function AnalyticsPage() {
                     ) : (
                       <div className="text-center py-12">
                         <p className="text-muted-foreground">
-                          Keine Dauer-Daten verfügbar für die ausgewählten Filter.
+                          {t('noDurationData')}
                         </p>
                       </div>
                     )}
@@ -1479,21 +1503,23 @@ export default function AnalyticsPage() {
                     {restTimeData && restTimeData.dataPoints.length > 0 ? (
                       <AnalyticsChart
                         data={restTimeData.dataPoints}
-                        title="Durchschnittliche Satzpause"
+                        title={t('averageRestTime')}
                         height={300}
                         chartType="line"
                         dataKey="averageRestTime"
-                        name="Satzpause"
+                        name={t('restTimeView')}
                         stroke={CHART_ACCENT}
                         yAxisTickFormatter={(value) => `${value}`}
-                        yAxisLabel="Sekunden"
+                        yAxisLabel={t('seconds')}
+                        locale={locale}
+                        formatWorkoutCount={(count) => t('workoutCount', { count })}
                         footer={
                           <div className="mt-4 text-center">
                             <div className="text-sm text-muted-foreground">
-                              Durchschnittliche Pause
+                              {t('averagePause')}
                             </div>
                             <div className="text-2xl font-bold text-foreground">
-                              {restTimeData.overallAverage}s
+                              {format.number(restTimeData.overallAverage)}s
                             </div>
                           </div>
                         }
@@ -1501,7 +1527,7 @@ export default function AnalyticsPage() {
                     ) : (
                       <div className="text-center py-12">
                         <p className="text-muted-foreground">
-                          Keine Satzpausen-Daten verfügbar für die ausgewählten Filter.
+                          {t('noRestTimeData')}
                         </p>
                       </div>
                     )}
@@ -1514,21 +1540,23 @@ export default function AnalyticsPage() {
                     {restTimeData && restTimeData.dataPoints.length > 0 ? (
                       <AnalyticsChart
                         data={restTimeData.dataPoints}
-                        title="Durchschnittliche Satzpause"
+                        title={t('averageRestTime')}
                         height={300}
                         chartType="line"
                         dataKey="averageRestTime"
-                        name="Satzpause"
+                        name={t('restTimeView')}
                         stroke={CHART_ACCENT}
                         yAxisTickFormatter={(value) => `${value}`}
-                        yAxisLabel="Sekunden"
+                        yAxisLabel={t('seconds')}
+                        locale={locale}
+                        formatWorkoutCount={(count) => t('workoutCount', { count })}
                         footer={
                           <div className="mt-4 text-center">
                             <div className="text-sm text-muted-foreground">
-                              Durchschnittliche Pause
+                              {t('averagePause')}
                             </div>
                             <div className="text-2xl font-bold text-foreground">
-                              {restTimeData.overallAverage}s
+                              {format.number(restTimeData.overallAverage)}s
                             </div>
                           </div>
                         }
@@ -1536,7 +1564,7 @@ export default function AnalyticsPage() {
                     ) : (
                       <div className="text-center py-12">
                         <p className="text-muted-foreground">
-                          Keine Satzpausen-Daten verfügbar für die ausgewählten Filter.
+                          {t('noRestTimeData')}
                         </p>
                       </div>
                     )}
@@ -1549,30 +1577,32 @@ export default function AnalyticsPage() {
                     {repsData && repsData.dataPoints.length > 0 ? (
                       <AnalyticsChart
                         data={repsData.dataPoints}
-                        title="Wiederholungen pro Workout"
+                        title={t('repsPerWorkout')}
                         height={300}
                         chartType="line"
                         dataKey="reps"
-                        name="Wiederholungen"
+                        name={t('repsView')}
                         stroke={CHART_ACCENT}
                         yAxisTickFormatter={(value) => `${value}`}
-                        yAxisLabel="Wiederholungen"
+                        yAxisLabel={t('repsView')}
+                        locale={locale}
+                        formatWorkoutCount={(count) => t('workoutCount', { count })}
                         footer={
                           <div className="mt-4 grid grid-cols-2 gap-4 text-center">
                             <div>
                               <div className="text-sm text-muted-foreground">
-                                Gesamt
+                                {t('total')}
                               </div>
                               <div className="text-2xl font-bold text-foreground">
-                                {formatNumber(repsData.totalReps)}
+                                {formatNumber(repsData.totalReps, locale)}
                               </div>
                             </div>
                             <div>
                               <div className="text-sm text-muted-foreground">
-                                Ø pro Workout
+                                {t('avgPerWorkout')}
                               </div>
                               <div className="text-2xl font-bold text-foreground">
-                                {formatNumber(repsData.averageReps)}
+                                {formatNumber(repsData.averageReps, locale)}
                               </div>
                             </div>
                           </div>
@@ -1581,7 +1611,7 @@ export default function AnalyticsPage() {
                     ) : (
                       <div className="text-center py-12">
                         <p className="text-muted-foreground">
-                          Keine Wiederholungs-Daten verfügbar für die ausgewählten Filter.
+                          {t('noRepsData')}
                         </p>
                       </div>
                     )}
@@ -1594,30 +1624,32 @@ export default function AnalyticsPage() {
                     {setsData && setsData.dataPoints.length > 0 ? (
                       <AnalyticsChart
                         data={setsData.dataPoints}
-                        title="Arbeitssätze pro Workout"
+                        title={t('workingSetsPerWorkout')}
                         height={300}
                         chartType="line"
                         dataKey="sets"
-                        name="Sätze"
+                        name={viewNames.sets}
                         stroke={CHART_ACCENT}
                         yAxisTickFormatter={(value) => `${value}`}
-                        yAxisLabel="Sätze"
+                        yAxisLabel={viewNames.sets}
+                        locale={locale}
+                        formatWorkoutCount={(count) => t('workoutCount', { count })}
                         footer={
                           <div className="mt-4 grid grid-cols-2 gap-4 text-center">
                             <div>
                               <div className="text-sm text-muted-foreground">
-                                Gesamt
+                                {t('total')}
                               </div>
                               <div className="text-2xl font-bold text-foreground">
-                                {formatNumber(setsData.totalSets)}
+                                {formatNumber(setsData.totalSets, locale)}
                               </div>
                             </div>
                             <div>
                               <div className="text-sm text-muted-foreground">
-                                Ø pro Workout
+                                {t('avgPerWorkout')}
                               </div>
                               <div className="text-2xl font-bold text-foreground">
-                                {formatNumber(setsData.averageSets)}
+                                {formatNumber(setsData.averageSets, locale)}
                               </div>
                             </div>
                           </div>
@@ -1626,7 +1658,7 @@ export default function AnalyticsPage() {
                     ) : (
                       <div className="text-center py-12">
                         <p className="text-muted-foreground">
-                          Keine Satz-Daten verfügbar für die ausgewählten Filter.
+                          {t('noSetsData')}
                         </p>
                       </div>
                     )}
@@ -1639,21 +1671,23 @@ export default function AnalyticsPage() {
                     {intensityData && intensityData.dataPoints.length > 0 ? (
                       <AnalyticsChart
                         data={intensityData.dataPoints}
-                        title="Intensität pro Workout"
+                        title={t('intensityPerWorkout')}
                         height={300}
                         chartType="line"
                         dataKey="intensity"
-                        name="Intensität"
+                        name={viewNames.intensity}
                         stroke={CHART_ACCENT}
                         yAxisTickFormatter={(value) => `${value}`}
                         yAxisLabel="%"
+                        locale={locale}
+                        formatWorkoutCount={(count) => t('workoutCount', { count })}
                         footer={
                           <div className="mt-4 text-center">
                             <div className="text-sm text-muted-foreground">
-                              Durchschnittliche Intensität
+                              {t('averageIntensity')}
                             </div>
                             <div className="text-2xl font-bold text-foreground">
-                              {formatNumber(intensityData.averageIntensity)}%
+                              {formatNumber(intensityData.averageIntensity, locale)}%
                             </div>
                           </div>
                         }
@@ -1661,7 +1695,7 @@ export default function AnalyticsPage() {
                     ) : (
                       <div className="text-center py-12">
                         <p className="text-muted-foreground">
-                          Keine Intensitäts-Daten verfügbar für die ausgewählten Filter.
+                          {t('noIntensityData')}
                         </p>
                       </div>
                     )}
@@ -1674,30 +1708,32 @@ export default function AnalyticsPage() {
                     {repsData && repsData.dataPoints.length > 0 ? (
                       <AnalyticsChart
                         data={repsData.dataPoints}
-                        title="Wiederholungen pro Workout"
+                        title={t('repsPerWorkout')}
                         height={300}
                         chartType="line"
                         dataKey="reps"
-                        name="Wiederholungen"
+                        name={t('repsView')}
                         stroke={CHART_ACCENT}
                         yAxisTickFormatter={(value) => `${value}`}
-                        yAxisLabel="Wiederholungen"
+                        yAxisLabel={t('repsView')}
+                        locale={locale}
+                        formatWorkoutCount={(count) => t('workoutCount', { count })}
                         footer={
                           <div className="mt-4 grid grid-cols-2 gap-4 text-center">
                             <div>
                               <div className="text-sm text-muted-foreground">
-                                Gesamt
+                                {t('total')}
                               </div>
                               <div className="text-2xl font-bold text-foreground">
-                                {formatNumber(repsData.totalReps)}
+                                {formatNumber(repsData.totalReps, locale)}
                               </div>
                             </div>
                             <div>
                               <div className="text-sm text-muted-foreground">
-                                Ø pro Workout
+                                {t('avgPerWorkout')}
                               </div>
                               <div className="text-2xl font-bold text-foreground">
-                                {formatNumber(repsData.averageReps)}
+                                {formatNumber(repsData.averageReps, locale)}
                               </div>
                             </div>
                           </div>
@@ -1706,7 +1742,7 @@ export default function AnalyticsPage() {
                     ) : (
                       <div className="text-center py-12">
                         <p className="text-muted-foreground">
-                          Keine Wiederholungs-Daten verfügbar für die ausgewählten Filter.
+                          {t('noRepsData')}
                         </p>
                       </div>
                     )}
@@ -1719,30 +1755,32 @@ export default function AnalyticsPage() {
                     {setsData && setsData.dataPoints.length > 0 ? (
                       <AnalyticsChart
                         data={setsData.dataPoints}
-                        title="Arbeitssätze pro Workout"
+                        title={t('workingSetsPerWorkout')}
                         height={300}
                         chartType="line"
                         dataKey="sets"
-                        name="Sätze"
+                        name={viewNames.sets}
                         stroke={CHART_ACCENT}
                         yAxisTickFormatter={(value) => `${value}`}
-                        yAxisLabel="Sätze"
+                        yAxisLabel={viewNames.sets}
+                        locale={locale}
+                        formatWorkoutCount={(count) => t('workoutCount', { count })}
                         footer={
                           <div className="mt-4 grid grid-cols-2 gap-4 text-center">
                             <div>
                               <div className="text-sm text-muted-foreground">
-                                Gesamt
+                                {t('total')}
                               </div>
                               <div className="text-2xl font-bold text-foreground">
-                                {formatNumber(setsData.totalSets)}
+                                {formatNumber(setsData.totalSets, locale)}
                               </div>
                             </div>
                             <div>
                               <div className="text-sm text-muted-foreground">
-                                Ø pro Workout
+                                {t('avgPerWorkout')}
                               </div>
                               <div className="text-2xl font-bold text-foreground">
-                                {formatNumber(setsData.averageSets)}
+                                {formatNumber(setsData.averageSets, locale)}
                               </div>
                             </div>
                           </div>
@@ -1751,7 +1789,7 @@ export default function AnalyticsPage() {
                     ) : (
                       <div className="text-center py-12">
                         <p className="text-muted-foreground">
-                          Keine Satz-Daten verfügbar für die ausgewählten Filter.
+                          {t('noSetsData')}
                         </p>
                       </div>
                     )}
@@ -1764,21 +1802,23 @@ export default function AnalyticsPage() {
                     {intensityData && intensityData.dataPoints.length > 0 ? (
                       <AnalyticsChart
                         data={intensityData.dataPoints}
-                        title="Intensität pro Workout"
+                        title={t('intensityPerWorkout')}
                         height={300}
                         chartType="line"
                         dataKey="intensity"
-                        name="Intensität"
+                        name={viewNames.intensity}
                         stroke={CHART_ACCENT}
                         yAxisTickFormatter={(value) => `${value}`}
                         yAxisLabel="%"
+                        locale={locale}
+                        formatWorkoutCount={(count) => t('workoutCount', { count })}
                         footer={
                           <div className="mt-4 text-center">
                             <div className="text-sm text-muted-foreground">
-                              Durchschnittliche Intensität
+                              {t('averageIntensity')}
                             </div>
                             <div className="text-2xl font-bold text-foreground">
-                              {formatNumber(intensityData.averageIntensity)}%
+                              {formatNumber(intensityData.averageIntensity, locale)}%
                             </div>
                           </div>
                         }
@@ -1786,7 +1826,7 @@ export default function AnalyticsPage() {
                     ) : (
                       <div className="text-center py-12">
                         <p className="text-muted-foreground">
-                          Keine Intensitäts-Daten verfügbar für die ausgewählten Filter.
+                          {t('noIntensityData')}
                         </p>
                       </div>
                     )}
@@ -1798,7 +1838,7 @@ export default function AnalyticsPage() {
                   <Card>
                     <CardContent className="p-6">
                       <h3 className="text-lg font-semibold text-foreground mb-4">
-                        Muskelgruppen-Verteilung (Volumen)
+                        {t('muscleGroupDistribution')}
                       </h3>
                       <div className="space-y-3">
                         {[...volumeData.byMuscleGroup]
@@ -1817,16 +1857,16 @@ export default function AnalyticsPage() {
                                   />
                                 </div>
                                 <div className="w-12 text-right text-sm font-medium tabular-nums text-foreground">
-                                  {pct}%
+                                  {format.number(pct)}%
                                 </div>
                                 <div className="w-20 text-right text-xs text-muted-foreground tabular-nums">
-                                  {formatNumber(mg.volume)} kg
+                                  {formatNumber(mg.volume, locale)} kg
                                 </div>
                               </div>
                             );
                           })}
                       </div>
-                      <p className="text-[10px] text-muted-foreground mt-3">Sortiert nach Anteil • Relative Balken zeigen die Verteilung des Volumens</p>
+                      <p className="text-[10px] text-muted-foreground mt-3">{t('sortedByShare')}</p>
                     </CardContent>
                   </Card>
                 )}
@@ -1837,7 +1877,7 @@ export default function AnalyticsPage() {
                     charts to reach. */}
                 <NutritionTrendChart
                   trend={nutritionTrend}
-                  rangeLabel={nutritionRangeLabelFor(cycleMode, selectedCycle, timeFilter)}
+                  rangeLabel={nutritionRangeLabelFor(cycleMode, selectedCycle, timeFilter, t, locale)}
                   loading={nutritionLoading}
                 />
 
@@ -1846,7 +1886,7 @@ export default function AnalyticsPage() {
                   <Card>
                     <div className="px-6 py-4 border-b border-border">
                       <h3 className="text-lg font-semibold text-foreground">
-                        Persönliche Rekorde
+                        {t('personalRecords')}
                       </h3>
                     </div>
 
@@ -1863,8 +1903,8 @@ export default function AnalyticsPage() {
                       ) : (
                         <p className="text-muted-foreground text-center py-8">
                           {!selectedMuscles.includes('ALL') || !selectedEquipment.includes('ALL')
-                            ? 'Keine persönlichen Rekorde für die ausgewählten Filter gefunden'
-                            : 'Noch keine persönlichen Rekorde vorhanden'}
+                            ? t('noPersonalRecordsFiltered')
+                            : t('noPersonalRecordsYet')}
                         </p>
                       )}
                     </CardContent>
@@ -1876,14 +1916,13 @@ export default function AnalyticsPage() {
                   <Card>
                     <CardContent className="p-12 text-center">
                       <p className="text-muted-foreground">
-                        Noch keine Trainingsdaten für den ausgewählten Zeitraum
-                        vorhanden.
+                        {t('noTrainingDataYet')}
                       </p>
                       <Link
                         href="/workout"
                         className="mt-4 inline-block text-primary hover:underline"
                       >
-                        Zum Workout →
+                        {t('toWorkoutArrow')}
                       </Link>
                     </CardContent>
                   </Card>

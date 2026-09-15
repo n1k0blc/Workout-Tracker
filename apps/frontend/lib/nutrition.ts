@@ -187,9 +187,9 @@ export function formatMacroLineLong(macros: Macros): string {
   )} g Protein · ${Math.round(macros.fat)} g Fett`;
 }
 
-/** Whole-number kcal with a German thousands separator: `1842` -> `"1.842"`. */
-export function formatKcal(kcal: number): string {
-  return Math.round(kcal).toLocaleString('de-DE');
+/** Whole-number kcal with a locale-aware thousands separator: `1842` -> `"1.842"` (de). */
+export function formatKcal(kcal: number, locale = 'de-DE'): string {
+  return Math.round(kcal).toLocaleString(locale);
 }
 
 /** A quantity multiplier the German way: `0.5` -> `"0,5×"`, `1` -> `"1×"`. */
@@ -367,8 +367,8 @@ export function metricTarget(
 }
 
 /** A metric value the way its tile and tooltip read it: `"2.219 kcal"`, `"150 g"`. */
-export function formatMetricValue(value: number, metric: NutritionMetric): string {
-  if (metric === 'kcal') return `${formatKcal(value)} kcal`;
+export function formatMetricValue(value: number, metric: NutritionMetric, locale = 'de-DE'): string {
+  if (metric === 'kcal') return `${formatKcal(value, locale)} kcal`;
   return `${Math.round(value)} g`;
 }
 
@@ -396,9 +396,4 @@ export function nutritionTargetReached(
     hit: days.filter((day) => day[metric] >= target).length,
     total: days.length,
   };
-}
-
-/** The legend's range phrase for a series `dayCount` days long: `"letzte 7 Tage"`. */
-export function nutritionRangeLabel(dayCount: number): string {
-  return `letzte ${dayCount} Tage`;
 }

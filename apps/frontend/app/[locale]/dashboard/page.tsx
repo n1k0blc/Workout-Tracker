@@ -3,9 +3,10 @@
 import { ProtectedRoute } from '@/components/protected-route';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useState, useEffect } from 'react';
+import { useTranslations, useFormatter } from 'next-intl';
 import { apiClient } from '@/lib/api';
 import { fromLocalDateString } from '@/lib/local-date';
-import { WEEKDAY_NAMES } from '@/lib/weekday';
+import { weekdayReferenceDate } from '@/lib/weekday';
 import {
   WorkoutListItem,
   PersonalRecord,
@@ -25,6 +26,8 @@ import { IconBarbell, IconCalendar, IconChartBar, IconTrophy } from '@tabler/ico
 
 export default function DashboardPage() {
   const router = useRouter();
+  const t = useTranslations('Dashboard');
+  const format = useFormatter();
   const [weekStats, setWeekStats] = useState<DashboardStats | null>(null);
   const [cycleProgress, setCycleProgress] = useState<CycleProgress | null>(null);
   const [nextWorkout, setNextWorkout] = useState<NextPlannedWorkout | null>(null);
@@ -126,22 +129,21 @@ export default function DashboardPage() {
   }, []);
 
   const formatDay = (date: Date) =>
-    new Intl.DateTimeFormat('de-DE', {
+    format.dateTime(date, {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
-    }).format(date);
+    });
 
   const formatDate = (dateStr: string) => formatDay(new Date(dateStr));
 
   /** `suggestedDate` is a calendar day, not an instant -- parse it as one. */
   const formatLocalDate = (localDate: string) => formatDay(fromLocalDateString(localDate));
 
-  const formatNumber = (num: number) => {
-    return new Intl.NumberFormat('de-DE').format(Math.round(num));
-  };
+  const formatNumber = (num: number) => format.number(Math.round(num));
 
-  const getDayName = (dayOfWeek: number): string => WEEKDAY_NAMES[dayOfWeek];
+  const getDayName = (dayOfWeek: number): string =>
+    format.dateTime(weekdayReferenceDate(dayOfWeek), { weekday: 'long', timeZone: 'UTC' });
 
   return (
     <ProtectedRoute>
@@ -150,7 +152,7 @@ export default function DashboardPage() {
           <div className="px-4 py-6 sm:px-0">
             {loading ? (
               <div className="flex items-center justify-center py-12">
-                <div className="text-lg text-muted-foreground">Lädt Dashboard...</div>
+                <div className="text-lg text-muted-foreground">{t('loading')}</div>
               </div>
             ) : (
               <div className="space-y-6">
@@ -160,7 +162,7 @@ export default function DashboardPage() {
                   <Card>
                     <CardContent className="p-6">
                       <div className="text-sm font-medium text-muted-foreground mb-1">
-                        Workouts (letzte 7 Tage)
+                        {t('workoutsLast7Days')}
                       </div>
                       <div className="text-3xl font-bold text-foreground">
                         {weekStats?.lastSevenDays.workouts || 0}
@@ -172,7 +174,7 @@ export default function DashboardPage() {
                   <Card>
                     <CardContent className="p-6">
                       <div className="text-sm font-medium text-muted-foreground mb-1">
-                        Volumen (letzte 7 Tage)
+                        {t('volumeLast7Days')}
                       </div>
                       <div className="flex items-end gap-3">
                         <div className="text-3xl font-bold text-foreground">
@@ -192,12 +194,12 @@ export default function DashboardPage() {
                   <Card>
                     <CardContent className="p-6">
                       <div className="text-sm font-medium text-muted-foreground mb-3">
-                        Zyklus-Status
+                        {t('cycleStatus')}
                       </div>
-                      
+
                       {/* Show cycle completion card if recently completed */}
                       {showCycleCompletion && completedCycle ? (
-                        <div 
+                        <div
                           onClick={() => {
                             localStorage.setItem(`cycle-${completedCycle.id}-acknowledged`, 'true');
                             router.push(`/cycles/${completedCycle.id}?celebration=true`);
@@ -207,13 +209,13 @@ export default function DashboardPage() {
                           <div className="text-center">
                             <IconTrophy className="size-12 mx-auto mb-3" stroke={1.5} />
                             <div className="text-sm font-medium mb-1 opacity-80">
-                              Zyklus beendet
+                              {t('cycleCompleted')}
                             </div>
                             <div className="text-xl font-bold">
                               {completedCycle.name}
                             </div>
                             <div className="text-xs opacity-70 mt-2">
-                              Klicken für Details
+                              {t('clickForDetails')}
                             </div>
                           </div>
                         </div>
@@ -233,13 +235,13 @@ export default function DashboardPage() {
                         /* No active cycle - show placeholder */
                         <div className="text-center py-4">
                           <div className="text-muted-foreground mb-4 text-sm">
-                            Kein aktiver Zyklus
+                            {t('noActiveCycle')}
                           </div>
                           <Button
                             onClick={() => router.push('/cycles/new')}
                             size="sm"
                           >
-                            Neuen Zyklus anlegen
+                            {t('createNewCycle')}
                           </Button>
                         </div>
                       )}
@@ -250,16 +252,16 @@ export default function DashboardPage() {
                   <Card>
                     <CardContent className="p-6">
                       <div className="text-sm font-medium text-muted-foreground mb-1">
-                        Ø Dauer (letzte 7 Tage)
+                        {t('avgDurationLast7Days')}
                       </div>
                       {weekStats?.lastSevenDays.averageDuration !== null ? (
                         <div className="text-3xl font-bold text-foreground">
-                          {weekStats?.lastSevenDays.averageDuration || 0}
+                          {format.number(weekStats?.lastSevenDays.averageDuration || 0)}
                           <span className="text-lg text-muted-foreground ml-1">min</span>
                         </div>
                       ) : (
                         <div className="text-lg text-muted-foreground py-2">
-                          Keine Daten
+                          {t('noData')}
                         </div>
                       )}
                     </CardContent>
@@ -281,10 +283,10 @@ export default function DashboardPage() {
                       <CardContent className="p-6">
                         <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
                           <IconBarbell className="size-5" />
-                          Workout starten
+                          {t('startWorkout')}
                         </h3>
                         <p className="opacity-80 text-sm">
-                          Starte ein neues Workout
+                          {t('startNewWorkout')}
                         </p>
                       </CardContent>
                     </Card>
@@ -295,10 +297,10 @@ export default function DashboardPage() {
                       <CardContent className="p-6">
                         <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
                           <IconCalendar className="size-5" />
-                          Zyklen verwalten
+                          {t('manageCycles')}
                         </h3>
                         <p className="text-muted-foreground text-sm">
-                          Trainingszyklen erstellen
+                          {t('createTrainingCycles')}
                         </p>
                       </CardContent>
                     </Card>
@@ -309,10 +311,10 @@ export default function DashboardPage() {
                       <CardContent className="p-6">
                         <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
                           <IconChartBar className="size-5" />
-                          Analytics
+                          {t('analytics')}
                         </h3>
                         <p className="text-muted-foreground text-sm">
-                          Trainingsfortschritt analysieren
+                          {t('analyzeTrainingProgress')}
                         </p>
                       </CardContent>
                     </Card>
@@ -324,7 +326,7 @@ export default function DashboardPage() {
                   {/* Workouts dieser Woche (Liste) */}
                   <Card>
                     <CardHeader>
-                      <CardTitle>Workouts dieser Woche</CardTitle>
+                      <CardTitle>{t('workoutsThisWeek')}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       {weekWorkouts.length > 0 ? (
@@ -337,7 +339,7 @@ export default function DashboardPage() {
                             >
                               <div>
                                 <div className="font-medium">
-                                  {workout.workoutDayName || workout.originTemplateName || 'Freies Workout'}
+                                  {workout.workoutDayName || workout.originTemplateName || t('freeWorkout')}
                                 </div>
                                 <div className="text-sm text-muted-foreground mt-1">
                                   {formatDate(workout.date)}
@@ -345,14 +347,14 @@ export default function DashboardPage() {
                                 </div>
                               </div>
                               <Badge variant="secondary">
-                                {workout.exerciseCount} Übungen
+                                {t('exerciseCount', { count: workout.exerciseCount })}
                               </Badge>
                             </div>
                           ))}
                         </div>
                       ) : (
                         <p className="text-muted-foreground text-center py-8">
-                          Noch keine Workouts diese Woche
+                          {t('noWorkoutsThisWeek')}
                         </p>
                       )}
                     </CardContent>
@@ -361,7 +363,7 @@ export default function DashboardPage() {
                   {/* Nächstes geplantes Workout */}
                   <Card>
                     <CardHeader>
-                      <CardTitle>Nächstes geplantes Workout</CardTitle>
+                      <CardTitle>{t('nextPlannedWorkout')}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       {nextWorkout ? (
@@ -380,7 +382,7 @@ export default function DashboardPage() {
                             )}
                             {nextWorkout.cycleStartDate && (
                               <Badge variant="secondary" className="mb-2">
-                                Zyklus beginnt am {formatLocalDate(nextWorkout.cycleStartDate)}
+                                {t('cycleStartsOn', { date: formatLocalDate(nextWorkout.cycleStartDate) })}
                               </Badge>
                             )}
                             <div className="mt-4 pt-4 border-t">
@@ -396,13 +398,13 @@ export default function DashboardPage() {
                       ) : (
                         <div className="rounded-lg border border-dashed p-8 text-center">
                           <div className="text-muted-foreground mb-2">
-                            Kein aktiver Zyklus
+                            {t('noActiveCycle')}
                           </div>
                           <Link
                             href="/cycles"
                             className="inline-block text-sm text-primary hover:underline font-medium"
                           >
-                            Zyklus erstellen →
+                            {t('createCycleArrow')}
                           </Link>
                         </div>
                       )}
@@ -412,7 +414,7 @@ export default function DashboardPage() {
                   {/* Personal Records */}
                   <Card className="lg:col-span-2">
                     <CardHeader>
-                      <CardTitle>Persönliche Rekorde</CardTitle>
+                      <CardTitle>{t('personalRecords')}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       {prs.length > 0 ? (
@@ -426,14 +428,14 @@ export default function DashboardPage() {
                         </div>
                       ) : (
                         <p className="text-muted-foreground text-center py-8">
-                          Noch keine PRs vorhanden
+                          {t('noPersonalRecords')}
                         </p>
                       )}
                       <Link
                         href="/analytics"
                         className="block mt-4 text-center text-sm text-primary hover:underline font-medium"
                       >
-                        Alle PRs ansehen →
+                        {t('viewAllPersonalRecords')}
                       </Link>
                     </CardContent>
                   </Card>
