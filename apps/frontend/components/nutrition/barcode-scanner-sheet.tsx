@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   IconAlertTriangle,
   IconCheck,
@@ -217,6 +218,7 @@ function FoodResult({
   onOpenFood?: (food: Food) => void;
   onRescan: () => void;
 }) {
+  const t = useTranslations('BarcodeScannerSheet');
   const stops = useMemo(() => buildQuantityStops(food.portions), [food.portions]);
   const [amount, setAmount] = useState(() => {
     const index = defaultQuantityStopIndex(
@@ -235,7 +237,11 @@ function FoodResult({
   const fromOpenFoodFacts = food.source === 'OPEN_FOOD_FACTS';
   // "Eigenes" / "System" / "Open Food Facts", the same badges the Lebensmittel tab shows;
   // null for another user's food, which carries no badge anywhere in the app.
-  const sourceLabel = foodSourceLabel(food);
+  const sourceLabel = foodSourceLabel(food, {
+    own: t('sourceOwn'),
+    system: t('sourceSystem'),
+    openFoodFacts: t('sourceOpenFoodFacts'),
+  });
 
   async function log() {
     if (mode.kind !== 'log' || saving) return;
@@ -269,7 +275,7 @@ function FoodResult({
         }
       >
         Treffer ·{' '}
-        {sourceLabel === 'Eigenes' ? 'Eigenes Lebensmittel' : (sourceLabel ?? 'Lebensmittel')}
+        {food.editable ? t('ownFoodHit') : (sourceLabel ?? t('foodHit'))}
       </ResultLabel>
 
       <div className="mt-2.5 flex items-center gap-1.5">

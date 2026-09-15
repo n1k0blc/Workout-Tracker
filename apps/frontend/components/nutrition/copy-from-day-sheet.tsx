@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import {
   Drawer,
@@ -49,6 +50,7 @@ export function CopyFromDaySheet({
   date: string;
   onCopied: () => void;
 }) {
+  const t = useTranslations('CopyFromDaySheet');
   const [sourceDates, setSourceDates] = useState<string[] | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
   const [preview, setPreview] = useState<NutritionDay | null>(null);
@@ -137,8 +139,14 @@ export function CopyFromDaySheet({
         <DrawerHeader>
           <DrawerTitle>Von einem anderen Tag kopieren</DrawerTitle>
           <DrawerDescription>
-            Überträgt Einträge auf {relativeDayLabel(date, toLocalDateString(new Date()))} ·{' '}
-            {formatFullDate(date)}. Kopien sind eigenständige Schnappschüsse.
+            Überträgt Einträge auf{' '}
+            {relativeDayLabel(
+              date,
+              toLocalDateString(new Date()),
+              { today: t('today'), yesterday: t('yesterday'), tomorrow: t('tomorrow') },
+              (d) => new Intl.DateTimeFormat('de-DE', { weekday: 'long' }).format(d),
+            )}{' '}
+            · {formatFullDate(date)}. Kopien sind eigenständige Schnappschüsse.
           </DrawerDescription>
         </DrawerHeader>
 

@@ -18,6 +18,7 @@ import { Food, MealListItem, PickerItem } from '@/types';
 import {
   buildQuantityStops,
   defaultQuantityStopIndex,
+  foodSourceLabel,
   formatFactor,
   formatKcal,
   formatQuantityLabel,
@@ -419,13 +420,11 @@ function FoodPickerRow({
   onAdd: (grams: number, label: string) => void;
 }) {
   const t = useTranslations('FoodPickerSheet');
-  const sourceLabel = food.editable
-    ? t('sourceOwn')
-    : food.source === 'SEED'
-      ? t('sourceSystem')
-      : food.source === 'OPEN_FOOD_FACTS'
-        ? t('sourceOpenFoodFacts')
-        : null;
+  const sourceLabel = foodSourceLabel(food, {
+    own: t('sourceOwn'),
+    system: t('sourceSystem'),
+    openFoodFacts: t('sourceOpenFoodFacts'),
+  });
 
   return (
     <div className={cn(expanded && 'bg-muted/50')}>

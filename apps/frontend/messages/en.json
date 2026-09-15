@@ -520,5 +520,22 @@
   "FavoriteStar": {
     "add": "Add {name} to favorites",
     "remove": "Remove {name} from favorites"
+  },
+  "FoodsTab": {
+    "sourceOwn": "Own",
+    "sourceSystem": "System",
+    "sourceOpenFoodFacts": "Open Food Facts"
+  },
+  "BarcodeScannerSheet": {
+    "sourceOwn": "Own",
+    "sourceSystem": "System",
+    "sourceOpenFoodFacts": "Open Food Facts",
+    "ownFoodHit": "Own food",
+    "foodHit": "Food"
+  },
+  "CopyFromDaySheet": {
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "tomorrow": "Tomorrow"
   }
 }

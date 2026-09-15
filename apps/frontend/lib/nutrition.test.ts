@@ -213,20 +213,22 @@ describe('formatQuantityLabel', () => {
   });
 });
 
+const sourceLabels = { own: 'Eigenes', system: 'System', openFoodFacts: 'Open Food Facts' };
+
 describe('foodSourceLabel', () => {
   it('marks the current user\'s own food', () => {
-    expect(foodSourceLabel({ editable: true, source: 'USER' })).toBe('Eigenes');
+    expect(foodSourceLabel({ editable: true, source: 'USER' }, sourceLabels)).toBe('Eigenes');
   });
 
   it('marks seeded and imported foods', () => {
-    expect(foodSourceLabel({ editable: false, source: 'SEED' })).toBe('System');
-    expect(foodSourceLabel({ editable: false, source: 'OPEN_FOOD_FACTS' })).toBe(
+    expect(foodSourceLabel({ editable: false, source: 'SEED' }, sourceLabels)).toBe('System');
+    expect(foodSourceLabel({ editable: false, source: 'OPEN_FOOD_FACTS' }, sourceLabels)).toBe(
       'Open Food Facts',
     );
   });
 
   it('shows nothing for another user\'s food', () => {
-    expect(foodSourceLabel({ editable: false, source: 'USER' })).toBeNull();
+    expect(foodSourceLabel({ editable: false, source: 'USER' }, sourceLabels)).toBeNull();
   });
 });
 
@@ -467,16 +469,26 @@ describe('withFavoriteOverrides', () => {
   });
 });
 
+const dayLabels = { today: 'Heute', yesterday: 'Gestern', tomorrow: 'Morgen' };
+const formatWeekdayDe = (date: Date) =>
+  new Intl.DateTimeFormat('de-DE', { weekday: 'long', timeZone: 'Europe/Berlin' }).format(date);
+
 describe('relativeDayLabel', () => {
   it('names today, yesterday and tomorrow', () => {
-    expect(relativeDayLabel('2026-09-07', '2026-09-07')).toBe('Heute');
-    expect(relativeDayLabel('2026-09-06', '2026-09-07')).toBe('Gestern');
-    expect(relativeDayLabel('2026-09-08', '2026-09-07')).toBe('Morgen');
+    expect(relativeDayLabel('2026-09-07', '2026-09-07', dayLabels, formatWeekdayDe)).toBe('Heute');
+    expect(relativeDayLabel('2026-09-06', '2026-09-07', dayLabels, formatWeekdayDe)).toBe(
+      'Gestern',
+    );
+    expect(relativeDayLabel('2026-09-08', '2026-09-07', dayLabels, formatWeekdayDe)).toBe(
+      'Morgen',
+    );
   });
 
   it('falls back to the weekday name further out', () => {
     process.env.TZ = 'Europe/Berlin';
-    expect(relativeDayLabel('2026-09-04', '2026-09-07')).toBe('Freitag');
+    expect(relativeDayLabel('2026-09-04', '2026-09-07', dayLabels, formatWeekdayDe)).toBe(
+      'Freitag',
+    );
   });
 });
 

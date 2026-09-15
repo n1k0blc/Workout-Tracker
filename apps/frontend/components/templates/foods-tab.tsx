@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { IconBarcode, IconChevronRight, IconPlus, IconSearch } from '@tabler/icons-react';
 import { apiClient } from '@/lib/api';
 import { Food } from '@/types';
@@ -20,6 +21,7 @@ function subtitle(food: Food): string {
 }
 
 export default function FoodsTab() {
+  const t = useTranslations('FoodsTab');
   const [foods, setFoods] = useState<Food[]>([]);
   // Totals for the whole library, not the capped page the list renders (#146).
   const [totals, setTotals] = useState({ total: 0, ownTotal: 0 });
@@ -112,7 +114,11 @@ export default function FoodsTab() {
       ) : (
         <div className="divide-y rounded-lg border bg-card">
           {rows.map((food) => {
-            const badge = foodSourceLabel(food);
+            const badge = foodSourceLabel(food, {
+              own: t('sourceOwn'),
+              system: t('sourceSystem'),
+              openFoodFacts: t('sourceOpenFoodFacts'),
+            });
             return (
               <div key={food.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50">
                 <button

@@ -9,7 +9,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { addDays } from '@/lib/nutrition';
+import { addDays, relativeDayLabel } from '@/lib/nutrition';
 import { fromLocalDateString, toLocalDateString } from '@/lib/local-date';
 
 /**
@@ -28,14 +28,12 @@ export function NutritionDayBar({
   const t = useTranslations('NutritionDayBar');
   const format = useFormatter();
 
-  const relativeDayLabel =
-    date === today
-      ? t('today')
-      : date === addDays(today, -1)
-        ? t('yesterday')
-        : date === addDays(today, 1)
-          ? t('tomorrow')
-          : format.dateTime(fromLocalDateString(date), { weekday: 'long' });
+  const relativeDay = relativeDayLabel(
+    date,
+    today,
+    { today: t('today'), yesterday: t('yesterday'), tomorrow: t('tomorrow') },
+    (d) => format.dateTime(d, { weekday: 'long' }),
+  );
 
   const fullDate = format.dateTime(fromLocalDateString(date), {
     weekday: 'short',
@@ -57,7 +55,7 @@ export function NutritionDayBar({
 
       <div className="text-center">
         <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-          {relativeDayLabel}
+          {relativeDay}
         </div>
         <div className="mt-0.5 text-sm font-semibold">{fullDate}</div>
       </div>

@@ -109,17 +109,21 @@ export function formatQuantityLabel(
 }
 
 /**
- * The ownership / provenance marker shown next to a food: `"Eigenes"` for the current user's
- * own food, `"System"` for a seeded one, `"Open Food Facts"` for an imported one, and `null`
- * for another user's food (no byline, per ADR-0003).
+ * The ownership / provenance marker shown next to a food: `labels.own` for the current user's
+ * own food, `labels.system` for a seeded one, `labels.openFoodFacts` for an imported one, and
+ * `null` for another user's food (no byline, per ADR-0003). Callers supply the already-
+ * translated labels -- this stays a plain data function, not a React hook.
  */
-export function foodSourceLabel(food: {
-  editable: boolean;
-  source: 'SEED' | 'OPEN_FOOD_FACTS' | 'USER';
-}): string | null {
-  if (food.editable) return 'Eigenes';
-  if (food.source === 'SEED') return 'System';
-  if (food.source === 'OPEN_FOOD_FACTS') return 'Open Food Facts';
+export function foodSourceLabel(
+  food: {
+    editable: boolean;
+    source: 'SEED' | 'OPEN_FOOD_FACTS' | 'USER';
+  },
+  labels: { own: string; system: string; openFoodFacts: string },
+): string | null {
+  if (food.editable) return labels.own;
+  if (food.source === 'SEED') return labels.system;
+  if (food.source === 'OPEN_FOOD_FACTS') return labels.openFoodFacts;
   return null;
 }
 
@@ -322,16 +326,20 @@ export function withFavoriteOverrides<T extends { id: string; isFavorite: boolea
 }
 
 /**
- * How a day reads relative to the client's today: `"Heute"`, `"Gestern"`, `"Morgen"`, or the
- * full German weekday for anything further out.
+ * How a day reads relative to the client's today: `labels.today`, `labels.yesterday`,
+ * `labels.tomorrow`, or the locale-aware full weekday (via `formatWeekday`, typically
+ * next-intl's `useFormatter().dateTime`) for anything further out.
  */
-export function relativeDayLabel(localDate: string, today: string): string {
-  if (localDate === today) return 'Heute';
-  if (localDate === addDays(today, -1)) return 'Gestern';
-  if (localDate === addDays(today, 1)) return 'Morgen';
-  return new Intl.DateTimeFormat('de-DE', { weekday: 'long' }).format(
-    fromLocalDateString(localDate),
-  );
+export function relativeDayLabel(
+  localDate: string,
+  today: string,
+  labels: { today: string; yesterday: string; tomorrow: string },
+  formatWeekday: (date: Date) => string,
+): string {
+  if (localDate === today) return labels.today;
+  if (localDate === addDays(today, -1)) return labels.yesterday;
+  if (localDate === addDays(today, 1)) return labels.tomorrow;
+  return formatWeekday(fromLocalDateString(localDate));
 }
 
 // --- Ernährungs-Analytics (#153) --------------------------------------------------------
