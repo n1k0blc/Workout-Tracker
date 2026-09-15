@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useTranslations, useFormatter } from 'next-intl';
 import { useAuth } from '@/lib/auth-context';
 import { CycleFormData, WorkoutDayData } from './cycle-wizard';
-import { sortByCycleWeekday } from '@/lib/weekday';
+import { sortByCycleWeekday, weekdayReferenceDate } from '@/lib/weekday';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -36,6 +37,8 @@ export default function WorkoutDaysStep({
   onBack,
 }: WorkoutDaysStepProps) {
   const { user } = useAuth();
+  const t = useTranslations('WorkoutDaysStep');
+  const format = useFormatter();
 
   const [selectedDaysList, setSelectedDaysList] = useState<SelectedDay[]>(() =>
     formData.workoutDays.map((d) => ({
@@ -58,17 +61,19 @@ export default function WorkoutDaysStep({
     a.name.localeCompare(b.name)
   );
 
-  const weekdays = [
-    { value: 1, label: 'Montag' },
-    { value: 2, label: 'Dienstag' },
-    { value: 3, label: 'Mittwoch' },
-    { value: 4, label: 'Donnerstag' },
-    { value: 5, label: 'Freitag' },
-    { value: 6, label: 'Samstag' },
-    { value: 0, label: 'Sonntag' },
-  ];
+  const weekdays = [1, 2, 3, 4, 5, 6, 0].map((value) => ({
+    value,
+    label: format.dateTime(weekdayReferenceDate(value), { weekday: 'long', timeZone: 'UTC' }),
+  }));
 
-  const nameSuggestions = ['Push', 'Pull', 'Beine', 'Upper', 'Lower', 'Full Body'];
+  const nameSuggestions = [
+    t('suggestions.push'),
+    t('suggestions.pull'),
+    t('suggestions.legs'),
+    t('suggestions.upper'),
+    t('suggestions.lower'),
+    t('suggestions.fullBody'),
+  ];
 
   // Load from parent when backtracking
   useEffect(() => {
@@ -84,16 +89,16 @@ export default function WorkoutDaysStep({
   }, [formData.workoutDays]);
 
   const getWeekdayLabel = (weekday: number): string => {
-    return weekdays.find((w) => w.value === weekday)?.label || `Tag ${weekday}`;
+    return weekdays.find((w) => w.value === weekday)?.label || t('unknownWeekday', { weekday });
   };
 
   const getGymDisplay = (day: SelectedDay): string => {
     if (day.customGymName) return day.customGymName;
     if (day.plannedHomeGymId) {
       const gym = homeGyms.find((g) => g.id === day.plannedHomeGymId);
-      return gym?.name || 'Unbekannt';
+      return gym?.name || t('unknownGym');
     }
-    return 'Nicht ausgewählt';
+    return t('noGymSelected');
   };
 
   const openAddDay = () => {
@@ -165,17 +170,17 @@ export default function WorkoutDaysStep({
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-semibold text-foreground mb-2">
-          Wähle deine Trainingstage
+          {t('title')}
         </h3>
         <p className="text-sm text-muted-foreground mb-4">
-          Wähle die Wochentage aus, an denen du trainieren möchtest.
+          {t('subtitle')}
         </p>
 
         {selectedDaysList.length > 0 && (
           <div className="text-sm text-muted-foreground mb-3">
-            {selectedDaysList.length} von 7 Tagen ausgewählt
+            {t('daysSelected', { count: selectedDaysList.length })}
             {selectedDaysList.length > 6 && (
-              <span className="text-destructive ml-2 text-xs">(Mehr als 6 Tage nicht empfohlen)</span>
+              <span className="text-destructive ml-2 text-xs">{t('tooManyDaysHint')}</span>
             )}
           </div>
         )}
@@ -183,9 +188,9 @@ export default function WorkoutDaysStep({
         {selectedDaysList.length === 0 ? (
           <Card>
             <CardContent className="p-8 text-center">
-              <p className="text-muted-foreground">Noch keine Trainingstage hinzugefügt</p>
+              <p className="text-muted-foreground">{t('emptyTitle')}</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Klicke auf das + um einen Trainingstag hinzuzufügen.
+                {t('emptyHint')}
               </p>
             </CardContent>
           </Card>
@@ -211,7 +216,7 @@ export default function WorkoutDaysStep({
                         size="icon"
                         className="size-8 text-destructive hover:text-destructive"
                         onClick={() => removeDay(day.weekday)}
-                        aria-label="Entfernen"
+                        aria-label={t('remove')}
                       >
                         <IconTrash className="size-4" />
                       </Button>
@@ -229,7 +234,7 @@ export default function WorkoutDaysStep({
             onClick={openAddDay}
             disabled={selectedDaysList.length >= 7}
             className="h-14 w-14 rounded-lg p-0"
-            aria-label="Trainingstag hinzufügen"
+            aria-label={t('addDay')}
           >
             <IconPlus className="size-7" />
           </Button>
@@ -239,10 +244,10 @@ export default function WorkoutDaysStep({
       {/* Navigation */}
       <div className="flex gap-3 pt-2">
         <Button type="button" variant="outline" onClick={onBack} className="flex-1">
-          Zurück
+          {t('back')}
         </Button>
         <Button type="button" onClick={handleNext} disabled={!isValid} className="flex-1">
-          Weiter
+          {t('next')}
         </Button>
       </div>
 
@@ -251,14 +256,14 @@ export default function WorkoutDaysStep({
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {editingWeekday !== null ? 'Trainingstag bearbeiten' : 'Trainingstag hinzufügen'}
+              {editingWeekday !== null ? t('editDialog.editTitle') : t('editDialog.addTitle')}
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
             {/* Weekday chips */}
             <div>
-              <Label className="mb-2 block">Wochentag *</Label>
+              <Label className="mb-2 block">{t('editDialog.weekdayLabel')}</Label>
               <div className="flex flex-wrap gap-2">
                 {weekdays.map((w) => {
                   const used = new Set(selectedDaysList.map((d) => d.weekday));
@@ -282,16 +287,16 @@ export default function WorkoutDaysStep({
 
             {/* Name + suggestions */}
             <div>
-              <Label htmlFor="day-name">Trainingsname</Label>
+              <Label htmlFor="day-name">{t('editDialog.nameLabel')}</Label>
               <Input
                 id="day-name"
                 value={modalName}
                 onChange={(e) => setModalName(e.target.value)}
-                placeholder="z.B. Push Day"
+                placeholder={t('editDialog.namePlaceholder')}
                 className="mt-1"
               />
               <div className="mt-2">
-                <div className="text-xs text-muted-foreground mb-1">Vorschläge:</div>
+                <div className="text-xs text-muted-foreground mb-1">{t('editDialog.suggestionsLabel')}</div>
                 <div className="flex flex-wrap gap-1">
                   {nameSuggestions.map((s) => (
                     <Button
@@ -311,13 +316,13 @@ export default function WorkoutDaysStep({
 
             {/* Gym / Location - only user's home gyms, no custom option */}
             <div>
-              <Label>Fitnessstudio / Ort</Label>
+              <Label>{t('editDialog.gymLabel')}</Label>
               <select
                 value={modalGymId}
                 onChange={(e) => setModalGymId(e.target.value)}
                 className="mt-1 w-full px-3 py-2 border border-input bg-background text-sm rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
               >
-                <option value="">Bitte wählen</option>
+                <option value="">{t('editDialog.gymPlaceholder')}</option>
                 {homeGyms.map((gym) => (
                   <option key={gym.id} value={gym.id}>
                     {gym.name}
@@ -335,10 +340,10 @@ export default function WorkoutDaysStep({
                 setEditingWeekday(null);
               }}
             >
-              Abbrechen
+              {t('editDialog.cancel')}
             </Button>
             <Button onClick={handleModalSave} disabled={modalWeekday == null || !modalName.trim()}>
-              {editingWeekday !== null ? 'Speichern' : 'Hinzufügen'}
+              {editingWeekday !== null ? t('editDialog.save') : t('editDialog.add')}
             </Button>
           </DialogFooter>
         </DialogContent>

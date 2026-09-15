@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useTranslations, useFormatter } from 'next-intl';
 import { CycleFormData } from './cycle-wizard';
 import { Exercise } from '@/types';
 import type { ExerciseLog } from '@/types';
 import { apiClient } from '@/lib/api';
-import { sortByCycleWeekday } from '@/lib/weekday';
+import { sortByCycleWeekday, weekdayReferenceDate } from '@/lib/weekday';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +23,8 @@ export default function ReviewStep({
   onSubmit,
   loading,
 }: ReviewStepProps) {
+  const t = useTranslations('ReviewStep');
+  const format = useFormatter();
   const [exercises, setExercises] = useState<Exercise[]>([]);
 
   const loadExercises = async () => {
@@ -61,7 +64,7 @@ export default function ReviewStep({
       return {
         id: ex.id || `ex-${ex.exerciseId}-${idx}`,
         exerciseId: ex.exerciseId,
-        exerciseName: exercise?.name || 'Übung lädt...',
+        exerciseName: exercise?.name || t('exerciseLoading'),
         isUnilateral: ex.isUnilateral ?? exercise?.isUnilateral ?? false,
         isDoubleWeight: ex.isDoubleWeight ?? exercise?.isDoubleWeight ?? false,
         order: ex.order || idx + 1,
@@ -71,19 +74,15 @@ export default function ReviewStep({
     });
   };
 
-  const getWeekday = (weekday: number): string => {
-    const days = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-    return days[weekday];
-  };
+  const getWeekday = (weekday: number): string =>
+    format.dateTime(weekdayReferenceDate(weekday), { weekday: 'long', timeZone: 'UTC' });
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return new Intl.DateTimeFormat('de-DE', {
+  const formatDate = (dateStr: string) =>
+    format.dateTime(new Date(dateStr), {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
-    }).format(date);
-  };
+    });
 
   const totalExercises = formData.workoutDays.reduce(
     (sum, day) => sum + day.blueprint.exercises.length,
@@ -98,33 +97,33 @@ export default function ReviewStep({
       <Card>
         <CardContent className="p-6">
           <h3 className="text-lg font-semibold text-foreground mb-4">
-            Zusammenfassung
+            {t('summary')}
           </h3>
           <div className="space-y-3 text-sm">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Zyklus-Name:</span>
+              <span className="text-muted-foreground">{t('cycleNameLabel')}</span>
               <span className="font-medium text-foreground">{formData.name}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Dauer:</span>
+              <span className="text-muted-foreground">{t('durationLabel')}</span>
               <span className="font-medium text-foreground">
-                {formData.duration} Wochen
+                {t('durationWeeks', { count: formData.duration })}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Start-Datum:</span>
+              <span className="text-muted-foreground">{t('startDateLabel')}</span>
               <span className="font-medium text-foreground">
                 {formatDate(formData.startDate)}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Trainingstage:</span>
+              <span className="text-muted-foreground">{t('workoutDaysLabel')}</span>
               <span className="font-medium text-foreground">
                 {formData.workoutDays.length}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Gesamte Übungen:</span>
+              <span className="text-muted-foreground">{t('totalExercisesLabel')}</span>
               <span className="font-medium text-foreground">
                 {totalExercises}
               </span>
@@ -160,7 +159,7 @@ export default function ReviewStep({
               </div>
             ) : (
               <p className="text-muted-foreground text-center py-4">
-                Keine Übungen definiert
+                {t('noExercises')}
               </p>
             )}
           </CardContent>
@@ -176,7 +175,7 @@ export default function ReviewStep({
           disabled={loading}
           className="flex-1"
         >
-          Zurück
+          {t('back')}
         </Button>
         <Button
           type="button"
@@ -184,7 +183,7 @@ export default function ReviewStep({
           disabled={loading}
           className="flex-1"
         >
-          {loading ? 'Wird erstellt...' : 'Zyklus erstellen'}
+          {loading ? t('creating') : t('createCycle')}
         </Button>
       </div>
     </div>

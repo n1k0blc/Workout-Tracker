@@ -1,6 +1,7 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { ProtectedRoute } from '@/components/protected-route';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -16,6 +17,7 @@ type TabId = (typeof TABS)[number];
 
 export default function TemplatesPage() {
   const router = useRouter();
+  const t = useTranslations('TemplatesPage');
   const searchParams = useSearchParams();
   const requested = searchParams.get('tab');
   const tab: TabId = TABS.includes(requested as TabId) ? (requested as TabId) : 'exercises';
@@ -27,9 +29,9 @@ export default function TemplatesPage() {
           <div className="px-4 py-6 sm:px-0 space-y-6">
             {/* Header */}
             <div>
-              <h2 className="text-2xl font-bold text-foreground">Vorlagen</h2>
+              <h2 className="text-2xl font-bold text-foreground">{t('title')}</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Verwalte Übungen, Workouts und Ernährung
+                {t('subtitle')}
               </p>
             </div>
 
@@ -48,16 +50,16 @@ export default function TemplatesPage() {
                 className="w-full justify-start gap-1 overflow-x-auto border-b pb-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               >
                 <TabsTrigger value="exercises" className="shrink-0">
-                  Übungen
+                  {t('tabs.exercises')}
                 </TabsTrigger>
                 <TabsTrigger value="templates" className="shrink-0">
-                  Workouts
+                  {t('tabs.workouts')}
                 </TabsTrigger>
                 <TabsTrigger value="foods" className="shrink-0">
-                  Lebensmittel
+                  {t('tabs.foods')}
                 </TabsTrigger>
                 <TabsTrigger value="meals" className="shrink-0">
-                  Mahlzeiten
+                  {t('tabs.meals')}
                 </TabsTrigger>
               </TabsList>
 

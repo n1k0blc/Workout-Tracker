@@ -4,6 +4,7 @@ import { ProtectedRoute } from '@/components/protected-route';
 import { useParams } from 'next/navigation';
 import { useRouter } from '@/i18n/navigation';
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslations, useFormatter } from 'next-intl';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { WorkoutCycle, Exercise, WorkoutExercise, SetType } from '@/types';
@@ -53,12 +54,14 @@ import { withArrayPositionOrder } from '@/lib/workout-order';
 import { plannedSideFields } from '@/lib/set-sides';
 import { addPlannedSet } from '@/lib/planned-sets';
 import type { PlannedSet } from '@/types';
-import { WEEKDAY_NAMES } from '@/lib/weekday';
+import { weekdayReferenceDate } from '@/lib/weekday';
 
 export default function EditBlueprintPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
+  const t = useTranslations('EditBlueprintPage');
+  const format = useFormatter();
   const cycleId = params.id as string;
   const workoutDayId = params.workoutDayId as string;
 
@@ -135,7 +138,7 @@ export default function EditBlueprintPage() {
       }
     } catch (error) {
       console.error('Failed to load data:', error);
-      alert('Fehler beim Laden der Daten');
+      alert(t('alerts.loadFailed'));
       router.push('/cycles');
     } finally {
       setLoading(false);
@@ -218,7 +221,7 @@ export default function EditBlueprintPage() {
 
   const handleSave = async () => {
     if (!workoutDayName.trim()) {
-      alert('Bitte gib einen Workout-Namen ein');
+      alert(t('alerts.nameRequired'));
       return;
     }
 
@@ -266,7 +269,7 @@ export default function EditBlueprintPage() {
       router.push('/cycles');
     } catch (error) {
       console.error('Failed to save blueprint:', error);
-      alert('Fehler beim Speichern des Blueprints');
+      alert(t('alerts.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -286,12 +289,12 @@ export default function EditBlueprintPage() {
 
   const handleSaveAsTemplate = async () => {
     if (!templateName.trim()) {
-      alert('Bitte gib einen Vorlagen-Namen ein');
+      alert(t('alerts.templateNameRequired'));
       return;
     }
 
     if (exercises.length === 0) {
-      alert('Füge mindestens eine Übung hinzu');
+      alert(t('alerts.atLeastOneExercise'));
       return;
     }
 
@@ -315,16 +318,16 @@ export default function EditBlueprintPage() {
       };
 
       await apiClient.createWorkoutTemplate(templateData);
-      alert('Vorlage erfolgreich erstellt!');
+      alert(t('alerts.templateCreated'));
       setShowSaveTemplateModal(false);
       setTemplateName('');
     } catch (error: unknown) {
       console.error('Failed to save template:', error);
       const err = error as { response?: { status?: number } };
       if (err.response?.status === 409) {
-        alert('Eine Vorlage mit diesem Namen existiert bereits');
+        alert(t('alerts.templateNameExists'));
       } else {
-        alert('Fehler beim Speichern der Vorlage');
+        alert(t('alerts.templateSaveFailed'));
       }
     } finally {
       setSavingTemplate(false);
@@ -370,7 +373,7 @@ export default function EditBlueprintPage() {
     return (
       <ProtectedRoute>
         <div className="min-h-screen bg-background flex items-center justify-center">
-          <div className="text-lg text-muted-foreground">Lädt Blueprint...</div>
+          <div className="text-lg text-muted-foreground">{t('loading')}</div>
         </div>
       </ProtectedRoute>
     );
@@ -384,7 +387,7 @@ export default function EditBlueprintPage() {
             {/* Header */}
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-foreground">
-                Blueprint bearbeiten
+                {t('title')}
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 {cycle?.name}
@@ -395,42 +398,40 @@ export default function EditBlueprintPage() {
             <Card className="mb-6">
               <CardContent className="p-6">
                 <h3 className="text-lg font-medium text-foreground mb-4">
-                  Workout-Einstellungen
+                  {t('settings.title')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <Label className="block text-sm font-medium text-foreground mb-2">
-                    Workout-Name
+                    {t('settings.nameLabel')}
                   </Label>
                   <Input
                     type="text"
                     value={workoutDayName}
                     onChange={(e) => setWorkoutDayName(e.target.value)}
                     className="w-full"
-                    placeholder="z.B. Push Day, Pull Day, Legs"
+                    placeholder={t('settings.namePlaceholder')}
                   />
                 </div>
                 <div>
                   <Label className="block text-sm font-medium text-foreground mb-2">
-                    Geplanter Wochentag
+                    {t('settings.weekdayLabel')}
                   </Label>
                   <select
                     value={plannedWeekday}
                     onChange={(e) => setPlannedWeekday(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring"
                   >
-                    <option value={1}>Montag</option>
-                    <option value={2}>Dienstag</option>
-                    <option value={3}>Mittwoch</option>
-                    <option value={4}>Donnerstag</option>
-                    <option value={5}>Freitag</option>
-                    <option value={6}>Samstag</option>
-                    <option value={0}>Sonntag</option>
+                    {[1, 2, 3, 4, 5, 6, 0].map((value) => (
+                      <option key={value} value={value}>
+                        {format.dateTime(weekdayReferenceDate(value), { weekday: 'long', timeZone: 'UTC' })}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
                   <Label className="block text-sm font-medium text-foreground mb-2">
-                    Geplantes Gym
+                    {t('settings.gymLabel')}
                   </Label>
                   <select
                     value={plannedHomeGymId}
@@ -446,7 +447,7 @@ export default function EditBlueprintPage() {
                           </option>
                         ))
                     ) : (
-                      <option value="">Keine Gyms verfügbar</option>
+                      <option value="">{t('settings.noGyms')}</option>
                     )}
                   </select>
                 </div>
@@ -457,7 +458,7 @@ export default function EditBlueprintPage() {
             {/* Exercise List Header */}
             <div className="mb-4">
               <h3 className="text-lg font-medium text-foreground">
-                Übungen
+                {t('exercises')}
               </h3>
             </div>
 
@@ -466,14 +467,14 @@ export default function EditBlueprintPage() {
               <Card>
                 <CardContent className="p-8 text-center">
                   <p className="text-muted-foreground mb-4">
-                    Noch keine Übungen hinzugefügt
+                    {t('emptyExercises')}
                   </p>
                   {/* Large centered + as primary CTA (consistent with active workout + wizard step 3) */}
                   <Button
                     variant="outline"
                     onClick={openAddModal}
                     className="h-16 w-16 rounded-lg p-0"
-                    aria-label="Erste Übung hinzufügen"
+                    aria-label={t('addFirstExercise')}
                   >
                     <IconPlus className="size-8" />
                   </Button>
@@ -547,7 +548,7 @@ export default function EditBlueprintPage() {
                     variant="outline"
                     onClick={openAddModal}
                     className="h-14 w-14 rounded-lg p-0"
-                    aria-label="Übung hinzufügen"
+                    aria-label={t('addExercise')}
                   >
                     <IconPlus className="size-7" />
                   </Button>
@@ -563,7 +564,7 @@ export default function EditBlueprintPage() {
                 disabled={saving}
                 className="w-full mt-2"
               >
-                Als Vorlage speichern
+                {t('saveAsTemplate')}
               </Button>
             )}
 
@@ -575,14 +576,14 @@ export default function EditBlueprintPage() {
                 disabled={saving}
                 className="flex-1"
               >
-                Abbrechen
+                {t('cancel')}
               </Button>
               <Button
                 onClick={handleSave}
                 disabled={saving || exercises.length === 0}
                 className="flex-1"
               >
-                {saving ? 'Speichert...' : 'Speichern'}
+                {saving ? t('saving') : t('save')}
               </Button>
             </div>
           </div>
@@ -604,17 +605,16 @@ export default function EditBlueprintPage() {
       }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Blueprint als Vorlage speichern</DialogTitle>
+            <DialogTitle>{t('saveTemplateDialog.title')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-muted-foreground">
-              Gib einen Namen für deine Workout-Vorlage ein. Diese Vorlage kannst du
-              später wiederverwenden oder direkt als Workout starten.
+              {t('saveTemplateDialog.description')}
             </p>
             <Input
               value={templateName}
               onChange={(e) => setTemplateName(e.target.value)}
-              placeholder="z.B. Mein Push Workout"
+              placeholder={t('saveTemplateDialog.namePlaceholder')}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !savingTemplate) {
                   handleSaveAsTemplate();
@@ -632,13 +632,13 @@ export default function EditBlueprintPage() {
               }}
               disabled={savingTemplate}
             >
-              Abbrechen
+              {t('saveTemplateDialog.cancel')}
             </Button>
             <Button
               onClick={handleSaveAsTemplate}
               disabled={savingTemplate || !templateName.trim()}
             >
-              {savingTemplate ? 'Speichert...' : 'Speichern'}
+              {savingTemplate ? t('saveTemplateDialog.saving') : t('saveTemplateDialog.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -649,17 +649,20 @@ export default function EditBlueprintPage() {
       <AlertDialog open={!!swapConflict} onOpenChange={(open) => !open && setSwapConflict(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Tage tauschen?</AlertDialogTitle>
+            <AlertDialogTitle>{t('swapDialog.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              {WEEKDAY_NAMES[plannedWeekday]} ist für &quot;{swapConflict?.name}&quot; belegt. Tage tauschen?
+              {t('swapDialog.description', {
+                weekday: format.dateTime(weekdayReferenceDate(plannedWeekday), { weekday: 'long', timeZone: 'UTC' }),
+                name: swapConflict?.name ?? '',
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={saving}>
-              Abbrechen
+              {t('cancel')}
             </AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmSwap} disabled={saving}>
-              Tauschen
+              {t('swapDialog.confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

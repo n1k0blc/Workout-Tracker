@@ -8,17 +8,6 @@ export function weekdayReferenceDate(weekday: number): Date {
   return new Date(Date.UTC(2023, 0, 1 + weekday));
 }
 
-/** `weekday` is 0 = Sunday .. 6 = Saturday, matching `Date.getDay()`. Mirrors the backend's `WEEKDAY_NAMES`. */
-export const WEEKDAY_NAMES = [
-  'Sonntag',
-  'Montag',
-  'Dienstag',
-  'Mittwoch',
-  'Donnerstag',
-  'Freitag',
-  'Samstag',
-];
-
 /**
  * A cycle's own week starts on its `startDate`'s weekday, not on Monday -- days sort by
  * their distance from that weekday so a Sunday-anchored cycle reads Sunday, Monday, Friday

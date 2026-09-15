@@ -3,7 +3,9 @@
 import { ProtectedRoute } from '@/components/protected-route';
 import { useRouter } from '@/i18n/navigation';
 import { useState, useEffect } from 'react';
+import { useTranslations, useFormatter } from 'next-intl';
 import { apiClient } from '@/lib/api';
+import { weekdayReferenceDate } from '@/lib/weekday';
 import { WorkoutCycle } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,6 +29,8 @@ import {
 
 export default function CyclesPage() {
   const router = useRouter();
+  const t = useTranslations('CyclesPage');
+  const format = useFormatter();
   const [cycles, setCycles] = useState<WorkoutCycle[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -59,13 +63,13 @@ export default function CyclesPage() {
       const hasActiveCycle = data.some((c) => c.status === 'ACTIVE');
       
       if (hasActiveCycle) {
-        alert('Es existiert bereits ein aktiver Zyklus. Bitte beende diesen zuerst.');
+        alert(t('alerts.activeCycleExists'));
       } else {
         router.push('/cycles/new');
       }
     } catch (error) {
       console.error('Failed to check active cycles:', error);
-      alert('Fehler beim Prüfen der aktiven Zyklen');
+      alert(t('alerts.checkFailed'));
     } finally {
       setCreatingNew(false);
     }
@@ -79,7 +83,7 @@ export default function CyclesPage() {
       setCompleteConfirm(null);
     } catch (error) {
       console.error('Failed to complete cycle:', error);
-      alert('Fehler beim Beenden des Zyklus');
+      alert(t('alerts.completeFailed'));
     } finally {
       setCompleting(null);
     }
@@ -97,19 +101,15 @@ export default function CyclesPage() {
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return new Intl.DateTimeFormat('de-DE', {
+  const formatDate = (dateStr: string) =>
+    format.dateTime(new Date(dateStr), {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
-    }).format(date);
-  };
+    });
 
-  const getWeekday = (weekday: number): string => {
-    const days = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
-    return days[weekday];
-  };
+  const getWeekday = (weekday: number): string =>
+    format.dateTime(weekdayReferenceDate(weekday), { weekday: 'short', timeZone: 'UTC' });
 
   const activeCycles = cycles.filter((c) => c.status === 'ACTIVE');
   const completedCycles = cycles.filter((c) => c.status === 'COMPLETED');
@@ -124,10 +124,10 @@ export default function CyclesPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-2xl font-bold text-foreground">
-                    Trainingszyklen
+                    {t('title')}
                   </h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Verwalte deine Trainingszyklen und Blueprints
+                    {t('subtitle')}
                   </p>
                 </div>
                 <Button
@@ -135,14 +135,14 @@ export default function CyclesPage() {
                   disabled={creatingNew}
                 >
                   <IconPlus className="mr-2 size-4" />
-                  {creatingNew ? 'Prüfe...' : 'Neuer Zyklus'}
+                  {creatingNew ? t('checking') : t('newCycle')}
                 </Button>
               </div>
 
               {/* Cycles List */}
               {loading ? (
                 <div className="flex items-center justify-center py-12">
-                  <div className="text-lg text-muted-foreground">Lädt Zyklen...</div>
+                  <div className="text-lg text-muted-foreground">{t('loading')}</div>
                 </div>
               ) : cycles.length > 0 ? (
                 <div className="space-y-6">
@@ -150,7 +150,7 @@ export default function CyclesPage() {
                   {activeCycles.length > 0 && (
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold text-foreground">
-                        Aktive Zyklen
+                        {t('activeCycles')}
                       </h3>
                       {activeCycles.map((cycle) => (
                         <Card
@@ -165,14 +165,14 @@ export default function CyclesPage() {
                                   <h3 className="text-lg font-semibold text-foreground">
                                     {cycle.name}
                                   </h3>
-                                  <Badge variant="default">Aktiv</Badge>
+                                  <Badge variant="default">{t('active')}</Badge>
                                 </div>
                                 <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
-                                  <span>{cycle.duration} Wochen</span>
+                                  <span>{t('durationWeeks', { count: cycle.duration })}</span>
                                   <span>•</span>
-                                  <span>Start: {formatDate(cycle.startDate)}</span>
+                                  <span>{t('startLabel', { date: formatDate(cycle.startDate) })}</span>
                                   <span>•</span>
-                                  <span>{cycle.workoutDays.length} Trainingstage</span>
+                                  <span>{t('workoutDaysCount', { count: cycle.workoutDays.length })}</span>
                                 </div>
                               </div>
                               <div className="flex gap-1">
@@ -185,8 +185,8 @@ export default function CyclesPage() {
                                   }}
                                   disabled={completing === cycle.id}
                                   className="hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-950"
-                                  title="Zyklus beenden"
-                                  aria-label="Zyklus beenden"
+                                  title={t('completeCycle')}
+                                  aria-label={t('completeCycle')}
                                 >
                                   <IconCheck className="size-5" />
                                 </Button>
@@ -198,8 +198,8 @@ export default function CyclesPage() {
                                     setDeleteConfirm(cycle.id);
                                   }}
                                   className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                  title="Zyklus löschen"
-                                  aria-label="Zyklus löschen"
+                                  title={t('deleteCycle')}
+                                  aria-label={t('deleteCycle')}
                                 >
                                   <IconTrash className="size-5" />
                                 </Button>
@@ -231,7 +231,7 @@ export default function CyclesPage() {
                                     {day.blueprint && (
                                       <div className="flex items-center justify-between">
                                         <div className="text-xs text-muted-foreground">
-                                          {day.blueprint.exercises.length} Übungen
+                                          {t('exercisesCount', { count: day.blueprint.exercises.length })}
                                         </div>
                                         <IconChevronRight className="size-4 text-muted-foreground" />
                                       </div>
@@ -256,7 +256,7 @@ export default function CyclesPage() {
                         <IconChevronRight
                           className={`size-5 transition-transform ${showCompleted ? 'rotate-90' : ''}`}
                         />
-                        Abgeschlossene Zyklen ({completedCycles.length})
+                        {t('completedCycles', { count: completedCycles.length })}
                       </button>
 
                       {showCompleted && (
@@ -274,23 +274,23 @@ export default function CyclesPage() {
                                       <h3 className="text-lg font-semibold text-foreground">
                                         {cycle.name}
                                       </h3>
-                                      <Badge variant="secondary">Abgeschlossen</Badge>
+                                      <Badge variant="secondary">{t('completed')}</Badge>
                                     </div>
                                     <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
-                                      <span>{cycle.duration} Wochen</span>
+                                      <span>{t('durationWeeks', { count: cycle.duration })}</span>
                                       <span>•</span>
-                                      <span>Start: {formatDate(cycle.startDate)}</span>
+                                      <span>{t('startLabel', { date: formatDate(cycle.startDate) })}</span>
                                       {cycle.completedAt && (
                                         <>
                                           <span>•</span>
                                           <span>
-                                            Beendet: {formatDate(cycle.completedAt)}
+                                            {t('completedLabel', { date: formatDate(cycle.completedAt) })}
                                           </span>
                                         </>
                                       )}
                                       <span>•</span>
                                       <span>
-                                        {cycle.workoutDays.length} Trainingstage
+                                        {t('workoutDaysCount', { count: cycle.workoutDays.length })}
                                       </span>
                                     </div>
                                   </div>
@@ -302,8 +302,8 @@ export default function CyclesPage() {
                                       setDeleteConfirm(cycle.id);
                                     }}
                                     className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                    title="Zyklus löschen"
-                                    aria-label="Zyklus löschen"
+                                    title={t('deleteCycle')}
+                                    aria-label={t('deleteCycle')}
                                   >
                                     <IconTrash className="size-5" />
                                   </Button>
@@ -327,7 +327,7 @@ export default function CyclesPage() {
                                         </div>
                                         {day.blueprint && (
                                           <div className="text-xs text-muted-foreground">
-                                            {day.blueprint.exercises.length} Übungen
+                                            {t('exercisesCount', { count: day.blueprint.exercises.length })}
                                           </div>
                                         )}
                                       </div>
@@ -346,11 +346,10 @@ export default function CyclesPage() {
                 <Card>
                   <CardContent className="p-12 text-center">
                     <h3 className="text-lg font-semibold text-foreground mb-2">
-                      Noch keine Zyklen vorhanden
+                      {t('emptyTitle')}
                     </h3>
                     <p className="text-muted-foreground mb-6">
-                      Erstelle deinen ersten Trainingszyklus, um strukturiert zu
-                      trainieren.
+                      {t('emptyDescription')}
                     </p>
                     <Button
                       onClick={handleCreateNewCycle}
@@ -358,7 +357,7 @@ export default function CyclesPage() {
                       size="lg"
                     >
                       <IconPlus className="mr-2 size-4" />
-                      Zyklus erstellen
+                      {t('createCycle')}
                     </Button>
                   </CardContent>
                 </Card>
@@ -372,21 +371,21 @@ export default function CyclesPage() {
         <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Zyklus löschen?</AlertDialogTitle>
+              <AlertDialogTitle>{t('deleteDialog.title')}</AlertDialogTitle>
               <AlertDialogDescription>
-                Bist du sicher, dass du diesen Zyklus löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden.
+                {t('deleteDialog.description')}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={deleting}>
-                Abbrechen
+                {t('cancel')}
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => deleteConfirm && handleDeleteCycle(deleteConfirm)}
                 disabled={deleting}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
-                {deleting ? 'Wird gelöscht...' : 'Löschen'}
+                {deleting ? t('deleteDialog.deleting') : t('deleteDialog.confirm')}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -396,20 +395,20 @@ export default function CyclesPage() {
         <AlertDialog open={!!completeConfirm} onOpenChange={(open) => !open && setCompleteConfirm(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Zyklus vorzeitig beenden?</AlertDialogTitle>
+              <AlertDialogTitle>{t('completeDialog.title')}</AlertDialogTitle>
               <AlertDialogDescription>
-                Möchtest du diesen Zyklus wirklich vorzeitig beenden? Der Zyklus wird als abgeschlossen markiert.
+                {t('completeDialog.description')}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={completing === completeConfirm}>
-                Abbrechen
+                {t('cancel')}
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => completeConfirm && handleCompleteCycle(completeConfirm)}
                 disabled={completing === completeConfirm}
               >
-                {completing === completeConfirm ? 'Beende...' : 'Beenden'}
+                {completing === completeConfirm ? t('completeDialog.completing') : t('completeDialog.confirm')}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

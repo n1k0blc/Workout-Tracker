@@ -4,6 +4,7 @@ import { ProtectedRoute } from '@/components/protected-route';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useRouter } from '@/i18n/navigation';
 import { useState, useEffect } from 'react';
+import { useTranslations, useLocale, useFormatter } from 'next-intl';
 import { apiClient } from '@/lib/api';
 import { useExerciseLabels } from '@/hooks/useExerciseLabels';
 import {
@@ -53,6 +54,9 @@ export default function CycleDetailPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = useTranslations('CycleDetailPage');
+  const locale = useLocale();
+  const format = useFormatter();
   const cycleId = params.id as string;
   const showCelebration = searchParams.get('celebration') === 'true';
 
@@ -239,8 +243,8 @@ export default function CycleDetailPage() {
     equipment?: Equipment
   ): string => {
     const viewNames: Record<string, string> = {
-      volume: 'Volumen', rir: 'RIR', duration: 'Dauer',
-      restTime: 'Pause', reps: 'Wdh', sets: 'Sätze', intensity: 'Intensität',
+      volume: t('metrics.volume'), rir: t('metrics.rir'), duration: t('metrics.duration'),
+      restTime: t('metrics.restTime'), reps: t('metrics.reps'), sets: t('metrics.sets'), intensity: t('metrics.intensity'),
     };
 
     const parts = [viewNames[view] || view];
@@ -257,8 +261,8 @@ export default function CycleDetailPage() {
       rir: { unit: 'RIR', yAxisId: 'left' },
       duration: { unit: 'min', yAxisId: 'left' },
       restTime: { unit: 's', yAxisId: 'left' },
-      reps: { unit: 'Wdh', yAxisId: 'left' },
-      sets: { unit: 'Sätze', yAxisId: 'left' },
+      reps: { unit: t('metrics.reps'), yAxisId: 'left' },
+      sets: { unit: t('metrics.sets'), yAxisId: 'left' },
       intensity: { unit: '%', yAxisId: 'left' },
     };
     return configs[view] || { unit: '', yAxisId: 'left' };
@@ -466,25 +470,23 @@ export default function CycleDetailPage() {
   };
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
-  const formatVolume = (volume: number): string => {
-    return new Intl.NumberFormat('de-DE').format(Math.round(volume));
-  };
+  const formatVolume = (volume: number): string => format.number(Math.round(volume));
 
   const formatDuration = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    
+
     if (hours > 0) {
-      return `${hours}h ${minutes}min`;
+      return t('durationHoursMinutes', { hours, minutes });
     }
-    return `${minutes} min`;
+    return t('durationMinutes', { minutes });
   };
 
   if (loading) {
     return (
       <ProtectedRoute>
         <div className="min-h-screen bg-background flex items-center justify-center">
-          <div className="text-lg text-muted-foreground">Lädt Zyklusdetails...</div>
+          <div className="text-lg text-muted-foreground">{t('loading')}</div>
         </div>
       </ProtectedRoute>
     );
@@ -494,7 +496,7 @@ export default function CycleDetailPage() {
     return (
       <ProtectedRoute>
         <div className="min-h-screen bg-background flex items-center justify-center">
-          <div className="text-lg text-muted-foreground">Zyklus nicht gefunden</div>
+          <div className="text-lg text-muted-foreground">{t('notFound')}</div>
         </div>
       </ProtectedRoute>
     );
@@ -524,7 +526,7 @@ export default function CycleDetailPage() {
                 className="flex items-center gap-2 mb-4 px-0 text-muted-foreground hover:text-foreground"
               >
                 <IconArrowLeft className="size-4" />
-                Zurück zu Zyklen
+                {t('backToCycles')}
               </Button>
 
               <div className="flex items-center justify-between">
@@ -534,23 +536,23 @@ export default function CycleDetailPage() {
                       {cycleDetails.name}
                     </h1>
                     <span
-                      className={`px-3 py-1 rounded-full text-sm font-semibold ${ 
+                      className={`px-3 py-1 rounded-full text-sm font-semibold ${
                         cycleDetails.status === 'ACTIVE'
                           ? 'bg-foreground text-background'
                           : 'bg-muted text-muted-foreground'
                       }`}
                     >
-                      {cycleDetails.status === 'ACTIVE' ? 'Aktiv' : 'Abgeschlossen'}
+                      {cycleDetails.status === 'ACTIVE' ? t('active') : t('completed')}
                     </span>
                   </div>
                   <div className="flex items-center gap-2 mt-2 text-muted-foreground">
                     <IconCalendar className="size-4" />
                     <span>
-                      {formatDate(cycleDetails.startDate)} - {formatDate(cycleDetails.endDate)}
+                      {formatDate(cycleDetails.startDate, locale)} - {formatDate(cycleDetails.endDate, locale)}
                     </span>
                     {cycleDetails.completedAt && (
                       <span className="ml-2 text-sm">
-                        (Beendet: {formatDate(cycleDetails.completedAt)})
+                        {t('completedLabel', { date: formatDate(cycleDetails.completedAt, locale) })}
                       </span>
                     )}
                   </div>
@@ -564,7 +566,7 @@ export default function CycleDetailPage() {
               {cycleDetails.status === 'ACTIVE' && cycleDetails.currentWeek && cycleDetails.totalWeeks && (
                 <div className="bg-card border rounded-lg p-6">
                   <div className="text-sm font-medium text-muted-foreground mb-4">
-                    Fortschritt
+                    {t('progress')}
                   </div>
                   <div className="flex justify-center">
                     <CircularProgress
@@ -580,21 +582,21 @@ export default function CycleDetailPage() {
               <div className="bg-card border rounded-lg p-6">
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-sm font-medium text-muted-foreground">
-                    Gesamtvolumen
+                    {t('totalVolume')}
                   </div>
                   <IconTrendingUp className="size-5 text-muted-foreground" />
                 </div>
                 <div className="text-3xl font-bold text-foreground">
                   {formatVolume(cycleDetails.totalVolume)}
                 </div>
-                <div className="text-sm text-muted-foreground mt-1">kg bewegt</div>
+                <div className="text-sm text-muted-foreground mt-1">{t('kgMoved')}</div>
               </div>
 
               {/* Workout Count */}
               <div className="bg-card border rounded-lg p-6">
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-sm font-medium text-muted-foreground">
-                    Workouts
+                    {t('workouts')}
                   </div>
                   <IconBarbell className="size-5 text-muted-foreground" />
                 </div>
@@ -618,14 +620,14 @@ export default function CycleDetailPage() {
               <div className="bg-card border rounded-lg p-6">
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-sm font-medium text-muted-foreground">
-                    Personal Records
+                    {t('personalRecords')}
                   </div>
                   <IconTrophy className="size-5 text-muted-foreground" />
                 </div>
                 <div className="text-3xl font-bold text-foreground">
                   {personalRecords.length}
                 </div>
-                <div className="text-sm text-muted-foreground mt-1">neue PRs</div>
+                <div className="text-sm text-muted-foreground mt-1">{t('newPRs')}</div>
               </div>
             </div>
 
@@ -634,10 +636,10 @@ export default function CycleDetailPage() {
               {/* Analytics Header */}
               <div>
                 <h2 className="text-2xl font-semibold text-foreground mb-2">
-                  Statistiken
+                  {t('stats')}
                 </h2>
                 <p className="text-sm text-muted-foreground">
-                  Analysiere deine Performance während dieses Zyklus
+                  {t('statsSubtitle')}
                 </p>
               </div>
 
@@ -646,27 +648,27 @@ export default function CycleDetailPage() {
                 {/* 1. Gym as Dropdown (first as requested) */}
                 <div>
                   <label className="text-sm font-medium text-muted-foreground mb-1.5 block">
-                    Gym
+                    {t('gym')}
                   </label>
                   <select
                     value={gymFilter}
                     onChange={(e) => setGymFilter(e.target.value)}
                     className="w-full px-3 py-2 border border-input bg-background rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
-                    <option value="alle">Alle</option>
+                    <option value="alle">{t('all')}</option>
                     {homeGyms.map((gym) => (
                       <option key={gym.id} value={gym.id}>
                         {gym.name}
                       </option>
                     ))}
-                    <option value="andere">Andere</option>
+                    <option value="andere">{t('otherGymOption')}</option>
                   </select>
                 </div>
 
                 {/* 2. Aggregation (Tage / Wochen) - directly after Gym */}
                 <div>
                   <label className="text-sm font-medium text-muted-foreground mb-1.5 block">
-                    Ansicht
+                    {t('view')}
                   </label>
                   <div className="flex gap-2">
                     <Button
@@ -674,14 +676,14 @@ export default function CycleDetailPage() {
                       size="sm"
                       onClick={() => setAggregationMode('day')}
                     >
-                      Tage
+                      {t('days')}
                     </Button>
                     <Button
                       variant={aggregationMode === 'week' ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setAggregationMode('week')}
                     >
-                      Wochen
+                      {t('weeks')}
                     </Button>
                   </div>
                 </div>
@@ -690,7 +692,7 @@ export default function CycleDetailPage() {
                 {/* Views Filter */}
                 <div>
                   <label className="text-sm font-medium text-muted-foreground mb-1.5 block">
-                    Ansichten (max. 2 für Vergleich)
+                    {t('viewsMax')}
                   </label>
                   <div className="flex flex-wrap gap-2">
                     <Button
@@ -698,51 +700,51 @@ export default function CycleDetailPage() {
                       size="sm"
                       onClick={() => toggleView('volume')}
                     >
-                      Volumen
+                      {t('metrics.volume')}
                     </Button>
                     <Button
                       variant={selectedViews.includes('rir') ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => toggleView('rir')}
                     >
-                      RIR
+                      {t('metrics.rir')}
                     </Button>
                     <Button
                       variant={selectedViews.includes('duration') ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => toggleView('duration')}
                       disabled={!selectedMuscles.includes('ALL') || !selectedEquipment.includes('ALL')}
-                      title={!selectedMuscles.includes('ALL') || !selectedEquipment.includes('ALL') ? 'Dauer nur mit Alle/Alle verfügbar' : ''}
+                      title={!selectedMuscles.includes('ALL') || !selectedEquipment.includes('ALL') ? t('durationDisabledHint') : ''}
                     >
-                      Dauer
+                      {t('metrics.duration')}
                     </Button>
                     <Button
                       variant={selectedViews.includes('restTime') ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => toggleView('restTime')}
                     >
-                      Satzpause
+                      {t('metrics.restTime')}
                     </Button>
                     <Button
                       variant={selectedViews.includes('reps') ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => toggleView('reps')}
                     >
-                      Wiederholungen
+                      {t('metrics.reps')}
                     </Button>
                     <Button
                       variant={selectedViews.includes('sets') ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => toggleView('sets')}
                     >
-                      Sätze
+                      {t('metrics.sets')}
                     </Button>
                     <Button
                       variant={selectedViews.includes('intensity') ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => toggleView('intensity')}
                     >
-                      Intensität
+                      {t('metrics.intensity')}
                     </Button>
                   </div>
                 </div>
@@ -750,7 +752,7 @@ export default function CycleDetailPage() {
                 {/* Muscle Group Filter */}
                 <div>
                   <label className="text-sm font-medium text-muted-foreground mb-1.5 block">
-                    Muskelgruppe
+                    {t('muscleGroup')}
                   </label>
                   <div className="flex flex-wrap gap-2">
                     <Button
@@ -758,7 +760,7 @@ export default function CycleDetailPage() {
                       size="sm"
                       onClick={() => toggleMuscle('ALL')}
                     >
-                      Alle
+                      {t('all')}
                     </Button>
                     {[
                       MuscleGroup.ABDOMEN,
@@ -789,7 +791,7 @@ export default function CycleDetailPage() {
                 {/* Equipment Filter */}
                 <div>
                   <label className="text-sm font-medium text-muted-foreground mb-1.5 block">
-                    Equipment
+                    {t('equipment')}
                   </label>
                   <div className="flex flex-wrap gap-2">
                     <Button
@@ -797,7 +799,7 @@ export default function CycleDetailPage() {
                       size="sm"
                       onClick={() => toggleEquipment('ALL')}
                     >
-                      Alle
+                      {t('all')}
                     </Button>
                     {(['CABLE', 'MACHINE', 'DUMBBELL', 'BARBELL', 'BODYWEIGHT', 'SMITH_MACHINE', 'EZ_BAR'] as Equipment[]).map((equip) => (
                       <Button
@@ -815,7 +817,7 @@ export default function CycleDetailPage() {
                 {/* Exercise Filter - Alternative to Muscle/Equipment (kept in the "rest" group) */}
                 <div className="border-t border-border pt-4">
                   <div className="text-center mb-3">
-                    <span className="text-sm text-muted-foreground italic">ODER</span>
+                    <span className="text-sm text-muted-foreground italic">{t('or')}</span>
                   </div>
 
                   {selectedExercise ? (
@@ -830,7 +832,7 @@ export default function CycleDetailPage() {
                         variant="outline"
                         onClick={() => setShowExerciseModal(true)}
                         className="h-14 w-14 rounded-lg p-0"
-                        aria-label="Übung zum Filtern hinzufügen"
+                        aria-label={t('addFilterExercise')}
                       >
                         <IconPlus className="size-7" />
                       </Button>
@@ -846,10 +848,12 @@ export default function CycleDetailPage() {
                   {selectedViews.length > 1 && mergedChartData.length > 0 && (
                     <AnalyticsChart
                       data={mergedChartData}
-                      title="Vergleich"
+                      title={t('charts.comparison')}
                       height={300}
                       isComparison={true}
                       lineConfigs={chartLineConfigs}
+                      locale={locale}
+                      formatWorkoutCount={(count) => t('workoutCount', { count })}
                     />
                   )}
 
@@ -857,21 +861,23 @@ export default function CycleDetailPage() {
                   {selectedViews.length === 1 && selectedViews.includes('volume') && volumeData && volumeData.dataPoints.length > 0 && (
                     <AnalyticsChart
                       data={volumeData.dataPoints}
-                      title="Volumen-Entwicklung"
+                      title={t('charts.volumeTitle')}
                       height={300}
                       chartType="line"
                       dataKey="volume"
-                      name="Volumen"
+                      name={t('metrics.volume')}
                       stroke={CHART_ACCENT}
-                      yAxisTickFormatter={(value) => `${formatNumber(value)}`}
+                      yAxisTickFormatter={(value) => `${formatNumber(value, locale)}`}
                       yAxisLabel="kg"
+                      locale={locale}
+                      formatWorkoutCount={(count) => t('workoutCount', { count })}
                       footer={
                         <div className="mt-4 text-center">
                           <div className="text-sm text-muted-foreground">
-                            Gesamtes Volumen
+                            {t('charts.totalVolume')}
                           </div>
                           <div className="text-2xl font-bold text-foreground">
-                            {formatNumber(volumeData.totalVolume)} kg
+                            {formatNumber(volumeData.totalVolume, locale)} kg
                           </div>
                         </div>
                       }
@@ -884,10 +890,12 @@ export default function CycleDetailPage() {
                       {rirData && rirData.dataPoints.length > 0 ? (
                         <AnalyticsChart
                           data={rirData.dataPoints}
-                          title="RIR-Verteilung"
+                          title={t('charts.rirTitle')}
                           height={300}
                           chartType="bar"
-                          yAxisLabel="Anzahl"
+                          yAxisLabel={t('charts.count')}
+                          locale={locale}
+                          formatWorkoutCount={(count) => t('workoutCount', { count })}
                         >
                           <Bar dataKey="rir0Count" fill={getRIRBarFill(0)} name="RIR 0" />
                           <Bar dataKey="rir1Count" fill={getRIRBarFill(1)} name="RIR 1" />
@@ -896,7 +904,7 @@ export default function CycleDetailPage() {
                       ) : (
                         <div className="text-center py-12">
                           <p className="text-muted-foreground">
-                            Keine RIR Daten verfügbar für die ausgewählten Filter.
+                            {t('charts.noRirData')}
                           </p>
                         </div>
                       )}
@@ -907,21 +915,23 @@ export default function CycleDetailPage() {
                   {selectedViews.length === 1 && selectedViews.includes('duration') && durationData && durationData.dataPoints.length > 0 && (
                     <AnalyticsChart
                       data={durationData.dataPoints}
-                      title="Dauer-Entwicklung"
+                      title={t('charts.durationTitle')}
                       height={300}
                       chartType="line"
                       dataKey="duration"
-                      name="Dauer"
+                      name={t('metrics.duration')}
                       stroke={CHART_ACCENT}
                       yAxisTickFormatter={(value) => `${value}`}
-                      yAxisLabel="Minuten"
+                      yAxisLabel={t('charts.minutes')}
+                      locale={locale}
+                      formatWorkoutCount={(count) => t('workoutCount', { count })}
                       footer={
                         <div className="mt-4 text-center">
                           <div className="text-sm text-muted-foreground">
-                            Durchschnittliche Dauer
+                            {t('charts.averageDuration')}
                           </div>
                           <div className="text-2xl font-bold text-foreground">
-                            {Math.round(durationData.averageDuration)} min
+                            {t('durationMinutes', { minutes: Math.round(durationData.averageDuration) })}
                           </div>
                         </div>
                       }
@@ -932,21 +942,23 @@ export default function CycleDetailPage() {
                   {selectedViews.length === 1 && selectedViews.includes('restTime') && restTimeData && restTimeData.dataPoints.length > 0 && (
                     <AnalyticsChart
                       data={restTimeData.dataPoints}
-                      title="Satzpausen-Entwicklung"
+                      title={t('charts.restTimeTitle')}
                       height={300}
                       chartType="line"
                       dataKey="averageRestTime"
-                      name="Satzpause"
+                      name={t('metrics.restTime')}
                       stroke={CHART_ACCENT}
                       yAxisTickFormatter={(value) => `${value}`}
-                      yAxisLabel="Sekunden"
+                      yAxisLabel={t('charts.seconds')}
+                      locale={locale}
+                      formatWorkoutCount={(count) => t('workoutCount', { count })}
                       footer={
                         <div className="mt-4 text-center">
                           <div className="text-sm text-muted-foreground">
-                            Durchschnittliche Satzpause
+                            {t('charts.averageRestTime')}
                           </div>
                           <div className="text-2xl font-bold text-foreground">
-                            {Math.round(restTimeData.overallAverage)} s
+                            {t('secondsValue', { seconds: Math.round(restTimeData.overallAverage) })}
                           </div>
                         </div>
                       }
@@ -957,21 +969,23 @@ export default function CycleDetailPage() {
                   {selectedViews.length === 1 && selectedViews.includes('reps') && repsData && repsData.dataPoints.length > 0 && (
                     <AnalyticsChart
                       data={repsData.dataPoints}
-                      title="Wiederholungen-Entwicklung"
+                      title={t('charts.repsTitle')}
                       height={300}
                       chartType="line"
                       dataKey="reps"
-                      name="Wiederholungen"
+                      name={t('metrics.reps')}
                       stroke={CHART_ACCENT}
                       yAxisTickFormatter={(value) => `${value}`}
-                      yAxisLabel="Wiederholungen"
+                      yAxisLabel={t('metrics.reps')}
+                      locale={locale}
+                      formatWorkoutCount={(count) => t('workoutCount', { count })}
                       footer={
                         <div className="mt-4 text-center">
                           <div className="text-sm text-muted-foreground">
-                            Gesamte Wiederholungen
+                            {t('charts.totalReps')}
                           </div>
                           <div className="text-2xl font-bold text-foreground">
-                            {formatNumber(repsData.totalReps)}
+                            {formatNumber(repsData.totalReps, locale)}
                           </div>
                         </div>
                       }
@@ -982,18 +996,20 @@ export default function CycleDetailPage() {
                   {selectedViews.length === 1 && selectedViews.includes('sets') && setsData && setsData.dataPoints.length > 0 && (
                     <AnalyticsChart
                       data={setsData.dataPoints}
-                      title="Sätze-Entwicklung"
+                      title={t('charts.setsTitle')}
                       height={300}
                       chartType="line"
                       dataKey="sets"
-                      name="Sätze"
+                      name={t('metrics.sets')}
                       stroke={CHART_ACCENT}
                       yAxisTickFormatter={(value) => `${value}`}
-                      yAxisLabel="Sätze"
+                      yAxisLabel={t('metrics.sets')}
+                      locale={locale}
+                      formatWorkoutCount={(count) => t('workoutCount', { count })}
                       footer={
                         <div className="mt-4 text-center">
                           <div className="text-sm text-muted-foreground">
-                            Gesamte Sätze
+                            {t('charts.totalSets')}
                           </div>
                           <div className="text-2xl font-bold text-foreground">
                             {setsData.totalSets}
@@ -1007,21 +1023,23 @@ export default function CycleDetailPage() {
                   {selectedViews.length === 1 && selectedViews.includes('intensity') && intensityData && intensityData.dataPoints.length > 0 && (
                     <AnalyticsChart
                       data={intensityData.dataPoints}
-                      title="Intensität-Entwicklung"
+                      title={t('charts.intensityTitle')}
                       height={300}
                       chartType="line"
                       dataKey="intensity"
-                      name="Intensität"
+                      name={t('metrics.intensity')}
                       stroke={CHART_ACCENT}
                       yAxisTickFormatter={(value) => `${value}`}
                       yAxisLabel="%"
+                      locale={locale}
+                      formatWorkoutCount={(count) => t('workoutCount', { count })}
                       footer={
                         <div className="mt-4 text-center">
                           <div className="text-sm text-muted-foreground">
-                            Durchschnittliche Intensität
+                            {t('charts.averageIntensity')}
                           </div>
                           <div className="text-2xl font-bold text-foreground">
-                            {formatNumber(intensityData.averageIntensity)}%
+                            {formatNumber(intensityData.averageIntensity, locale)}%
                           </div>
                         </div>
                       }
@@ -1036,7 +1054,7 @@ export default function CycleDetailPage() {
               <Card>
                 <div className="px-6 py-4 border-b border-border">
                   <h2 className="text-lg font-semibold text-foreground">
-                    Personal Records
+                    {t('personalRecords')}
                   </h2>
                 </div>
                 <CardContent className="p-6 space-y-3">
@@ -1052,10 +1070,10 @@ export default function CycleDetailPage() {
               <div className="space-y-4">
                 <div>
                   <h2 className="text-xl font-semibold text-foreground">
-                    Workout-Verlauf
+                    {t('workoutHistory')}
                   </h2>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {workouts.length} Workout{workouts.length !== 1 ? 's' : ''} in diesem Zyklus
+                    {t('workoutCountInCycle', { count: workouts.length })}
                   </p>
                 </div>
                 {workouts.map((workout) => (
@@ -1070,8 +1088,8 @@ export default function CycleDetailPage() {
                           <div className="flex items-center gap-3 mb-2 flex-wrap">
                             <h3 className="text-lg font-semibold text-foreground">
                               {workout.isFreeWorkout
-                                ? workout.originTemplateName || 'Freies Workout'
-                                : workout.workoutDayName || 'Workout'}
+                                ? workout.originTemplateName || t('freeWorkout')
+                                : workout.workoutDayName || t('workout')}
                             </h3>
                             {workout.homeGym ? (
                               <Badge variant="secondary" className="text-xs">
@@ -1079,14 +1097,14 @@ export default function CycleDetailPage() {
                               </Badge>
                             ) : (
                               <Badge variant="outline" className="text-xs">
-                                Anderes Gym
+                                {t('otherGym')}
                               </Badge>
                             )}
                           </div>
                           <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                             <div className="flex items-center gap-1">
                               <IconCalendar className="size-4" />
-                              <span>{formatDate(workout.date)}</span>
+                              <span>{formatDate(workout.date, locale)}</span>
                             </div>
                             {workout.totalDuration && (
                               <div className="flex items-center gap-1">
@@ -1096,7 +1114,7 @@ export default function CycleDetailPage() {
                             )}
                             <div className="flex items-center gap-1">
                               <IconBarbell className="size-4" />
-                              <span>{workout.exerciseCount} Übung{workout.exerciseCount !== 1 ? 'en' : ''}</span>
+                              <span>{t('exercisesCount', { count: workout.exerciseCount })}</span>
                             </div>
                             <div className="flex items-center gap-1">
                               <IconTrendingUp className="size-4" />
@@ -1119,7 +1137,7 @@ export default function CycleDetailPage() {
                   onClick={() => router.push('/cycles/new')}
                   className="px-6 py-3"
                 >
-                  Neuen Zyklus anlegen
+                  {t('createNewCycle')}
                 </Button>
               </div>
             )}
