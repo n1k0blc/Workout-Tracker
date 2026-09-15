@@ -18,21 +18,6 @@ export function kcalFromMacros({ carbs, protein, fat }: Macros): number {
 }
 
 /**
- * The Schnelleintrag consistency hint. Returns `null` when there is nothing worth saying --
- * no kcal entered yet, or the macros already add up to the entered kcal. Otherwise it states
- * what the macros imply and that the entered kcal is what gets saved, unchanged.
- */
-export function macroConsistencyHint(
-  enteredKcal: number,
-  macros: Macros,
-): string | null {
-  if (!Number.isFinite(enteredKcal) || enteredKcal <= 0) return null;
-  const macroKcal = kcalFromMacros(macros);
-  if (macroKcal === enteredKcal) return null;
-  return `Makros ergeben ${macroKcal} kcal. Differenz zu ${enteredKcal} kcal wird übernommen wie eingegeben.`;
-}
-
-/**
  * The Tagesziele editor's footer hint: how the three macro targets' energy compares to the
  * kcal target. `null` when there is no positive kcal target to compare against. The macros
  * are read at 4 / 4 / 9 kcal per g, the same as the Schnelleintrag hint.

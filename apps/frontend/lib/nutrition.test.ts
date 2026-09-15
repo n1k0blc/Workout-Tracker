@@ -1,7 +1,6 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import {
   kcalFromMacros,
-  macroConsistencyHint,
   dailyTargetMacroHint,
   targetProgressPercent,
   remainingToTarget,
@@ -47,29 +46,6 @@ describe('kcalFromMacros', () => {
   it('rounds the total to a whole number', () => {
     expect(kcalFromMacros({ carbs: 1.2, protein: 0, fat: 0 })).toBe(5); // 4.8
     expect(kcalFromMacros({ carbs: 0, protein: 3.3, fat: 0 })).toBe(13); // 13.2
-  });
-});
-
-describe('macroConsistencyHint', () => {
-  it('states the macro-derived kcal and that the entered value is kept as-is', () => {
-    expect(macroConsistencyHint(540, { carbs: 48, protein: 22, fat: 24 })).toBe(
-      'Makros ergeben 496 kcal. Differenz zu 540 kcal wird übernommen wie eingegeben.',
-    );
-  });
-
-  it('fires in both directions (macros above the entered kcal too)', () => {
-    expect(macroConsistencyHint(400, { carbs: 48, protein: 22, fat: 24 })).toBe(
-      'Makros ergeben 496 kcal. Differenz zu 400 kcal wird übernommen wie eingegeben.',
-    );
-  });
-
-  it('is silent when the macros already match the entered kcal', () => {
-    expect(macroConsistencyHint(90, { carbs: 0, protein: 0, fat: 10 })).toBeNull();
-  });
-
-  it('is silent when no usable kcal has been entered yet', () => {
-    expect(macroConsistencyHint(0, { carbs: 48, protein: 22, fat: 24 })).toBeNull();
-    expect(macroConsistencyHint(NaN, { carbs: 1, protein: 1, fat: 1 })).toBeNull();
   });
 });
 

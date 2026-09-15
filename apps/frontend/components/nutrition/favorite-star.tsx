@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { IconStar, IconStarFilled } from '@tabler/icons-react';
 import { cn } from '@/lib/utils';
 
@@ -20,14 +21,13 @@ export function FavoriteStar({
   label: string;
   className?: string;
 }) {
+  const t = useTranslations('FavoriteStar');
   const Icon = favorite ? IconStarFilled : IconStar;
   return (
     <button
       type="button"
       aria-pressed={favorite}
-      aria-label={
-        favorite ? `${label} aus Favoriten entfernen` : `${label} zu Favoriten hinzufügen`
-      }
+      aria-label={favorite ? t('remove', { name: label }) : t('add', { name: label })}
       onClick={onToggle}
       className={cn(
         'flex size-8 shrink-0 items-center justify-center rounded-md transition-colors',

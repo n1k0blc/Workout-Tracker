@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import {
   IconGripVertical,
@@ -54,6 +55,7 @@ export function ManageSlotsSheet({
   onOpenChange: (open: boolean) => void;
   onChanged: () => void;
 }) {
+  const t = useTranslations('ManageSlotsSheet');
   const [active, setActive] = useState<MealSlot[] | null>(null);
   const [archived, setArchived] = useState<MealSlot[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -72,9 +74,9 @@ export function ManageSlotsSheet({
       setActive(list.active);
       setArchived(list.archived);
     } catch {
-      toast.error('Abschnitte konnten nicht geladen werden');
+      toast.error(t('loadError'));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (open) {
@@ -113,7 +115,7 @@ export function ManageSlotsSheet({
         setActive(list.active);
         setArchived(list.archived);
       } catch {
-        toast.error('Reihenfolge konnte nicht gespeichert werden');
+        toast.error(t('reorderError'));
         await refresh();
       }
     });
@@ -133,7 +135,7 @@ export function ManageSlotsSheet({
         );
         setEditingId(null);
       } catch {
-        toast.error('Umbenennen fehlgeschlagen');
+        toast.error(t('renameError'));
       }
     });
   }
@@ -146,7 +148,7 @@ export function ManageSlotsSheet({
       } catch {
         // The only expected failure is the server's "keep one active" 409 (the button is
         // already disabled at one active slot, so this is the race guard).
-        toast.error('Abschnitt konnte nicht archiviert werden');
+        toast.error(t('archiveError'));
       }
     });
   }
@@ -157,7 +159,7 @@ export function ManageSlotsSheet({
         await apiClient.setMealSlotArchived(slot.id, false);
         await refresh();
       } catch {
-        toast.error('Wiederherstellen fehlgeschlagen');
+        toast.error(t('unarchiveError'));
       }
     });
   }
@@ -171,7 +173,7 @@ export function ManageSlotsSheet({
         setNewName('');
         await refresh();
       } catch {
-        toast.error('Abschnitt konnte nicht hinzugefügt werden');
+        toast.error(t('addError'));
       }
     });
   }
@@ -180,13 +182,13 @@ export function ManageSlotsSheet({
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="mx-auto max-w-2xl">
         <DrawerHeader>
-          <DrawerTitle>Abschnitte verwalten</DrawerTitle>
-          <DrawerDescription>Umbenennen, sortieren, archivieren</DrawerDescription>
+          <DrawerTitle>{t('title')}</DrawerTitle>
+          <DrawerDescription>{t('description')}</DrawerDescription>
         </DrawerHeader>
 
         <div className="flex flex-col gap-4 overflow-y-auto px-4 pb-2">
           {active === null ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Lädt …</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">{t('loading')}</p>
           ) : (
             <div className="border">
               <DndContext
@@ -225,7 +227,7 @@ export function ManageSlotsSheet({
 
           <div className="flex items-center gap-2">
             <Input
-              placeholder="Neuer Abschnitt"
+              placeholder={t('newSlotPlaceholder')}
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               onKeyDown={(e) => {
@@ -234,14 +236,14 @@ export function ManageSlotsSheet({
             />
             <Button variant="outline" onClick={addSlot} disabled={busy || !newName.trim()}>
               <IconPlus data-icon="inline-start" />
-              Hinzufügen
+              {t('add')}
             </Button>
           </div>
 
           {archived.length > 0 && (
             <div>
               <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                Archiviert · {archived.length}
+                {t('archivedHeading', { count: archived.length })}
               </div>
               <div className="divide-y border">
                 {archived.map((slot) => (
@@ -255,22 +257,19 @@ export function ManageSlotsSheet({
                       disabled={busy}
                       onClick={() => unarchive(slot)}
                     >
-                      Wiederherstellen
+                      {t('restore')}
                     </Button>
                   </div>
                 ))}
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Archivierte Abschnitte bleiben in vergangenen Tagen sichtbar, erscheinen aber
-                nicht mehr in der Tagesansicht.
-              </p>
+              <p className="mt-2 text-xs text-muted-foreground">{t('archivedHint')}</p>
             </div>
           )}
         </div>
 
         <div className="mt-auto p-4">
           <Button className="w-full" onClick={() => onOpenChange(false)}>
-            Fertig
+            {t('done')}
           </Button>
         </div>
       </DrawerContent>
@@ -305,6 +304,7 @@ function SortableSlotRow({
   onConfirmEdit: () => void;
   onArchive: () => void;
 }) {
+  const t = useTranslations('ManageSlotsSheet');
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: slot.id,
     disabled: dragDisabled,
@@ -320,7 +320,7 @@ function SortableSlotRow({
     >
       <button
         type="button"
-        aria-label="Verschieben"
+        aria-label={t('move')}
         disabled={dragDisabled}
         className="shrink-0 cursor-grab touch-none text-muted-foreground active:cursor-grabbing disabled:cursor-default disabled:opacity-40"
         {...attributes}
@@ -344,7 +344,7 @@ function SortableSlotRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label="Speichern"
+            aria-label={t('save')}
             disabled={disabled || !editValue.trim()}
             onClick={onConfirmEdit}
           >
@@ -353,7 +353,7 @@ function SortableSlotRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label="Abbrechen"
+            aria-label={t('cancel')}
             onClick={onCancelEdit}
           >
             <IconX />
@@ -367,7 +367,7 @@ function SortableSlotRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label={`${slot.name} umbenennen`}
+            aria-label={t('rename', { name: slot.name })}
             disabled={disabled}
             onClick={onStartEdit}
           >
@@ -376,7 +376,7 @@ function SortableSlotRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label={`${slot.name} archivieren`}
+            aria-label={t('archive', { name: slot.name })}
             disabled={disabled || !canArchive}
             onClick={onArchive}
           >

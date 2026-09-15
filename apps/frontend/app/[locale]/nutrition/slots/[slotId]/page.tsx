@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { useParams, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
@@ -58,10 +59,12 @@ function SlotEntries({
   onEdit: (entry: DiaryEntry) => void;
   onDelete: (entry: DiaryEntry) => void;
 }) {
+  const t = useTranslations('AbschnittPage');
+
   if (entries.length === 0) {
     return (
       <div className="border bg-card p-8 text-center text-sm text-muted-foreground">
-        Noch nichts erfasst
+        {t('nothingLoggedYet')}
       </div>
     );
   }
@@ -82,7 +85,7 @@ function SlotEntries({
         <div key={group.mealId} className="border border-l-2 border-l-foreground bg-card">
           <div className="flex items-center justify-between gap-2 px-3.5 py-2.5">
             <span className="truncate text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-              Mahlzeit {group.mealName}
+              {t('mealGroupHeading', { name: group.mealName })}
             </span>
             <span className="shrink-0 text-[13px] font-semibold">
               {formatKcal(group.kcal)} kcal
@@ -95,20 +98,19 @@ function SlotEntries({
       {singles.length > 0 && (
         <div>
           <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-            Einzeleinträge
+            {t('singleEntries')}
           </div>
           <div className="divide-y border bg-card">{singles.map(renderRow)}</div>
         </div>
       )}
 
-      <p className="text-xs text-muted-foreground">
-        Tippen bearbeitet die Menge · Nach links wischen löscht
-      </p>
+      <p className="text-xs text-muted-foreground">{t('editDeleteHint')}</p>
     </div>
   );
 }
 
 export default function AbschnittPage() {
+  const t = useTranslations('AbschnittPage');
   const params = useParams();
   const searchParams = useSearchParams();
   const slotId = params?.slotId as string;
@@ -150,10 +152,10 @@ export default function AbschnittPage() {
     try {
       await apiClient.deleteDiaryEntry(entry.id);
       await load();
-      toast('Eintrag gelöscht', {
+      toast(t('entryDeleted'), {
         description: `${entry.name} · ${formatKcal(entry.kcal)} kcal`,
         action: {
-          label: 'Widerrufen',
+          label: t('undo'),
           onClick: async () => {
             try {
               await apiClient.createDiaryEntry({
@@ -169,13 +171,13 @@ export default function AbschnittPage() {
               });
               await load();
             } catch {
-              toast.error('Wiederherstellen fehlgeschlagen');
+              toast.error(t('undoError'));
             }
           },
         },
       });
     } catch {
-      toast.error('Eintrag konnte nicht gelöscht werden');
+      toast.error(t('deleteError'));
     }
   }
 
@@ -183,13 +185,13 @@ export default function AbschnittPage() {
     <ProtectedRoute>
       <div className="mx-auto flex min-h-screen w-full max-w-2xl flex-col">
         <header className="relative flex h-16 items-center justify-between border-b px-2">
-          <Button variant="ghost" size="icon" asChild aria-label="Zurück">
+          <Button variant="ghost" size="icon" asChild aria-label={t('back')}>
             <Link href={`/nutrition?date=${date}`}>
               <IconArrowLeft />
             </Link>
           </Button>
           <div className="absolute left-1/2 -translate-x-1/2 text-lg font-semibold uppercase tracking-[0.05em]">
-            {slot?.name ?? 'Abschnitt'}
+            {slot?.name ?? t('fallbackTitle')}
           </div>
           <div className="flex items-center">
             {slot && !slot.archived && (
@@ -197,13 +199,13 @@ export default function AbschnittPage() {
                 variant="ghost"
                 size="icon"
                 onClick={() => setCopyOpen(true)}
-                aria-label="Von einem anderen Tag kopieren"
+                aria-label={t('copyFromDay')}
               >
                 <IconCopy />
               </Button>
             )}
             {/* Renaming an Abschnitt is part of "Abschnitte verwalten" (#142). */}
-            <Button variant="ghost" size="icon" disabled aria-label="Abschnitt bearbeiten">
+            <Button variant="ghost" size="icon" disabled aria-label={t('editSlot')}>
               <IconPencil />
             </Button>
           </div>
@@ -220,15 +222,15 @@ export default function AbschnittPage() {
                 />
                 <TotalsCell
                   value={formatGrams(slot.totals.carbs)}
-                  label="Kohlenhydrate"
+                  label={t('carbs')}
                   border="border-b"
                 />
                 <TotalsCell
                   value={formatGrams(slot.totals.protein)}
-                  label="Protein"
+                  label={t('protein')}
                   border="border-r"
                 />
-                <TotalsCell value={formatGrams(slot.totals.fat)} label="Fett" border="" />
+                <TotalsCell value={formatGrams(slot.totals.fat)} label={t('fat')} border="" />
               </div>
 
               <SlotEntries
@@ -243,18 +245,15 @@ export default function AbschnittPage() {
 
             <div className="sticky bottom-0 border-t bg-background p-4">
               {slot.archived ? (
-                <p className="text-center text-xs text-muted-foreground">
-                  Dieser Abschnitt ist archiviert · nur die vorhandenen Einträge lassen sich
-                  noch bearbeiten.
-                </p>
+                <p className="text-center text-xs text-muted-foreground">{t('archivedHint')}</p>
               ) : (
                 <div className="flex gap-2">
                   <Button className="flex-1" onClick={() => setPickerOpen(true)}>
                     <IconPlus data-icon="inline-start" />
-                    Hinzufügen
+                    {t('add')}
                   </Button>
                   <Button variant="outline" onClick={() => setQuickOpen(true)}>
-                    Schnelleintrag
+                    {t('quickEntry')}
                   </Button>
                 </div>
               )}
@@ -263,11 +262,11 @@ export default function AbschnittPage() {
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
             <p className="text-sm text-muted-foreground">
-              {loading ? 'Lädt …' : 'Abschnitt nicht gefunden'}
+              {loading ? t('loading') : t('notFound')}
             </p>
             {!loading && (
               <Button variant="outline" asChild>
-                <Link href={`/nutrition?date=${date}`}>Zur Tagesansicht</Link>
+                <Link href={`/nutrition?date=${date}`}>{t('backToDay')}</Link>
               </Button>
             )}
           </div>

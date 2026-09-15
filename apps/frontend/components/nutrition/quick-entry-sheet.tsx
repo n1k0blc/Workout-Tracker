@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import {
   Drawer,
@@ -13,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { apiClient } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { macroConsistencyHint, parseAmount } from '@/lib/nutrition';
+import { kcalFromMacros, parseAmount } from '@/lib/nutrition';
 
 export interface QuickEntrySlot {
   id: string;
@@ -41,6 +42,7 @@ export function QuickEntrySheet({
   date: string;
   onCreated: () => void;
 }) {
+  const t = useTranslations('QuickEntrySheet');
   const [slotId, setSlotId] = useState<string | null>(defaultSlotId);
   const [name, setName] = useState('');
   const [kcal, setKcal] = useState('');
@@ -74,7 +76,11 @@ export function QuickEntrySheet({
     protein: parseAmount(protein) ?? 0,
     fat: parseAmount(fat) ?? 0,
   };
-  const hint = kcalValue === null ? null : macroConsistencyHint(kcalValue, macros);
+  const macroKcal = kcalFromMacros(macros);
+  const hint =
+    kcalValue === null || kcalValue <= 0 || macroKcal === kcalValue
+      ? null
+      : t('macroHint', { macroKcal, enteredKcal: kcalValue });
   const canSave = !saving && slotId !== null && name.trim() !== '' && kcalValue !== null;
 
   async function handleSave() {
@@ -94,7 +100,7 @@ export function QuickEntrySheet({
       onOpenChange(false);
       onCreated();
     } catch {
-      toast.error('Eintrag konnte nicht gespeichert werden');
+      toast.error(t('saveError'));
       setSaving(false);
     }
   }
@@ -103,28 +109,26 @@ export function QuickEntrySheet({
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="mx-auto max-w-md">
         <DrawerHeader>
-          <DrawerTitle>Schnelleintrag</DrawerTitle>
-          <DrawerDescription>
-            Nur für diesen Tag. Wird nicht als Lebensmittel gespeichert.
-          </DrawerDescription>
+          <DrawerTitle>{t('title')}</DrawerTitle>
+          <DrawerDescription>{t('description')}</DrawerDescription>
         </DrawerHeader>
 
         <div className="flex flex-col gap-5 overflow-y-auto px-4 pb-2">
           <label className="block">
             <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-              Bezeichnung
+              {t('name')}
             </span>
             <Input
               autoFocus
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="z. B. Kantine · Gemüsepfanne"
+              placeholder={t('namePlaceholder')}
             />
           </label>
 
           <label className="block">
             <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-              Kalorien
+              {t('calories')}
             </span>
             <div className="flex items-baseline gap-2 border-b border-b-foreground">
               <Input
@@ -140,9 +144,9 @@ export function QuickEntrySheet({
 
           <div className="grid grid-cols-3 gap-3">
             {[
-              { label: 'Kohlenh.', value: carbs, set: setCarbs },
-              { label: 'Protein', value: protein, set: setProtein },
-              { label: 'Fett', value: fat, set: setFat },
+              { label: t('carbs'), value: carbs, set: setCarbs },
+              { label: t('protein'), value: protein, set: setProtein },
+              { label: t('fat'), value: fat, set: setFat },
             ].map((field) => (
               <label key={field.label} className="block">
                 <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
@@ -163,7 +167,7 @@ export function QuickEntrySheet({
 
           <div>
             <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-              Abschnitt
+              {t('slot')}
             </div>
             <div className="flex flex-wrap gap-2">
               {slots.map((slot) => (
@@ -192,10 +196,8 @@ export function QuickEntrySheet({
               className="size-4 shrink-0 accent-primary"
             />
             <span className="min-w-0 flex-1">
-              <span className="block text-sm font-medium">Als Lebensmittel speichern</span>
-              <span className="block text-xs text-muted-foreground">
-                Erscheint danach in Vorlagen › Lebensmittel
-              </span>
+              <span className="block text-sm font-medium">{t('saveAsFood')}</span>
+              <span className="block text-xs text-muted-foreground">{t('saveAsFoodHint')}</span>
             </span>
           </label>
 
@@ -225,13 +227,14 @@ function DrawerFooterButtons({
   onSave: () => void;
   canSave: boolean;
 }) {
+  const t = useTranslations('QuickEntrySheet');
   return (
     <div className="mt-auto flex gap-2 border-t p-4">
       <Button className="flex-1" onClick={onSave} disabled={!canSave}>
-        Speichern
+        {t('save')}
       </Button>
       <Button variant="outline" onClick={onCancel}>
-        Abbrechen
+        {t('cancel')}
       </Button>
     </div>
   );

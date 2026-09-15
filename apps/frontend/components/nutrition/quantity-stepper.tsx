@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +32,7 @@ export function QuantityStepper({
   portionLabel: string | null;
   onChange: (grams: number, portionLabel: string | null) => void;
 }) {
+  const t = useTranslations('QuantityStepper');
   const stops = useMemo(() => buildQuantityStops(portions), [portions]);
   const unit = isLiquid ? 'ml' : 'g';
   const [freeText, setFreeText] = useState('');
@@ -64,16 +66,16 @@ export function QuantityStepper({
     <div className="space-y-2">
       <div className="flex items-center gap-3">
         <span className="w-14 shrink-0 text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-          Menge
+          {t('amount')}
         </span>
         <div className="flex items-center border">
-          <Button variant="ghost" size="icon-sm" aria-label="Weniger" onClick={() => step(-1)}>
+          <Button variant="ghost" size="icon-sm" aria-label={t('less')} onClick={() => step(-1)}>
             <IconChevronLeft />
           </Button>
           <span className="min-w-[110px] px-1 text-center text-sm font-semibold">
             {valueText}
           </span>
-          <Button variant="ghost" size="icon-sm" aria-label="Mehr" onClick={() => step(1)}>
+          <Button variant="ghost" size="icon-sm" aria-label={t('more')} onClick={() => step(1)}>
             <IconChevronRight />
           </Button>
         </div>
@@ -86,7 +88,7 @@ export function QuantityStepper({
 
       <div className="flex items-center gap-3">
         <span className="w-14 shrink-0 text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-          Frei
+          {t('free')}
         </span>
         <div className="flex w-24 items-baseline gap-1 border-b border-b-input">
           <Input

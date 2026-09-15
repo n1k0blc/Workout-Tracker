@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { IconChevronRight, IconPlus } from '@tabler/icons-react';
 import { NutritionDaySlot } from '@/types';
@@ -22,9 +23,10 @@ export function MealSlotRow({
   date: string;
   onQuickAdd: () => void;
 }) {
+  const t = useTranslations('MealSlotRow');
   const subtitle = slot.entries.length
     ? slot.entries.map((e) => e.name).join(', ')
-    : 'Noch nichts erfasst';
+    : t('nothingLoggedYet');
 
   return (
     <div className="flex items-center gap-3 px-4 py-3.5">
@@ -47,7 +49,7 @@ export function MealSlotRow({
           <IconChevronRight className="size-3.5 text-muted-foreground" />
           {slot.archived && (
             <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              archiviert
+              {t('archived')}
             </span>
           )}
         </div>
@@ -61,7 +63,7 @@ export function MealSlotRow({
         <Button
           variant="outline"
           size="icon"
-          aria-label={`${slot.name}: Lebensmittel hinzufügen`}
+          aria-label={t('addFood', { name: slot.name })}
           onClick={onQuickAdd}
         >
           <IconPlus />

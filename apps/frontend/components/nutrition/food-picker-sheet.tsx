@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { IconBarcode, IconMinus, IconPlus, IconSearch } from '@tabler/icons-react';
 import {
@@ -17,7 +18,6 @@ import { Food, MealListItem, PickerItem } from '@/types';
 import {
   buildQuantityStops,
   defaultQuantityStopIndex,
-  foodSourceLabel,
   formatFactor,
   formatKcal,
   formatQuantityLabel,
@@ -33,10 +33,7 @@ import { FavoriteStar } from './favorite-star';
 import {
   PickerTabBar,
   PickerTabPlaceholder,
-  LOGGING_PICKER_TABS,
-  FAVORITEN_EMPTY,
-  ZULETZT_EMPTY,
-  PICKER_LOADING,
+  LOGGING_PICKER_TAB_IDS,
   type PickerTabId,
 } from './picker-tabs';
 
@@ -80,9 +77,8 @@ function foodRowSubtitle(food: Food): string {
   return `100 ${unit} · ${Math.round(food.kcal)} kcal`;
 }
 
-function mealRowSubtitle(meal: MealListItem): string {
-  const zutaten = `${meal.itemCount} ${meal.itemCount === 1 ? 'Zutat' : 'Zutaten'}`;
-  return `${mealIngredientPreview(meal.ingredientNames)} · ${zutaten} · ${formatKcal(
+function mealRowSubtitle(meal: MealListItem, ingredientCount: string): string {
+  return `${mealIngredientPreview(meal.ingredientNames)} · ${ingredientCount} · ${formatKcal(
     meal.totals.kcal,
   )} kcal`;
 }
@@ -108,6 +104,7 @@ export function FoodPickerSheet({
    */
   onScanRequest: () => void;
 }) {
+  const t = useTranslations('FoodPickerSheet');
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState<PickerTabId>('lebensmittel');
   const [foods, setFoods] = useState<Food[]>([]);
@@ -154,7 +151,7 @@ export function FoodPickerSheet({
         const data = await apiClient.getFoods(search.trim() || undefined);
         if (!cancelled) setFoods(data.items);
       } catch {
-        if (!cancelled) toast.error('Lebensmittel konnten nicht geladen werden');
+        if (!cancelled) toast.error(t('loadFoodsError'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -163,7 +160,7 @@ export function FoodPickerSheet({
       cancelled = true;
       clearTimeout(id);
     };
-  }, [open, tab, search]);
+  }, [open, tab, search, t]);
 
   // Lebensmittel and Mahlzeiten are separate tabs (#155): at ~180k imported foods a handful
   // of meals is unfindable in a merged list, and the two are logged differently anyway (a
@@ -273,7 +270,7 @@ export function FoodPickerSheet({
       onOpenChange(false);
       onCommitted();
     } catch {
-      toast.error('Einträge konnten nicht gespeichert werden');
+      toast.error(t('commitError'));
       setCommitting(false);
     }
   }
@@ -334,7 +331,7 @@ export function FoodPickerSheet({
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="mx-auto flex h-[88vh] max-w-2xl flex-col">
         <DrawerHeader className="flex-row items-center justify-between">
-          <DrawerTitle>Hinzufügen</DrawerTitle>
+          <DrawerTitle>{t('title')}</DrawerTitle>
           <span className="text-xs text-muted-foreground">{slotName}</span>
         </DrawerHeader>
 
@@ -344,66 +341,58 @@ export function FoodPickerSheet({
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Lebensmittel oder Mahlzeit suchen..."
+              placeholder={t('searchPlaceholder')}
               className="border-b-0"
             />
             <Button
               variant="ghost"
               size="icon-sm"
-              aria-label="Barcode scannen"
+              aria-label={t('scanBarcode')}
               onClick={onScanRequest}
             >
               <IconBarcode />
             </Button>
           </div>
 
-          <PickerTabBar tab={tab} onTab={setTab} tabs={LOGGING_PICKER_TABS} />
+          <PickerTabBar tab={tab} onTab={setTab} tabs={LOGGING_PICKER_TAB_IDS} />
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-3">
           {tab === 'lebensmittel' &&
             (loading && foodRows.length === 0
-              ? placeholder(PICKER_LOADING)
+              ? placeholder(t('loading'))
               : foodRows.length === 0
-                ? placeholder(
-                    search.trim() ? 'Nichts gefunden.' : 'Die Bibliothek ist noch leer.',
-                  )
+                ? placeholder(search.trim() ? t('noFoodsFound') : t('libraryEmpty'))
                 : renderRows(foodRows))}
 
           {tab === 'mahlzeiten' &&
             (meals === null
-              ? placeholder(PICKER_LOADING)
+              ? placeholder(t('loading'))
               : mealRows.length === 0
-                ? placeholder(
-                    search.trim()
-                      ? 'Keine Mahlzeit gefunden.'
-                      : 'Noch keine Mahlzeiten. Lege welche in den Vorlagen an.',
-                  )
+                ? placeholder(search.trim() ? t('noMealsFound') : t('noMealsYet'))
                 : renderRows(mealRows))}
 
           {tab === 'favoriten' &&
             (favorites === null
-              ? placeholder(PICKER_LOADING)
+              ? placeholder(t('loading'))
               : favoriteRows.length === 0
-                ? placeholder(FAVORITEN_EMPTY)
+                ? placeholder(t('favoritesEmpty'))
                 : renderRows(favoriteRows))}
 
           {tab === 'zuletzt' &&
             (recents === null
-              ? placeholder(PICKER_LOADING)
+              ? placeholder(t('loading'))
               : recentRows.length === 0
-                ? placeholder(ZULETZT_EMPTY)
+                ? placeholder(t('recentEmpty'))
                 : renderRows(recentRows))}
         </div>
 
         <div className="mt-auto flex gap-2 border-t p-4">
           <Button className="flex-1" onClick={commit} disabled={basket.length === 0 || committing}>
-            {basket.length === 1
-              ? '1 Eintrag übernehmen'
-              : `${basket.length} Einträge übernehmen`}
+            {t('commit', { count: basket.length })}
           </Button>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Abbrechen
+            {t('cancel')}
           </Button>
         </div>
       </DrawerContent>
@@ -429,7 +418,14 @@ function FoodPickerRow({
   onToggle: () => void;
   onAdd: (grams: number, label: string) => void;
 }) {
-  const sourceLabel = foodSourceLabel(food);
+  const t = useTranslations('FoodPickerSheet');
+  const sourceLabel = food.editable
+    ? t('sourceOwn')
+    : food.source === 'SEED'
+      ? t('sourceSystem')
+      : food.source === 'OPEN_FOOD_FACTS'
+        ? t('sourceOpenFoodFacts')
+        : null;
 
   return (
     <div className={cn(expanded && 'bg-muted/50')}>
@@ -438,12 +434,12 @@ function FoodPickerRow({
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <span className="text-sm font-medium">{food.name}</span>
             <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-              Lebensmittel
+              {t('foodBadge')}
               {sourceLabel && ` · ${sourceLabel}`}
             </span>
             {basketCount > 0 && (
               <span className="text-[10px] font-semibold text-foreground">
-                {basketCount}× im Korb
+                {t('inBasket', { count: basketCount })}
               </span>
             )}
           </div>
@@ -453,7 +449,7 @@ function FoodPickerRow({
         <Button
           variant="outline"
           size="icon-sm"
-          aria-label={expanded ? 'Schließen' : `${food.name} hinzufügen`}
+          aria-label={expanded ? t('close') : t('addNamed', { name: food.name })}
           onClick={onToggle}
         >
           {expanded ? <IconMinus /> : <IconPlus />}
@@ -472,6 +468,7 @@ function ExpandedFoodRow({
   food: Food;
   onAdd: (grams: number, label: string) => void;
 }) {
+  const t = useTranslations('FoodPickerSheet');
   const stops = useMemo(() => buildQuantityStops(food.portions), [food.portions]);
   const [amount, setAmount] = useState(() => {
     const i = defaultQuantityStopIndex(
@@ -496,11 +493,15 @@ function ExpandedFoodRow({
 
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted-foreground">
-          {formatKcal(totals.kcal)} kcal · {Math.round(totals.carbs)} KH ·{' '}
-          {Math.round(totals.protein)} P · {Math.round(totals.fat)} F
+          {t('macroLine', {
+            kcal: formatKcal(totals.kcal),
+            carbs: Math.round(totals.carbs),
+            protein: Math.round(totals.protein),
+            fat: Math.round(totals.fat),
+          })}
         </span>
         <Button size="sm" onClick={() => onAdd(amount.grams, label)}>
-          Übernehmen
+          {t('apply')}
         </Button>
       </div>
     </div>
@@ -524,6 +525,7 @@ function MealPickerRow({
   onToggle: () => void;
   onAdd: (factor: number) => void;
 }) {
+  const t = useTranslations('FoodPickerSheet');
   const [factor, setFactor] = useState(1);
 
   const scaled = scaleMacros(meal.totals, factor);
@@ -535,28 +537,28 @@ function MealPickerRow({
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <span className="text-sm font-medium">{meal.name}</span>
             <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-foreground">
-              Mahlzeit
+              {t('mealBadge')}
             </span>
             {meal.editable && (
               <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                · Meine
+                · {t('mine')}
               </span>
             )}
             {basketCount > 0 && (
               <span className="text-[10px] font-semibold text-foreground">
-                {basketCount}× im Korb
+                {t('inBasket', { count: basketCount })}
               </span>
             )}
           </div>
           <div className="mt-0.5 truncate text-xs text-muted-foreground">
-            {mealRowSubtitle(meal)}
+            {mealRowSubtitle(meal, t('ingredientCount', { count: meal.itemCount }))}
           </div>
         </div>
         <FavoriteStar favorite={favorite} onToggle={onToggleFavorite} label={meal.name} />
         <Button
           variant="outline"
           size="icon-sm"
-          aria-label={expanded ? 'Schließen' : `${meal.name} hinzufügen`}
+          aria-label={expanded ? t('close') : t('addNamed', { name: meal.name })}
           onClick={onToggle}
         >
           {expanded ? <IconMinus /> : <IconPlus />}
@@ -567,7 +569,7 @@ function MealPickerRow({
         <div className="space-y-3 px-3.5 pb-4">
           <div className="flex items-center gap-3">
             <span className="w-14 shrink-0 text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-              Faktor
+              {t('factor')}
             </span>
             <div className="flex border">
               {QUANTITY_FACTORS.map((f) => (
@@ -590,11 +592,15 @@ function MealPickerRow({
 
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">
-              {formatKcal(scaled.kcal)} kcal · {Math.round(scaled.carbs)} KH ·{' '}
-              {Math.round(scaled.protein)} P · {Math.round(scaled.fat)} F
+              {t('macroLine', {
+                kcal: formatKcal(scaled.kcal),
+                carbs: Math.round(scaled.carbs),
+                protein: Math.round(scaled.protein),
+                fat: Math.round(scaled.fat),
+              })}
             </span>
             <Button size="sm" onClick={() => onAdd(factor)}>
-              Übernehmen
+              {t('apply')}
             </Button>
           </div>
         </div>

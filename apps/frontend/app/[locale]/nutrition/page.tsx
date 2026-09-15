@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
 import { IconAdjustmentsHorizontal } from '@tabler/icons-react';
 import { ProtectedRoute } from '@/components/protected-route';
@@ -18,6 +19,7 @@ import { ScanToLog } from '@/components/nutrition/scan-to-log';
 import { ManageSlotsSheet } from '@/components/nutrition/manage-slots-sheet';
 
 export default function NutritionPage() {
+  const t = useTranslations('NutritionPage');
   const today = useMemo(() => toLocalDateString(new Date()), []);
   // The Abschnitt page's back arrow links here with `?date=` so leaving it returns to the day
   // it was opened from, not always today.
@@ -65,8 +67,8 @@ export default function NutritionPage() {
       <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col px-4 py-6">
         <div className="flex-1 space-y-6">
           <div>
-            <h2 className="text-2xl font-bold text-foreground">Ernährung</h2>
-            <p className="mt-1 text-sm text-muted-foreground">Kalorien und Makros pro Tag</p>
+            <h2 className="text-2xl font-bold text-foreground">{t('title')}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{t('subtitle')}</p>
           </div>
 
           <NutritionDayBar date={date} today={today} onChange={setDate} />
@@ -78,7 +80,7 @@ export default function NutritionPage() {
               <div>
                 <div className="mb-3 flex items-center justify-between">
                   <div className="text-lg font-semibold uppercase tracking-[0.05em]">
-                    Abschnitte
+                    {t('sections')}
                   </div>
                   <Button
                     variant="outline"
@@ -86,7 +88,7 @@ export default function NutritionPage() {
                     onClick={() => setManageOpen(true)}
                   >
                     <IconAdjustmentsHorizontal data-icon="inline-start" />
-                    Verwalten
+                    {t('manage')}
                   </Button>
                 </div>
 
@@ -107,7 +109,7 @@ export default function NutritionPage() {
             </>
           ) : (
             <p className="py-12 text-center text-sm text-muted-foreground">
-              {loading ? 'Lädt …' : 'Konnte nicht geladen werden'}
+              {loading ? t('loading') : t('loadError')}
             </p>
           )}
         </div>
