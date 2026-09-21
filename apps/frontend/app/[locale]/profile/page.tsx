@@ -4,6 +4,15 @@ import { useState, useEffect } from 'react';
 import { useTranslations, useFormatter } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { useUnitSystem } from '@/lib/use-units';
+import {
+  weightInputString,
+  weightToKg,
+  weightUnitLabel,
+  heightInputString,
+  heightToCm,
+  heightUnitLabel,
+} from '@/lib/units';
 import { apiClient } from '@/lib/api/client';
 import { HomeGym } from '@/types';
 import {
@@ -79,10 +88,14 @@ export default function ProfilePage() {
   const [editingGymId, setEditingGymId] = useState<string | null>(null);
   const [editingGymName, setEditingGymName] = useState('');
 
-  // Language (#179) - the only preference axis with UI in this ticket. unitSystem and
-  // foodMarket also exist on User but get none, per the tracer-bullet scope.
+  // Language (#179). foodMarket also exists on User but gets no UI until a second market does.
   const [localeValue, setLocaleValue] = useState<'de' | 'en'>('de');
   const [localeSaving, setLocaleSaving] = useState(false);
+
+  // Unit system (#186): display-only. Weight/height inputs are prefilled in it, but stored
+  // values are only rewritten when the user actually edits the field (see lib/units.ts).
+  const unitSystem = useUnitSystem();
+  const [unitSaving, setUnitSaving] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -90,8 +103,8 @@ export default function ProfilePage() {
       setFirstName(user.firstName || '');
       setLastName(user.lastName || '');
       setDateOfBirth(user.dateOfBirth ? new Date(user.dateOfBirth) : null);
-      setHeight(user.height?.toString() || '');
-      setWeight(user.weight?.toString() || '');
+      setHeight(user.height != null ? heightInputString(user.height, unitSystem) : '');
+      setWeight(user.weight != null ? weightInputString(user.weight, unitSystem) : '');
       setTargetKcal(user.targetKcal?.toString() || '');
       setTargetCarbs(user.targetCarbs?.toString() || '');
       setTargetProtein(user.targetProtein?.toString() || '');
@@ -101,7 +114,7 @@ export default function ProfilePage() {
         setHomeGyms(user.homeGyms);
       }
     }
-  }, [user]);
+  }, [user, unitSystem]);
 
   useEffect(() => {
     loadHomeGyms();
@@ -142,15 +155,29 @@ export default function ProfilePage() {
         throw new Error(t('profileData.validationInvalidEmail'));
       }
 
-      const heightNum = parseInt(height);
-      const weightNum = parseFloat(weight);
+      // Typed values are exact in the user's own unit and converted once; untouched
+      // fields keep their stored cm/kg (never write back a value the user did not type).
+      const heightNum = heightToCm(height, unitSystem, user?.height);
+      const weightNum = weightToKg(weight, unitSystem, user?.weight);
 
-      if (heightNum < 50 || heightNum > 300) {
-        throw new Error(t('profileData.validationHeightRange'));
+      if (heightNum == null || heightNum < 50 || heightNum > 300) {
+        throw new Error(
+          t('profileData.validationHeightRange', {
+            min: unitSystem === 'IMPERIAL' ? 20 : 50,
+            max: unitSystem === 'IMPERIAL' ? 118 : 300,
+            unit: heightUnitLabel(unitSystem),
+          }),
+        );
       }
 
-      if (weightNum < 20 || weightNum > 500) {
-        throw new Error(t('profileData.validationWeightRange'));
+      if (weightNum == null || weightNum < 20 || weightNum > 500) {
+        throw new Error(
+          t('profileData.validationWeightRange', {
+            min: unitSystem === 'IMPERIAL' ? 44 : 20,
+            max: unitSystem === 'IMPERIAL' ? 1102 : 500,
+            unit: weightUnitLabel(unitSystem),
+          }),
+        );
       }
 
       const age = calculateAge(dateOfBirth);
@@ -337,6 +364,23 @@ export default function ProfilePage() {
     } catch (err: any) {
       setError(err.message || t('language.updateError'));
       setLocaleSaving(false);
+    }
+  };
+
+  // Reloads rather than patching auth state: every weight in the app re-renders in the new
+  // system, and the auth context has no setter for the user.
+  const handleUnitSystemChange = async (next: string) => {
+    if (next !== 'METRIC' && next !== 'IMPERIAL') return;
+
+    setError('');
+    setUnitSaving(true);
+
+    try {
+      await apiClient.updateProfile({ unitSystem: next });
+      window.location.reload();
+    } catch (err: any) {
+      setError(err.message || t('units.updateError'));
+      setUnitSaving(false);
     }
   };
 
@@ -584,36 +628,36 @@ export default function ProfilePage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Field>
-                  <FieldLabel>{t('profileData.heightLabel')}</FieldLabel>
+                  <FieldLabel>{t('profileData.heightLabel', { unit: heightUnitLabel(unitSystem) })}</FieldLabel>
                   {isEditingProfile ? (
                     <Input
                       type="number"
                       value={height}
                       onChange={(e) => setHeight(e.target.value)}
-                      min="50"
-                      max="300"
+                      min={unitSystem === 'IMPERIAL' ? 20 : 50}
+                      max={unitSystem === 'IMPERIAL' ? 118 : 300}
                     />
                   ) : (
                     <p className="text-foreground py-2">
-                      {height ? t('profileData.heightValue', { height }) : t('profileData.empty')}
+                      {height ? t('profileData.heightValue', { height, unit: heightUnitLabel(unitSystem) }) : t('profileData.empty')}
                     </p>
                   )}
                 </Field>
 
                 <Field>
-                  <FieldLabel>{t('profileData.weightLabel')}</FieldLabel>
+                  <FieldLabel>{t('profileData.weightLabel', { unit: weightUnitLabel(unitSystem) })}</FieldLabel>
                   {isEditingProfile ? (
                     <Input
                       type="number"
                       value={weight}
                       onChange={(e) => setWeight(e.target.value)}
-                      min="20"
-                      max="500"
+                      min={unitSystem === 'IMPERIAL' ? 44 : 20}
+                      max={unitSystem === 'IMPERIAL' ? 1102 : 500}
                       step="0.1"
                     />
                   ) : (
                     <p className="text-foreground py-2">
-                      {weight ? t('profileData.weightValue', { weight }) : t('profileData.empty')}
+                      {weight ? t('profileData.weightValue', { weight, unit: weightUnitLabel(unitSystem) }) : t('profileData.empty')}
                     </p>
                   )}
                 </Field>
@@ -622,14 +666,32 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        {/* Language Section (#179): the only preference axis with UI in this ticket */}
+        {/* Unit system (#186): independent of language */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>{t('units.title')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value={unitSystem} onValueChange={handleUnitSystemChange} disabled={unitSaving}>
+              <SelectTrigger className="w-48" aria-label={t('units.title')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="METRIC">{t('units.metric')}</SelectItem>
+                <SelectItem value="IMPERIAL">{t('units.imperial')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+
+        {/* Language Section (#179) */}
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>{t('language.title')}</CardTitle>
           </CardHeader>
           <CardContent>
             <Select value={localeValue} onValueChange={handleLocaleChange} disabled={localeSaving}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-48" aria-label={t('language.title')}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

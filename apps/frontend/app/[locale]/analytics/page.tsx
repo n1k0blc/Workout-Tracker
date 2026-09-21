@@ -6,6 +6,8 @@ import { ProtectedRoute } from '@/components/protected-route';
 import { Link } from '@/i18n/navigation';
 import { useState, useEffect } from 'react';
 import { useTranslations, useLocale, useFormatter } from 'next-intl';
+import { useUnits } from '@/lib/use-units';
+import { volumeAnalyticsForDisplay } from '@/lib/units';
 import { apiClient } from '@/lib/api';
 import {
   VolumeAnalytics,
@@ -121,6 +123,8 @@ export default function AnalyticsPage() {
   const tChart = useTranslations('AnalyticsChart');
   const locale = useLocale();
   const format = useFormatter();
+  // Volume arrives in canonical kg; every figure shown is converted at the boundary (#186).
+  const units = useUnits();
 
   // Data states
   const [volumeData, setVolumeData] = useState<VolumeAnalytics | null>(null);
@@ -338,7 +342,7 @@ export default function AnalyticsPage() {
   // Helper function to get unit and Y-axis config for a view
   const getViewConfig = (view: string): { unit: string; yAxisId: string } => {
     const configs: Record<string, { unit: string; yAxisId: string }> = {
-      volume: { unit: 'kg', yAxisId: 'left' },
+      volume: { unit: units.unit, yAxisId: 'left' },
       rir: { unit: 'RIR', yAxisId: 'left' },
       duration: { unit: 'min', yAxisId: 'left' },
       restTime: { unit: 's', yAxisId: 'left' },
@@ -411,7 +415,7 @@ export default function AnalyticsPage() {
         if (dateEntry) {
           // Determine the value key based on view type
           let value = 0;
-          if (combo.view === 'volume') value = point.volume;
+          if (combo.view === 'volume') value = units.volume(point.volume);
           else if (combo.view === 'rir') value = point.rir0Count || 0;
           else if (combo.view === 'duration') value = point.duration;
           else if (combo.view === 'restTime') value = point.averageRestTime;
@@ -676,10 +680,15 @@ export default function AnalyticsPage() {
     if (selectedViews.includes('volume') && results.length > 0) {
       const volumeResult = results.find((r, i) => filterCombinations[i].view === 'volume');
       if (volumeResult) {
-        setVolumeData({
-          ...volumeResult,
-          dataPoints: volumeResult.dataPoints.filter((point: any) => point.volume > 0),
-        });
+        setVolumeData(
+          volumeAnalyticsForDisplay(
+            {
+              ...volumeResult,
+              dataPoints: volumeResult.dataPoints.filter((point: any) => point.volume > 0),
+            },
+            units.system,
+          ),
+        );
       }
     }
     if (selectedViews.includes('rir')) {
@@ -899,10 +908,15 @@ export default function AnalyticsPage() {
     if (selectedViews.includes('volume') && results.length > 0) {
       const volumeResult = results.find((r, i) => filterCombinations[i].view === 'volume');
       if (volumeResult) {
-        setVolumeData({
-          ...volumeResult,
-          dataPoints: volumeResult.dataPoints.filter((point: any) => point.volume > 0),
-        });
+        setVolumeData(
+          volumeAnalyticsForDisplay(
+            {
+              ...volumeResult,
+              dataPoints: volumeResult.dataPoints.filter((point: any) => point.volume > 0),
+            },
+            units.system,
+          ),
+        );
       }
     }
     if (selectedViews.includes('rir')) {
@@ -1303,7 +1317,7 @@ export default function AnalyticsPage() {
                     name={viewNames.volume}
                     stroke={CHART_ACCENT}
                     yAxisTickFormatter={(value) => `${formatNumber(value, locale)}`}
-                    yAxisLabel="kg"
+                    yAxisLabel={units.unit}
                     locale={locale}
                     formatWorkoutCount={(count) => t('workoutCount', { count })}
                     footer={
@@ -1312,7 +1326,7 @@ export default function AnalyticsPage() {
                           {t('totalVolume')}
                         </div>
                         <div className="text-2xl font-bold text-foreground">
-                          {formatNumber(volumeData.totalVolume, locale)} kg
+                          {formatNumber(volumeData.totalVolume, locale)} {units.unit}
                         </div>
                       </div>
                     }
@@ -1860,7 +1874,7 @@ export default function AnalyticsPage() {
                                   {format.number(pct)}%
                                 </div>
                                 <div className="w-20 text-right text-xs text-muted-foreground tabular-nums">
-                                  {formatNumber(mg.volume, locale)} kg
+                                  {formatNumber(mg.volume, locale)} {units.unit}
                                 </div>
                               </div>
                             );

@@ -75,4 +75,9 @@ export class UpdateUserDto {
   @IsOptional()
   @IsIn(SUPPORTED_LOCALES)
   locale?: ApiLocale;
+
+  // Weight unit system (#186): independent of `locale`, never re-derived from it.
+  @IsOptional()
+  @IsIn(['METRIC', 'IMPERIAL'])
+  unitSystem?: 'METRIC' | 'IMPERIAL';
 }

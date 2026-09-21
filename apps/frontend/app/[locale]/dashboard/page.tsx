@@ -5,6 +5,7 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { useState, useEffect } from 'react';
 import { useTranslations, useFormatter } from 'next-intl';
 import { apiClient } from '@/lib/api';
+import { useUnits } from '@/lib/use-units';
 import { fromLocalDateString } from '@/lib/local-date';
 import { weekdayReferenceDate } from '@/lib/weekday';
 import {
@@ -27,6 +28,7 @@ import { IconBarbell, IconCalendar, IconChartBar, IconTrophy } from '@tabler/ico
 export default function DashboardPage() {
   const router = useRouter();
   const t = useTranslations('Dashboard');
+  const units = useUnits();
   const format = useFormatter();
   const [weekStats, setWeekStats] = useState<DashboardStats | null>(null);
   const [cycleProgress, setCycleProgress] = useState<CycleProgress | null>(null);
@@ -178,8 +180,8 @@ export default function DashboardPage() {
                       </div>
                       <div className="flex items-end gap-3">
                         <div className="text-3xl font-bold text-foreground">
-                          {formatNumber(weekStats?.lastSevenDays.volume || 0)}
-                          <span className="text-lg text-muted-foreground ml-1">kg</span>
+                          {formatNumber(units.volume(weekStats?.lastSevenDays.volume || 0))}
+                          <span className="text-lg text-muted-foreground ml-1">{units.unit}</span>
                         </div>
                         {weekStats && (
                           <div className="pb-1">

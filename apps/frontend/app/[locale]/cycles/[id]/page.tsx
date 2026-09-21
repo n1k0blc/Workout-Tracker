@@ -5,6 +5,8 @@ import { useParams, useSearchParams } from 'next/navigation';
 import { useRouter } from '@/i18n/navigation';
 import { useState, useEffect } from 'react';
 import { useTranslations, useLocale, useFormatter } from 'next-intl';
+import { useUnits } from '@/lib/use-units';
+import { volumeAnalyticsForDisplay } from '@/lib/units';
 import { apiClient } from '@/lib/api';
 import { useExerciseLabels } from '@/hooks/useExerciseLabels';
 import {
@@ -57,6 +59,8 @@ export default function CycleDetailPage() {
   const t = useTranslations('CycleDetailPage');
   const locale = useLocale();
   const format = useFormatter();
+  // Volume arrives in canonical kg; every figure shown is converted at the boundary (#186).
+  const units = useUnits();
   const cycleId = params.id as string;
   const showCelebration = searchParams.get('celebration') === 'true';
 
@@ -257,7 +261,7 @@ export default function CycleDetailPage() {
   // Helper function to get unit and Y-axis config for a view
   const getViewConfig = (view: string): { unit: string; yAxisId: string } => {
     const configs: Record<string, { unit: string; yAxisId: string }> = {
-      volume: { unit: 'kg', yAxisId: 'left' },
+      volume: { unit: units.unit, yAxisId: 'left' },
       rir: { unit: 'RIR', yAxisId: 'left' },
       duration: { unit: 'min', yAxisId: 'left' },
       restTime: { unit: 's', yAxisId: 'left' },
@@ -324,7 +328,7 @@ export default function CycleDetailPage() {
         const dateEntry = mergedData.find((d) => d.date === point.date);
         if (dateEntry) {
           let value = 0;
-          if (combo.view === 'volume') value = point.volume;
+          if (combo.view === 'volume') value = units.volume(point.volume);
           else if (combo.view === 'rir') value = point.rir0Count || 0;
           else if (combo.view === 'duration') value = point.duration;
           else if (combo.view === 'restTime') value = point.averageRestTime;
@@ -434,10 +438,15 @@ export default function CycleDetailPage() {
       if (selectedViews.includes('volume') && results.length > 0) {
         const volumeResult = results.find((r, i) => filterCombinations[i].view === 'volume');
         if (volumeResult) {
-          setVolumeData({
-            ...volumeResult,
-            dataPoints: volumeResult.dataPoints.filter((point: any) => point.volume > 0),
-          });
+          setVolumeData(
+            volumeAnalyticsForDisplay(
+              {
+                ...volumeResult,
+                dataPoints: volumeResult.dataPoints.filter((point: any) => point.volume > 0),
+              },
+              units.system,
+            ),
+          );
         }
       }
       if (selectedViews.includes('rir')) {
@@ -470,7 +479,7 @@ export default function CycleDetailPage() {
   };
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
-  const formatVolume = (volume: number): string => format.number(Math.round(volume));
+  const formatVolume = (volume: number): string => format.number(units.volume(volume));
 
   const formatDuration = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
@@ -589,7 +598,7 @@ export default function CycleDetailPage() {
                 <div className="text-3xl font-bold text-foreground">
                   {formatVolume(cycleDetails.totalVolume)}
                 </div>
-                <div className="text-sm text-muted-foreground mt-1">{t('kgMoved')}</div>
+                <div className="text-sm text-muted-foreground mt-1">{t('volumeMoved', { unit: units.unit })}</div>
               </div>
 
               {/* Workout Count */}
@@ -868,7 +877,7 @@ export default function CycleDetailPage() {
                       name={t('metrics.volume')}
                       stroke={CHART_ACCENT}
                       yAxisTickFormatter={(value) => `${formatNumber(value, locale)}`}
-                      yAxisLabel="kg"
+                      yAxisLabel={units.unit}
                       locale={locale}
                       formatWorkoutCount={(count) => t('workoutCount', { count })}
                       footer={
@@ -877,7 +886,7 @@ export default function CycleDetailPage() {
                             {t('charts.totalVolume')}
                           </div>
                           <div className="text-2xl font-bold text-foreground">
-                            {formatNumber(volumeData.totalVolume, locale)} kg
+                            {formatNumber(volumeData.totalVolume, locale)} {units.unit}
                           </div>
                         </div>
                       }
@@ -1118,7 +1127,7 @@ export default function CycleDetailPage() {
                             </div>
                             <div className="flex items-center gap-1">
                               <IconTrendingUp className="size-4" />
-                              <span>{formatVolume(workout.totalVolume)} kg</span>
+                              <span>{formatVolume(workout.totalVolume)} {units.unit}</span>
                             </div>
                           </div>
                         </div>

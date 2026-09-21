@@ -33,6 +33,7 @@ export class UsersService {
         targetFat: true,
         createdAt: true,
         locale: true,
+        unitSystem: true,
         ...ACTIVE_HOME_GYMS_SELECT,
       },
     });
@@ -82,6 +83,7 @@ export class UsersService {
         targetFat: true,
         createdAt: true,
         locale: true,
+        unitSystem: true,
         ...ACTIVE_HOME_GYMS_SELECT,
       },
     });

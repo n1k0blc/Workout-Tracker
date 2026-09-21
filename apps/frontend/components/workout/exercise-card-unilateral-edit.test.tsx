@@ -8,6 +8,10 @@ vi.mock('@/lib/api', () => ({
   apiClient: { getExercises: vi.fn().mockResolvedValue([]) },
 }));
 
+vi.mock('@/lib/auth-context', () => ({
+  useAuth: () => ({ user: { unitSystem: 'METRIC' } }),
+}));
+
 const updateSet = vi.fn();
 
 vi.mock('@/lib/workout-context', () => ({

@@ -5,6 +5,7 @@ import { Workout, SetType } from '@/types';
 import { IconClipboardList, IconFlame, IconBarbell } from '@tabler/icons-react';
 import { Badge } from '@/components/ui/badge';
 import { setPerSide } from '@/lib/set-sides';
+import { useUnits } from '@/lib/use-units';
 
 interface SummarySlideProps {
   workout: Workout;
@@ -12,6 +13,7 @@ interface SummarySlideProps {
 
 export function SummarySlide({ workout }: SummarySlideProps) {
   const t = useTranslations('WorkoutCompletion.summary');
+  const units = useUnits();
   return (
     <div className="space-y-6 animate-fadeIn max-h-[400px] overflow-y-auto">
       <div className="text-center mb-6">
@@ -71,7 +73,7 @@ export function SummarySlide({ workout }: SummarySlideProps) {
                             <div key={label} className="flex items-center gap-2">
                               <span className="text-muted-foreground text-xs w-3">{label}</span>
                               <span className="font-semibold text-foreground tabular-nums">
-                                {side.weight}kg × {side.reps}
+                                {units.weight(side.weight)}{units.unit} × {side.reps}
                               </span>
                               {side.rir !== null && (
                                 <span className="text-muted-foreground text-xs">RIR {side.rir}</span>
@@ -82,7 +84,7 @@ export function SummarySlide({ workout }: SummarySlideProps) {
                       ) : (
                         <div className="flex items-center gap-3">
                           <span className="font-semibold text-foreground tabular-nums">
-                            {set.weight}kg × {set.reps}
+                            {units.weight(set.weight)}{units.unit} × {set.reps}
                           </span>
                           {set.rir !== undefined && set.rir !== null && (
                             <span className="text-muted-foreground text-xs">

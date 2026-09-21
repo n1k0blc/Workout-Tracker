@@ -3,6 +3,7 @@
 import { useTranslations, useFormatter } from 'next-intl';
 import { PersonalRecord } from '@/types';
 import { prValueParts } from '@/lib/prUtils';
+import { useUnits } from '@/lib/use-units';
 import { GymTag } from './GymTag';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +28,7 @@ export function PersonalRecordCard({
   className = '',
 }: PersonalRecordCardProps) {
   const t = useTranslations('PersonalRecordCard');
+  const units = useUnits();
   const format = useFormatter();
 
   const prTypeLabel = (type: string): string => {
@@ -46,7 +48,9 @@ export function PersonalRecordCard({
 
   const { value, unit } = prValueParts(pr);
   const prValueLabel =
-    unit === 'kg' ? `${format.number(value)} kg` : t('reps', { count: value });
+    unit === 'kg'
+      ? `${format.number(pr.type === 'volume' ? units.volume(value) : units.weight(value))} ${units.unit}`
+      : t('reps', { count: value });
 
   /** `format.dateTime` (unlike the old `toLocaleDateString`) throws on an invalid Date --
    *  fall back to the raw string rather than crashing the card render. */
@@ -81,7 +85,7 @@ export function PersonalRecordCard({
             </div>
             {pr.details?.weight && pr.details?.reps && (
               <div className="text-sm text-muted-foreground mt-1">
-                {format.number(pr.details.weight)} kg × {format.number(pr.details.reps)}
+                {format.number(units.weight(pr.details.weight))} {units.unit} × {format.number(pr.details.reps)}
               </div>
             )}
           </div>

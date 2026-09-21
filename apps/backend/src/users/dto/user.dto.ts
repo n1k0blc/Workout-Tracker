@@ -16,10 +16,11 @@ export class UserDto {
   weight?: number;
   createdAt: Date;
   homeGyms?: HomeGymDto[];
-  // Locale tracer bullet (#179): drives next-intl routing/UI. unitSystem and foodMarket
-  // also exist on User but stay off this DTO until they get their own UI (unitSystem)
-  // or a second market (foodMarket).
+  // Locale tracer bullet (#179): drives next-intl routing/UI. foodMarket
+  // also exists on User but stays off this DTO until a second market exists.
   locale: ApiLocale;
+  // Weight unit system (#186): display-only preference; storage stays canonical kg.
+  unitSystem: 'METRIC' | 'IMPERIAL';
   // Tagesziele (#152): manual daily targets, each null until the user sets it.
   targetKcal?: number | null;
   targetCarbs?: number | null;

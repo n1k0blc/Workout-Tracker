@@ -31,6 +31,7 @@ const baseUser = {
   lastName: 'Lee',
   createdAt: '2026-01-01T00:00:00.000Z',
   locale: 'de' as const,
+  unitSystem: 'METRIC' as 'METRIC' | 'IMPERIAL',
 };
 
 const { push, logout, updateProfile } = vi.hoisted(() => ({
@@ -99,7 +100,7 @@ describe('ProfilePage language select', () => {
   it('persists the new locale and navigates to the locale-prefixed profile URL', async () => {
     renderProfilePage();
 
-    const trigger = await screen.findByRole('combobox');
+    const trigger = await screen.findByRole('combobox', { name: 'Sprache' });
     fireEvent.click(trigger);
 
     const englishOption = await screen.findByText('English');
@@ -114,7 +115,7 @@ describe('ProfilePage language select', () => {
     updateProfile.mockRejectedValueOnce(new Error('network down'));
     renderProfilePage();
 
-    const trigger = await screen.findByRole('combobox');
+    const trigger = await screen.findByRole('combobox', { name: 'Sprache' });
     fireEvent.click(trigger);
 
     const englishOption = await screen.findByText('English');
@@ -123,5 +124,63 @@ describe('ProfilePage language select', () => {
     await waitFor(() => expect(screen.getByText('network down')).toBeTruthy());
     expect(window.location.href).toBe('');
     expect(push).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Weight unit system (#186): the Einheiten select persists `unitSystem` independently of the
+ * language, and body weight/height display in it. An untouched weight/height must never be
+ * written back re-converted -- only a field the user edited is converted (once).
+ */
+describe('ProfilePage unit system', () => {
+  const reload = vi.fn();
+  beforeEach(() => {
+    Object.defineProperty(window, 'location', {
+      value: { href: '', reload },
+      writable: true,
+      configurable: true,
+    });
+  });
+  afterEach(() => {
+    cleanup();
+    updateProfile.mockClear();
+    reload.mockClear();
+    currentUser = baseUser;
+  });
+
+  it('persists unitSystem without touching locale', async () => {
+    renderProfilePage();
+
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Einheiten' }));
+    fireEvent.click(await screen.findByText('Imperial (lb, in)'));
+
+    await waitFor(() => expect(updateProfile).toHaveBeenCalledWith({ unitSystem: 'IMPERIAL' }));
+    expect(reload).toHaveBeenCalled();
+  });
+
+  it('shows body weight and height in the imperial system', async () => {
+    currentUser = { ...baseUser, unitSystem: 'IMPERIAL', weight: 100, height: 180 } as typeof baseUser;
+    renderProfilePage();
+
+    await waitFor(() => expect(screen.getByText('220 lb')).toBeTruthy());
+    expect(screen.getByText('71 in')).toBeTruthy();
+  });
+
+  it('writes back the stored kg/cm for untouched weight and height', async () => {
+    currentUser = {
+      ...baseUser,
+      unitSystem: 'IMPERIAL',
+      weight: 100,
+      height: 180,
+      dateOfBirth: '1990-01-01T00:00:00.000Z',
+    } as typeof baseUser;
+    renderProfilePage();
+
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Bearbeiten' }))[1]);
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Speichern' }))[0]);
+
+    await waitFor(() =>
+      expect(updateProfile).toHaveBeenCalledWith(expect.objectContaining({ weight: 100, height: 180 })),
+    );
   });
 });

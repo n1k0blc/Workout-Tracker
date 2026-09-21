@@ -33,6 +33,7 @@ const USER_SELECT = {
   weight: true,
   createdAt: true,
   locale: true,
+  unitSystem: true,
   homeGyms: {
     select: { id: true, name: true, createdAt: true },
     orderBy: { name: 'asc' as const },

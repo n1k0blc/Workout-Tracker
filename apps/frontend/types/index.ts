@@ -1,3 +1,5 @@
+import type { UnitSystem } from '@/lib/units';
+
 // User Types
 export interface User {
   id: string;
@@ -16,6 +18,8 @@ export interface User {
   targetFat?: number | null;
   /** Locale tracer bullet (#179): drives next-intl routing/UI. Always set. */
   locale: 'de' | 'en';
+  /** Weight unit system (#186): display-only; storage stays canonical kg / cm. */
+  unitSystem: UnitSystem;
 }
 
 export interface HomeGym {

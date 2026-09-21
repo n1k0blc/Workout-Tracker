@@ -113,3 +113,47 @@ describe('UsersService locale (#179)', () => {
     });
   });
 });
+
+/**
+ * Weight unit system (#186): `unitSystem` is an independent column, exposed on the DTO and
+ * writable through `PATCH /users/me`. The Prisma enum (METRIC/IMPERIAL) is the wire type.
+ */
+describe('UsersService unitSystem (#186)', () => {
+  it('selects unitSystem on findById', async () => {
+    const { service, prisma } = makeService();
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'a@b.com',
+      locale: 'DE',
+      unitSystem: 'IMPERIAL',
+    });
+
+    const user = await service.findById('user-1');
+
+    expect(user.unitSystem).toBe('IMPERIAL');
+    expect(prisma.user.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ unitSystem: true }),
+      }),
+    );
+  });
+
+  it('writes unitSystem without touching locale', async () => {
+    const { service, prisma } = makeService();
+    prisma.user.update.mockResolvedValue({
+      id: 'user-1',
+      email: 'a@b.com',
+      locale: 'DE',
+      unitSystem: 'IMPERIAL',
+    });
+
+    await service.updateUser('user-1', { unitSystem: 'IMPERIAL' } as never);
+
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ unitSystem: 'IMPERIAL', locale: undefined }),
+        select: expect.objectContaining({ unitSystem: true }),
+      }),
+    );
+  });
+});

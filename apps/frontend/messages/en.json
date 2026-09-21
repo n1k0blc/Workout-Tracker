@@ -34,15 +34,15 @@
       "dateOfBirth": "Date of birth",
       "dateOfBirthWithAge": "Date of birth ({age, plural, one {# year} other {# years}})",
       "datePlaceholder": "MM/DD/YYYY",
-      "heightLabel": "Height (cm)",
-      "weightLabel": "Weight (kg)",
-      "heightValue": "{height} cm",
-      "weightValue": "{weight} kg",
+      "heightLabel": "Height ({unit})",
+      "weightLabel": "Weight ({unit})",
+      "heightValue": "{height} {unit}",
+      "weightValue": "{weight} {unit}",
       "empty": "-",
       "validationAllFields": "Please fill in all fields",
       "validationInvalidEmail": "Please provide a valid email address",
-      "validationHeightRange": "Height must be between 50 and 300 cm",
-      "validationWeightRange": "Weight must be between 20 and 500 kg",
+      "validationHeightRange": "Height must be between {min} and {max} {unit}",
+      "validationWeightRange": "Weight must be between {min} and {max} {unit}",
       "validationAgeRange": "Age must be between 13 and 120 years",
       "updated": "Profile updated successfully",
       "updateError": "Failed to update profile"
@@ -52,6 +52,12 @@
       "german": "Deutsch",
       "english": "English",
       "updateError": "Failed to change language"
+    },
+    "units": {
+      "title": "Units",
+      "metric": "Metric (kg, cm)",
+      "imperial": "Imperial (lb, in)",
+      "updateError": "Failed to save units"
     },
     "gyms": {
       "title": "My Gyms",
@@ -256,7 +262,7 @@
     "slideAria": "Go to slide {number}",
     "volume": {
       "title": "Total Volume",
-      "unit": "kg moved",
+      "unit": "{unit} moved",
       "description": "This is the sum of all reps × weight in this workout"
     },
     "duration": {
@@ -941,7 +947,6 @@
     "completedLabel": "(Completed: {date})",
     "progress": "Progress",
     "totalVolume": "Total Volume",
-    "kgMoved": "kg moved",
     "workouts": "Workouts",
     "personalRecords": "Personal Records",
     "newPRs": "new PRs",
@@ -998,7 +1003,8 @@
     "freeWorkout": "Free Workout",
     "workout": "Workout",
     "exercisesCount": "{count, plural, one {# exercise} other {# exercises}}",
-    "createNewCycle": "Create New Cycle"
+    "createNewCycle": "Create New Cycle",
+    "volumeMoved": "{unit} moved"
   },
   "MobileNav": {
     "dashboard": "Dashboard",

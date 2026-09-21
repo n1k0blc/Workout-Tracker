@@ -16,6 +16,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { WeightInput } from './weight-input';
+import { useUnits } from '@/lib/use-units';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -151,6 +153,7 @@ export default function ExerciseCard({
   defaultOpen,
 }: ExerciseCardProps) {
   const t = useTranslations('ExerciseCard');
+  const units = useUnits();
 
   // Derive effective flags. For 'active' everything is on.
   // For 'edit' the caller decides (History: all structural/logging off; Blueprint: structural on, logging off).
@@ -916,12 +919,10 @@ export default function ExerciseCard({
           className="grid grid-cols-[0.75rem_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)] items-center gap-x-2"
         >
           <span className="text-[10px] font-medium text-muted-foreground">{label}</span>
-          <Input
-            type="number"
-            step="0.5"
+          <WeightInput
             inputMode="decimal"
-            value={draft[side].weight}
-            onChange={(e) => onChange(side, 'weight', e.target.value)}
+            valueKg={draft[side].weight}
+            onChangeKg={(kg) => onChange(side, 'weight', kg)}
             placeholder="0"
             className="h-7 text-base md:text-sm tabular-nums"
             disabled={opts.disabled}
@@ -982,7 +983,7 @@ export default function ExerciseCard({
         return (
           <div key={side} className="flex items-center gap-2">
             <span className="w-3 text-xs text-muted-foreground">{label}</span>
-            <span className="font-medium text-foreground tabular-nums">{s.weight} kg × {s.reps}</span>
+            <span className="font-medium text-foreground tabular-nums">{units.weight(s.weight)} {units.unit} × {s.reps}</span>
             {s.rir !== null && <span className="text-xs text-muted-foreground">{t('rirLabel', { rir: s.rir })}</span>}
           </div>
         );
@@ -1066,7 +1067,7 @@ export default function ExerciseCard({
             renderPerSideEntryCells(setNumber)
           ) : (
             <>
-              <Input type="number" step="0.5" inputMode="decimal" value={getEditValue(setNumber, 'weight')} onChange={(e) => handleRowValueChange(setNumber, null, 'weight', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-base md:text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} />
+              <WeightInput inputMode="decimal" valueKg={getEditValue(setNumber, 'weight')} onChangeKg={(kg) => handleRowValueChange(setNumber, null, 'weight', kg)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-base md:text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} />
               <Input type="number" inputMode="numeric" value={getEditValue(setNumber, 'reps')} onChange={(e) => handleRowValueChange(setNumber, null, 'reps', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-base md:text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} />
               <Input type="number" inputMode="numeric" value={getEditValue(setNumber, 'rir')} onChange={(e) => handleRowValueChange(setNumber, null, 'rir', e.target.value)} onBlur={commitIfNeeded} placeholder="" className="h-7 text-base md:text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} />
             </>
@@ -1148,12 +1149,10 @@ export default function ExerciseCard({
             renderLoggedSideCells(perSide)
           ) : (
             <>
-              <Input
-                type="number"
-                step="0.5"
+              <WeightInput
                 inputMode="decimal"
-                value={isEditingThis ? editingValues.weight : set.weight.toString()}
-                onChange={(e) => handleRowValueChange(set.setNumber, set, 'weight', e.target.value)}
+                valueKg={isEditingThis ? editingValues.weight : set.weight.toString()}
+                onChangeKg={(kg) => handleRowValueChange(set.setNumber, set, 'weight', kg)}
                 placeholder="0"
                 className="h-7 text-base md:text-sm tabular-nums"
                 disabled={loading || isReadonly}
@@ -1399,12 +1398,10 @@ export default function ExerciseCard({
                     ) : (
                       <>
                         {/* Weight cell - always input style; for logged: live editable via updateSet */}
-                        <Input
-                          type="number"
-                          step="0.5"
+                        <WeightInput
                           inputMode="decimal"
-                          value={isEditingThis ? editingValues.weight : (loggedSet ? loggedSet.weight.toString() : getEditValue(setNumber, 'weight'))}
-                          onChange={(e) => handleRowValueChange(setNumber, loggedSet ?? null, 'weight', e.target.value)}
+                          valueKg={isEditingThis ? editingValues.weight : (loggedSet ? loggedSet.weight.toString() : getEditValue(setNumber, 'weight'))}
+                          onChangeKg={(kg) => handleRowValueChange(setNumber, loggedSet ?? null, 'weight', kg)}
                           onBlur={commitIfNeeded}
                           placeholder="0"
                           className="h-7 text-base md:text-sm tabular-nums"

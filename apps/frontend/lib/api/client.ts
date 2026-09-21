@@ -55,6 +55,7 @@ import {
 } from '@/types';
 import { clientTimeZone } from '@/lib/local-date';
 import { clientLocale } from '@/lib/client-locale';
+import type { UnitSystem } from '@/lib/units';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
@@ -250,6 +251,7 @@ class ApiClient {
     targetProtein?: number | null;
     targetFat?: number | null;
     locale?: 'de' | 'en';
+    unitSystem?: UnitSystem;
   }): Promise<User> {
     return this.request<User>('/users/me', {
       method: 'PATCH',

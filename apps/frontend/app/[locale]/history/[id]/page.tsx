@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
 import { Workout, WorkoutExercise, ExerciseLog } from '@/types';
 import { setWorkingVolume } from '@/lib/volume';
+import { useUnits } from '@/lib/use-units';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,7 @@ import {
 } from '@tabler/icons-react';
 
 export default function WorkoutDetailPage() {
+  const units = useUnits();
   const params = useParams();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -235,8 +237,8 @@ export default function WorkoutDetailPage() {
                         Gesamtvolumen
                       </div>
                       <div className="text-2xl font-bold text-foreground">
-                        {formatNumber(calculateTotalVolume())}{' '}
-                        <span className="text-lg text-muted-foreground">kg</span>
+                        {formatNumber(units.volume(calculateTotalVolume()))}{' '}
+                        <span className="text-lg text-muted-foreground">{units.unit}</span>
                       </div>
                     </CardContent>
                   </Card>
