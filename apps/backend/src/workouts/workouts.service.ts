@@ -21,6 +21,7 @@ import { CreateWorkoutDto, SaveAsTemplateMode } from './dto/create-workout.dto';
 import { UpdateWorkoutDto } from './dto/update-workout.dto';
 import { WorkoutResponseDto, WorkoutListItemDto } from './dto/workout-response.dto';
 import { LastPerformanceDto, LastPerformanceSource } from './dto/last-performance.dto';
+import { ApiLocale, DEFAULT_LOCALE } from '../common/utils/locale.util';
 
 const WORKOUT_FULL_INCLUDE = {
   cycle: { select: { name: true } },
@@ -107,7 +108,11 @@ export class WorkoutsService {
     });
   }
 
-  async findById(id: string, userId: string): Promise<WorkoutResponseDto> {
+  async findById(
+    id: string,
+    userId: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<WorkoutResponseDto> {
     const workout = await this.prisma.workout.findUnique({
       where: { id },
       include: WORKOUT_FULL_INCLUDE,
@@ -117,7 +122,7 @@ export class WorkoutsService {
       throw new AppNotFoundException('Workout not found', 'WORKOUT_NOT_FOUND');
     }
 
-    return this.mapWorkoutToResponse(workout);
+    return this.mapWorkoutToResponse(workout, locale);
   }
 
   /**
@@ -193,7 +198,11 @@ export class WorkoutsService {
     return null;
   }
 
-  async create(dto: CreateWorkoutDto, userId: string): Promise<WorkoutResponseDto> {
+  async create(
+    dto: CreateWorkoutDto,
+    userId: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<WorkoutResponseDto> {
     if (!dto.isFreeWorkout && (!dto.cycleId || !dto.workoutDayId)) {
       throw new AppBadRequestException(
         'cycleId and workoutDayId are required for non-free workouts',
@@ -226,10 +235,15 @@ export class WorkoutsService {
       return workout.id;
     });
 
-    return this.findById(workoutId, userId);
+    return this.findById(workoutId, userId, locale);
   }
 
-  async update(id: string, dto: UpdateWorkoutDto, userId: string): Promise<WorkoutResponseDto> {
+  async update(
+    id: string,
+    dto: UpdateWorkoutDto,
+    userId: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<WorkoutResponseDto> {
     const existing = await this.prisma.workout.findUnique({ where: { id } });
     if (!existing || existing.kind !== 'WORKOUT' || existing.userId !== userId) {
       throw new AppNotFoundException('Workout not found', 'WORKOUT_NOT_FOUND');
@@ -273,7 +287,7 @@ export class WorkoutsService {
       }
     });
 
-    return this.findById(id, userId);
+    return this.findById(id, userId, locale);
   }
 
   async delete(id: string, userId: string): Promise<void> {
@@ -455,7 +469,7 @@ export class WorkoutsService {
     }
   }
 
-  private mapWorkoutToResponse(workout: any): WorkoutResponseDto {
+  private mapWorkoutToResponse(workout: any, locale: ApiLocale): WorkoutResponseDto {
     return {
       id: workout.id,
       date: workout.date,
@@ -470,7 +484,7 @@ export class WorkoutsService {
       workoutDayName: workout.workoutDay?.name,
       originTemplateId: workout.originTemplateId ?? undefined,
       originTemplateName: workout.originTemplate?.name,
-      exercises: mapExercisesToResponse(workout.exercises),
+      exercises: mapExercisesToResponse(workout.exercises, locale),
       createdAt: workout.createdAt,
     };
   }

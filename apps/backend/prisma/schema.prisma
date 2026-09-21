@@ -217,6 +217,20 @@ model Exercise {
   tricepsPercent    Int               @default(0)
   user              User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
   workoutExercises  WorkoutExercise[]
+  translations      ExerciseTranslation[]
+}
+
+// Per-locale display name of a catalogue Exercise (#187, ADR-0006). Custom exercises are user
+// content and have no rows here. The real FK + cascade means a translation can never outlive
+// its exercise; `Exercise.name` stays as the German source / last-resort fallback.
+model ExerciseTranslation {
+  id         String   @id @default(uuid())
+  exerciseId String
+  locale     Locale
+  name       String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@unique([exerciseId, locale])
 }
 
 // A named division of a user's eating day (Abschnitt): Frühstück, Mittagessen, Abendessen,

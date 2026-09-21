@@ -200,6 +200,7 @@ const SYSTEM_EXERCISE = {
   equipment: Equipment.BARBELL,
   isUnilateral: false,
   isCustom: false,
+  translations: [{ locale: 'DE' as const, name: 'Barbell Squat' }],
   userId: null,
 };
 
@@ -266,5 +267,56 @@ describe('ExercisesService.validateAccessible — cross-user access', () => {
     );
 
     expect(Array.from(accessible.keys())).toEqual([SYSTEM_EXERCISE.id, CUSTOM_EXERCISE.id]);
+  });
+});
+
+describe('ExercisesService — catalogue names resolve in the client locale (#187)', () => {
+  const catalogue = (id: string, de: string, en: string) => ({
+    ...CUSTOM_EXERCISE,
+    id,
+    name: de,
+    isCustom: false,
+    userId: null,
+    translations: [
+      { locale: 'DE', name: de },
+      { locale: 'EN', name: en },
+    ],
+  });
+  const CRUNCH = catalogue('c1', 'Kabel Crunch', 'Cable Crunch');
+  const ROW = catalogue('c2', 'Kurzhantel Rudern', 'Dumbbell Row');
+  const CUSTOM = { ...CUSTOM_EXERCISE, name: 'Mein Curl', translations: [] };
+
+  it('returns the English name, leaving the DTO shape unchanged', async () => {
+    const { service } = makeService({ findMany: [CRUNCH] });
+
+    const [dto] = await service.findAll({} as never, 'user-1', 'en');
+
+    expect(dto.name).toBe('Cable Crunch');
+    expect(dto).not.toHaveProperty('translations');
+  });
+
+  it('renders custom exercises verbatim', async () => {
+    const { service } = makeService({ findMany: [CUSTOM] });
+
+    const [dto] = await service.findAll({} as never, 'user-1', 'en');
+
+    expect(dto.name).toBe('Mein Curl');
+  });
+
+  it('searches and sorts on the translated name', async () => {
+    const { service } = makeService({ findMany: [CRUNCH, ROW] });
+
+    const searched = await service.findAll({ search: 'dumbbell' } as never, 'user-1', 'en');
+    expect(searched.map((e) => e.name)).toEqual(['Dumbbell Row']);
+
+    // German order would put "Kabel" first; English puts "Cable" first, then "Dumbbell".
+    const sorted = await service.findAll({} as never, 'user-1', 'en');
+    expect(sorted.map((e) => e.name)).toEqual(['Cable Crunch', 'Dumbbell Row']);
+  });
+
+  it('resolves findById in the client locale', async () => {
+    const { service } = makeService({ findUnique: CRUNCH });
+
+    expect((await service.findById('c1', 'user-1', 'en')).name).toBe('Cable Crunch');
   });
 });

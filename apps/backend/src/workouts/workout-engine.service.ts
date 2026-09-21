@@ -11,6 +11,7 @@ import {
   instantToLocalDate,
   weekdayOfLocalDate,
 } from '../common/utils/today.util';
+import { ApiLocale, DEFAULT_LOCALE } from '../common/utils/locale.util';
 
 export interface SuggestedWorkout {
   cycleId: string;
@@ -153,7 +154,11 @@ export class WorkoutEngineService {
     return day;
   }
 
-  async getSuggestedWorkout(userId: string, today: Today): Promise<SuggestedWorkout | null> {
+  async getSuggestedWorkout(
+    userId: string,
+    today: Today,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<SuggestedWorkout | null> {
     const activeCycle = await this.getRecommendableCycle(userId, today);
     if (!activeCycle || this.isCycleNotStarted(activeCycle, today)) {
       return null;
@@ -171,7 +176,7 @@ export class WorkoutEngineService {
       workoutDayName: day.name,
       weekday: day.weekday,
       plannedHomeGymId: day.plannedHomeGymId,
-      exercises: mapExercisesToResponse(day.workouts[0].exercises),
+      exercises: mapExercisesToResponse(day.workouts[0].exercises, locale),
     };
   }
 

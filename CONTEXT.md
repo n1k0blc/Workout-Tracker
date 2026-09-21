@@ -187,6 +187,16 @@ say.
   series is in the client's timezone; omitted, the window is the last 7 days up to the
   client's "today". No weight correlation. Code: `NutritionAnalyticsService`.
 
+### Übungen (exercise catalogue)
+
+- **Übung-Übersetzung** — the 115 catalogue Übungen (`isCustom = false`) show their name in the
+  user's locale, one `ExerciseTranslation` row per `(exercise, locale)` with a cascading foreign
+  key. The API resolves it from the `X-Locale` header (`@ClientLocale()`), so DTO shapes carry
+  just `name`. A missing translation falls back to `de`, then any row, never to empty, and logs
+  the gap; user-created Übungen are never translated. See
+  [ADR-0006](docs/adr/0006-catalogue-names-are-translated-server-side-per-locale.md). Code:
+  `ExerciseTranslation`, `resolveExerciseName`.
+
 ### Tracked nutrients
 
 Only **kcal**, **Kohlenhydrate** (carbs), **Protein** and **Fett** (fat). No micronutrients.

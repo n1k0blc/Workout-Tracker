@@ -245,7 +245,10 @@ describe('mapExercisesToResponse', () => {
       exerciseId: 'ex1',
       order: 1,
       exercise: {
+        id: 'ex1',
         name: 'Split Squat',
+        isCustom: true,
+        translations: [],
         equipment: Equipment.BODYWEIGHT,
         isUnilateral: true,
         isDoubleWeight: false,
@@ -273,6 +276,29 @@ describe('mapExercisesToResponse', () => {
       rirLeft: 2,
       rirRight: 2,
     });
+  });
+
+  it('resolves the catalogue exercise name in the requested locale; custom stays verbatim (#187)', () => {
+    const catalogue = loadedExercise();
+    catalogue.exercise = {
+      ...catalogue.exercise,
+      isCustom: false,
+      name: 'Kabel Crunch',
+      translations: [
+        { locale: 'DE', name: 'Kabel Crunch' },
+        { locale: 'EN', name: 'Cable Crunch' },
+      ],
+    };
+    const custom = loadedExercise();
+    custom.exercise = { ...custom.exercise, name: 'Mein Curl' };
+
+    const [en] = mapExercisesToResponse([catalogue], 'en');
+    const [de] = mapExercisesToResponse([catalogue], 'de');
+    const [verbatim] = mapExercisesToResponse([custom], 'en');
+
+    expect(en.exerciseName).toBe('Cable Crunch');
+    expect(de.exerciseName).toBe('Kabel Crunch');
+    expect(verbatim.exerciseName).toBe('Mein Curl');
   });
 
   it('carries the exercise equipment through to the response', () => {

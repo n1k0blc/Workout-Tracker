@@ -6,6 +6,11 @@ import {
   WorkoutExerciseInputDto,
   WorkoutExerciseResponseDto,
 } from '../common/dto/workout-tree.dto';
+import { ApiLocale, DEFAULT_LOCALE } from '../common/utils/locale.util';
+import {
+  EXERCISE_TRANSLATIONS_SELECT,
+  resolveExerciseName,
+} from '../common/utils/exercise-name.util';
 
 /**
  * Neither shape carries `order`: array position *is* the order once a tree is inside the
@@ -254,7 +259,10 @@ type LoadedWorkoutExercise = {
   exerciseId: string;
   order: number;
   exercise: {
+    id: string;
     name: string;
+    isCustom: boolean;
+    translations: { locale: 'DE' | 'EN'; name: string }[];
     equipment: Equipment;
     isUnilateral: boolean;
     isDoubleWeight: boolean;
@@ -277,9 +285,13 @@ type LoadedWorkoutExercise = {
   }[];
 };
 
-/** Maps a Prisma-loaded WorkoutExercise[] (with nested exercise+sets) to the API response shape. */
+/**
+ * Maps a Prisma-loaded WorkoutExercise[] (with nested exercise+sets) to the API response shape.
+ * `exerciseName` is resolved in `locale` -- the DTO shape is unchanged (ADR-0006).
+ */
 export function mapExercisesToResponse(
   exercises: LoadedWorkoutExercise[],
+  locale: ApiLocale = DEFAULT_LOCALE,
 ): WorkoutExerciseResponseDto[] {
   return exercises
     .slice()
@@ -287,7 +299,7 @@ export function mapExercisesToResponse(
     .map((ex) => ({
       id: ex.id,
       exerciseId: ex.exerciseId,
-      exerciseName: ex.exercise.name,
+      exerciseName: resolveExerciseName(ex.exercise, locale),
       equipment: ex.exercise.equipment,
       isUnilateral: ex.exercise.isUnilateral,
       isDoubleWeight: ex.exercise.isDoubleWeight,
@@ -319,7 +331,10 @@ export const WORKOUT_EXERCISE_TREE_INCLUDE = {
     include: {
       exercise: {
         select: {
+          id: true,
           name: true,
+          isCustom: true,
+          translations: EXERCISE_TRANSLATIONS_SELECT,
           equipment: true,
           isUnilateral: true,
           isDoubleWeight: true,

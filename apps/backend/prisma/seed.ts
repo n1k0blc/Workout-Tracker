@@ -3,6 +3,10 @@ import { config } from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
 import { parseFoodsCsv, seedFoods } from '../src/foods/foods-seed';
+import {
+  parseExerciseTranslationsCsv,
+  seedExerciseTranslations,
+} from '../src/exercises/exercise-translations-seed';
 
 // Load .env from backend directory
 config({ path: path.join(__dirname, '../.env') });
@@ -186,9 +190,20 @@ async function main() {
     console.log(`❌ Failed to process ${errorCount} exercises`);
   }
 
+  await seedExerciseTranslationsFromCsv();
   await seedFoodsFromCsv();
 
   console.log('✅ Seeding completed!');
+}
+
+// Catalogue Übung names per locale (#187): de from the rows just upserted, en from
+// ExerciseTranslations-en.csv. Throws if any catalogue row would lack either locale.
+async function seedExerciseTranslationsFromCsv() {
+  console.log('🌱 Seeding exercise translations...');
+  const csvPath = path.join(__dirname, '../../../ExerciseTranslations-en.csv');
+  const english = parseExerciseTranslationsCsv(fs.readFileSync(csvPath, 'utf-8'));
+  const count = await seedExerciseTranslations(prisma, english);
+  console.log(`✅ Seeded de + en names for ${count} catalogue exercises`);
 }
 
 // Generic Lebensmittel (#145): FoodsSeed.csv at the repo root, upserted on `seedKey`.

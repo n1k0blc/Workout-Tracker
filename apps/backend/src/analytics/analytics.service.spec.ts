@@ -3,7 +3,13 @@ import { AnalyticsService } from './analytics.service';
 import { AnalyticsFilterDto, AnalyticsScope } from '../common/dto/analytics-filter.dto';
 
 const baseExercise = {
-  name: 'Bench Press',
+  id: 'exercise-1',
+  name: 'Bankdrücken',
+  isCustom: false,
+  translations: [
+    { locale: 'DE', name: 'Bankdrücken' },
+    { locale: 'EN', name: 'Bench Press' },
+  ],
   equipment: 'BARBELL',
   isUnilateral: false,
   isDoubleWeight: false,
@@ -339,9 +345,16 @@ describe('AnalyticsService', () => {
         }),
       ]);
 
-      const result = await service.getPersonalRecords('user-1');
+      const result = await service.getPersonalRecords(
+        'user-1',
+        undefined,
+        undefined,
+        undefined,
+        'en',
+      );
 
       expect(result.allTimePRs).toHaveLength(1);
+      expect(result.allTimePRs[0].exerciseName).toBe('Bench Press');
       expect(result.allTimePRs[0].value).toBe(80); // 40 * 2, the higher of the two
       expect(result.allTimePRs[0].type).toBe('weight');
     });

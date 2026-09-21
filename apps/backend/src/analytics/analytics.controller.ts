@@ -1,5 +1,7 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
+import { ClientLocale } from '../common/decorators/client-locale.decorator';
+import { ApiLocale } from '../common/utils/locale.util';
 import {
   VolumeAnalyticsDto,
   PersonalRecordsDto,
@@ -37,11 +39,12 @@ export class AnalyticsController {
   @Get('prs')
   async getPersonalRecords(
     @CurrentUser() user: { id: string },
-    @Query('muscleGroup') muscleGroup?: string | string[],
-    @Query('equipment') equipment?: string | string[],
-    @Query('gymId') gymId?: string,
+    @Query('muscleGroup') muscleGroup: string | string[] | undefined,
+    @Query('equipment') equipment: string | string[] | undefined,
+    @Query('gymId') gymId: string | undefined,
+    @ClientLocale() locale: ApiLocale,
   ): Promise<PersonalRecordsDto> {
-    return this.analyticsService.getPersonalRecords(user.id, muscleGroup, equipment, gymId);
+    return this.analyticsService.getPersonalRecords(user.id, muscleGroup, equipment, gymId, locale);
   }
 
   @Get('muscle-distribution')

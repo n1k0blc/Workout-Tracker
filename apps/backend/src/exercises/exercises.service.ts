@@ -13,10 +13,16 @@ import {
   MUSCLE_PERCENT_FIELD,
 } from '../common/muscle.util';
 import type { ExerciseShape } from '../workout-tree/workout-tree.service';
+import { ApiLocale, DEFAULT_LOCALE } from '../common/utils/locale.util';
+import {
+  EXERCISE_TRANSLATIONS_SELECT,
+  resolveExerciseName,
+} from '../common/utils/exercise-name.util';
 
 const EXERCISE_SELECT = {
   id: true,
   name: true,
+  translations: EXERCISE_TRANSLATIONS_SELECT,
   equipment: true,
   isUnilateral: true,
   isDoubleWeight: true,
@@ -40,6 +46,7 @@ const EXERCISE_SELECT = {
 type ExerciseRow = {
   id: string;
   name: string;
+  translations: { locale: 'DE' | 'EN'; name: string }[];
   equipment: string;
   isUnilateral: boolean;
   isDoubleWeight: boolean;
@@ -48,10 +55,11 @@ type ExerciseRow = {
   deletedAt: Date | null;
 } & MusclePercentages;
 
-function toDto(exercise: ExerciseRow, inUse: boolean): ExerciseDto {
-  const { deletedAt: _deletedAt, ...rest } = exercise;
+function toDto(exercise: ExerciseRow, inUse: boolean, locale: ApiLocale): ExerciseDto {
+  const { deletedAt: _deletedAt, translations: _translations, ...rest } = exercise;
   return {
     ...rest,
+    name: resolveExerciseName(exercise, locale),
     userId: rest.userId ?? undefined,
     primaryMuscle: derivePrimaryMuscle(exercise),
     inUse,
@@ -162,7 +170,11 @@ export class ExercisesService {
     return percentages;
   }
 
-  async findAll(filterDto: FilterExerciseDto, userId?: string): Promise<ExerciseDto[]> {
+  async findAll(
+    filterDto: FilterExerciseDto,
+    userId?: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<ExerciseDto[]> {
     const { search, primaryMuscle, equipment, includeCustom } = filterDto;
 
     const where: any = {
@@ -179,25 +191,30 @@ export class ExercisesService {
       where.equipment = equipment as any;
     }
 
-    if (search) {
-      where.name = {
-        contains: search,
-        mode: 'insensitive',
-      };
-    }
-
     const exercises = await this.prisma.exercise.findMany({
       where,
       select: EXERCISE_SELECT,
-      orderBy: [{ isCustom: 'asc' }, { name: 'asc' }],
     });
 
+    // Search and order act on the *resolved* name, so they run here rather than in SQL --
+    // the catalogue is ~115 rows plus one user's customs. ADR-0006 names this as the exit
+    // condition: revisit the read path if volumes ever outgrow it.
     const inUseIds = await this.findInUseIds(exercises.map((e) => e.id));
-    const dtos = exercises.map((e) => toDto(e as ExerciseRow, inUseIds.has(e.id)));
+    const needle = search?.toLowerCase();
+    const dtos = exercises
+      .map((e) => toDto(e as ExerciseRow, inUseIds.has(e.id), locale))
+      .filter((e) => !needle || e.name.toLowerCase().includes(needle))
+      .sort(
+        (a, b) => Number(a.isCustom) - Number(b.isCustom) || a.name.localeCompare(b.name, locale),
+      );
     return primaryMuscle ? dtos.filter((e) => e.primaryMuscle === primaryMuscle) : dtos;
   }
 
-  async findById(id: string, userId?: string): Promise<ExerciseDto> {
+  async findById(
+    id: string,
+    userId?: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<ExerciseDto> {
     const exercise = await this.prisma.exercise.findUnique({
       where: { id },
       select: EXERCISE_SELECT,
@@ -212,7 +229,7 @@ export class ExercisesService {
       throw new AppNotFoundException('Exercise not found', 'EXERCISE_NOT_FOUND');
     }
 
-    return toDto(exercise as ExerciseRow, await this.isInUse(id));
+    return toDto(exercise as ExerciseRow, await this.isInUse(id), locale);
   }
 
   async create(createExerciseDto: CreateExerciseDto, userId: string): Promise<ExerciseDto> {
@@ -253,7 +270,7 @@ export class ExercisesService {
       select: EXERCISE_SELECT,
     });
 
-    return toDto(exercise as ExerciseRow, false);
+    return toDto(exercise as ExerciseRow, false, DEFAULT_LOCALE);
   }
 
   async delete(id: string, userId: string): Promise<void> {
@@ -331,6 +348,6 @@ export class ExercisesService {
       select: EXERCISE_SELECT,
     });
 
-    return toDto(updated as ExerciseRow, inUse);
+    return toDto(updated as ExerciseRow, inUse, DEFAULT_LOCALE);
   }
 }

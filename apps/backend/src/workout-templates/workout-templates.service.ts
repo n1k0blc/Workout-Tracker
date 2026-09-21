@@ -10,6 +10,7 @@ import {
 } from '../workout-tree/workout-tree.service';
 import { WorkoutTemplateDto, CreateWorkoutTemplateDto, UpdateWorkoutTemplateDto } from './dto';
 import { ExercisesService } from '../exercises/exercises.service';
+import { ApiLocale, DEFAULT_LOCALE } from '../common/utils/locale.util';
 
 const TEMPLATE_INCLUDE = {
   ...WORKOUT_EXERCISE_TREE_INCLUDE,
@@ -24,7 +25,7 @@ export class WorkoutTemplatesService {
     private exercisesService: ExercisesService,
   ) {}
 
-  async findAll(userId: string): Promise<WorkoutTemplateDto[]> {
+  async findAll(userId: string, locale: ApiLocale = DEFAULT_LOCALE): Promise<WorkoutTemplateDto[]> {
     const templates = await this.prisma.workout.findMany({
       where: {
         kind: 'TEMPLATE',
@@ -34,10 +35,14 @@ export class WorkoutTemplatesService {
       orderBy: [{ isCustom: 'asc' }, { name: 'asc' }],
     });
 
-    return templates.map((template) => this.mapToDto(template));
+    return templates.map((template) => this.mapToDto(template, locale));
   }
 
-  async findOne(id: string, userId: string): Promise<WorkoutTemplateDto> {
+  async findOne(
+    id: string,
+    userId: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<WorkoutTemplateDto> {
     const template = await this.prisma.workout.findUnique({
       where: { id },
       include: TEMPLATE_INCLUDE,
@@ -51,10 +56,14 @@ export class WorkoutTemplatesService {
       throw new AppNotFoundException('Workout template not found', 'WORKOUT_TEMPLATE_NOT_FOUND');
     }
 
-    return this.mapToDto(template);
+    return this.mapToDto(template, locale);
   }
 
-  async create(userId: string, createDto: CreateWorkoutTemplateDto): Promise<WorkoutTemplateDto> {
+  async create(
+    userId: string,
+    createDto: CreateWorkoutTemplateDto,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<WorkoutTemplateDto> {
     const existing = await this.prisma.workout.findFirst({
       where: { kind: 'TEMPLATE', userId, name: createDto.name },
     });
@@ -90,13 +99,14 @@ export class WorkoutTemplatesService {
       return template.id;
     });
 
-    return this.findOne(templateId, userId);
+    return this.findOne(templateId, userId, locale);
   }
 
   async update(
     id: string,
     userId: string,
     updateDto: UpdateWorkoutTemplateDto,
+    locale: ApiLocale = DEFAULT_LOCALE,
   ): Promise<WorkoutTemplateDto> {
     const template = await this.prisma.workout.findUnique({ where: { id } });
 
@@ -156,7 +166,7 @@ export class WorkoutTemplatesService {
       }
     });
 
-    return this.findOne(id, userId);
+    return this.findOne(id, userId, locale);
   }
 
   async delete(id: string, userId: string): Promise<void> {
@@ -180,8 +190,8 @@ export class WorkoutTemplatesService {
     await this.prisma.workout.delete({ where: { id } });
   }
 
-  private mapToDto(template: any): WorkoutTemplateDto {
-    const exercises = mapExercisesToResponse(template.exercises);
+  private mapToDto(template: any, locale: ApiLocale): WorkoutTemplateDto {
+    const exercises = mapExercisesToResponse(template.exercises, locale);
 
     return {
       id: template.id,

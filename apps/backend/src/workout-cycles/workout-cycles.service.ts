@@ -27,6 +27,7 @@ import {
   CycleDetailsDto,
   WorkoutsByGymDto,
 } from './dto';
+import { ApiLocale, DEFAULT_LOCALE } from '../common/utils/locale.util';
 
 const WEEKDAY_UNIQUE_INDEX = 'WorkoutDay_cycleId_weekday_key';
 const ORDER_UNIQUE_INDEX = 'WorkoutDay_cycleId_order_key';
@@ -105,17 +106,21 @@ export class WorkoutCyclesService {
     }
   }
 
-  async findAll(userId: string): Promise<CycleResponseDto[]> {
+  async findAll(userId: string, locale: ApiLocale = DEFAULT_LOCALE): Promise<CycleResponseDto[]> {
     const cycles = await this.prisma.workoutCycle.findMany({
       where: { userId },
       include: CYCLE_TREE_INCLUDE,
       orderBy: { createdAt: 'desc' },
     });
 
-    return cycles.map((cycle) => this.mapCycleToResponse(cycle));
+    return cycles.map((cycle) => this.mapCycleToResponse(cycle, locale));
   }
 
-  async findById(id: string, userId: string): Promise<CycleResponseDto> {
+  async findById(
+    id: string,
+    userId: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<CycleResponseDto> {
     const cycle = await this.prisma.workoutCycle.findUnique({
       where: { id },
       include: CYCLE_TREE_INCLUDE,
@@ -125,10 +130,14 @@ export class WorkoutCyclesService {
       throw new AppNotFoundException('Workout cycle not found', 'CYCLE_NOT_FOUND');
     }
 
-    return this.mapCycleToResponse(cycle);
+    return this.mapCycleToResponse(cycle, locale);
   }
 
-  async create(createCycleDto: CreateCycleDto, userId: string): Promise<CycleResponseDto> {
+  async create(
+    createCycleDto: CreateCycleDto,
+    userId: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<CycleResponseDto> {
     const existingActiveCycle = await this.prisma.workoutCycle.findFirst({
       where: { userId, status: 'ACTIVE' },
     });
@@ -186,13 +195,14 @@ export class WorkoutCyclesService {
       return cycle.id;
     });
 
-    return this.findById(cycleId, userId);
+    return this.findById(cycleId, userId, locale);
   }
 
   async update(
     id: string,
     updateCycleDto: UpdateCycleDto,
     userId: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
   ): Promise<CycleResponseDto> {
     const cycle = await this.findById(id, userId);
 
@@ -235,7 +245,7 @@ export class WorkoutCyclesService {
       null,
     );
 
-    return this.findById(id, userId);
+    return this.findById(id, userId, locale);
   }
 
   async updateBlueprint(
@@ -243,6 +253,7 @@ export class WorkoutCyclesService {
     workoutDayId: string,
     updateBlueprintDto: UpdateBlueprintDto,
     userId: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
   ): Promise<CycleResponseDto> {
     await this.findById(cycleId, userId);
     const exercisesById = await this.exercisesService.validateAccessible(
@@ -273,7 +284,7 @@ export class WorkoutCyclesService {
       await tx.workout.update({ where: { id: blueprint.id }, data: { updatedAt: new Date() } });
     });
 
-    return this.findById(cycleId, userId);
+    return this.findById(cycleId, userId, locale);
   }
 
   async updateWorkoutDay(
@@ -281,6 +292,7 @@ export class WorkoutCyclesService {
     workoutDayId: string,
     updateWorkoutDayDto: UpdateWorkoutDayDto,
     userId: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
   ): Promise<CycleResponseDto> {
     const cycle = await this.findById(cycleId, userId);
 
@@ -345,7 +357,7 @@ export class WorkoutCyclesService {
         updateWorkoutDayDto.weekday,
       );
 
-      return this.findById(cycleId, userId);
+      return this.findById(cycleId, userId, locale);
     }
 
     await this.runWorkoutDayWrite(
@@ -364,7 +376,7 @@ export class WorkoutCyclesService {
       updateWorkoutDayDto.weekday,
     );
 
-    return this.findById(cycleId, userId);
+    return this.findById(cycleId, userId, locale);
   }
 
   /**
@@ -397,7 +409,11 @@ export class WorkoutCyclesService {
     }
   }
 
-  async completeCycle(id: string, userId: string): Promise<CycleResponseDto> {
+  async completeCycle(
+    id: string,
+    userId: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<CycleResponseDto> {
     const cycle = await this.findById(id, userId);
 
     if (cycle.status === 'COMPLETED') {
@@ -412,7 +428,7 @@ export class WorkoutCyclesService {
       data: { status: 'COMPLETED', completedAt: getCurrentDate() },
     });
 
-    return this.findById(id, userId);
+    return this.findById(id, userId, locale);
   }
 
   async delete(id: string, userId: string): Promise<void> {
@@ -519,7 +535,7 @@ export class WorkoutCyclesService {
     };
   }
 
-  private mapCycleToResponse(cycle: any): CycleResponseDto {
+  private mapCycleToResponse(cycle: any, locale: ApiLocale): CycleResponseDto {
     return {
       id: cycle.id,
       name: cycle.name,
@@ -543,7 +559,7 @@ export class WorkoutCyclesService {
             ? {
                 id: blueprint.id,
                 updatedAt: blueprint.updatedAt,
-                exercises: mapExercisesToResponse(blueprint.exercises),
+                exercises: mapExercisesToResponse(blueprint.exercises, locale),
               }
             : undefined,
         };

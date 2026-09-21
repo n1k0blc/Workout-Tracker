@@ -4,6 +4,8 @@ export const LOCALE_HEADER = 'x-locale';
 export const SUPPORTED_LOCALES = ['de', 'en'] as const;
 export type ApiLocale = (typeof SUPPORTED_LOCALES)[number];
 
+export const DEFAULT_LOCALE: ApiLocale = 'de';
+
 /**
  * The `Locale` -> lowercase wire-type mapping. The Prisma enum stays SCREAMING_SNAKE_CASE
  * to match every other enum in the schema (`CycleStatus`, `SetType`, ...); next-intl's
@@ -36,8 +38,10 @@ export function withApiLocale<T extends { locale: 'DE' | 'EN' }>(
  * sends a real value; the fallback only matters for direct API calls that skip it.
  */
 export function resolveRegisterLocale(header?: string | string[]): ApiLocale {
-  if (typeof header !== 'string') return 'de';
-  return (SUPPORTED_LOCALES as readonly string[]).includes(header) ? (header as ApiLocale) : 'de';
+  if (typeof header !== 'string') return DEFAULT_LOCALE;
+  return (SUPPORTED_LOCALES as readonly string[]).includes(header)
+    ? (header as ApiLocale)
+    : DEFAULT_LOCALE;
 }
 
 /**
