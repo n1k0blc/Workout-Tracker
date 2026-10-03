@@ -15,6 +15,8 @@ import { AppBadRequestException } from '../common/errors/app-exceptions';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ClientToday } from '../common/decorators/client-today.decorator';
+import { ClientLocale } from '../common/decorators/client-locale.decorator';
+import { ApiLocale } from '../common/utils/locale.util';
 import { Today } from '../common/utils/today.util';
 import { isLocalDate } from '../common/utils/local-date.util';
 import { DiaryEntriesService } from './diary-entries.service';
@@ -103,17 +105,19 @@ export class NutritionController {
   @Get('picker/favorites')
   async pickerFavorites(
     @CurrentUser() user: { id: string },
+    @ClientLocale() locale: ApiLocale,
     @Query('scope') scope?: string,
   ): Promise<PickerListDto> {
-    return this.picker.getFavorites(user.id, toPickerScope(scope));
+    return this.picker.getFavorites(user.id, toPickerScope(scope), locale);
   }
 
   @Get('picker/recent')
   async pickerRecent(
     @CurrentUser() user: { id: string },
+    @ClientLocale() locale: ApiLocale,
     @Query('scope') scope?: string,
   ): Promise<PickerListDto> {
-    return this.picker.getRecent(user.id, toPickerScope(scope));
+    return this.picker.getRecent(user.id, toPickerScope(scope), locale);
   }
 
   // --- Abschnitte (#142) --------------------------------------------------------------------

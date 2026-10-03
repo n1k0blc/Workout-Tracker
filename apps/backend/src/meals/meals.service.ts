@@ -4,6 +4,13 @@ import { PrismaService } from '../prisma/prisma.service';
 import { FavoritesService } from '../favorites/favorites.service';
 import { scalePer100 } from '../common/utils/nutrition.util';
 import { orderByIds } from '../common/utils/order-by-ids';
+import { ApiLocale, DEFAULT_LOCALE } from '../common/utils/locale.util';
+import {
+  FOOD_TRANSLATIONS_SELECT,
+  PORTION_TRANSLATIONS_SELECT,
+  resolveFoodName,
+  resolvePortionLabel,
+} from '../common/utils/food-name.util';
 import {
   CreateMealDto,
   UpdateMealDto,
@@ -20,11 +27,14 @@ type PortionRow = {
   grams: number;
   order: number;
   isDefault: boolean;
+  translations: { locale: 'DE' | 'EN'; label: string }[];
 };
 
 type FoodRow = {
   id: string;
   name: string;
+  source: 'SEED' | 'OPEN_FOOD_FACTS' | 'USER';
+  translations: { locale: 'DE' | 'EN'; name: string }[];
   isLiquid: boolean;
   kcal: number;
   carbs: number;
@@ -56,7 +66,17 @@ type MealCheckRow = Pick<MealRow, 'id' | 'createdById' | 'deletedAt'>;
 const WITH_ITEMS = {
   items: {
     orderBy: { order: 'asc' as const },
-    include: { food: { include: { portions: { orderBy: { order: 'asc' as const } } } } },
+    include: {
+      food: {
+        include: {
+          translations: FOOD_TRANSLATIONS_SELECT,
+          portions: {
+            orderBy: { order: 'asc' as const },
+            include: { translations: PORTION_TRANSLATIONS_SELECT },
+          },
+        },
+      },
+    },
   },
 };
 
@@ -95,7 +115,11 @@ export class MealsService {
    * carries the two counts the tab's count line needs: how many match, and how many the
    * caller created.
    */
-  async findAll(userId: string, mineOnly = false): Promise<MealListDto> {
+  async findAll(
+    userId: string,
+    mineOnly = false,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<MealListDto> {
     // No page cap and the counts come off the array, unlike FoodsService.findAll: the meal
     // library is hand-built and bounded (dozens per user), not the ~180k of the Open Food
     // Facts import. `total` / `mineTotal` always describe the whole library so the tab's
@@ -111,14 +135,16 @@ export class MealsService {
     const mine = all.filter((m) => m.createdById === userId);
 
     return {
-      items: (mineOnly ? mine : all).map((meal) => this.toListItemDto(meal, userId, favoriteIds)),
+      items: (mineOnly ? mine : all).map((meal) =>
+        this.toListItemDto(meal, userId, favoriteIds, locale),
+      ),
       total: all.length,
       mineTotal: mine.length,
     };
   }
 
   /** One Mahlzeit with its ingredients resolved and its totals computed live. */
-  async findById(id: string, userId: string): Promise<MealDto> {
+  async findById(id: string, userId: string, locale: ApiLocale = DEFAULT_LOCALE): Promise<MealDto> {
     const [meal, favoriteIds] = await Promise.all([
       this.prisma.meal.findUnique({
         where: { id },
@@ -129,7 +155,7 @@ export class MealsService {
     if (!meal) {
       throw new AppNotFoundException('Mahlzeit nicht gefunden', 'MEAL_NOT_FOUND');
     }
-    return this.toDto(meal, userId, favoriteIds);
+    return this.toDto(meal, userId, locale, favoriteIds);
   }
 
   /**
@@ -137,7 +163,11 @@ export class MealsService {
    * the nutrition picker's Favoriten / Zuletzt tabs decide the order and this preserves it. A
    * soft-deleted or missing id drops out, so the result may be shorter than `ids`.
    */
-  async listByIds(userId: string, ids: string[]): Promise<MealListItemDto[]> {
+  async listByIds(
+    userId: string,
+    ids: string[],
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<MealListItemDto[]> {
     if (ids.length === 0) return [];
     const [meals, favoriteIds] = await Promise.all([
       this.prisma.meal.findMany({
@@ -147,23 +177,32 @@ export class MealsService {
       this.favorites.favoriteMealIds(userId),
     ]);
     return orderByIds(ids, meals, (m) => m.id).map((m) =>
-      this.toListItemDto(m, userId, favoriteIds),
+      this.toListItemDto(m, userId, favoriteIds, locale),
     );
   }
 
-  private toListItemDto(meal: MealRow, userId: string, favoriteIds: Set<string>): MealListItemDto {
+  private toListItemDto(
+    meal: MealRow,
+    userId: string,
+    favoriteIds: Set<string>,
+    locale: ApiLocale,
+  ): MealListItemDto {
     return {
       id: meal.id,
       name: meal.name,
       editable: this.isEditable(meal, userId),
       isFavorite: favoriteIds.has(meal.id),
       itemCount: meal.items.length,
-      ingredientNames: meal.items.map((i) => i.food.name),
+      ingredientNames: meal.items.map((i) => resolveFoodName(i.food, locale)),
       totals: computeTotals(meal.items),
     };
   }
 
-  async create(userId: string, dto: CreateMealDto): Promise<MealDto> {
+  async create(
+    userId: string,
+    dto: CreateMealDto,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<MealDto> {
     await this.assertFoodsExist(dto.items);
     const meal = (await this.prisma.meal.create({
       data: {
@@ -173,10 +212,15 @@ export class MealsService {
       },
       include: WITH_ITEMS,
     })) as MealRow;
-    return this.toDto(meal, userId);
+    return this.toDto(meal, userId, locale);
   }
 
-  async update(userId: string, id: string, dto: UpdateMealDto): Promise<MealDto> {
+  async update(
+    userId: string,
+    id: string,
+    dto: UpdateMealDto,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<MealDto> {
     const meal = (await this.prisma.meal.findUnique({
       where: { id },
     })) as MealCheckRow | null;
@@ -196,7 +240,7 @@ export class MealsService {
       },
       include: WITH_ITEMS,
     })) as MealRow;
-    return this.toDto(updated, userId, await this.favorites.favoriteMealIds(userId));
+    return this.toDto(updated, userId, locale, await this.favorites.favoriteMealIds(userId));
   }
 
   /** Soft delete: the meal leaves the list but `findById` still resolves it, and entries
@@ -212,7 +256,12 @@ export class MealsService {
     await this.prisma.meal.update({ where: { id }, data: { deletedAt: new Date() } });
   }
 
-  private toDto(meal: MealRow, userId: string, favoriteIds?: Set<string>): MealDto {
+  private toDto(
+    meal: MealRow,
+    userId: string,
+    locale: ApiLocale,
+    favoriteIds?: Set<string>,
+  ): MealDto {
     return {
       id: meal.id,
       name: meal.name,
@@ -224,7 +273,7 @@ export class MealsService {
         foodId: item.foodId,
         order: item.order,
         quantity: item.quantity,
-        foodName: item.food.name,
+        foodName: resolveFoodName(item.food, locale),
         isLiquid: item.food.isLiquid,
         deleted: item.food.deletedAt !== null,
         per100: {
@@ -235,7 +284,7 @@ export class MealsService {
         },
         portions: item.food.portions.map((p) => ({
           id: p.id,
-          label: p.label,
+          label: resolvePortionLabel(p, item.food.source, locale),
           grams: p.grams,
           order: p.order,
           isDefault: p.isDefault,

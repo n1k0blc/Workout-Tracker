@@ -13,6 +13,8 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { ClientLocale } from '../common/decorators/client-locale.decorator';
+import { ApiLocale } from '../common/utils/locale.util';
 import { FoodsService } from './foods.service';
 import {
   CreateFoodDto,
@@ -31,9 +33,10 @@ export class FoodsController {
   @Get()
   async findAll(
     @CurrentUser() user: { id: string },
+    @ClientLocale() locale: ApiLocale,
     @Query('search') search?: string,
   ): Promise<FoodListDto> {
-    return this.foods.findAll(user.id, search);
+    return this.foods.findAll(user.id, search, locale);
   }
 
   // Declared before `:id` so "similar" is not captured as an id.
@@ -55,13 +58,18 @@ export class FoodsController {
   async lookupByBarcode(
     @CurrentUser() user: { id: string },
     @Param('barcode') barcode: string,
+    @ClientLocale() locale: ApiLocale,
   ): Promise<BarcodeLookupDto> {
-    return this.foods.lookupByBarcode(user.id, barcode);
+    return this.foods.lookupByBarcode(user.id, barcode, locale);
   }
 
   @Get(':id')
-  async findOne(@CurrentUser() user: { id: string }, @Param('id') id: string): Promise<FoodDto> {
-    return this.foods.findById(id, user.id);
+  async findOne(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @ClientLocale() locale: ApiLocale,
+  ): Promise<FoodDto> {
+    return this.foods.findById(id, user.id, locale);
   }
 
   @Post()

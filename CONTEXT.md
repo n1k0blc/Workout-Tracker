@@ -197,6 +197,17 @@ say.
   [ADR-0006](docs/adr/0006-catalogue-names-are-translated-server-side-per-locale.md). Code:
   `ExerciseTranslation`, `resolveExerciseName`.
 
+### Lebensmittel (food library)
+
+- **Lebensmittel-Übersetzung** — the 289 `SEED` Lebensmittel and their Portionsgrößen show their
+  name / label in the user's locale, one `FoodTranslation` / `FoodPortionTranslation` row per
+  `(parent, locale)` with a cascading foreign key, resolved from `X-Locale` like Übungen.
+  `OPEN_FOOD_FACTS` and `USER` foods are never translated. Search matches translated names and
+  keeps the source grouping; barcode lookup stays global while text search will rank by market,
+  not filter. See
+  [ADR-0007](docs/adr/0007-seed-foods-are-translated-barcode-lookup-stays-global-search-ranks-by-market.md).
+  Code: `FoodTranslation`, `resolveFoodName`, `resolvePortionLabel`.
+
 ### Tracked nutrients
 
 Only **kcal**, **Kohlenhydrate** (carbs), **Protein** and **Fett** (fat). No micronutrients.

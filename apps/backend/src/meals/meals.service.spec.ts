@@ -322,3 +322,56 @@ describe('MealsService.update / softDelete — creator only', () => {
     );
   });
 });
+
+describe('MealsService — translated SEED ingredients (#188, ADR-0007)', () => {
+  const seedOats = {
+    ...OATS,
+    source: 'SEED' as const,
+    translations: [
+      { locale: 'DE' as const, name: 'Haferflocken' },
+      { locale: 'EN' as const, name: 'Rolled oats' },
+    ],
+    portions: [
+      {
+        id: 'p-oats-1',
+        label: '1 Portion',
+        grams: 40,
+        order: 1,
+        isDefault: true,
+        translations: [
+          { locale: 'DE' as const, label: '1 Portion' },
+          { locale: 'EN' as const, label: '1 serving' },
+        ],
+      },
+    ],
+  };
+  const meal = mealRow({
+    items: [
+      { id: 'mi-1', foodId: 'food-oats', quantity: 40, order: 1, food: seedOats },
+      {
+        id: 'mi-2',
+        foodId: 'food-skyr',
+        quantity: 150,
+        order: 2,
+        food: { ...SKYR, source: 'USER' },
+      },
+    ],
+  });
+
+  it('translates SEED ingredient names and portion labels, leaving USER foods verbatim', async () => {
+    const { service } = makeService({ findUnique: meal });
+
+    const dto = await service.findById('meal-1', 'user-1', 'en');
+
+    expect(dto.items.map((i) => i.foodName)).toEqual(['Rolled oats', 'Skyr natur']);
+    expect(dto.items[0].portions[0].label).toBe('1 serving');
+  });
+
+  it('translates the ingredient names on the list rows too', async () => {
+    const { service } = makeService({ findMany: [meal] });
+
+    const list = await service.findAll('user-1', false, 'en');
+
+    expect(list.items[0].ingredientNames).toEqual(['Rolled oats', 'Skyr natur']);
+  });
+});

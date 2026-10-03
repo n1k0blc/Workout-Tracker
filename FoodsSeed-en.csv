@@ -1,0 +1,290 @@
+key;name;portions
+apfel-mit-schale;Apple, with skin;1 piece
+banane;Banana;1 piece
+birne;Pear;1 piece
+orange;Orange;1 piece
+mandarine;Mandarin;1 piece
+erdbeeren;Strawberries;
+himbeeren;Raspberries;
+heidelbeeren;Blueberries;
+brombeeren;Blackberries;
+johannisbeeren-rot;Redcurrants;
+stachelbeeren;Gooseberries;
+weintrauben;Grapes;
+kirschen-suess;Cherries, sweet;
+pflaume;Plum;1 piece
+pfirsich;Peach;1 piece
+nektarine;Nectarine;1 piece
+aprikose;Apricot;1 piece
+wassermelone;Watermelon;
+honigmelone;Honeydew melon;
+ananas;Pineapple;
+mango;Mango;
+kiwi;Kiwi;1 piece
+zitrone-ohne-schale;Lemon, peeled;1 piece
+grapefruit;Grapefruit;1 half fruit
+avocado;Avocado;1 half fruit
+rosinen;Raisins;1 tablespoon
+datteln-getrocknet;Dates, dried;1 piece
+aprikosen-getrocknet;Apricots, dried;1 piece
+tomate;Tomato;1 piece
+gurke-mit-schale;Cucumber, with skin;
+paprika-rot;Bell pepper, red;1 piece
+paprika-gruen;Bell pepper, green;1 piece
+zwiebel;Onion;1 piece
+fruehlingszwiebel;Spring onion;
+knoblauch;Garlic;1 clove
+ingwer-roh;Ginger, raw;
+karotte-roh;Carrot, raw;1 piece
+karotte-gekocht;Carrot, cooked;
+brokkoli-roh;Broccoli, raw;
+brokkoli-gekocht;Broccoli, cooked;
+blumenkohl-roh;Cauliflower, raw;
+spinat-roh;Spinach, raw;
+spinat-gekocht;Spinach, cooked;
+zucchini-roh;Zucchini, raw;
+aubergine-roh;Aubergine, raw;
+champignons-roh;Mushrooms, raw;
+kopfsalat;Lettuce;
+eisbergsalat;Iceberg lettuce;
+rucola;Rocket;
+weisskohl-roh;White cabbage, raw;
+rotkohl-roh;Red cabbage, raw;
+wirsing-roh;Savoy cabbage, raw;
+gruenkohl-roh;Kale, raw;
+rosenkohl-roh;Brussels sprouts, raw;
+lauch-roh;Leek, raw;
+knollensellerie-roh;Celeriac, raw;
+kohlrabi-roh;Kohlrabi, raw;1 piece
+rote-bete-roh;Beetroot, raw;
+radieschen;Radishes;1 piece
+spargel-gruen-roh;Asparagus, green, raw;
+kuerbis-roh;Pumpkin, raw;
+gruene-bohnen-roh;Green beans, raw;
+erbsen-tk;Peas, frozen;
+mais-dose-abgetropft;Sweetcorn, canned, drained;
+sauerkraut;Sauerkraut;
+gewuerzgurken;Pickled gherkins;1 piece
+oliven-schwarz;Olives, black;1 piece
+reis-weiss-roh;Rice, white, raw;
+reis-weiss-gekocht;Rice, white, cooked;
+naturreis-roh;Brown rice, raw;
+naturreis-gekocht;Brown rice, cooked;
+nudeln-roh;Pasta, raw;
+nudeln-gekocht;Pasta, cooked;
+vollkornnudeln-roh;Wholemeal pasta, raw;
+vollkornnudeln-gekocht;Wholemeal pasta, cooked;
+spaetzle-gekocht;Spätzle, cooked;
+haferflocken;Rolled oats;1 tablespoon|1 serving
+couscous-roh;Couscous, raw;
+couscous-gekocht;Couscous, cooked;
+bulgur-roh;Bulgur, raw;
+bulgur-gekocht;Bulgur, cooked;
+quinoa-roh;Quinoa, raw;
+quinoa-gekocht;Quinoa, cooked;
+hirse-roh;Millet, raw;
+hirse-gekocht;Millet, cooked;
+polenta-maisgriess-roh;Polenta / cornmeal, raw;
+cornflakes;Cornflakes;1 serving
+muesli-ungesuesst;Muesli, unsweetened;1 serving
+kartoffel-roh;Potato, raw;1 piece
+kartoffel-gekocht-mit-schale;Potato, boiled, with skin;1 piece
+kartoffel-gekocht-ohne-schale;Potato, boiled, peeled;1 piece
+suesskartoffel-roh;Sweet potato, raw;
+suesskartoffel-gekocht;Sweet potato, cooked;
+pommes-frites-ofen;French fries, oven-baked;1 serving
+reiswaffel;Rice cake;1 piece
+weizenbroetchen;Wheat roll;1 piece
+laugenbroetchen;Pretzel roll;1 piece
+weissbrot;White bread;1 slice
+toastbrot;Sandwich bread;1 slice
+vollkorntoast;Wholemeal sandwich bread;1 slice
+baguette;Baguette;1 piece
+weizenvollkornbrot;Wholemeal wheat bread;1 slice
+mischbrot;Mixed rye-wheat bread;1 slice
+roggenbrot-sauerteig;Rye bread, sourdough;1 slice
+roggenvollkornbrot;Wholemeal rye bread;1 slice
+pumpernickel;Pumpernickel;1 slice
+knaeckebrot-vollkorn;Crispbread, wholemeal;1 slice
+croissant-butter;Croissant, butter;1 piece
+weizentortilla-wrap;Wheat tortilla / wrap;1 piece
+pita-fladenbrot;Pita / flatbread;1 piece
+vollmilch-3-5;Whole milk 3.5%;1 glass
+fettarme-milch-1-5;Low-fat milk 1.5%;1 glass
+magermilch;Skimmed milk;1 glass
+buttermilch;Buttermilk;1 glass
+kondensmilch-ungezuckert;Evaporated milk, unsweetened;1 tablespoon
+joghurt-natur-3-5;Yoghurt, plain, 3.5%;1 tub
+joghurt-natur-fettarm;Yoghurt, plain, low-fat;1 tub
+fruchtjoghurt-gezuckert;Fruit yoghurt, sweetened;1 tub
+joghurt-griechisch-0;Greek yoghurt, 0% fat;1 serving
+joghurt-griechisch-5;Greek yoghurt, 5% fat;1 serving
+magerquark;Low-fat quark;1 serving
+speisequark-20;Quark 20% fat in dry matter;1 serving
+sahnequark;Cream quark;1 serving
+fruchtquark-gezuckert;Fruit quark, sweetened;1 tub
+huettenkaese;Cottage cheese;1 serving
+frischkaese-doppelrahm;Cream cheese, double cream;1 tablespoon
+schlagsahne;Whipping cream;1 tablespoon
+saure-sahne;Sour cream;1 tablespoon
+schmand;Schmand (sour cream, 20%);1 tablespoon
+creme-fraiche;Crème fraîche;1 tablespoon
+gouda;Gouda;1 slice
+edamer;Edam;1 slice
+emmentaler;Emmental;1 slice
+cheddar;Cheddar;1 slice
+camembert;Camembert;1 piece
+blauschimmelkaese;Blue cheese;
+mozzarella;Mozzarella;1 scoop
+feta;Feta;
+ziegenfrischkaese;Fresh goat cheese;
+parmesan;Parmesan;1 tablespoon
+ricotta;Ricotta;
+haferdrink-ungesuesst;Oat drink, unsweetened;1 glass
+sojadrink-ungesuesst;Soy drink, unsweetened;1 glass
+mandeldrink-ungesuesst;Almond drink, unsweetened;1 glass
+reisdrink;Rice drink;1 glass
+kokosdrink;Coconut drink;1 glass
+sojajoghurt-natur;Soy yoghurt, plain;1 tub
+huehnerei-roh;Hen's egg, raw;1 egg (size M)
+huehnerei-gekocht;Hen's egg, boiled;1 egg (size M)
+eiweiss-roh;Egg white, raw;1 piece
+eigelb-roh;Egg yolk, raw;1 piece
+haehnchenbrust-roh;Chicken breast, raw;
+haehnchenbrust-gebraten;Chicken breast, pan-fried;
+haehnchenschenkel-mit-haut-roh;Chicken thigh, with skin, raw;
+haehnchenschenkel-mit-haut-gebraten;Chicken thigh, with skin, pan-fried;
+putenbrust-roh;Turkey breast, raw;
+putenbrust-gebraten;Turkey breast, pan-fried;
+putenbrust-aufschnitt;Turkey breast, sliced deli meat;1 slice
+rinderhackfleisch-roh;Ground beef, raw;
+rinderhackfleisch-gebraten;Ground beef, pan-fried;
+rinderfilet-roh;Beef tenderloin, raw;
+rindersteak-entrecote-roh;Beef steak (entrecôte), raw;
+rindersteak-entrecote-gebraten;Beef steak (entrecôte), pan-fried;
+schweinehackfleisch-roh;Ground pork, raw;
+schweinefilet-roh;Pork tenderloin, raw;
+schweinefilet-gebraten;Pork tenderloin, pan-fried;
+schweineschnitzel-roh;Pork schnitzel (top round), raw;
+schweinekotelett-roh;Pork chop, raw;
+schweinebauch-roh;Pork belly, raw;
+fruehstuecksspeck-roh;Breakfast bacon, raw;1 slice
+kochschinken;Cooked ham;1 slice
+salami;Salami;1 slice
+bratwurst-gebraten;Bratwurst (pork), pan-fried;1 piece
+wiener-wuerstchen;Vienna sausages;1 piece
+leberwurst;Liver sausage;1 tablespoon
+fleischwurst-lyoner;Fleischwurst (Lyoner);1 slice
+leberkaese;Leberkäse / meatloaf;1 slice
+lammkotelett-roh;Lamb chop, raw;
+lachs-zucht-roh;Salmon, farmed, raw;
+lachs-zucht-gebraten;Salmon, farmed, pan-fried;
+raeucherlachs;Smoked salmon;1 slice
+thunfisch-dose-wasser;Tuna, canned in water, drained;1 can
+thunfisch-dose-oel;Tuna, canned in oil, drained;1 can
+forelle-roh;Trout, raw;
+forelle-geraeuchert;Trout, smoked;
+kabeljau-roh;Cod, raw;
+kabeljau-gegart;Cod, cooked;
+seelachs-roh;Pollock, raw;
+scholle-roh;Plaice, raw;
+zander-roh;Pike-perch, raw;
+hering-roh;Herring, raw;
+rollmops;Rollmop herring;1 piece
+makrele-roh;Mackerel, raw;
+sardinen-dose-oel;Sardines, canned in oil, drained;1 can
+garnelen-roh;Prawns, raw;
+miesmuscheln-roh;Mussels, raw;
+fischstaebchen-zubereitet;Fish fingers, prepared;1 piece
+linsen-braun-roh;Lentils, brown, raw;
+linsen-braun-gekocht;Lentils, brown, cooked;
+linsen-rot-roh;Lentils, red, raw;
+kichererbsen-roh;Chickpeas, raw;
+kichererbsen-gekocht;Chickpeas, cooked;
+kichererbsen-dose-abgetropft;Chickpeas, canned, drained;
+kidneybohnen-roh;Kidney beans, raw;
+kidneybohnen-gekocht;Kidney beans, cooked;
+kidneybohnen-dose-abgetropft;Kidney beans, canned, drained;
+weisse-bohnen-roh;White beans, raw;
+weisse-bohnen-gekocht;White beans, cooked;
+edamame-tk;Edamame, frozen;
+tofu-fest;Tofu, firm;
+tofu-geraeuchert;Tofu, smoked;
+seidentofu;Silken tofu;
+tempeh;Tempeh;
+mandeln;Almonds;1 handful
+walnuesse;Walnuts;1 handful
+haselnuesse;Hazelnuts;1 handful
+cashewkerne;Cashews;1 handful
+erdnuesse-geroestet-gesalzen;Peanuts, roasted, salted;1 handful
+pistazien-geroestet-gesalzen;Pistachios, roasted, salted;1 handful
+paranuesse;Brazil nuts;1 piece
+macadamianuesse;Macadamia nuts;1 handful
+pinienkerne;Pine nuts;1 tablespoon
+sonnenblumenkerne;Sunflower seeds;1 tablespoon
+kuerbiskerne;Pumpkin seeds;1 tablespoon
+leinsamen;Flaxseed;1 tablespoon
+chiasamen;Chia seeds;1 tablespoon
+sesam;Sesame seeds;1 tablespoon
+erdnussbutter;Peanut butter;1 tablespoon
+mandelmus;Almond butter;1 tablespoon
+olivenoel;Olive oil;1 tablespoon|1 teaspoon
+rapsoel;Rapeseed oil;1 tablespoon|1 teaspoon
+sonnenblumenoel;Sunflower oil;1 tablespoon|1 teaspoon
+kokosoel;Coconut oil;1 tablespoon|1 teaspoon
+leinoel;Flaxseed oil;1 tablespoon|1 teaspoon
+butter;Butter;1 teaspoon|1 tablespoon
+margarine;Margarine;1 teaspoon|1 tablespoon
+vollmilchschokolade;Milk chocolate;1 bar|1 large bar
+zartbitterschokolade-70;Dark chocolate 70%;1 bar|1 large bar
+nuss-nougat-creme;Chocolate hazelnut spread;1 tablespoon
+konfituere;Jam;1 teaspoon|1 tablespoon
+fruchtgummi;Fruit gums;1 piece
+kartoffelchips;Potato crisps;1 serving
+salzstangen;Pretzel sticks;1 piece
+butterkekse;Butter biscuits;1 piece
+vanilleeis;Vanilla ice cream;1 scoop
+muesliriegel;Muesli bar;1 bar
+popcorn-ohne-fett;Popcorn, no added fat;1 serving
+marzipan;Marzipan;1 piece
+lebkuchen;Lebkuchen (gingerbread);1 piece
+pudding-vanille;Vanilla pudding;1 tub
+mineralwasser;Mineral water;1 glass
+apfelsaft;Apple juice;1 glass
+orangensaft;Orange juice;1 glass
+saftschorle;Spritzer (60% juice);1 glass
+cola;Cola;1 glass|1 can
+cola-zuckerfrei;Cola, sugar-free;1 glass|1 can
+limonade;Lemonade;1 glass|1 can
+eistee-gezuckert;Iced tea, sweetened;1 glass
+energydrink;Energy drink;1 can
+kaffee-schwarz;Coffee, black;1 cup
+tee-schwarz-ungesuesst;Tea, black, unsweetened;1 cup
+bier-hell;Beer, pale (pilsner/lager);1 glass|1 bottle
+bier-alkoholfrei;Beer, alcohol-free;1 glass|1 bottle
+radler;Shandy;1 glass|1 bottle
+weisswein;White wine;1 glass
+rotwein;Red wine;1 glass
+sekt;Sparkling wine;1 glass
+wodka;Vodka (40%);1 shot
+zucker;Sugar;1 teaspoon|1 tablespoon
+honig;Honey;1 teaspoon|1 tablespoon
+ahornsirup;Maple syrup;1 tablespoon
+weizenmehl-405;Wheat flour, type 405;1 tablespoon
+weizenvollkornmehl;Wholemeal wheat flour;1 tablespoon
+dinkelmehl-630;Spelt flour, type 630;1 tablespoon
+speisestaerke;Cornstarch;1 tablespoon
+salz;Salt;1 teaspoon
+tomatenmark;Tomato paste;1 tablespoon
+tomaten-passiert;Tomatoes, passata;
+tomaten-gehackt-dose;Tomatoes, chopped, canned;1 can
+ketchup;Ketchup;1 tablespoon
+senf;Mustard;1 teaspoon
+mayonnaise;Mayonnaise;1 tablespoon
+sojasauce;Soy sauce;1 tablespoon
+weinessig;Wine vinegar;1 tablespoon
+balsamico;Balsamic vinegar;1 tablespoon
+kakaopulver-ungesuesst;Cocoa powder, unsweetened;1 tablespoon
+kokosmilch;Coconut milk;1 can
+gemuesebruehe-zubereitet;Vegetable stock, prepared;1 cup
+whey-proteinpulver;Whey protein powder;1 measuring scoop

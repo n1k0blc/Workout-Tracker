@@ -333,9 +333,22 @@ model Food {
   portions     FoodPortion[]
   mealItems    MealItem[]
   favorites    FoodFavorite[]
+  translations FoodTranslation[]
 
   @@index([createdById])
   @@index([deletedAt])
+}
+
+// Per-locale display name of a SEED Food (#188, ADR-0007). OPEN_FOOD_FACTS and USER foods have
+// no rows here: imports stay German and user foods are user content. Cascades with its food.
+model FoodTranslation {
+  id     String @id @default(uuid())
+  foodId String
+  locale Locale
+  name   String
+  food   Food   @relation(fields: [foodId], references: [id], onDelete: Cascade)
+
+  @@unique([foodId, locale])
 }
 
 // A named amount of a Food ("1 Portion" = 40 g, "1 Esslöffel" = 12 g). `grams` is grams or
@@ -343,16 +356,29 @@ model Food {
 // `isDefault` when a food has any; `order` is 1-based and contiguous, written from array
 // position on every save (the client never sends it), like the workout tree.
 model FoodPortion {
-  id        String  @id @default(uuid())
-  foodId    String
-  label     String
-  grams     Float
-  order     Int
-  isDefault Boolean @default(false)
-  food      Food    @relation(fields: [foodId], references: [id], onDelete: Cascade)
+  id           String                   @id @default(uuid())
+  foodId       String
+  label        String
+  grams        Float
+  order        Int
+  isDefault    Boolean                  @default(false)
+  food         Food                     @relation(fields: [foodId], references: [id], onDelete: Cascade)
+  translations FoodPortionTranslation[]
 
   @@unique([foodId, order])
   @@index([foodId])
+}
+
+// Per-locale label of a SEED food's portion (#188, ADR-0007). The seed rewrites portions
+// wholesale, so these rows are re-created with them; the cascade keeps none orphaned.
+model FoodPortionTranslation {
+  id        String      @id @default(uuid())
+  portionId String
+  locale    Locale
+  label     String
+  portion   FoodPortion @relation(fields: [portionId], references: [id], onDelete: Cascade)
+
+  @@unique([portionId, locale])
 }
 
 enum FoodSource {

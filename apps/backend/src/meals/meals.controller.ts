@@ -13,6 +13,8 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { ClientLocale } from '../common/decorators/client-locale.decorator';
+import { ApiLocale } from '../common/utils/locale.util';
 import { MealsService } from './meals.service';
 import { CreateMealDto, UpdateMealDto, MealDto, MealListDto } from './dto';
 
@@ -25,19 +27,28 @@ export class MealsController {
   @Get()
   async findAll(
     @CurrentUser() user: { id: string },
+    @ClientLocale() locale: ApiLocale,
     @Query('mine') mine?: string,
   ): Promise<MealListDto> {
-    return this.meals.findAll(user.id, mine === '1' || mine === 'true');
+    return this.meals.findAll(user.id, mine === '1' || mine === 'true', locale);
   }
 
   @Get(':id')
-  async findOne(@CurrentUser() user: { id: string }, @Param('id') id: string): Promise<MealDto> {
-    return this.meals.findById(id, user.id);
+  async findOne(
+    @CurrentUser() user: { id: string },
+    @Param('id') id: string,
+    @ClientLocale() locale: ApiLocale,
+  ): Promise<MealDto> {
+    return this.meals.findById(id, user.id, locale);
   }
 
   @Post()
-  async create(@CurrentUser() user: { id: string }, @Body() dto: CreateMealDto): Promise<MealDto> {
-    return this.meals.create(user.id, dto);
+  async create(
+    @CurrentUser() user: { id: string },
+    @Body() dto: CreateMealDto,
+    @ClientLocale() locale: ApiLocale,
+  ): Promise<MealDto> {
+    return this.meals.create(user.id, dto, locale);
   }
 
   @Patch(':id')
@@ -45,8 +56,9 @@ export class MealsController {
     @CurrentUser() user: { id: string },
     @Param('id') id: string,
     @Body() dto: UpdateMealDto,
+    @ClientLocale() locale: ApiLocale,
   ): Promise<MealDto> {
-    return this.meals.update(user.id, id, dto);
+    return this.meals.update(user.id, id, dto, locale);
   }
 
   @Delete(':id')
