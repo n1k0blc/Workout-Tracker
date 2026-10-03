@@ -2,6 +2,7 @@
 
 import { ProtectedRoute } from '@/components/protected-route';
 import { Link } from '@/i18n/navigation';
+import { useFormatter, useTranslations } from 'next-intl';
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/lib/api';
 import { WorkoutListItem } from '@/types';
@@ -17,6 +18,8 @@ import {
 type FilterType = '7days' | '30days' | '90days' | 'currentMonth' | 'currentYear' | 'custom';
 
 export default function HistoryPage() {
+  const t = useTranslations('HistoryPage');
+  const format = useFormatter();
   const [workouts, setWorkouts] = useState<WorkoutListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<FilterType>('30days');
@@ -92,13 +95,12 @@ export default function HistoryPage() {
   }, [loadWorkouts]);
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return new Intl.DateTimeFormat('de-DE', {
+    return format.dateTime(new Date(dateStr), {
       weekday: 'short',
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
-    }).format(date);
+    });
   };
 
   const formatDuration = (seconds: number | null) => {
@@ -117,10 +119,10 @@ export default function HistoryPage() {
               {/* Header */}
               <div>
                 <h2 className="text-2xl font-bold text-foreground">
-                  Trainingsverlauf
+                  {t('title')}
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Übersicht deiner abgeschlossenen Workouts
+                  {t('subtitle')}
                 </p>
               </div>
 
@@ -128,7 +130,7 @@ export default function HistoryPage() {
               <div className="bg-card rounded-lg border p-6 space-y-4">
                 <div>
                   <div className="text-sm font-medium text-muted-foreground mb-3">
-                    Zeitraum
+                    {t('period')}
                   </div>
                   <ToggleGroup
                     type="single"
@@ -138,23 +140,23 @@ export default function HistoryPage() {
                     }}
                     className="flex flex-wrap gap-2"
                   >
-                    <ToggleGroupItem value="7days" aria-label="Letzte 7 Tage">
-                      Letzte 7 Tage
+                    <ToggleGroupItem value="7days" aria-label={t('last7')}>
+                      {t('last7')}
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="30days" aria-label="Letzte 30 Tage">
-                      Letzte 30 Tage
+                    <ToggleGroupItem value="30days" aria-label={t('last30')}>
+                      {t('last30')}
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="90days" aria-label="Letzte 90 Tage">
-                      Letzte 90 Tage
+                    <ToggleGroupItem value="90days" aria-label={t('last90')}>
+                      {t('last90')}
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="currentMonth" aria-label="Aktueller Monat">
-                      Aktueller Monat
+                    <ToggleGroupItem value="currentMonth" aria-label={t('currentMonth')}>
+                      {t('currentMonth')}
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="currentYear" aria-label="Aktuelles Jahr">
-                      Aktuelles Jahr
+                    <ToggleGroupItem value="currentYear" aria-label={t('currentYear')}>
+                      {t('currentYear')}
                     </ToggleGroupItem>
-                    <ToggleGroupItem value="custom" aria-label="Benutzerdefiniert">
-                      Benutzerdefiniert
+                    <ToggleGroupItem value="custom" aria-label={t('custom')}>
+                      {t('custom')}
                     </ToggleGroupItem>
                   </ToggleGroup>
                 </div>
@@ -164,7 +166,7 @@ export default function HistoryPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
                     <div>
                       <div className="text-sm font-medium text-muted-foreground mb-2">
-                        Von
+                        {t('from')}
                       </div>
                       <input
                         type="date"
@@ -175,7 +177,7 @@ export default function HistoryPage() {
                     </div>
                     <div>
                       <div className="text-sm font-medium text-muted-foreground mb-2">
-                        Bis
+                        {t('to')}
                       </div>
                       <input
                         type="date"
@@ -191,12 +193,12 @@ export default function HistoryPage() {
               {/* Workouts List */}
               {loading ? (
                 <div className="flex items-center justify-center py-12">
-                  <div className="text-lg text-muted-foreground">Lädt Workouts...</div>
+                  <div className="text-lg text-muted-foreground">{t('loading')}</div>
                 </div>
               ) : workouts.length > 0 ? (
                 <div className="space-y-4">
                   <div className="text-sm text-muted-foreground mb-2">
-                    {workouts.length} Workout{workouts.length !== 1 ? 's' : ''} gefunden
+                    {t('found', { count: workouts.length })}
                   </div>
                   {workouts.map((workout) => (
                     <div
@@ -208,8 +210,8 @@ export default function HistoryPage() {
                           <div className="flex items-center gap-3 mb-3 flex-wrap">
                             <h3 className="text-lg font-semibold text-foreground">
                               {workout.isFreeWorkout
-                                ? workout.originTemplateName || 'Freies Workout'
-                                : workout.workoutDayName || 'Workout'}
+                                ? workout.originTemplateName || t('freeWorkout')
+                                : workout.workoutDayName || t('workout')}
                             </h3>
                             {workout.cycleName && (
                               <Badge variant="secondary">{workout.cycleName}</Badge>
@@ -231,7 +233,7 @@ export default function HistoryPage() {
                             <div className="flex items-center gap-1.5">
                               <IconList className="size-4" />
                               <span>
-                                {workout.exerciseCount} Übung{workout.exerciseCount !== 1 ? 'en' : ''}
+                                {t('exercises', { count: workout.exerciseCount })}
                               </span>
                             </div>
                           </div>
@@ -245,7 +247,7 @@ export default function HistoryPage() {
               ) : (
                 <div className="bg-card border rounded-lg p-12 text-center">
                   <p className="text-muted-foreground">
-                    Keine Workouts im ausgewählten Zeitraum gefunden
+                    {t('empty')}
                   </p>
                 </div>
               )}

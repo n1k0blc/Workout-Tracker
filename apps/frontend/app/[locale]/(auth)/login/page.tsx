@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
 
 export default function LoginPage() {
+  const t = useTranslations('LoginPage');
   const apiError = useApiErrorMessage();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
@@ -44,22 +46,22 @@ export default function LoginPage() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-bold text-foreground">
-            Anmelden
+            {t('title')}
           </h2>
           <p className="mt-2 text-center text-sm text-muted-foreground">
-            Oder{' '}
+            {t('or')}{' '}
             <Link
               href="/register"
               className="font-medium text-foreground hover:underline"
             >
-              erstelle einen neuen Account
+              {t('createAccount')}
             </Link>
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="email">E-Mail-Adresse</FieldLabel>
+              <FieldLabel htmlFor="email">{t('email')}</FieldLabel>
               <Input
                 id="email"
                 type="email"
@@ -67,12 +69,12 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="E-Mail-Adresse"
+                placeholder={t('email')}
               />
             </Field>
 
             <Field>
-              <FieldLabel htmlFor="password">Passwort</FieldLabel>
+              <FieldLabel htmlFor="password">{t('password')}</FieldLabel>
               <Input
                 id="password"
                 type="password"
@@ -80,7 +82,7 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Passwort"
+                placeholder={t('password')}
               />
             </Field>
           </FieldGroup>
@@ -92,7 +94,7 @@ export default function LoginPage() {
           )}
 
           <Button type="submit" className="w-full" disabled={loading} size="lg">
-            {loading ? 'Wird angemeldet...' : 'Anmelden'}
+            {loading ? t('submitting') : t('submit')}
           </Button>
         </form>
       </div>

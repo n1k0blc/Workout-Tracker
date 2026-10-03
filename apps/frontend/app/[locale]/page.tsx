@@ -1,7 +1,9 @@
+import { getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 
-export default function Home() {
+export default async function Home() {
+  const t = await getTranslations('HomePage');
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="max-w-2xl w-full text-center">
@@ -9,14 +11,14 @@ export default function Home() {
           Workout Tracker
         </h1>
         <p className="text-xl text-muted-foreground mb-8">
-          Deine persönliche Workout-Tracking-App für maximalen Trainingserfolg
+          {t('tagline')}
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Button asChild size="lg" className="px-8">
-            <Link href="/login">Anmelden</Link>
+            <Link href="/login">{t('signIn')}</Link>
           </Button>
           <Button asChild variant="outline" size="lg" className="px-8">
-            <Link href="/register">Registrieren</Link>
+            <Link href="/register">{t('register')}</Link>
           </Button>
         </div>
       </div>

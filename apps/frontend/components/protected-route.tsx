@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/lib/auth-context';
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const t = useTranslations('ProtectedRoute');
   const router = useRouter();
   const { user, loading } = useAuth();
 
@@ -23,7 +25,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg text-gray-600">Lädt...</div>
+        <div className="text-lg text-gray-600">{t('loading')}</div>
       </div>
     );
   }

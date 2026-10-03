@@ -50,21 +50,23 @@ describe('kcalFromMacros', () => {
 
 describe('dailyTargetMacroHint', () => {
   it('states how far the macro energy sits under the kcal target', () => {
-    expect(dailyTargetMacroHint(2400, { carbs: 260, protein: 150, fat: 80 })).toBe(
-      '40 kcal unter dem Kalorienziel. Die Tagesansicht rechnet immer mit den erfassten Einträgen.',
-    );
+    expect(dailyTargetMacroHint(2400, { carbs: 260, protein: 150, fat: 80 })).toEqual({
+      kind: 'under',
+      kcal: 40,
+    });
   });
 
-  it('flips to "über" when the macros carry more energy than the target', () => {
-    expect(dailyTargetMacroHint(2000, { carbs: 260, protein: 150, fat: 80 })).toBe(
-      '360 kcal über dem Kalorienziel. Die Tagesansicht rechnet immer mit den erfassten Einträgen.',
-    );
+  it('flips to "over" when the macros carry more energy than the target', () => {
+    expect(dailyTargetMacroHint(2000, { carbs: 260, protein: 150, fat: 80 })).toEqual({
+      kind: 'over',
+      kcal: 360,
+    });
   });
 
   it('says so when they line up exactly', () => {
-    expect(dailyTargetMacroHint(2360, { carbs: 260, protein: 150, fat: 80 })).toBe(
-      'Makros und Kalorienziel stimmen überein. Die Tagesansicht rechnet immer mit den erfassten Einträgen.',
-    );
+    expect(dailyTargetMacroHint(2360, { carbs: 260, protein: 150, fat: 80 })).toEqual({
+      kind: 'match',
+    });
   });
 
   it('is null without a positive kcal target', () => {

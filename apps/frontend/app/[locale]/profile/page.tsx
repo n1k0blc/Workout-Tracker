@@ -526,7 +526,14 @@ export default function ProfilePage() {
                     </div>
                     <MacroProgressBar percent={targetBarPercent} className="mt-2.5" />
                     {targetHint && (
-                      <p className="mt-2.5 text-xs text-muted-foreground">{targetHint}</p>
+                      <p className="mt-2.5 text-xs text-muted-foreground">
+                        {targetHint.kind === 'match'
+                          ? t('targets.hintMatch')
+                          : t(targetHint.kind === 'under' ? 'targets.hintUnder' : 'targets.hintOver', {
+                              kcal: targetHint.kcal,
+                            })}{' '}
+                        {t('targets.hintTail')}
+                      </p>
                     )}
                   </div>
                 )}

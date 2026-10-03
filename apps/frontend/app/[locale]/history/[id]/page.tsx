@@ -3,6 +3,7 @@
 import { ProtectedRoute } from '@/components/protected-route';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Link, useRouter } from '@/i18n/navigation';
+import { useFormatter, useTranslations } from 'next-intl';
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
 import { Workout, WorkoutExercise, ExerciseLog } from '@/types';
@@ -29,6 +30,8 @@ import {
 } from '@tabler/icons-react';
 
 export default function WorkoutDetailPage() {
+  const t = useTranslations('HistoryDetailPage');
+  const format = useFormatter();
   const units = useUnits();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -105,13 +108,12 @@ export default function WorkoutDetailPage() {
   };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return new Intl.DateTimeFormat('de-DE', {
+    return format.dateTime(new Date(dateStr), {
       weekday: 'long',
       day: '2-digit',
       month: 'long',
       year: 'numeric',
-    }).format(date);
+    });
   };
 
   const formatDuration = (seconds: number | null) => {
@@ -138,7 +140,7 @@ export default function WorkoutDetailPage() {
   };
 
   const formatNumber = (num: number) => {
-    return new Intl.NumberFormat('de-DE').format(Math.round(num));
+    return format.number(Math.round(num));
   };
 
   return (
@@ -148,7 +150,7 @@ export default function WorkoutDetailPage() {
           <div className="px-4 py-6 sm:px-0">
             {loading ? (
               <div className="flex items-center justify-center py-12">
-                <div className="text-lg text-muted-foreground">Lädt Workout...</div>
+                <div className="text-lg text-muted-foreground">{t('loading')}</div>
               </div>
             ) : workout ? (
               <div className="space-y-6">
@@ -160,13 +162,13 @@ export default function WorkoutDetailPage() {
                     className="flex items-center gap-2 -ml-2"
                   >
                     <IconChevronLeft className="size-4" />
-                    Zurück zu Zyklusdetails
+                    {t('backToCycle')}
                   </Button>
                 ) : (
                   <Link href="/history">
                     <Button variant="ghost" className="flex items-center gap-2 -ml-2">
                       <IconChevronLeft className="size-4" />
-                      Zurück zum Verlauf
+                      {t('backToHistory')}
                     </Button>
                   </Link>
                 )}
@@ -178,8 +180,8 @@ export default function WorkoutDetailPage() {
                       <div>
                         <h2 className="text-2xl font-bold text-foreground">
                           {workout.isFreeWorkout
-                            ? workout.originTemplateName || 'Freies Workout'
-                            : workout.workoutDayName || 'Workout'}
+                            ? workout.originTemplateName || t('freeWorkout')
+                            : workout.workoutDayName || t('workout')}
                         </h2>
                         {workout.cycleName && (
                           <p className="text-sm text-muted-foreground mt-1">
@@ -190,7 +192,7 @@ export default function WorkoutDetailPage() {
                       <div className="flex items-center gap-2">
                         <Badge variant="secondary" className="flex items-center gap-1">
                           <IconCheck className="size-3.5" />
-                          Abgeschlossen
+                          {t('completed')}
                         </Badge>
                         <Button
                           variant="outline"
@@ -202,7 +204,7 @@ export default function WorkoutDetailPage() {
                             router.push(editUrl);
                           }}
                         >
-                          Bearbeiten
+                          {t('edit')}
                         </Button>
                         <Button
                           variant="outline"
@@ -223,7 +225,7 @@ export default function WorkoutDetailPage() {
                   <Card>
                     <CardContent className="p-6">
                       <div className="text-sm font-medium text-muted-foreground mb-1">
-                        Dauer
+                        {t('duration')}
                       </div>
                       <div className="text-2xl font-bold text-foreground">
                         {formatDuration(workout.totalDuration || 0)}
@@ -234,7 +236,7 @@ export default function WorkoutDetailPage() {
                   <Card>
                     <CardContent className="p-6">
                       <div className="text-sm font-medium text-muted-foreground mb-1">
-                        Gesamtvolumen
+                        {t('totalVolume')}
                       </div>
                       <div className="text-2xl font-bold text-foreground">
                         {formatNumber(units.volume(calculateTotalVolume()))}{' '}
@@ -246,7 +248,7 @@ export default function WorkoutDetailPage() {
                   <Card>
                     <CardContent className="p-6">
                       <div className="text-sm font-medium text-muted-foreground mb-1">
-                        Übungen
+                        {t('exercises')}
                       </div>
                       <div className="text-2xl font-bold text-foreground">
                         {workout.exercises.length}
@@ -257,7 +259,7 @@ export default function WorkoutDetailPage() {
 
                 {/* Exercises - now using the shared modern ExerciseCard for consistent look */}
                 <div className="space-y-4">
-                  <h3 className="text-xl font-bold text-foreground">Übungen</h3>
+                  <h3 className="text-xl font-bold text-foreground">{t('exercises')}</h3>
                   {exerciseLogs.map((exercise, idx) => (
                     <ExerciseCard
                       key={exercise.id}
@@ -276,17 +278,17 @@ export default function WorkoutDetailPage() {
             ) : (
               <Card>
                 <CardContent className="p-12 text-center">
-                  <p className="text-muted-foreground mb-4">Workout nicht gefunden</p>
+                  <p className="text-muted-foreground mb-4">{t('notFound')}</p>
                   {fromCycle && cycleId ? (
                     <Button
                       variant="outline"
                       onClick={() => router.push(`/cycles/${cycleId}`)}
                     >
-                      Zurück zu Zyklusdetails
+                      {t('backToCycle')}
                     </Button>
                   ) : (
                     <Link href="/history">
-                      <Button variant="outline">Zurück zum Verlauf</Button>
+                      <Button variant="outline">{t('backToHistory')}</Button>
                     </Link>
                   )}
                 </CardContent>
@@ -300,20 +302,19 @@ export default function WorkoutDetailPage() {
       <AlertDialog open={showDeleteConfirm} onOpenChange={(open) => !open && setShowDeleteConfirm(false)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Workout löschen?</AlertDialogTitle>
+            <AlertDialogTitle>{t('deleteTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Dieses Workout und alle geloggten Sätze werden dauerhaft gelöscht. Dies kann nicht
-              rückgängig gemacht werden.
+              {t('deleteDescription')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{t('cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleting ? 'Wird gelöscht...' : 'Löschen'}
+              {deleting ? t('deleting') : t('delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

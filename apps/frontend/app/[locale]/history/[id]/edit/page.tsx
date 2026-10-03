@@ -3,6 +3,7 @@
 import { ProtectedRoute } from '@/components/protected-route';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useRouter } from '@/i18n/navigation';
+import { useFormatter, useTranslations } from 'next-intl';
 import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/lib/api';
 import { ExerciseLog, SetLog, Workout, WorkoutExercise } from '@/types';
@@ -35,6 +36,8 @@ type SetEditData = Partial<
 >;
 
 export default function EditWorkoutPage() {
+  const t = useTranslations('HistoryEditPage');
+  const format = useFormatter();
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -73,7 +76,7 @@ export default function EditWorkoutPage() {
       setWorkoutDate(data.localDate);
     } catch (error) {
       console.error('Failed to load workout:', error);
-      alert('Fehler beim Laden des Workouts');
+      alert(t('loadError'));
       if (fromCycle && cycleId) {
         router.push(`/cycles/${cycleId}`);
       } else {
@@ -120,27 +123,26 @@ export default function EditWorkoutPage() {
       navigateBack();
     } catch (error) {
       console.error('Failed to save workout:', error);
-      alert('Fehler beim Speichern des Workouts');
+      alert(t('saveError'));
     } finally {
       setSaving(false);
     }
   };
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return new Intl.DateTimeFormat('de-DE', {
+    return format.dateTime(new Date(dateStr), {
       weekday: 'long',
       day: '2-digit',
       month: 'long',
       year: 'numeric',
-    }).format(date);
+    });
   };
 
   if (loading || !workout) {
     return (
       <ProtectedRoute>
         <div className="min-h-screen bg-background flex items-center justify-center">
-          <div className="text-lg text-muted-foreground">Lädt Workout...</div>
+          <div className="text-lg text-muted-foreground">{t('loading')}</div>
         </div>
       </ProtectedRoute>
     );
@@ -158,7 +160,7 @@ export default function EditWorkoutPage() {
               className="flex items-center gap-2 -ml-2"
             >
               <IconChevronLeft className="size-4" />
-              {fromCycle && cycleId ? 'Zurück zu Zyklusdetails' : 'Zurück zum Verlauf'}
+              {fromCycle && cycleId ? t('backToCycle') : t('backToHistory')}
             </Button>
 
             {/* Header */}
@@ -167,16 +169,16 @@ export default function EditWorkoutPage() {
                 <div className="flex items-start justify-between mb-2">
                   <div>
                     <h2 className="text-2xl font-bold text-foreground">
-                      Workout bearbeiten
+                      {t('title')}
                     </h2>
                     <p className="text-sm text-muted-foreground mt-1">
                       {workout.isFreeWorkout
-                        ? workout.originTemplateName || 'Freies Workout'
-                        : workout.workoutDayName || 'Workout'}
+                        ? workout.originTemplateName || t('freeWorkout')
+                        : workout.workoutDayName || t('workout')}
                       {workout.cycleName && ` - ${workout.cycleName}`}
                     </p>
                   </div>
-                  <Badge variant="outline">Bearbeitung</Badge>
+                  <Badge variant="outline">{t('editing')}</Badge>
                 </div>
               </CardContent>
             </Card>
@@ -185,7 +187,7 @@ export default function EditWorkoutPage() {
             <Card>
               <CardContent className="p-6">
                 <Field>
-                  <FieldLabel>Workout-Datum</FieldLabel>
+                  <FieldLabel>{t('date')}</FieldLabel>
                   <DatePicker
                     date={workoutDate ? new Date(workoutDate) : null}
                     onSelect={(date) => {
@@ -202,7 +204,7 @@ export default function EditWorkoutPage() {
                   />
                 </Field>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Ursprünglich: {formatDate(workout.date)}
+                  {t('originally', { date: formatDate(workout.date) })}
                 </p>
               </CardContent>
             </Card>
@@ -233,7 +235,7 @@ export default function EditWorkoutPage() {
                 disabled={saving}
                 className="w-full md:w-auto"
               >
-                {saving ? 'Speichert...' : 'Speichern'}
+                {saving ? t('saving') : t('save')}
               </Button>
             </div>
           </div>

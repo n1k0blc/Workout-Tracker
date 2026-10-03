@@ -17,6 +17,9 @@ export function kcalFromMacros({ carbs, protein, fat }: Macros): number {
   );
 }
 
+/** How the macro targets' energy compares to the kcal target; the UI words it. */
+export type MacroHint = { kind: 'match' } | { kind: 'under' | 'over'; kcal: number };
+
 /**
  * The Tagesziele editor's footer hint: how the three macro targets' energy compares to the
  * kcal target. `null` when there is no positive kcal target to compare against. The macros
@@ -25,16 +28,14 @@ export function kcalFromMacros({ carbs, protein, fat }: Macros): number {
 export function dailyTargetMacroHint(
   targetKcal: number | null | undefined,
   macros: Macros,
-): string | null {
+): MacroHint | null {
   if (typeof targetKcal !== 'number' || !Number.isFinite(targetKcal) || targetKcal <= 0) {
     return null;
   }
   const macroKcal = kcalFromMacros(macros);
-  const tail = 'Die Tagesansicht rechnet immer mit den erfassten Einträgen.';
   const diff = targetKcal - macroKcal;
-  if (diff === 0) return `Makros und Kalorienziel stimmen überein. ${tail}`;
-  const direction = diff > 0 ? 'unter' : 'über';
-  return `${Math.abs(diff)} kcal ${direction} dem Kalorienziel. ${tail}`;
+  if (diff === 0) return { kind: 'match' };
+  return { kind: diff > 0 ? 'under' : 'over', kcal: Math.abs(diff) };
 }
 
 /**

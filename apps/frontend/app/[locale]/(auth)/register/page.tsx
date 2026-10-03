@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { IconChevronLeft, IconPlus, IconX } from '@tabler/icons-react';
@@ -16,6 +17,7 @@ interface HomeGymInput {
 }
 
 export default function RegisterPage() {
+  const t = useTranslations('RegisterPage');
   const apiError = useApiErrorMessage();
   const { register } = useAuth();
   const [step, setStep] = useState<1 | 2>(1);
@@ -40,29 +42,29 @@ export default function RegisterPage() {
 
     // Validation
     if (!email || !password || !confirmPassword || !firstName || !lastName || !dateOfBirth || !height || !weight) {
-      setError('Bitte fülle alle Felder aus');
+      setError(t('errors.missingFields'));
       return;
     }
 
     if (password !== confirmPassword) {
-      setError('Passwörter stimmen nicht überein');
+      setError(t('errors.passwordMismatch'));
       return;
     }
 
-    if (password.length < 6) {
-      setError('Passwort muss mindestens 6 Zeichen lang sein');
+    if (password.length < 8) {
+      setError(t('errors.passwordTooShort'));
       return;
     }
 
     const heightNum = parseInt(height);
     if (heightNum < 50 || heightNum > 300) {
-      setError('Größe muss zwischen 50 und 300 cm liegen');
+      setError(t('errors.heightRange'));
       return;
     }
 
     const weightNum = parseFloat(weight);
     if (weightNum < 20 || weightNum > 500) {
-      setError('Gewicht muss zwischen 20 und 500 kg liegen');
+      setError(t('errors.weightRange'));
       return;
     }
 
@@ -76,12 +78,12 @@ export default function RegisterPage() {
     }
 
     if (age < 13) {
-      setError('Du musst mindestens 13 Jahre alt sein');
+      setError(t('errors.tooYoung'));
       return;
     }
 
     if (age > 120) {
-      setError('Bitte gib ein gültiges Geburtsdatum ein');
+      setError(t('errors.invalidBirthDate'));
       return;
     }
 
@@ -109,7 +111,7 @@ export default function RegisterPage() {
     // Validate homeGyms
     const validGyms = homeGyms.filter(gym => gym.name.trim() !== '');
     if (validGyms.length === 0) {
-      setError('Bitte füge mindestens ein Home Gym hinzu');
+      setError(t('errors.noGym'));
       return;
     }
 
@@ -143,16 +145,16 @@ export default function RegisterPage() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h2 className="mt-6 text-center text-3xl font-bold tracking-tight">
-            Registrieren
+            {t('title')}
           </h2>
           <p className="mt-2 text-center text-sm text-muted-foreground">
-            {step === 1 ? 'Schritt 1 von 2: Deine Daten' : 'Schritt 2 von 2: Deine Studios'}
+            {step === 1 ? t('step1') : t('step2')}
           </p>
           {step === 1 && (
             <p className="mt-1 text-center text-sm text-muted-foreground">
-              Oder{' '}
+              {t('or')}{' '}
               <Link href="/login" className="font-medium text-primary hover:underline">
-                melde dich mit bestehendem Account an
+                {t('signIn')}
               </Link>
             </p>
           )}
@@ -163,7 +165,7 @@ export default function RegisterPage() {
             <FieldGroup>
               {/* Email & Password */}
               <Field>
-                <FieldLabel htmlFor="email">E-Mail-Adresse</FieldLabel>
+                <FieldLabel htmlFor="email">{t('email')}</FieldLabel>
                 <Input
                   id="email"
                   type="email"
@@ -171,12 +173,12 @@ export default function RegisterPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="max@example.com"
+                  placeholder={t('emailPlaceholder')}
                 />
               </Field>
 
               <Field>
-                <FieldLabel htmlFor="password">Passwort</FieldLabel>
+                <FieldLabel htmlFor="password">{t('password')}</FieldLabel>
                 <Input
                   id="password"
                   type="password"
@@ -184,12 +186,12 @@ export default function RegisterPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Mindestens 6 Zeichen"
+                  placeholder={t('passwordPlaceholder')}
                 />
               </Field>
 
               <Field>
-                <FieldLabel htmlFor="confirm-password">Passwort bestätigen</FieldLabel>
+                <FieldLabel htmlFor="confirm-password">{t('confirmPassword')}</FieldLabel>
                 <Input
                   id="confirm-password"
                   type="password"
@@ -197,50 +199,50 @@ export default function RegisterPage() {
                   required
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="Passwort wiederholen"
+                  placeholder={t('confirmPlaceholder')}
                 />
               </Field>
             </FieldGroup>
 
             {/* Personal Info */}
             <div className="pt-4">
-              <div className="mb-3 text-sm font-medium text-muted-foreground">Persönliche Daten</div>
+              <div className="mb-3 text-sm font-medium text-muted-foreground">{t('personal')}</div>
               <FieldGroup>
                 <div className="grid grid-cols-2 gap-3">
                   <Field>
-                    <FieldLabel htmlFor="firstName">Vorname</FieldLabel>
+                    <FieldLabel htmlFor="firstName">{t('firstName')}</FieldLabel>
                     <Input
                       id="firstName"
                       required
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
-                      placeholder="Max"
+                      placeholder={t('firstNamePlaceholder')}
                     />
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="lastName">Nachname</FieldLabel>
+                    <FieldLabel htmlFor="lastName">{t('lastName')}</FieldLabel>
                     <Input
                       id="lastName"
                       required
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
-                      placeholder="Mustermann"
+                      placeholder={t('lastNamePlaceholder')}
                     />
                   </Field>
                 </div>
 
                 <Field>
-                  <FieldLabel htmlFor="dateOfBirth">Geburtsdatum</FieldLabel>
+                  <FieldLabel htmlFor="dateOfBirth">{t('dateOfBirth')}</FieldLabel>
                   <DatePicker
                     date={dateOfBirth}
                     onSelect={setDateOfBirth}
-                    placeholder="TT.MM.JJJJ"
+                    placeholder={t('dateOfBirthPlaceholder')}
                   />
                 </Field>
 
                 <div className="grid grid-cols-2 gap-3">
                   <Field>
-                    <FieldLabel htmlFor="height">Größe (cm)</FieldLabel>
+                    <FieldLabel htmlFor="height">{t('height')}</FieldLabel>
                     <Input
                       id="height"
                       type="number"
@@ -253,7 +255,7 @@ export default function RegisterPage() {
                     />
                   </Field>
                   <Field>
-                    <FieldLabel htmlFor="weight">Gewicht (kg)</FieldLabel>
+                    <FieldLabel htmlFor="weight">{t('weight')}</FieldLabel>
                     <Input
                       id="weight"
                       type="number"
@@ -277,16 +279,16 @@ export default function RegisterPage() {
             )}
 
             <Button type="submit" className="w-full" size="lg">
-              Weiter
+              {t('next')}
             </Button>
           </form>
         ) : (
           <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
             <FieldGroup>
               <Field>
-                <FieldLabel>Deine Home Gyms</FieldLabel>
+                <FieldLabel>{t('homeGyms')}</FieldLabel>
                 <p className="text-sm text-muted-foreground mt-1 mb-4">
-                  Füge die Studios hinzu, in denen du trainierst. Du kannst später weitere hinzufügen.
+                  {t('homeGymsHint')}
                 </p>
               </Field>
 
@@ -297,7 +299,7 @@ export default function RegisterPage() {
                       <Input
                         value={gym.name}
                         onChange={(e) => handleGymNameChange(index, e.target.value)}
-                        placeholder="Gym name"
+                        placeholder={t('gymPlaceholder')}
                         className="flex-1"
                       />
                       <Button
@@ -305,6 +307,7 @@ export default function RegisterPage() {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleRemoveGym(index)}
+                        aria-label={t('removeGym')}
                         className="text-muted-foreground hover:text-destructive shrink-0"
                       >
                         <IconX />
@@ -323,7 +326,7 @@ export default function RegisterPage() {
                   className={homeGyms.length === 0 
                     ? "h-16 w-16 rounded-lg p-0 flex items-center justify-center" 
                     : "h-14 w-14 rounded-lg p-0 flex items-center justify-center"}
-                  aria-label={homeGyms.length === 0 ? "Home Gym hinzufügen" : "Weiteres Home Gym hinzufügen"}
+                  aria-label={homeGyms.length === 0 ? t('addGym') : t('addAnotherGym')}
                 >
                   <IconPlus className={homeGyms.length === 0 ? "size-8" : "size-7"} />
                 </Button>
@@ -344,10 +347,10 @@ export default function RegisterPage() {
                 onClick={() => setStep(1)}
               >
                 <IconChevronLeft className="mr-1 size-4" />
-                Zurück
+                {t('back')}
               </Button>
               <Button type="submit" className="flex-1" disabled={loading}>
-                {loading ? 'Wird erstellt...' : 'Account erstellen'}
+                {loading ? t('creating') : t('create')}
               </Button>
             </div>
           </form>
