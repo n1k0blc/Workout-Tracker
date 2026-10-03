@@ -3,11 +3,22 @@ import { afterEach, describe, it, expect, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import type { ReactNode } from 'react';
-import { ERROR_CODES } from '../../backend/src/common/errors/error-codes';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { ApiError } from '@/lib/api/errors';
 import { useApiErrorMessage } from './useApiErrorMessage';
 import deMessages from '@/messages/de.json';
 import enMessages from '@/messages/en.json';
+
+// The backend's error-code list, read as text rather than imported: the frontend's Docker image
+// holds only apps/frontend, and `next build` type-checks this file, so an import across the app
+// boundary breaks the image build. The test itself only runs where the backend exists.
+const ERROR_CODES = [
+  ...readFileSync(
+    resolve(process.cwd(), '../backend/src/common/errors/error-codes.ts'),
+    'utf-8',
+  ).matchAll(/^ {2}'([A-Z_]+)',$/gm),
+].map((m) => m[1]);
 
 function messageFor(locale: 'de' | 'en', error: unknown, fallback?: string) {
   const messages = locale === 'de' ? deMessages : enMessages;
