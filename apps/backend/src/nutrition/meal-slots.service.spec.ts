@@ -1,12 +1,19 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import {
   MealSlotsService,
-  DEFAULT_MEAL_SLOT_NAMES,
+  DEFAULT_MEAL_SLOTS,
   defaultMealSlotCreateData,
   assertContiguousOrder,
 } from './meal-slots.service';
 
-type Row = { id: string; userId: string; name: string; order: number; archivedAt: Date | null };
+type Row = {
+  id: string;
+  userId: string;
+  name: string;
+  seedKey: string | null;
+  order: number;
+  archivedAt: Date | null;
+};
 
 /**
  * A small stateful Prisma-for-MealSlot mock so the specs can assert the resulting rows rather
@@ -16,6 +23,7 @@ type Row = { id: string; userId: string; name: string; order: number; archivedAt
 function makeStore(initial: Array<Partial<Row> & { id: string; name: string; order: number }>) {
   const rows: Row[] = initial.map((r) => ({
     userId: 'user-1',
+    seedKey: null,
     archivedAt: null,
     ...r,
   }));
@@ -54,6 +62,7 @@ function makeStore(initial: Array<Partial<Row> & { id: string; name: string; ord
           id: data.id ?? `new-${++seq}`,
           userId: data.userId,
           name: data.name,
+          seedKey: data.seedKey ?? null,
           order: data.order,
           archivedAt: data.archivedAt ?? null,
         };
@@ -93,7 +102,16 @@ describe('defaultMealSlotCreateData — order invariant', () => {
       'Abendessen',
       'Snacks',
     ]);
-    expect(DEFAULT_MEAL_SLOT_NAMES).toHaveLength(4);
+    expect(DEFAULT_MEAL_SLOTS).toHaveLength(4);
+  });
+
+  it('tags each default with the seedKey the message catalogue renders it by (#189)', () => {
+    expect(defaultMealSlotCreateData().map((s) => s.seedKey)).toEqual([
+      'breakfast',
+      'lunch',
+      'dinner',
+      'snacks',
+    ]);
   });
 
   it('numbers them 1-based, contiguous, matching array position', () => {
@@ -124,10 +142,10 @@ describe('MealSlotsService.createDefaultsForUser', () => {
 
     expect(prisma.mealSlot.createMany).toHaveBeenCalledWith({
       data: [
-        { name: 'Frühstück', order: 1, userId: 'user-1' },
-        { name: 'Mittagessen', order: 2, userId: 'user-1' },
-        { name: 'Abendessen', order: 3, userId: 'user-1' },
-        { name: 'Snacks', order: 4, userId: 'user-1' },
+        { name: 'Frühstück', seedKey: 'breakfast', order: 1, userId: 'user-1' },
+        { name: 'Mittagessen', seedKey: 'lunch', order: 2, userId: 'user-1' },
+        { name: 'Abendessen', seedKey: 'dinner', order: 3, userId: 'user-1' },
+        { name: 'Snacks', seedKey: 'snacks', order: 4, userId: 'user-1' },
       ],
     });
   });
@@ -149,6 +167,9 @@ describe('assertContiguousOrder — the workout-tree order rule', () => {
     expect(() => assertContiguousOrder([{ order: 2 }, { order: 1 }])).toThrow(BadRequestException);
     expect(() => assertContiguousOrder([{ order: 1 }, { order: 3 }])).toThrow(BadRequestException);
     expect(() => assertContiguousOrder([{ order: 0 }])).toThrow(BadRequestException);
+    expect(() => assertContiguousOrder([{ order: 0 }])).toThrow(
+      expect.objectContaining({ code: 'MEAL_SLOT_ORDER_INVALID' }),
+    );
   });
 });
 
@@ -261,9 +282,9 @@ describe('MealSlotsService.setArchived — archive semantics', () => {
   it('refuses to archive the last remaining active Abschnitt (409)', async () => {
     const { service, prisma } = makeStore([{ id: 'f', name: 'Frühstück', order: 1 }]);
 
-    await expect(service.setArchived('user-1', 'f', true)).rejects.toBeInstanceOf(
-      ConflictException,
-    );
+    const result = service.setArchived('user-1', 'f', true);
+    await expect(result).rejects.toBeInstanceOf(ConflictException);
+    await expect(result).rejects.toMatchObject({ code: 'MEAL_SLOT_LAST_ACTIVE' });
     expect(prisma.mealSlot.update).not.toHaveBeenCalled();
   });
 
@@ -285,9 +306,9 @@ describe('MealSlotsService.setArchived — archive semantics', () => {
       { id: 'm', name: 'Mittagessen', order: 2 },
     ]);
 
-    await expect(service.setArchived('user-1', 'f', true)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    const result = service.setArchived('user-1', 'f', true);
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'MEAL_SLOT_NOT_FOUND' });
   });
 });
 
@@ -295,12 +316,12 @@ describe('MealSlotsService.reorder — order invariant', () => {
   it('rejects an order that disagrees with array position (400), writes nothing', async () => {
     const { service, prisma } = makeStore(FOUR());
 
-    await expect(
-      service.reorder('user-1', [
-        { id: 'm', order: 1 },
-        { id: 'f', order: 1 }, // should be 2
-      ]),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    const result = service.reorder('user-1', [
+      { id: 'm', order: 1 },
+      { id: 'f', order: 1 }, // should be 2
+    ]);
+    await expect(result).rejects.toBeInstanceOf(BadRequestException);
+    await expect(result).rejects.toMatchObject({ code: 'MEAL_SLOT_ORDER_INVALID' });
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
@@ -308,14 +329,14 @@ describe('MealSlotsService.reorder — order invariant', () => {
     const { service } = makeStore(FOUR());
 
     // missing 's', and includes an unknown id
-    await expect(
-      service.reorder('user-1', [
-        { id: 'f', order: 1 },
-        { id: 'm', order: 2 },
-        { id: 'a', order: 3 },
-        { id: 'ghost', order: 4 },
-      ]),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    const result = service.reorder('user-1', [
+      { id: 'f', order: 1 },
+      { id: 'm', order: 2 },
+      { id: 'a', order: 3 },
+      { id: 'ghost', order: 4 },
+    ]);
+    await expect(result).rejects.toBeInstanceOf(BadRequestException);
+    await expect(result).rejects.toMatchObject({ code: 'MEAL_SLOT_REORDER_SET_MISMATCH' });
   });
 
   it('rejects a duplicate id', async () => {
@@ -370,6 +391,17 @@ describe('MealSlotsService.rename', () => {
     expect(rows.find((r) => r.id === 'm')!.name).toBe('Lunch');
   });
 
+  it('clears seedKey, so the typed name wins permanently (#189)', async () => {
+    const { service, rows } = makeStore([
+      { id: 'f', name: 'Frühstück', seedKey: 'breakfast', order: 1 },
+    ]);
+
+    const result = await service.rename('user-1', 'f', 'Lunch');
+
+    expect(result.seedKey).toBeNull();
+    expect(rows[0]).toMatchObject({ name: 'Lunch', seedKey: null });
+  });
+
   it("404s on another user's slot", async () => {
     const { service } = makeStore([{ id: 'f', userId: 'someone-else', name: 'F', order: 1 }]);
 
@@ -378,6 +410,17 @@ describe('MealSlotsService.rename', () => {
 });
 
 describe('MealSlotsService.list', () => {
+  it('exposes seedKey so the client can render the name from its catalogue (#189)', async () => {
+    const { service } = makeStore([
+      { id: 'f', name: 'Frühstück', seedKey: 'breakfast', order: 1 },
+      { id: 'c', name: 'Mein Slot', order: 2 },
+    ]);
+
+    const list = await service.list('user-1');
+
+    expect(list.active.map((s) => s.seedKey)).toEqual(['breakfast', null]);
+  });
+
   it('splits active (in order) from archived', async () => {
     const { service } = makeStore([
       { id: 'f', name: 'Frühstück', order: 1 },

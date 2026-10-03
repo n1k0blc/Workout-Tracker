@@ -1,9 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { AppNotFoundException } from '../common/errors/app-exceptions';
 import { PrismaService } from '../prisma/prisma.service';
 import { derivePrimaryMuscle } from '../common/muscle.util';
 import { getCurrentDate } from '../common/utils/date.util';
 import { setWorkingVolume } from '../common/utils/volume.util';
 import { getWeekdayDistanceFromCycleStart } from '../common/utils/weekday.util';
+import { ApiLocale, DEFAULT_LOCALE } from '../common/utils/locale.util';
+import {
+  EXERCISE_TRANSLATIONS_SELECT,
+  resolveExerciseName,
+} from '../common/utils/exercise-name.util';
 import { AnalyticsFilterDto, AnalyticsScope } from '../common/dto/analytics-filter.dto';
 import {
   VolumeAnalyticsDto,
@@ -286,7 +292,7 @@ export class AnalyticsService {
         select: { id: true, name: true, startDate: true },
       });
       if (!found) {
-        throw new NotFoundException('Cycle not found');
+        throw new AppNotFoundException('CYCLE_NOT_FOUND');
       }
       cycle = found;
       where.cycleId = filter.cycleId;
@@ -460,6 +466,7 @@ export class AnalyticsService {
     muscleGroup?: string | string[],
     equipment?: string | string[],
     gymId?: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
   ): Promise<PersonalRecordsDto> {
     const muscleGroups = Array.isArray(muscleGroup)
       ? muscleGroup
@@ -483,7 +490,10 @@ export class AnalyticsService {
           include: {
             exercise: {
               select: {
+                id: true,
                 name: true,
+                isCustom: true,
+                translations: EXERCISE_TRANSLATIONS_SELECT,
                 equipment: true,
                 isUnilateral: true,
                 isDoubleWeight: true,
@@ -502,7 +512,7 @@ export class AnalyticsService {
     for (const workout of workouts) {
       for (const exerciseLog of workout.exercises) {
         const exerciseId = exerciseLog.exerciseId;
-        const exerciseName = exerciseLog.exercise.name;
+        const exerciseName = resolveExerciseName(exerciseLog.exercise, locale);
 
         if (
           !this.matchesMuscleFilter(derivePrimaryMuscle(exerciseLog.exercise as any), muscleGroups)

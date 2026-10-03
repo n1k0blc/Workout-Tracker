@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { FoodsService } from '../foods/foods.service';
 import { MealsService } from '../meals/meals.service';
 import { FavoritesService } from '../favorites/favorites.service';
+import { ApiLocale, DEFAULT_LOCALE } from '../common/utils/locale.util';
 import { PickerItemDto, PickerListDto } from './dto';
 
 /** How many distinct items the Zuletzt tab shows. */
@@ -41,7 +42,11 @@ export class PickerService {
     private favorites: FavoritesService,
   ) {}
 
-  async getRecent(userId: string, scope: PickerScope): Promise<PickerListDto> {
+  async getRecent(
+    userId: string,
+    scope: PickerScope,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<PickerListDto> {
     const where =
       scope === 'food'
         ? { userId, foodId: { not: null }, mealId: null }
@@ -69,10 +74,14 @@ export class PickerService {
       if (refs.length >= RECENT_LIMIT) break;
     }
 
-    return { items: await this.resolve(userId, refs) };
+    return { items: await this.resolve(userId, refs, locale) };
   }
 
-  async getFavorites(userId: string, scope: PickerScope): Promise<PickerListDto> {
+  async getFavorites(
+    userId: string,
+    scope: PickerScope,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<PickerListDto> {
     const [foodFavs, mealFavs] = await Promise.all([
       this.favorites.listFoodFavorites(userId),
       scope === 'food'
@@ -108,7 +117,7 @@ export class PickerService {
       return b.starredAt - a.starredAt;
     });
 
-    return { items: await this.resolve(userId, ranked) };
+    return { items: await this.resolve(userId, ranked, locale) };
   }
 
   /** Which library row an entry belongs to: its meal if it came from one, else its food. */
@@ -144,15 +153,17 @@ export class PickerService {
   }
 
   /** Resolve refs to DTOs, preserving order and dropping any soft-deleted / missing row. */
-  private async resolve(userId: string, refs: Ref[]): Promise<PickerItemDto[]> {
+  private async resolve(userId: string, refs: Ref[], locale: ApiLocale): Promise<PickerItemDto[]> {
     const [foods, meals] = await Promise.all([
       this.foods.listByIds(
         userId,
         refs.filter((r) => r.kind === 'food').map((r) => r.id),
+        locale,
       ),
       this.meals.listByIds(
         userId,
         refs.filter((r) => r.kind === 'meal').map((r) => r.id),
+        locale,
       ),
     ]);
     const foodById = new Map(foods.map((f) => [f.id, f]));

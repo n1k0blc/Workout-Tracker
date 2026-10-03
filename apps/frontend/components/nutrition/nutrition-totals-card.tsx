@@ -1,3 +1,4 @@
+import { useTranslations } from 'next-intl';
 import { MacroTargets, MacroTotals } from '@/types';
 import {
   formatKcal,
@@ -55,20 +56,22 @@ export function NutritionTotalsCard({
   totals: MacroTotals;
   targets?: MacroTargets | null;
 }) {
+  const t = useTranslations('NutritionTotalsCard');
+
   if (!targets) {
     return (
       <div className="border bg-card p-5">
         <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-          Gegessen
+          {t('eaten')}
         </div>
         <div className="mt-1.5 flex items-baseline gap-1.5">
           <span className="text-[34px] font-bold leading-none">{formatKcal(totals.kcal)}</span>
           <span className="text-sm text-muted-foreground">kcal</span>
         </div>
         <div className="mt-5 grid grid-cols-3 gap-3">
-          <PlainMacroCell label="Kohlenh." grams={totals.carbs} />
-          <PlainMacroCell label="Protein" grams={totals.protein} />
-          <PlainMacroCell label="Fett" grams={totals.fat} />
+          <PlainMacroCell label={t('carbs')} grams={totals.carbs} />
+          <PlainMacroCell label={t('protein')} grams={totals.protein} />
+          <PlainMacroCell label={t('fat')} grams={totals.fat} />
         </div>
       </div>
     );
@@ -81,7 +84,7 @@ export function NutritionTotalsCard({
       <div className="flex items-end justify-between">
         <div>
           <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-            Gegessen
+            {t('eaten')}
           </div>
           <div className="mt-1.5 flex items-baseline gap-1.5">
             <span className="text-[34px] font-bold leading-none">
@@ -95,7 +98,7 @@ export function NutritionTotalsCard({
         {remaining !== null && (
           <div className="text-right">
             <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-              Übrig
+              {t('remaining')}
             </div>
             <div className="mt-1.5 text-lg font-semibold">{formatKcal(remaining)}</div>
           </div>
@@ -108,9 +111,9 @@ export function NutritionTotalsCard({
       />
 
       <div className="mt-5 grid grid-cols-3 gap-3">
-        <TargetMacroCell label="Kohlenh." grams={totals.carbs} target={targets.carbs} />
-        <TargetMacroCell label="Protein" grams={totals.protein} target={targets.protein} />
-        <TargetMacroCell label="Fett" grams={totals.fat} target={targets.fat} />
+        <TargetMacroCell label={t('carbs')} grams={totals.carbs} target={targets.carbs} />
+        <TargetMacroCell label={t('protein')} grams={totals.protein} target={targets.protein} />
+        <TargetMacroCell label={t('fat')} grams={totals.fat} target={targets.fat} />
       </div>
     </div>
   );

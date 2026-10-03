@@ -17,20 +17,8 @@ export function kcalFromMacros({ carbs, protein, fat }: Macros): number {
   );
 }
 
-/**
- * The Schnelleintrag consistency hint. Returns `null` when there is nothing worth saying --
- * no kcal entered yet, or the macros already add up to the entered kcal. Otherwise it states
- * what the macros imply and that the entered kcal is what gets saved, unchanged.
- */
-export function macroConsistencyHint(
-  enteredKcal: number,
-  macros: Macros,
-): string | null {
-  if (!Number.isFinite(enteredKcal) || enteredKcal <= 0) return null;
-  const macroKcal = kcalFromMacros(macros);
-  if (macroKcal === enteredKcal) return null;
-  return `Makros ergeben ${macroKcal} kcal. Differenz zu ${enteredKcal} kcal wird übernommen wie eingegeben.`;
-}
+/** How the macro targets' energy compares to the kcal target; the UI words it. */
+export type MacroHint = { kind: 'match' } | { kind: 'under' | 'over'; kcal: number };
 
 /**
  * The Tagesziele editor's footer hint: how the three macro targets' energy compares to the
@@ -40,16 +28,14 @@ export function macroConsistencyHint(
 export function dailyTargetMacroHint(
   targetKcal: number | null | undefined,
   macros: Macros,
-): string | null {
+): MacroHint | null {
   if (typeof targetKcal !== 'number' || !Number.isFinite(targetKcal) || targetKcal <= 0) {
     return null;
   }
   const macroKcal = kcalFromMacros(macros);
-  const tail = 'Die Tagesansicht rechnet immer mit den erfassten Einträgen.';
   const diff = targetKcal - macroKcal;
-  if (diff === 0) return `Makros und Kalorienziel stimmen überein. ${tail}`;
-  const direction = diff > 0 ? 'unter' : 'über';
-  return `${Math.abs(diff)} kcal ${direction} dem Kalorienziel. ${tail}`;
+  if (diff === 0) return { kind: 'match' };
+  return { kind: diff > 0 ? 'under' : 'over', kcal: Math.abs(diff) };
 }
 
 /**
@@ -124,17 +110,21 @@ export function formatQuantityLabel(
 }
 
 /**
- * The ownership / provenance marker shown next to a food: `"Eigenes"` for the current user's
- * own food, `"System"` for a seeded one, `"Open Food Facts"` for an imported one, and `null`
- * for another user's food (no byline, per ADR-0003).
+ * The ownership / provenance marker shown next to a food: `labels.own` for the current user's
+ * own food, `labels.system` for a seeded one, `labels.openFoodFacts` for an imported one, and
+ * `null` for another user's food (no byline, per ADR-0003). Callers supply the already-
+ * translated labels -- this stays a plain data function, not a React hook.
  */
-export function foodSourceLabel(food: {
-  editable: boolean;
-  source: 'SEED' | 'OPEN_FOOD_FACTS' | 'USER';
-}): string | null {
-  if (food.editable) return 'Eigenes';
-  if (food.source === 'SEED') return 'System';
-  if (food.source === 'OPEN_FOOD_FACTS') return 'Open Food Facts';
+export function foodSourceLabel(
+  food: {
+    editable: boolean;
+    source: 'SEED' | 'OPEN_FOOD_FACTS' | 'USER';
+  },
+  labels: { own: string; system: string; openFoodFacts: string },
+): string | null {
+  if (food.editable) return labels.own;
+  if (food.source === 'SEED') return labels.system;
+  if (food.source === 'OPEN_FOOD_FACTS') return labels.openFoodFacts;
   return null;
 }
 
@@ -198,9 +188,9 @@ export function formatMacroLineLong(macros: Macros): string {
   )} g Protein · ${Math.round(macros.fat)} g Fett`;
 }
 
-/** Whole-number kcal with a German thousands separator: `1842` -> `"1.842"`. */
-export function formatKcal(kcal: number): string {
-  return Math.round(kcal).toLocaleString('de-DE');
+/** Whole-number kcal with a locale-aware thousands separator: `1842` -> `"1.842"` (de). */
+export function formatKcal(kcal: number, locale = 'de-DE'): string {
+  return Math.round(kcal).toLocaleString(locale);
 }
 
 /** A quantity multiplier the German way: `0.5` -> `"0,5×"`, `1` -> `"1×"`. */
@@ -337,16 +327,20 @@ export function withFavoriteOverrides<T extends { id: string; isFavorite: boolea
 }
 
 /**
- * How a day reads relative to the client's today: `"Heute"`, `"Gestern"`, `"Morgen"`, or the
- * full German weekday for anything further out.
+ * How a day reads relative to the client's today: `labels.today`, `labels.yesterday`,
+ * `labels.tomorrow`, or the locale-aware full weekday (via `formatWeekday`, typically
+ * next-intl's `useFormatter().dateTime`) for anything further out.
  */
-export function relativeDayLabel(localDate: string, today: string): string {
-  if (localDate === today) return 'Heute';
-  if (localDate === addDays(today, -1)) return 'Gestern';
-  if (localDate === addDays(today, 1)) return 'Morgen';
-  return new Intl.DateTimeFormat('de-DE', { weekday: 'long' }).format(
-    fromLocalDateString(localDate),
-  );
+export function relativeDayLabel(
+  localDate: string,
+  today: string,
+  labels: { today: string; yesterday: string; tomorrow: string },
+  formatWeekday: (date: Date) => string,
+): string {
+  if (localDate === today) return labels.today;
+  if (localDate === addDays(today, -1)) return labels.yesterday;
+  if (localDate === addDays(today, 1)) return labels.tomorrow;
+  return formatWeekday(fromLocalDateString(localDate));
 }
 
 // --- Ernährungs-Analytics (#153) --------------------------------------------------------
@@ -374,8 +368,8 @@ export function metricTarget(
 }
 
 /** A metric value the way its tile and tooltip read it: `"2.219 kcal"`, `"150 g"`. */
-export function formatMetricValue(value: number, metric: NutritionMetric): string {
-  if (metric === 'kcal') return `${formatKcal(value)} kcal`;
+export function formatMetricValue(value: number, metric: NutritionMetric, locale = 'de-DE'): string {
+  if (metric === 'kcal') return `${formatKcal(value, locale)} kcal`;
   return `${Math.round(value)} g`;
 }
 
@@ -403,9 +397,4 @@ export function nutritionTargetReached(
     hit: days.filter((day) => day[metric] >= target).length,
     total: days.length,
   };
-}
-
-/** The legend's range phrase for a series `dayCount` days long: `"letzte 7 Tage"`. */
-export function nutritionRangeLabel(dayCount: number): string {
-  return `letzte ${dayCount} Tage`;
 }

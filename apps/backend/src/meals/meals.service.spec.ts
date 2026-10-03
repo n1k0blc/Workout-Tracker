@@ -199,7 +199,9 @@ describe('MealsService.findById — live reference', () => {
 
   it('404s an unknown id', async () => {
     const { service } = makeService({ findUnique: null });
-    await expect(service.findById('nope', 'user-1')).rejects.toBeInstanceOf(NotFoundException);
+    const result = service.findById('nope', 'user-1');
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'MEAL_NOT_FOUND' });
   });
 
   it('resolves a meal created by a different user (reads are shared per ADR-0003)', async () => {
@@ -244,9 +246,9 @@ describe('MealsService.create', () => {
   it('404s when an item references a food that does not exist', async () => {
     const { service, prisma } = makeService({ foodCount: 1 });
 
-    await expect(service.create('user-1', baseCreateDto())).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    const result = service.create('user-1', baseCreateDto());
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'MEAL_ITEM_FOOD_NOT_FOUND' });
     expect(prisma.meal.create).not.toHaveBeenCalled();
   });
 });
@@ -257,9 +259,9 @@ describe('MealsService.update / softDelete — creator only', () => {
       findUnique: mealRow({ createdById: 'user-2' }),
     });
 
-    await expect(service.update('user-1', 'meal-1', baseCreateDto())).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    const result = service.update('user-1', 'meal-1', baseCreateDto());
+    await expect(result).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(result).rejects.toMatchObject({ code: 'MEAL_NOT_OWNER' });
     expect(prisma.meal.update).not.toHaveBeenCalled();
   });
 
@@ -318,5 +320,58 @@ describe('MealsService.update / softDelete — creator only', () => {
     await expect(gone.service.softDelete('user-1', 'meal-1')).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+});
+
+describe('MealsService — translated SEED ingredients (#188, ADR-0007)', () => {
+  const seedOats = {
+    ...OATS,
+    source: 'SEED' as const,
+    translations: [
+      { locale: 'DE' as const, name: 'Haferflocken' },
+      { locale: 'EN' as const, name: 'Rolled oats' },
+    ],
+    portions: [
+      {
+        id: 'p-oats-1',
+        label: '1 Portion',
+        grams: 40,
+        order: 1,
+        isDefault: true,
+        translations: [
+          { locale: 'DE' as const, label: '1 Portion' },
+          { locale: 'EN' as const, label: '1 serving' },
+        ],
+      },
+    ],
+  };
+  const meal = mealRow({
+    items: [
+      { id: 'mi-1', foodId: 'food-oats', quantity: 40, order: 1, food: seedOats },
+      {
+        id: 'mi-2',
+        foodId: 'food-skyr',
+        quantity: 150,
+        order: 2,
+        food: { ...SKYR, source: 'USER' },
+      },
+    ],
+  });
+
+  it('translates SEED ingredient names and portion labels, leaving USER foods verbatim', async () => {
+    const { service } = makeService({ findUnique: meal });
+
+    const dto = await service.findById('meal-1', 'user-1', 'en');
+
+    expect(dto.items.map((i) => i.foodName)).toEqual(['Rolled oats', 'Skyr natur']);
+    expect(dto.items[0].portions[0].label).toBe('1 serving');
+  });
+
+  it('translates the ingredient names on the list rows too', async () => {
+    const { service } = makeService({ findMany: [meal] });
+
+    const list = await service.findAll('user-1', false, 'en');
+
+    expect(list.items[0].ingredientNames).toEqual(['Rolled oats', 'Skyr natur']);
   });
 });

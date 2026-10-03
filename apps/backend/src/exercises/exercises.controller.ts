@@ -15,6 +15,8 @@ import { ExercisesService } from './exercises.service';
 import { CreateExerciseDto, FilterExerciseDto, ExerciseDto, UpdateExerciseDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { ClientLocale } from '../common/decorators/client-locale.decorator';
+import { ApiLocale } from '../common/utils/locale.util';
 
 @Controller('exercises')
 export class ExercisesController {
@@ -25,8 +27,9 @@ export class ExercisesController {
   async findAll(
     @Query() filterDto: FilterExerciseDto,
     @CurrentUser() user: { id: string },
+    @ClientLocale() locale: ApiLocale,
   ): Promise<ExerciseDto[]> {
-    return this.exercisesService.findAll(filterDto, user.id);
+    return this.exercisesService.findAll(filterDto, user.id, locale);
   }
 
   @Get(':id')
@@ -34,8 +37,9 @@ export class ExercisesController {
   async findOne(
     @Param('id') id: string,
     @CurrentUser() user: { id: string },
+    @ClientLocale() locale: ApiLocale,
   ): Promise<ExerciseDto> {
-    return this.exercisesService.findById(id, user.id);
+    return this.exercisesService.findById(id, user.id, locale);
   }
 
   @Post()

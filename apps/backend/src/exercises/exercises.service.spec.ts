@@ -76,8 +76,8 @@ describe('ExercisesService.update — isUnilateral toggle guard', () => {
       .catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(ConflictException);
-    // A clear German message the editor can surface, not a bare status code.
-    expect((error as ConflictException).message).toMatch(/unilateral lässt sich nicht mehr ändern/);
+    // A code the editor maps to a message, not a bare status.
+    expect(error).toMatchObject({ code: 'EXERCISE_UNILATERAL_CHANGE_BLOCKED' });
     expect(prisma.exercise.update).not.toHaveBeenCalled();
   });
 
@@ -88,9 +88,9 @@ describe('ExercisesService.update — isUnilateral toggle guard', () => {
       isUnilateral: false,
     });
 
-    await expect(
-      service.update('exercise-1', 'user-1', baseUpdateDto({ isUnilateral: true })),
-    ).rejects.toBeInstanceOf(ConflictException);
+    const result = service.update('exercise-1', 'user-1', baseUpdateDto({ isUnilateral: true }));
+    await expect(result).rejects.toBeInstanceOf(ConflictException);
+    await expect(result).rejects.toMatchObject({ code: 'EXERCISE_UNILATERAL_CHANGE_BLOCKED' });
 
     expect(prisma.exercise.update).not.toHaveBeenCalled();
   });
@@ -200,6 +200,7 @@ const SYSTEM_EXERCISE = {
   equipment: Equipment.BARBELL,
   isUnilateral: false,
   isCustom: false,
+  translations: [{ locale: 'DE' as const, name: 'Barbell Squat' }],
   userId: null,
 };
 
@@ -209,9 +210,9 @@ describe('ExercisesService.findById — cross-user access', () => {
   it("404s on another user's custom exercise", async () => {
     const { service } = makeService({ findUnique: OTHER_USER_EXERCISE });
 
-    await expect(service.findById(OTHER_USER_EXERCISE.id, 'user-1')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    const result = service.findById(OTHER_USER_EXERCISE.id, 'user-1');
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'EXERCISE_NOT_FOUND' });
   });
 
   it('remains accessible to any user for a system exercise', async () => {
@@ -249,9 +250,12 @@ describe('ExercisesService.validateAccessible — cross-user access', () => {
   it("rejects when one of the requested ids is another user's custom exercise", async () => {
     const { service } = makeService({ findMany: [SYSTEM_EXERCISE, OTHER_USER_EXERCISE] });
 
-    await expect(
-      service.validateAccessible([SYSTEM_EXERCISE.id, OTHER_USER_EXERCISE.id], 'user-1'),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    const result = service.validateAccessible(
+      [SYSTEM_EXERCISE.id, OTHER_USER_EXERCISE.id],
+      'user-1',
+    );
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'EXERCISES_NOT_FOUND' });
   });
 
   it('accepts system exercises and the same custom exercise for its own owner', async () => {
@@ -263,5 +267,56 @@ describe('ExercisesService.validateAccessible — cross-user access', () => {
     );
 
     expect(Array.from(accessible.keys())).toEqual([SYSTEM_EXERCISE.id, CUSTOM_EXERCISE.id]);
+  });
+});
+
+describe('ExercisesService — catalogue names resolve in the client locale (#187)', () => {
+  const catalogue = (id: string, de: string, en: string) => ({
+    ...CUSTOM_EXERCISE,
+    id,
+    name: de,
+    isCustom: false,
+    userId: null,
+    translations: [
+      { locale: 'DE', name: de },
+      { locale: 'EN', name: en },
+    ],
+  });
+  const CRUNCH = catalogue('c1', 'Kabel Crunch', 'Cable Crunch');
+  const ROW = catalogue('c2', 'Kurzhantel Rudern', 'Dumbbell Row');
+  const CUSTOM = { ...CUSTOM_EXERCISE, name: 'Mein Curl', translations: [] };
+
+  it('returns the English name, leaving the DTO shape unchanged', async () => {
+    const { service } = makeService({ findMany: [CRUNCH] });
+
+    const [dto] = await service.findAll({} as never, 'user-1', 'en');
+
+    expect(dto.name).toBe('Cable Crunch');
+    expect(dto).not.toHaveProperty('translations');
+  });
+
+  it('renders custom exercises verbatim', async () => {
+    const { service } = makeService({ findMany: [CUSTOM] });
+
+    const [dto] = await service.findAll({} as never, 'user-1', 'en');
+
+    expect(dto.name).toBe('Mein Curl');
+  });
+
+  it('searches and sorts on the translated name', async () => {
+    const { service } = makeService({ findMany: [CRUNCH, ROW] });
+
+    const searched = await service.findAll({ search: 'dumbbell' } as never, 'user-1', 'en');
+    expect(searched.map((e) => e.name)).toEqual(['Dumbbell Row']);
+
+    // German order would put "Kabel" first; English puts "Cable" first, then "Dumbbell".
+    const sorted = await service.findAll({} as never, 'user-1', 'en');
+    expect(sorted.map((e) => e.name)).toEqual(['Cable Crunch', 'Dumbbell Row']);
+  });
+
+  it('resolves findById in the client locale', async () => {
+    const { service } = makeService({ findUnique: CRUNCH });
+
+    expect((await service.findById('c1', 'user-1', 'en')).name).toBe('Cable Crunch');
   });
 });

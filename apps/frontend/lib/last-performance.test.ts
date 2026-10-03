@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   blankPlanValues,
-  buildPrefillToastMessage,
+  buildPrefillToast,
   mapLastPerformanceOntoPlan,
   resolvePlanPrefill,
 } from './last-performance';
@@ -210,7 +210,7 @@ describe('blankPlanValues', () => {
   });
 });
 
-describe('buildPrefillToastMessage', () => {
+describe('buildPrefillToast', () => {
   const base: LastPerformance = {
     exerciseId: 'ex-1',
     source: 'CURRENT_GYM',
@@ -220,33 +220,38 @@ describe('buildPrefillToastMessage', () => {
     sets: [],
   };
 
-  it('names the date and gym, short duration, no extra clauses', () => {
-    const { message, durationMs } = buildPrefillToastMessage(base, false, true);
-    expect(message).toBe('Werte vom 20.08.2026 (Nordgym) übernommen.');
-    expect(durationMs).toBe(6000);
+  it('carries the date and gym, short duration, no extra clauses', () => {
+    expect(buildPrefillToast(base, false, true)).toEqual({
+      performedOn: '2026-08-20',
+      gymName: 'Nordgym',
+      degraded: null,
+      setCountMismatch: false,
+      durationMs: 6000,
+    });
   });
 
   it('labels a degraded gym source and runs long', () => {
-    const { message, durationMs } = buildPrefillToastMessage({ ...base, source: 'HOME_GYM' }, false, true);
-    expect(message).toContain('anderes Gym verwendet');
-    expect(durationMs).toBe(10000);
+    const toast = buildPrefillToast({ ...base, source: 'HOME_GYM' }, false, true);
+    expect(toast.degraded).toBe('HOME_GYM');
+    expect(toast.durationMs).toBe(10000);
   });
 
   it('does not label degradation when no gym context was given', () => {
-    const { message, durationMs } = buildPrefillToastMessage({ ...base, source: 'HOME_GYM' }, false, false);
-    expect(message).toBe('Werte vom 20.08.2026 (Nordgym) übernommen.');
-    expect(durationMs).toBe(6000);
+    const toast = buildPrefillToast({ ...base, source: 'HOME_GYM' }, false, false);
+    expect(toast.degraded).toBeNull();
+    expect(toast.durationMs).toBe(6000);
   });
 
-  it('adds the set-count hint and runs long on a mismatch', () => {
-    const { message, durationMs } = buildPrefillToastMessage(base, true, true);
-    expect(message).toContain('Andere Satzanzahl');
-    expect(durationMs).toBe(10000);
+  it('flags a set-count mismatch and runs long', () => {
+    const toast = buildPrefillToast(base, true, true);
+    expect(toast.setCountMismatch).toBe(true);
+    expect(toast.durationMs).toBe(10000);
   });
 
-  it('falls back to "Anderes Gym" when the gym name is null', () => {
-    const { message } = buildPrefillToastMessage({ ...base, source: 'ANY_GYM', gymName: null }, false, true);
-    expect(message).toContain('(Anderes Gym)');
+  it('passes a null gym name through for the UI to word', () => {
+    const toast = buildPrefillToast({ ...base, source: 'ANY_GYM', gymName: null }, false, true);
+    expect(toast.gymName).toBeNull();
+    expect(toast.degraded).toBe('ANY_GYM');
   });
 });
 
@@ -277,7 +282,7 @@ describe('resolvePlanPrefill', () => {
       const current = [planned(1, W), planned(2, W)];
       const decision = resolvePlanPrefill(current, perf({ sets: [hist(W), hist(W), hist(W)] }), true, true, makeId);
 
-      expect(decision!.toast!.message).toContain('Andere Satzanzahl');
+      expect(decision!.toast!.setCountMismatch).toBe(true);
       expect(decision!.toast!.durationMs).toBe(10000);
     });
 
@@ -303,7 +308,7 @@ describe('resolvePlanPrefill', () => {
       const current = [planned(1, W), planned(2, W)];
       const decision = resolvePlanPrefill(current, perf({ source: 'HOME_GYM' }), true, false, makeId);
 
-      expect(decision!.toast!.message).toBe('Werte vom 20.08.2026 (Nordgym) übernommen.');
+      expect(decision!.toast).toMatchObject({ gymName: 'Nordgym', degraded: null });
     });
   });
 

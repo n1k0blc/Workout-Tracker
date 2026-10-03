@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useAuth } from '@/lib/auth-context';
 import {
   Dialog,
@@ -25,6 +26,7 @@ export default function GymLocationModal({
   onSelectGym,
   plannedHomeGymId,
 }: GymLocationModalProps) {
+  const t = useTranslations('WorkoutStart');
   const { user } = useAuth();
 
   // Sort home gyms alphabetically
@@ -36,9 +38,9 @@ export default function GymLocationModal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-center text-2xl">Wo trainierst du heute?</DialogTitle>
+          <DialogTitle className="text-center text-2xl">{t('gymModal.title')}</DialogTitle>
           <DialogDescription className="text-center">
-            Wähle dein Trainingsort aus
+            {t('gymModal.description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -58,10 +60,10 @@ export default function GymLocationModal({
                   <span>{gym.name}</span>
                   {isRecommended ? (
                     <Badge variant="secondary" className="text-xs mt-0.5">
-                      Heute empfohlen
+                      {t('common.recommendedToday')}
                     </Badge>
                   ) : (
-                    <span className="text-xs mt-0.5 invisible">Heute empfohlen</span>
+                    <span className="text-xs mt-0.5 invisible">{t('common.recommendedToday')}</span>
                   )}
                 </div>
               </Button>
@@ -75,12 +77,12 @@ export default function GymLocationModal({
             variant="outline"
           >
             <IconBuilding className="size-5" />
-            <span>Anderes Gym</span>
+            <span>{t('gymModal.otherGym')}</span>
           </Button>
         </div>
 
         <p className="text-xs text-muted-foreground text-center pt-2">
-          PRs werden nur von Home Gym Workouts gezählt
+          {t('gymModal.prHint')}
         </p>
       </DialogContent>
     </Dialog>

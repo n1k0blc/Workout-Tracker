@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslations, useFormatter } from 'next-intl';
 import { CycleFormData } from './cycle-wizard';
 import { SetType, Exercise } from '@/types';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
@@ -23,7 +24,7 @@ import { reorderExerciseLogs, withArrayPositionOrder } from '@/lib/workout-order
 import { plannedSideFields } from '@/lib/set-sides';
 import { addPlannedSet } from '@/lib/planned-sets';
 import type { PlannedSet } from '@/types';
-import { sortByCycleWeekday } from '@/lib/weekday';
+import { sortByCycleWeekday, weekdayReferenceDate } from '@/lib/weekday';
 import {
   DndContext,
   closestCenter,
@@ -57,6 +58,8 @@ export default function BlueprintEditorStep({
   onNext,
   onBack,
 }: BlueprintEditorStepProps) {
+  const t = useTranslations('BlueprintEditorStep');
+  const format = useFormatter();
   const [showExerciseModal, setShowExerciseModal] = useState(false);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
@@ -218,7 +221,7 @@ export default function BlueprintEditorStep({
 
   const handleSaveAsTemplate = async () => {
     if (!templateName.trim()) {
-      alert('Bitte gib einen Vorlagen-Namen ein');
+      alert(t('alerts.templateNameRequired'));
       return;
     }
 
@@ -227,7 +230,7 @@ export default function BlueprintEditorStep({
     }
 
     if (currentDay.blueprint.exercises.length === 0) {
-      alert('Füge mindestens eine Übung hinzu');
+      alert(t('alerts.atLeastOneExercise'));
       return;
     }
 
@@ -252,16 +255,16 @@ export default function BlueprintEditorStep({
       };
 
       await apiClient.createWorkoutTemplate(templateData);
-      alert('Vorlage erfolgreich erstellt!');
+      alert(t('alerts.templateCreated'));
       setShowSaveTemplateModal(false);
       setTemplateName('');
     } catch (error: unknown) {
       console.error('Failed to save template:', error);
       const err = error as { response?: { status?: number } };
       if (err.response?.status === 409) {
-        alert('Eine Vorlage mit diesem Namen existiert bereits');
+        alert(t('alerts.templateNameExists'));
       } else {
-        alert('Fehler beim Speichern der Vorlage');
+        alert(t('alerts.templateSaveFailed'));
       }
     } finally {
       setSavingTemplate(false);
@@ -277,7 +280,7 @@ export default function BlueprintEditorStep({
 
       // Check if template has exercises
       if (!template.exercises || template.exercises.length === 0) {
-        alert('Diese Vorlage enthält keine Übungen');
+        alert(t('alerts.templateEmpty'));
         return;
       }
 
@@ -312,7 +315,7 @@ export default function BlueprintEditorStep({
       setShowTemplateSelectionModal(false);
     } catch (error) {
       console.error('Failed to load template:', error);
-      alert('Fehler beim Laden der Vorlage');
+      alert(t('alerts.templateLoadFailed'));
     }
   };
 
@@ -381,10 +384,8 @@ export default function BlueprintEditorStep({
 
 
 
-  const getWeekday = (weekday: number): string => {
-    const days = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
-    return days[weekday];
-  };
+  const getWeekday = (weekday: number): string =>
+    format.dateTime(weekdayReferenceDate(weekday), { weekday: 'long', timeZone: 'UTC' });
 
   const allDaysHaveExercises = formData.workoutDays.every(
     (day) => day.blueprint.exercises.length > 0
@@ -428,7 +429,7 @@ export default function BlueprintEditorStep({
         {currentDay && (
           <div>
             <h3 className="text-lg font-semibold text-foreground mb-3">
-              Blueprint für {currentDay.name || getWeekday(currentDay.weekday)}
+              {t('blueprintFor', { dayName: currentDay.name || getWeekday(currentDay.weekday) })}
             </h3>
 
             {currentExercises.length > 0 ? (
@@ -527,14 +528,14 @@ export default function BlueprintEditorStep({
               <Card>
                 <CardContent className="p-8 text-center">
                   <p className="text-muted-foreground mb-4">
-                    Noch keine Übungen hinzugefügt
+                    {t('emptyExercises')}
                   </p>
                   {/* Large centered + as primary CTA (consistent with active workout) */}
                   <Button
                     variant="outline"
                     onClick={() => setShowExerciseModal(true)}
                     className="h-16 w-16 rounded-lg p-0"
-                    aria-label="Erste Übung hinzufügen"
+                    aria-label={t('addFirstExercise')}
                   >
                     <IconPlus className="size-8" />
                   </Button>
@@ -549,7 +550,7 @@ export default function BlueprintEditorStep({
                   variant="outline"
                   onClick={() => setShowExerciseModal(true)}
                   className="h-14 w-14 rounded-lg p-0"
-                  aria-label="Übung hinzufügen"
+                  aria-label={t('addExercise')}
                 >
                   <IconPlus className="size-7" />
                 </Button>
@@ -564,7 +565,7 @@ export default function BlueprintEditorStep({
                 disabled={currentDay.blueprint.exercises.length > 0}
                 className="w-full"
               >
-                Aus Vorlage laden
+                {t('loadFromTemplate')}
               </Button>
             </div>
 
@@ -575,7 +576,7 @@ export default function BlueprintEditorStep({
                 onClick={() => setShowSaveTemplateModal(true)}
                 className="w-full mt-2"
               >
-                Als Vorlage speichern
+                {t('saveAsTemplate')}
               </Button>
             )}
           </div>
@@ -589,7 +590,7 @@ export default function BlueprintEditorStep({
             onClick={onBack}
             className="flex-1"
           >
-            Zurück
+            {t('back')}
           </Button>
           <Button
             type="button"
@@ -597,7 +598,7 @@ export default function BlueprintEditorStep({
             disabled={!allDaysHaveExercises}
             className="flex-1"
           >
-            Weiter zur Überprüfung
+            {t('nextToReview')}
           </Button>
         </div>
       </div>
@@ -621,17 +622,16 @@ export default function BlueprintEditorStep({
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Blueprint als Vorlage speichern</DialogTitle>
+            <DialogTitle>{t('saveTemplateDialog.title')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <p className="text-sm text-muted-foreground">
-              Gib einen Namen für deine Workout-Vorlage ein. Diese Vorlage kannst du
-              später wiederverwenden oder direkt als Workout starten.
+              {t('saveTemplateDialog.description')}
             </p>
             <Input
               value={templateName}
               onChange={(e) => setTemplateName(e.target.value)}
-              placeholder="z.B. Mein Push Day"
+              placeholder={t('saveTemplateDialog.namePlaceholder')}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !savingTemplate) {
                   handleSaveAsTemplate();
@@ -649,13 +649,13 @@ export default function BlueprintEditorStep({
               }}
               disabled={savingTemplate}
             >
-              Abbrechen
+              {t('saveTemplateDialog.cancel')}
             </Button>
             <Button
               onClick={handleSaveAsTemplate}
               disabled={savingTemplate || !templateName.trim()}
             >
-              {savingTemplate ? 'Speichert...' : 'Speichern'}
+              {savingTemplate ? t('saveTemplateDialog.saving') : t('saveTemplateDialog.save')}
             </Button>
           </DialogFooter>
         </DialogContent>

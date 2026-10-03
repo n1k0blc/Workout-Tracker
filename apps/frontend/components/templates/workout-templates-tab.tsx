@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+import { useRouter } from '@/i18n/navigation';
 import { apiClient } from '@/lib/api';
 import { WorkoutTemplate } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
@@ -21,6 +22,7 @@ import { IconPlus, IconTrash, IconBarbell, IconClock, IconTag } from '@tabler/ic
 
 export default function WorkoutTemplatesTab() {
   const router = useRouter();
+  const t = useTranslations('WorkoutTemplatesTab');
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleteTemplateId, setDeleteTemplateId] = useState<string | null>(null);
@@ -50,7 +52,7 @@ export default function WorkoutTemplatesTab() {
       setDeleteTemplateId(null);
     } catch (error) {
       console.error('Failed to delete template:', error);
-      alert('Fehler beim Löschen der Vorlage.');
+      alert(t('deleteFailed'));
     }
   };
 
@@ -62,18 +64,17 @@ export default function WorkoutTemplatesTab() {
       {/* Header with count */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {systemTemplates.length} System-Vorlagen · {customTemplates.length} Benutzerdefinierte
-          Vorlagen
+          {t('counts', { system: systemTemplates.length, custom: customTemplates.length })}
         </p>
         <Button onClick={() => router.push('/templates/new')}>
           <IconPlus className="mr-2 size-4" />
-          Neue Vorlage
+          {t('newTemplate')}
         </Button>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <div className="text-lg text-muted-foreground">Lädt Vorlagen...</div>
+          <div className="text-lg text-muted-foreground">{t('loading')}</div>
         </div>
       ) : (
         <div className="space-y-8">
@@ -82,7 +83,7 @@ export default function WorkoutTemplatesTab() {
             <div>
               <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
                 <IconBarbell className="size-5" />
-                System-Vorlagen
+                {t('systemTemplates')}
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {systemTemplates.map((template) => (
@@ -100,7 +101,7 @@ export default function WorkoutTemplatesTab() {
           <div>
             <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
               <IconTag className="size-5" />
-              Benutzerdefinierte Vorlagen
+              {t('customTemplates')}
             </h3>
             {customTemplates.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -116,9 +117,9 @@ export default function WorkoutTemplatesTab() {
             ) : (
               <Card>
                 <CardContent className="p-12 text-center">
-                  <p className="text-muted-foreground mb-4">Noch keine benutzerdefinierten Vorlagen</p>
+                  <p className="text-muted-foreground mb-4">{t('customEmptyTitle')}</p>
                   <p className="text-sm text-muted-foreground">
-                    Erstelle Vorlagen aus Blueprints oder abgeschlossenen Workouts
+                    {t('customEmptyHint')}
                   </p>
                 </CardContent>
               </Card>
@@ -131,19 +132,18 @@ export default function WorkoutTemplatesTab() {
       <AlertDialog open={!!deleteTemplateId} onOpenChange={(open) => !open && setDeleteTemplateId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Vorlage löschen?</AlertDialogTitle>
+            <AlertDialogTitle>{t('deleteDialog.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Möchten Sie diese Workout-Vorlage wirklich löschen? Diese Aktion kann nicht
-              rückgängig gemacht werden.
+              {t('deleteDialog.description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel>{t('deleteDialog.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteTemplate}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Löschen
+              {t('deleteDialog.confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -159,6 +159,7 @@ interface TemplateCardProps {
 }
 
 function TemplateCard({ template, onDelete, onClick }: TemplateCardProps) {
+  const t = useTranslations('WorkoutTemplatesTab');
   return (
     <Card 
       className={`hover:shadow-sm transition-shadow ${onClick ? 'cursor-pointer' : ''}`}
@@ -178,7 +179,7 @@ function TemplateCard({ template, onDelete, onClick }: TemplateCardProps) {
                     e.stopPropagation();
                     onDelete();
                   }}
-                  title="Vorlage löschen"
+                  title={t('card.delete')}
                 >
                   <IconTrash className="size-4" />
                 </Button>
@@ -191,13 +192,13 @@ function TemplateCard({ template, onDelete, onClick }: TemplateCardProps) {
           <div className="flex items-center gap-2">
             <IconBarbell className="size-4" />
             <span>
-              {template.totalExercises} {template.totalExercises === 1 ? 'Übung' : 'Übungen'}
+              {t('card.exerciseCount', { count: template.totalExercises ?? 0 })}
             </span>
           </div>
           <div className="flex items-center gap-2">
             <IconClock className="size-4" />
             <span>
-              {template.totalSets} {template.totalSets === 1 ? 'Satz' : 'Sätze'}
+              {t('card.setCount', { count: template.totalSets ?? 0 })}
             </span>
           </div>
           {template.recommendedGymName && (
@@ -210,9 +211,9 @@ function TemplateCard({ template, onDelete, onClick }: TemplateCardProps) {
 
         <div className="mt-4 pt-3 border-t">
           {template.isCustom ? (
-            <Badge variant="secondary" className="text-xs">Benutzerdefiniert</Badge>
+            <Badge variant="secondary" className="text-xs">{t('card.custom')}</Badge>
           ) : (
-            <Badge variant="outline" className="text-xs">System-Vorlage</Badge>
+            <Badge variant="outline" className="text-xs">{t('card.system')}</Badge>
           )}
         </div>
       </CardContent>

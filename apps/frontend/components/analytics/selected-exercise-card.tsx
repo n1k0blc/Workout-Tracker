@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Exercise } from '@/types';
 import { IconTrash, IconRefresh } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,7 @@ export default function SelectedExerciseCard({
   onRemove,
   onReplace,
 }: SelectedExerciseCardProps) {
+  const t = useTranslations('SelectedExerciseCard');
   return (
     <div className="bg-card border border-border rounded-lg p-4 relative">
       {/* Action buttons - top right */}
@@ -24,7 +26,7 @@ export default function SelectedExerciseCard({
           size="icon"
           className="size-8"
           onClick={onReplace}
-          title="Übung tauschen"
+          title={t('swapExercise')}
         >
           <IconRefresh className="size-4" />
         </Button>
@@ -33,7 +35,7 @@ export default function SelectedExerciseCard({
           size="icon"
           className="size-8 text-destructive hover:text-destructive"
           onClick={onRemove}
-          title="Übung entfernen"
+          title={t('removeExercise')}
         >
           <IconTrash className="size-4" />
         </Button>
@@ -42,7 +44,7 @@ export default function SelectedExerciseCard({
       {/* Exercise details */}
       <div className="pr-20">
         <div className="font-semibold text-foreground">{exercise.name}</div>
-        <div className="text-xs text-muted-foreground mt-0.5">Gefiltert nach Übung</div>
+        <div className="text-xs text-muted-foreground mt-0.5">{t('filteredByExercise')}</div>
       </div>
     </div>
   );

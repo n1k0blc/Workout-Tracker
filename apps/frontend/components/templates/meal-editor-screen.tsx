@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+import { useRouter } from '@/i18n/navigation';
 import { toast } from 'sonner';
 import {
   IconArrowLeft,
@@ -56,14 +57,12 @@ import { FavoriteStar } from '@/components/nutrition/favorite-star';
 import {
   PickerTabBar,
   PickerTabPlaceholder,
-  ZUTAT_PICKER_TABS,
-  FAVORITEN_EMPTY,
-  ZULETZT_EMPTY,
-  PICKER_LOADING,
+  ZUTAT_PICKER_TAB_IDS,
   type PickerTabId,
 } from '@/components/nutrition/picker-tabs';
 import { usePickerLists } from '@/hooks/usePickerLists';
 import { ScanFlow } from '@/components/nutrition/scan-flow';
+import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
 
 /** Where Speichern, Abbrechen and Löschen all return to. */
 const MEALS_TAB = '/templates?tab=meals';
@@ -148,6 +147,8 @@ function signature(name: string, items: EditorItem[]): string {
  * handles fought the sheet's own drag-to-dismiss.
  */
 export default function MealEditorScreen({ mealId }: { mealId?: string }) {
+  const t = useTranslations('MealEditorScreen');
+  const apiError = useApiErrorMessage();
   const router = useRouter();
   const isEdit = mealId != null;
 
@@ -193,7 +194,7 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
         setBaseline(signature(meal.name, loaded));
       })
       .catch(() => {
-        if (!cancelled) setError('Mahlzeit konnte nicht geladen werden.');
+        if (!cancelled) setError(t('loadError'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -201,7 +202,7 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
     return () => {
       cancelled = true;
     };
-  }, [mealId]);
+  }, [mealId, t]);
 
   // Food search for the "Zutat" picker -- only the Lebensmittel tab queries; Favoriten /
   // Zuletzt are served by usePickerLists (#148). No Mahlzeiten tab here: a Mahlzeit cannot be
@@ -261,7 +262,7 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
 
   function addFood(food: Food) {
     setItems((prev) => [...prev, fromFood(food)]);
-    toast.success(`${food.name} hinzugefügt`);
+    toast.success(t('addedFood', { name: food.name }));
   }
 
   function removeItem(key: string) {
@@ -286,11 +287,11 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
   async function handleSave() {
     setError('');
     if (!name.trim()) {
-      setError('Bitte gib einen Namen ein.');
+      setError(t('nameRequired'));
       return;
     }
     if (items.length === 0) {
-      setError('Eine Mahlzeit braucht mindestens eine Zutat.');
+      setError(t('ingredientRequired'));
       return;
     }
     const input = {
@@ -306,10 +307,10 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
       }
       // Match the baseline before navigating, so the guard does not fire on the way out.
       setBaseline(signature(name, items));
-      toast.success(isEdit ? 'Mahlzeit gespeichert' : 'Mahlzeit angelegt');
+      toast.success(isEdit ? t('saved') : t('created'));
       router.push(MEALS_TAB);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Speichern fehlgeschlagen.');
+      setError(apiError(err, t('saveError')));
       setSaving(false);
     }
   }
@@ -319,20 +320,20 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
     try {
       await apiClient.deleteMeal(mealId);
       setBaseline(signature(name, items));
-      toast.success('Mahlzeit gelöscht');
+      toast.success(t('deleted'));
       router.push(MEALS_TAB);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Löschen fehlgeschlagen.');
+      setError(apiError(err, t('deleteError')));
     }
   }
 
   const title = searchOpen
-    ? 'Zutat'
+    ? t('titleIngredient')
     : readOnly
-      ? 'Mahlzeit'
+      ? t('titleMeal')
       : isEdit
-        ? 'Bearbeiten'
-        : 'Neue Mahlzeit';
+        ? t('titleEdit')
+        : t('titleNew');
 
   return (
     <ProtectedRoute>
@@ -341,7 +342,7 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Zurück"
+            aria-label={t('back')}
             onClick={searchOpen ? () => setSearchOpen(false) : leave}
           >
             <IconArrowLeft />
@@ -354,7 +355,7 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
               variant="ghost"
               size="icon"
               className="text-destructive"
-              aria-label="Mahlzeit löschen"
+              aria-label={t('deleteMeal')}
               onClick={() => setConfirmDelete(true)}
             >
               <IconTrash />
@@ -388,12 +389,12 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
               )}
 
               {loading ? (
-                <p className="py-10 text-center text-sm text-muted-foreground">Lädt …</p>
+                <p className="py-10 text-center text-sm text-muted-foreground">{t('loading')}</p>
               ) : (
                 <div className="space-y-5 pt-5">
                   <label className="block">
                     <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                      Name
+                      {t('name')}
                     </span>
                     <Input
                       value={name}
@@ -406,20 +407,18 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
                   <div>
                     <div className="mb-2.5 flex items-center justify-between">
                       <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                        Zutaten · {items.length}
+                        {t('ingredientsHeading', { count: items.length })}
                       </span>
                       {!readOnly && (
                         <Button variant="outline" size="xs" onClick={openSearch}>
                           <IconSearch data-icon="inline-start" />
-                          Zutat
+                          {t('ingredient')}
                         </Button>
                       )}
                     </div>
 
                     {items.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">
-                        Noch keine Zutaten. Füge welche über „Zutat“ hinzu.
-                      </p>
+                      <p className="text-xs text-muted-foreground">{t('noIngredientsYet')}</p>
                     ) : (
                       <DndContext
                         sensors={sensors}
@@ -452,7 +451,7 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
 
                   <div className="rounded-lg border bg-card p-4">
                     <div className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                      Summe der Mahlzeit
+                      {t('mealTotal')}
                     </div>
                     <div className="mt-2 flex items-baseline gap-1.5">
                       <span className="text-2xl font-bold leading-none">
@@ -462,9 +461,9 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
                     </div>
                     <div className="mt-3.5 grid grid-cols-3 gap-3">
                       {[
-                        { label: 'Kohlenh.', value: totals.carbs },
-                        { label: 'Protein', value: totals.protein },
-                        { label: 'Fett', value: totals.fat },
+                        { label: t('carbs'), value: totals.carbs },
+                        { label: t('protein'), value: totals.protein },
+                        { label: t('fat'), value: totals.fat },
                       ].map((m) => (
                         <div key={m.label}>
                           <div className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
@@ -488,15 +487,15 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
             <div className="sticky bottom-0 mt-auto flex gap-2 border-t bg-background p-4">
               {readOnly ? (
                 <Button className="flex-1" variant="outline" onClick={leave}>
-                  Schließen
+                  {t('close')}
                 </Button>
               ) : (
                 <>
                   <Button className="flex-1" onClick={handleSave} disabled={saving || loading}>
-                    {saving ? 'Speichert …' : 'Speichern'}
+                    {saving ? t('saving') : t('save')}
                   </Button>
                   <Button variant="outline" onClick={leave}>
-                    Abbrechen
+                    {t('cancel')}
                   </Button>
                 </>
               )}
@@ -513,7 +512,7 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
         onOpenChange={setScannerOpen}
         mode={{
           kind: 'pick',
-          label: 'Als Zutat',
+          label: t('asIngredient'),
           onPick: (food) => {
             addFood(food);
             setScannerOpen(false);
@@ -524,19 +523,16 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Mahlzeit löschen?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Die Mahlzeit verschwindet aus der Liste und dem Picker. Bereits protokollierte
-              Einträge bleiben unverändert.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('deleteDialog.title')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('deleteDialog.description')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               className="bg-destructive text-white hover:bg-destructive/90"
             >
-              Löschen
+              {t('deleteDialog.confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -545,18 +541,16 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
       <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Änderungen verwerfen?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Diese Mahlzeit hat ungespeicherte Änderungen. Beim Verlassen gehen sie verloren.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t('discardDialog.title')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('discardDialog.description')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Weiter bearbeiten</AlertDialogCancel>
+            <AlertDialogCancel>{t('discardDialog.keepEditing')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => router.push(MEALS_TAB)}
               className="bg-destructive text-white hover:bg-destructive/90"
             >
-              Verwerfen
+              {t('discardDialog.confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -590,6 +584,7 @@ function FoodSearchView({
   onScanRequest: () => void;
   fav: ReturnType<typeof usePickerLists>;
 }) {
+  const t = useTranslations('MealEditorScreen');
   const foodsOf = (items: PickerItem[] | null) =>
     (items ?? []).flatMap((i) => (i.kind === 'food' ? [i.food] : []));
 
@@ -627,14 +622,14 @@ function FoodSearchView({
           <Button
             variant="outline"
             size="icon-sm"
-            aria-label={`${food.name} hinzufügen`}
+            aria-label={t('addNamed', { name: food.name })}
             onClick={() => onAdd(food)}
           >
             <IconPlus />
           </Button>
           {addedFoodIds.has(food.id) && (
             <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              drin
+              {t('inMeal')}
             </span>
           )}
         </div>
@@ -650,48 +645,48 @@ function FoodSearchView({
           <Input
             value={search}
             onChange={(e) => onSearch(e.target.value)}
-            placeholder="Lebensmittel suchen..."
+            placeholder={t('searchPlaceholder')}
             className="border-b-0"
             autoFocus
           />
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label="Barcode scannen"
+            aria-label={t('scanBarcode')}
             onClick={onScanRequest}
           >
             <IconBarcode />
           </Button>
         </div>
-        <PickerTabBar tab={tab} onTab={onTab} tabs={ZUTAT_PICKER_TABS} />
+        <PickerTabBar tab={tab} onTab={onTab} tabs={ZUTAT_PICKER_TAB_IDS} />
       </div>
 
       <div className="flex-1 px-4 py-3">
         {tab === 'lebensmittel' &&
           (searching && results.length === 0
-            ? placeholder(PICKER_LOADING)
+            ? placeholder(t('loading'))
             : lebensmittelFoods.length === 0
-              ? placeholder(search.trim() ? 'Nichts gefunden.' : 'Die Bibliothek ist noch leer.')
+              ? placeholder(search.trim() ? t('noFoodsFound') : t('libraryEmpty'))
               : foodRows(lebensmittelFoods))}
 
         {tab === 'favoriten' &&
           (fav.favorites === null
-            ? placeholder(PICKER_LOADING)
+            ? placeholder(t('loading'))
             : favoriteFoods.length === 0
-              ? placeholder(FAVORITEN_EMPTY)
+              ? placeholder(t('favoritesEmpty'))
               : foodRows(favoriteFoods))}
 
         {tab === 'zuletzt' &&
           (fav.recents === null
-            ? placeholder(PICKER_LOADING)
+            ? placeholder(t('loading'))
             : recentFoods.length === 0
-              ? placeholder(ZULETZT_EMPTY)
+              ? placeholder(t('recentEmpty'))
               : foodRows(recentFoods))}
       </div>
 
       <div className="sticky bottom-0 mt-auto border-t bg-background p-4">
         <Button className="w-full" onClick={onDone}>
-          Fertig
+          {t('done')}
         </Button>
       </div>
     </>
@@ -713,6 +708,7 @@ function IngredientRow({
   onRemove: () => void;
   onAmountChange: (grams: number, portionLabel: string | null) => void;
 }) {
+  const t = useTranslations('MealEditorScreen');
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.key,
     disabled: readOnly,
@@ -728,7 +724,7 @@ function IngredientRow({
         {!readOnly && (
           <button
             type="button"
-            aria-label="Verschieben"
+            aria-label={t('move')}
             className="shrink-0 cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
             {...attributes}
             {...listeners}
@@ -745,7 +741,7 @@ function IngredientRow({
             {item.foodName}
             {item.deleted && (
               <span className="ml-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-                gelöscht
+                {t('deletedFood')}
               </span>
             )}
           </div>
@@ -756,7 +752,7 @@ function IngredientRow({
             variant="ghost"
             size="icon-sm"
             className="shrink-0"
-            aria-label={`${item.foodName} entfernen`}
+            aria-label={t('removeNamed', { name: item.foodName })}
             onClick={onRemove}
           >
             <IconX />

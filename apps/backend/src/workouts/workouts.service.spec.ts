@@ -205,7 +205,9 @@ describe('WorkoutsService per-side aggregates (#100)', () => {
       ],
     } as CreateWorkoutDto;
 
-    await expect(service.create(dto, 'user-1')).rejects.toThrow(/bilateral/);
+    await expect(service.create(dto, 'user-1')).rejects.toMatchObject({
+      code: 'WORKOUT_SET_UNEXPECTED_SIDE_DATA',
+    });
   });
 });
 
@@ -228,9 +230,8 @@ describe('WorkoutsService cycle start boundary', () => {
       exercises,
     } as CreateWorkoutDto;
 
-    await expect(service.create(dto, 'user-1')).rejects.toThrow(
-      'Dieser Zyklus hat noch nicht begonnen.',
-    );
+    const result = service.create(dto, 'user-1');
+    await expect(result).rejects.toMatchObject({ code: 'CYCLE_NOT_STARTED' });
   });
 
   it('allows starting a cycle workout dated on the cycle start date', async () => {
@@ -271,9 +272,9 @@ describe('WorkoutsService cycle start boundary', () => {
 
     // The existing workout's own localDate (2026-08-15) is what's left to compare
     // once the edit doesn't supply a new one.
-    await expect(service.update('workout-1', dto, 'user-1')).rejects.toThrow(
-      'Dieser Zyklus hat noch nicht begonnen.',
-    );
+    await expect(service.update('workout-1', dto, 'user-1')).rejects.toMatchObject({
+      code: 'CYCLE_NOT_STARTED',
+    });
   });
 });
 
@@ -287,7 +288,9 @@ describe('WorkoutsService.findById — ownership', () => {
       exercises: [],
     });
 
-    await expect(service.findById('workout-1', 'user-1')).rejects.toBeInstanceOf(NotFoundException);
+    const result = service.findById('workout-1', 'user-1');
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'WORKOUT_NOT_FOUND' });
   });
 });
 
@@ -364,7 +367,9 @@ describe('WorkoutsService.resolveSaveContext — ownership of referenced resourc
       exercises,
     } as CreateWorkoutDto;
 
-    await expect(service.create(dto, 'user-1')).rejects.toBeInstanceOf(NotFoundException);
+    const result = service.create(dto, 'user-1');
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'HOME_GYM_NOT_FOUND' });
     expect(tx.workout.create).not.toHaveBeenCalled();
   });
 
@@ -384,7 +389,9 @@ describe('WorkoutsService.resolveSaveContext — ownership of referenced resourc
       exercises,
     } as CreateWorkoutDto;
 
-    await expect(service.create(dto, 'user-1')).rejects.toBeInstanceOf(NotFoundException);
+    const result = service.create(dto, 'user-1');
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'WORKOUT_DAY_NOT_FOUND' });
     expect(tx.workout.create).not.toHaveBeenCalled();
   });
 
@@ -404,7 +411,9 @@ describe('WorkoutsService.resolveSaveContext — ownership of referenced resourc
       exercises,
     } as CreateWorkoutDto;
 
-    await expect(service.create(dto, 'user-1')).rejects.toBeInstanceOf(NotFoundException);
+    const result = service.create(dto, 'user-1');
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'ORIGIN_TEMPLATE_NOT_FOUND' });
     expect(tx.workout.create).not.toHaveBeenCalled();
   });
 });

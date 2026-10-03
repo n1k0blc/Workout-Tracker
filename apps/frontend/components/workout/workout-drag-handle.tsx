@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import type { DragPhase } from '@/hooks/useDragToMinimize';
 
@@ -16,10 +17,11 @@ interface WorkoutDragHandleProps {
  * to collapse the session; a plain tap collapses it too.
  */
 export function WorkoutDragHandle({ phase, onPointerDown, onClick }: WorkoutDragHandleProps) {
+  const t = useTranslations('ActiveWorkout');
   return (
     <button
       type="button"
-      aria-label="Workout minimieren"
+      aria-label={t('minimizeAria')}
       onPointerDown={onPointerDown}
       onClick={onClick}
       className="sticky top-0 z-20 flex h-7 w-full shrink-0 touch-none cursor-grab items-center justify-center bg-background active:cursor-grabbing"

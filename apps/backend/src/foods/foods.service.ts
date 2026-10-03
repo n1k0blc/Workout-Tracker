@@ -1,13 +1,20 @@
+import { Injectable } from '@nestjs/common';
 import {
-  Injectable,
-  NotFoundException,
-  ForbiddenException,
-  BadRequestException,
-  ConflictException,
-} from '@nestjs/common';
+  AppNotFoundException,
+  AppForbiddenException,
+  AppBadRequestException,
+  AppConflictException,
+} from '../common/errors/app-exceptions';
 import { PrismaService } from '../prisma/prisma.service';
 import { FavoritesService } from '../favorites/favorites.service';
 import { orderByIds } from '../common/utils/order-by-ids';
+import { ApiLocale, DEFAULT_LOCALE } from '../common/utils/locale.util';
+import {
+  FOOD_TRANSLATIONS_SELECT,
+  PORTION_TRANSLATIONS_SELECT,
+  resolveFoodName,
+  resolvePortionLabel,
+} from '../common/utils/food-name.util';
 import { normalizeBarcode } from './barcode';
 import { OffLookupService } from './off-lookup';
 import { MappedFood } from './off-mapping';
@@ -27,6 +34,7 @@ type PortionRow = {
   grams: number;
   order: number;
   isDefault: boolean;
+  translations?: { locale: 'DE' | 'EN'; label: string }[];
 };
 
 type FoodRow = {
@@ -42,19 +50,32 @@ type FoodRow = {
   source: 'SEED' | 'OPEN_FOOD_FACTS' | 'USER';
   createdById: string | null;
   deletedAt: Date | null;
+  translations?: { locale: 'DE' | 'EN'; name: string }[];
   portions?: PortionRow[];
 };
 
-const WITH_PORTIONS = { portions: { orderBy: { order: 'asc' as const } } };
+/** The food's portions plus the translation rows `toDto` resolves names and labels from. */
+const WITH_DETAIL = {
+  translations: FOOD_TRANSLATIONS_SELECT,
+  portions: {
+    orderBy: { order: 'asc' as const },
+    include: { translations: PORTION_TRANSLATIONS_SELECT },
+  },
+};
 
 /** How many matching foods one search page returns. The library holds ~180k imported rows
  *  (#146), so results are always capped. */
 const PAGE_SIZE = 200;
 
-function toDto(food: FoodRow, userId: string, favoriteIds?: Set<string>): FoodDto {
+function toDto(
+  food: FoodRow,
+  userId: string,
+  favoriteIds?: Set<string>,
+  locale: ApiLocale = DEFAULT_LOCALE,
+): FoodDto {
   return {
     id: food.id,
-    name: food.name,
+    name: resolveFoodName({ ...food, translations: food.translations ?? [] }, locale),
     brand: food.brand ?? null,
     barcode: food.barcode ?? null,
     isLiquid: food.isLiquid,
@@ -69,7 +90,7 @@ function toDto(food: FoodRow, userId: string, favoriteIds?: Set<string>): FoodDt
     isFavorite: favoriteIds?.has(food.id) ?? false,
     portions: (food.portions ?? []).map((p) => ({
       id: p.id,
-      label: p.label,
+      label: resolvePortionLabel({ ...p, translations: p.translations ?? [] }, food.source, locale),
       grams: p.grams,
       order: p.order,
       isDefault: p.isDefault,
@@ -115,8 +136,17 @@ export class FoodsService {
    * which rank together per ADR-0003 (creator names are never shown). Name order decides
    * within each group. This is why it is three queries rather than one: the alphabetical head
    * of the merged list would otherwise be all imports.
+   *
+   * SEED foods display a translated name (ADR-0007), so a search also matches any translation
+   * -- an English user typing "apple" finds Apfel -- and the SEED group is ordered by the
+   * *resolved* name in memory. It is the one group small enough for that (~289 rows), so it
+   * is fetched uncapped; the other two stay capped and ordered in SQL.
    */
-  async findAll(userId: string, search?: string): Promise<FoodListDto> {
+  async findAll(
+    userId: string,
+    search?: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<FoodListDto> {
     const where: Record<string, unknown> = { deletedAt: null };
     if (search && search.trim()) {
       // Brand as well as name: the Open Food Facts import (#146) fills the library with
@@ -125,6 +155,7 @@ export class FoodsService {
       where.OR = [
         { name: { contains: term, mode: 'insensitive' } },
         { brand: { contains: term, mode: 'insensitive' } },
+        { translations: { some: { name: { contains: term, mode: 'insensitive' } } } },
       ];
     }
 
@@ -133,39 +164,49 @@ export class FoodsService {
     const page = (extra: Record<string, unknown>) =>
       this.prisma.food.findMany({
         where: { ...where, ...extra },
-        include: WITH_PORTIONS,
+        include: WITH_DETAIL,
         orderBy: { name: 'asc' },
         take: PAGE_SIZE,
+      }) as Promise<FoodRow[]>;
+    const seedPage = () =>
+      this.prisma.food.findMany({
+        where: { ...where, ...seed },
+        include: WITH_DETAIL,
       }) as Promise<FoodRow[]>;
 
     const [ownFoods, seedFoods, restFoods, total, ownTotal, favoriteIds] = await Promise.all([
       page(own),
-      page(seed),
+      seedPage(),
       page({ NOT: [own, seed] }),
       this.prisma.food.count({ where }),
       this.prisma.food.count({ where: { ...where, ...own } }),
       this.favorites.favoriteFoodIds(userId),
     ]);
 
-    const items = [...ownFoods, ...seedFoods, ...restFoods]
-      .slice(0, PAGE_SIZE)
-      .map((f) => toDto(f, userId, favoriteIds));
+    const seedDtos = seedFoods
+      .map((f) => toDto(f, userId, favoriteIds, locale))
+      .sort((a, b) => a.name.localeCompare(b.name, locale));
+    const items = [
+      ...ownFoods.map((f) => toDto(f, userId, favoriteIds, locale)),
+      ...seedDtos,
+      ...restFoods.map((f) => toDto(f, userId, favoriteIds, locale)),
+    ].slice(0, PAGE_SIZE);
     return { items, total, ownTotal };
   }
 
   /** Resolves a food by id even when it is soft-deleted -- old entries must keep rendering. */
-  async findById(id: string, userId: string): Promise<FoodDto> {
+  async findById(id: string, userId: string, locale: ApiLocale = DEFAULT_LOCALE): Promise<FoodDto> {
     const [food, favoriteIds] = await Promise.all([
       this.prisma.food.findUnique({
         where: { id },
-        include: WITH_PORTIONS,
+        include: WITH_DETAIL,
       }) as Promise<FoodRow | null>,
       this.favorites.favoriteFoodIds(userId),
     ]);
     if (!food) {
-      throw new NotFoundException('Lebensmittel nicht gefunden');
+      throw new AppNotFoundException('FOOD_NOT_FOUND');
     }
-    return toDto(food, userId, favoriteIds);
+    return toDto(food, userId, favoriteIds, locale);
   }
 
   /**
@@ -174,16 +215,20 @@ export class FoodsService {
    * soft-deleted or missing id simply drops out (you cannot log it), so the result may be
    * shorter than `ids`.
    */
-  async listByIds(userId: string, ids: string[]): Promise<FoodDto[]> {
+  async listByIds(
+    userId: string,
+    ids: string[],
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<FoodDto[]> {
     if (ids.length === 0) return [];
     const [foods, favoriteIds] = await Promise.all([
       this.prisma.food.findMany({
         where: { id: { in: ids }, deletedAt: null },
-        include: WITH_PORTIONS,
+        include: WITH_DETAIL,
       }) as Promise<FoodRow[]>,
       this.favorites.favoriteFoodIds(userId),
     ]);
-    return orderByIds(ids, foods, (f) => f.id).map((f) => toDto(f, userId, favoriteIds));
+    return orderByIds(ids, foods, (f) => f.id).map((f) => toDto(f, userId, favoriteIds, locale));
   }
 
   /**
@@ -238,22 +283,26 @@ export class FoodsService {
    *     `lastSyncedAt` so the delta sync (#150) treats it like any imported row.
    *  3. **Nothing** -- the caller opens "Lebensmittel anlegen" with the barcode prefilled.
    */
-  async lookupByBarcode(userId: string, raw: string): Promise<BarcodeLookupDto> {
+  async lookupByBarcode(
+    userId: string,
+    raw: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<BarcodeLookupDto> {
     const barcode = normalizeBarcode(raw);
     if (!barcode) {
-      throw new BadRequestException('Kein gültiger EAN- oder UPC-Code');
+      throw new AppBadRequestException('BARCODE_INVALID');
     }
 
     const existing = (await this.prisma.food.findFirst({
       where: { barcode },
-      include: WITH_PORTIONS,
+      include: WITH_DETAIL,
     })) as FoodRow | null;
     if (existing) {
       const food = existing.deletedAt ? await this.undelete(existing.id) : existing;
       return {
         status: 'local',
         barcode,
-        food: toDto(food, userId, await this.favorites.favoriteFoodIds(userId)),
+        food: toDto(food, userId, await this.favorites.favoriteFoodIds(userId), locale),
       };
     }
 
@@ -269,7 +318,7 @@ export class FoodsService {
     return (await this.prisma.food.update({
       where: { id },
       data: { deletedAt: null },
-      include: WITH_PORTIONS,
+      include: WITH_DETAIL,
     })) as FoodRow;
   }
 
@@ -288,7 +337,7 @@ export class FoodsService {
       if (!isUniqueViolation(error)) throw error;
       const existing = (await this.prisma.food.findFirst({
         where: { barcode: product.barcode },
-        include: WITH_PORTIONS,
+        include: WITH_DETAIL,
       })) as FoodRow | null;
       if (!existing) throw error;
       return toDto(existing, userId);
@@ -318,7 +367,7 @@ export class FoodsService {
           })),
         },
       },
-      include: WITH_PORTIONS,
+      include: WITH_DETAIL,
     })) as FoodRow;
     return toDto(food, userId);
   }
@@ -340,7 +389,7 @@ export class FoodsService {
           createdById: userId,
           portions: { create: portionCreateData(dto.portions) },
         },
-        include: WITH_PORTIONS,
+        include: WITH_DETAIL,
       })) as FoodRow;
       return toDto(food, userId);
     } catch (error) {
@@ -351,7 +400,7 @@ export class FoodsService {
   async update(userId: string, id: string, dto: UpdateFoodDto): Promise<FoodDto> {
     const food = (await this.prisma.food.findUnique({ where: { id } })) as FoodRow | null;
     if (!food || food.deletedAt) {
-      throw new NotFoundException('Lebensmittel nicht gefunden');
+      throw new AppNotFoundException('FOOD_NOT_FOUND');
     }
     this.assertEditable(food, userId);
     this.assertPortions(dto.portions);
@@ -371,7 +420,7 @@ export class FoodsService {
           // Rewrite the portion list wholesale: delete all, then recreate from the payload.
           portions: { deleteMany: {}, create: portionCreateData(dto.portions) },
         },
-        include: WITH_PORTIONS,
+        include: WITH_DETAIL,
       })) as FoodRow;
       return toDto(updated, userId, await this.favorites.favoriteFoodIds(userId));
     } catch (error) {
@@ -383,7 +432,7 @@ export class FoodsService {
   async softDelete(userId: string, id: string): Promise<void> {
     const food = (await this.prisma.food.findUnique({ where: { id } })) as FoodRow | null;
     if (!food || food.deletedAt) {
-      throw new NotFoundException('Lebensmittel nicht gefunden');
+      throw new AppNotFoundException('FOOD_NOT_FOUND');
     }
     this.assertEditable(food, userId);
     await this.prisma.food.update({ where: { id }, data: { deletedAt: new Date() } });
@@ -392,10 +441,10 @@ export class FoodsService {
   /** SEED / OPEN_FOOD_FACTS are read-only for everyone; a USER food only for its creator. */
   private assertEditable(food: FoodRow, userId: string): void {
     if (food.source !== 'USER') {
-      throw new ForbiddenException('Seed- und Open-Food-Facts-Einträge sind schreibgeschützt');
+      throw new AppForbiddenException('FOOD_READ_ONLY_SOURCE');
     }
     if (food.createdById !== userId) {
-      throw new ForbiddenException('Nur der Ersteller kann dieses Lebensmittel ändern');
+      throw new AppForbiddenException('FOOD_NOT_OWNER');
     }
   }
 
@@ -403,18 +452,16 @@ export class FoodsService {
     if (!portions || portions.length === 0) return;
 
     if (portions.some((p) => !p.label.trim() || !(p.grams > 0))) {
-      throw new BadRequestException(
-        'Jede Portionsgröße braucht eine Bezeichnung und eine Menge größer als 0',
-      );
+      throw new AppBadRequestException('FOOD_PORTION_INVALID');
     }
     if (portions.filter((p) => p.isDefault).length !== 1) {
-      throw new BadRequestException('Genau eine Portionsgröße muss als Standard markiert sein');
+      throw new AppBadRequestException('FOOD_PORTION_DEFAULT_COUNT_INVALID');
     }
   }
 
   private barcodeConflictOrRethrow(error: unknown): Error {
     if (isUniqueViolation(error)) {
-      return new ConflictException('Ein Lebensmittel mit diesem Barcode existiert bereits');
+      return new AppConflictException('FOOD_BARCODE_TAKEN');
     }
     return error as Error;
   }

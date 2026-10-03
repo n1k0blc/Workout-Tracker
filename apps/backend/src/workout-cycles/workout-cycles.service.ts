@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { AppNotFoundException, AppBadRequestException } from '../common/errors/app-exceptions';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -11,11 +12,7 @@ import {
 import { setWorkingVolume } from '../common/utils/volume.util';
 import { calculateCycleWeek, getCurrentDate } from '../common/utils/date.util';
 import { Today, localDateToInstant } from '../common/utils/today.util';
-import {
-  WEEKDAY_NAMES,
-  cycleStartWeekday,
-  getWeekdayDistanceFromCycleStart,
-} from '../common/utils/weekday.util';
+import { cycleStartWeekday, getWeekdayDistanceFromCycleStart } from '../common/utils/weekday.util';
 import { ExercisesService } from '../exercises/exercises.service';
 import {
   CreateCycleDto,
@@ -26,6 +23,7 @@ import {
   CycleDetailsDto,
   WorkoutsByGymDto,
 } from './dto';
+import { ApiLocale, DEFAULT_LOCALE } from '../common/utils/locale.util';
 
 const WEEKDAY_UNIQUE_INDEX = 'WorkoutDay_cycleId_weekday_key';
 const ORDER_UNIQUE_INDEX = 'WorkoutDay_cycleId_order_key';
@@ -104,38 +102,44 @@ export class WorkoutCyclesService {
     }
   }
 
-  async findAll(userId: string): Promise<CycleResponseDto[]> {
+  async findAll(userId: string, locale: ApiLocale = DEFAULT_LOCALE): Promise<CycleResponseDto[]> {
     const cycles = await this.prisma.workoutCycle.findMany({
       where: { userId },
       include: CYCLE_TREE_INCLUDE,
       orderBy: { createdAt: 'desc' },
     });
 
-    return cycles.map((cycle) => this.mapCycleToResponse(cycle));
+    return cycles.map((cycle) => this.mapCycleToResponse(cycle, locale));
   }
 
-  async findById(id: string, userId: string): Promise<CycleResponseDto> {
+  async findById(
+    id: string,
+    userId: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<CycleResponseDto> {
     const cycle = await this.prisma.workoutCycle.findUnique({
       where: { id },
       include: CYCLE_TREE_INCLUDE,
     });
 
     if (!cycle || cycle.userId !== userId) {
-      throw new NotFoundException('Workout cycle not found');
+      throw new AppNotFoundException('CYCLE_NOT_FOUND');
     }
 
-    return this.mapCycleToResponse(cycle);
+    return this.mapCycleToResponse(cycle, locale);
   }
 
-  async create(createCycleDto: CreateCycleDto, userId: string): Promise<CycleResponseDto> {
+  async create(
+    createCycleDto: CreateCycleDto,
+    userId: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<CycleResponseDto> {
     const existingActiveCycle = await this.prisma.workoutCycle.findFirst({
       where: { userId, status: 'ACTIVE' },
     });
 
     if (existingActiveCycle) {
-      throw new BadRequestException(
-        'Es existiert bereits ein aktiver Zyklus. Bitte beende diesen zuerst.',
-      );
+      throw new AppBadRequestException('ACTIVE_CYCLE_ALREADY_EXISTS');
     }
 
     const { name, duration, startDate, workoutDays } = createCycleDto;
@@ -143,9 +147,9 @@ export class WorkoutCyclesService {
     const weekdays = workoutDays.map((day) => day.weekday);
     const duplicateWeekday = weekdays.find((weekday, i) => weekdays.indexOf(weekday) !== i);
     if (duplicateWeekday !== undefined) {
-      throw new BadRequestException(
-        `Zwei Trainingstage liegen auf ${WEEKDAY_NAMES[duplicateWeekday]}. Pro Zyklus ist jeder Wochentag nur einmal erlaubt.`,
-      );
+      throw new AppBadRequestException('DUPLICATE_WEEKDAY_IN_CYCLE', {
+        weekday: duplicateWeekday,
+      });
     }
 
     const allExerciseIds = workoutDays.flatMap((day) => day.exercises.map((e) => e.exerciseId));
@@ -183,13 +187,14 @@ export class WorkoutCyclesService {
       return cycle.id;
     });
 
-    return this.findById(cycleId, userId);
+    return this.findById(cycleId, userId, locale);
   }
 
   async update(
     id: string,
     updateCycleDto: UpdateCycleDto,
     userId: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
   ): Promise<CycleResponseDto> {
     const cycle = await this.findById(id, userId);
 
@@ -232,7 +237,7 @@ export class WorkoutCyclesService {
       null,
     );
 
-    return this.findById(id, userId);
+    return this.findById(id, userId, locale);
   }
 
   async updateBlueprint(
@@ -240,6 +245,7 @@ export class WorkoutCyclesService {
     workoutDayId: string,
     updateBlueprintDto: UpdateBlueprintDto,
     userId: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
   ): Promise<CycleResponseDto> {
     await this.findById(cycleId, userId);
     const exercisesById = await this.exercisesService.validateAccessible(
@@ -253,12 +259,12 @@ export class WorkoutCyclesService {
     });
 
     if (!workoutDay || workoutDay.cycleId !== cycleId) {
-      throw new NotFoundException('Workout day not found');
+      throw new AppNotFoundException('WORKOUT_DAY_NOT_FOUND');
     }
 
     const blueprint = workoutDay.workouts[0];
     if (!blueprint) {
-      throw new NotFoundException('Blueprint not found');
+      throw new AppNotFoundException('BLUEPRINT_NOT_FOUND');
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -270,7 +276,7 @@ export class WorkoutCyclesService {
       await tx.workout.update({ where: { id: blueprint.id }, data: { updatedAt: new Date() } });
     });
 
-    return this.findById(cycleId, userId);
+    return this.findById(cycleId, userId, locale);
   }
 
   async updateWorkoutDay(
@@ -278,6 +284,7 @@ export class WorkoutCyclesService {
     workoutDayId: string,
     updateWorkoutDayDto: UpdateWorkoutDayDto,
     userId: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
   ): Promise<CycleResponseDto> {
     const cycle = await this.findById(cycleId, userId);
 
@@ -286,7 +293,7 @@ export class WorkoutCyclesService {
     });
 
     if (!workoutDay || workoutDay.cycleId !== cycleId) {
-      throw new NotFoundException('Workout day not found');
+      throw new AppNotFoundException('WORKOUT_DAY_NOT_FOUND');
     }
 
     // The weekday decides which workout is recommended, so two days in one cycle sharing a
@@ -304,9 +311,10 @@ export class WorkoutCyclesService {
       // A plain move can't land on a taken weekday -- the editor has to ask the user to swap
       // with the specific day that holds it first, and confirm that by passing its id back.
       if (updateWorkoutDayDto.swapWithWorkoutDayId !== conflict.id) {
-        throw new BadRequestException(
-          `${WEEKDAY_NAMES[updateWorkoutDayDto.weekday]} ist in diesem Zyklus bereits durch "${conflict.name}" belegt.`,
-        );
+        throw new AppBadRequestException('WORKOUT_DAY_WEEKDAY_TAKEN', {
+          weekday: updateWorkoutDayDto.weekday,
+          conflictName: conflict.name,
+        });
       }
 
       // Exchange weekdays (and their derived `order`) atomically -- names, plans and planned
@@ -341,7 +349,7 @@ export class WorkoutCyclesService {
         updateWorkoutDayDto.weekday,
       );
 
-      return this.findById(cycleId, userId);
+      return this.findById(cycleId, userId, locale);
     }
 
     await this.runWorkoutDayWrite(
@@ -360,7 +368,7 @@ export class WorkoutCyclesService {
       updateWorkoutDayDto.weekday,
     );
 
-    return this.findById(cycleId, userId);
+    return this.findById(cycleId, userId, locale);
   }
 
   /**
@@ -378,24 +386,24 @@ export class WorkoutCyclesService {
       return await write();
     } catch (error) {
       if (weekday !== null && isWeekdayConflict(error)) {
-        throw new BadRequestException(
-          `${WEEKDAY_NAMES[weekday]} ist in diesem Zyklus bereits belegt.`,
-        );
+        throw new AppBadRequestException('WORKOUT_DAY_WEEKDAY_TAKEN', { weekday });
       }
       if (isWeekdayConflict(error) || isOrderConflict(error)) {
-        throw new BadRequestException(
-          'Eine andere Änderung an diesem Zyklus ist dazwischengekommen. Bitte versuche es erneut.',
-        );
+        throw new AppBadRequestException('CYCLE_CONCURRENT_MODIFICATION');
       }
       throw error;
     }
   }
 
-  async completeCycle(id: string, userId: string): Promise<CycleResponseDto> {
+  async completeCycle(
+    id: string,
+    userId: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<CycleResponseDto> {
     const cycle = await this.findById(id, userId);
 
     if (cycle.status === 'COMPLETED') {
-      throw new BadRequestException('Dieser Zyklus wurde bereits beendet.');
+      throw new AppBadRequestException('CYCLE_ALREADY_COMPLETED');
     }
 
     await this.prisma.workoutCycle.update({
@@ -403,7 +411,7 @@ export class WorkoutCyclesService {
       data: { status: 'COMPLETED', completedAt: getCurrentDate() },
     });
 
-    return this.findById(id, userId);
+    return this.findById(id, userId, locale);
   }
 
   async delete(id: string, userId: string): Promise<void> {
@@ -428,7 +436,7 @@ export class WorkoutCyclesService {
     });
 
     if (!cycle || cycle.userId !== userId) {
-      throw new NotFoundException('Zyklus nicht gefunden');
+      throw new AppNotFoundException('CYCLE_NOT_FOUND');
     }
 
     const endDate = new Date(cycle.startDate);
@@ -510,7 +518,7 @@ export class WorkoutCyclesService {
     };
   }
 
-  private mapCycleToResponse(cycle: any): CycleResponseDto {
+  private mapCycleToResponse(cycle: any, locale: ApiLocale): CycleResponseDto {
     return {
       id: cycle.id,
       name: cycle.name,
@@ -534,7 +542,7 @@ export class WorkoutCyclesService {
             ? {
                 id: blueprint.id,
                 updatedAt: blueprint.updatedAt,
-                exercises: mapExercisesToResponse(blueprint.exercises),
+                exercises: mapExercisesToResponse(blueprint.exercises, locale),
               }
             : undefined,
         };

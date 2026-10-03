@@ -10,11 +10,13 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  BadRequestException,
 } from '@nestjs/common';
+import { AppBadRequestException } from '../common/errors/app-exceptions';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ClientToday } from '../common/decorators/client-today.decorator';
+import { ClientLocale } from '../common/decorators/client-locale.decorator';
+import { ApiLocale } from '../common/utils/locale.util';
 import { Today } from '../common/utils/today.util';
 import { isLocalDate } from '../common/utils/local-date.util';
 import { DiaryEntriesService } from './diary-entries.service';
@@ -62,7 +64,7 @@ export class NutritionController {
   ): Promise<NutritionDayDto> {
     const localDate = date ?? today.localDate;
     if (!isLocalDate(localDate)) {
-      throw new BadRequestException('date must be a calendar date in YYYY-MM-DD form');
+      throw new AppBadRequestException('NUTRITION_DAY_DATE_INVALID');
     }
     return this.diaryEntries.getDay(user.id, localDate);
   }
@@ -84,7 +86,7 @@ export class NutritionController {
       !isLocalDate(start) ||
       !isLocalDate(end)
     ) {
-      throw new BadRequestException('start und end müssen Kalendertage in YYYY-MM-DD-Form sein');
+      throw new AppBadRequestException('NUTRITION_ANALYTICS_RANGE_INVALID');
     }
     return this.nutritionAnalytics.getTrend(user.id, start, end);
   }
@@ -97,17 +99,19 @@ export class NutritionController {
   @Get('picker/favorites')
   async pickerFavorites(
     @CurrentUser() user: { id: string },
+    @ClientLocale() locale: ApiLocale,
     @Query('scope') scope?: string,
   ): Promise<PickerListDto> {
-    return this.picker.getFavorites(user.id, toPickerScope(scope));
+    return this.picker.getFavorites(user.id, toPickerScope(scope), locale);
   }
 
   @Get('picker/recent')
   async pickerRecent(
     @CurrentUser() user: { id: string },
+    @ClientLocale() locale: ApiLocale,
     @Query('scope') scope?: string,
   ): Promise<PickerListDto> {
-    return this.picker.getRecent(user.id, toPickerScope(scope));
+    return this.picker.getRecent(user.id, toPickerScope(scope), locale);
   }
 
   // --- Abschnitte (#142) --------------------------------------------------------------------
@@ -148,7 +152,7 @@ export class NutritionController {
       slot = await this.mealSlots.setArchived(user.id, id, dto.archived);
     }
     if (!slot) {
-      throw new BadRequestException('name oder archived muss angegeben werden');
+      throw new AppBadRequestException('MEAL_SLOT_UPDATE_EMPTY');
     }
     return slot;
   }

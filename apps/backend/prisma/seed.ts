@@ -3,6 +3,14 @@ import { config } from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
 import { parseFoodsCsv, seedFoods } from '../src/foods/foods-seed';
+import {
+  parseFoodTranslationsCsv,
+  seedFoodTranslations,
+} from '../src/foods/food-translations-seed';
+import {
+  parseExerciseTranslationsCsv,
+  seedExerciseTranslations,
+} from '../src/exercises/exercise-translations-seed';
 
 // Load .env from backend directory
 config({ path: path.join(__dirname, '../.env') });
@@ -186,9 +194,20 @@ async function main() {
     console.log(`❌ Failed to process ${errorCount} exercises`);
   }
 
+  await seedExerciseTranslationsFromCsv();
   await seedFoodsFromCsv();
 
   console.log('✅ Seeding completed!');
+}
+
+// Catalogue Übung names per locale (#187): de from the rows just upserted, en from
+// ExerciseTranslations-en.csv. Throws if any catalogue row would lack either locale.
+async function seedExerciseTranslationsFromCsv() {
+  console.log('🌱 Seeding exercise translations...');
+  const csvPath = path.join(__dirname, '../../../ExerciseTranslations-en.csv');
+  const english = parseExerciseTranslationsCsv(fs.readFileSync(csvPath, 'utf-8'));
+  const count = await seedExerciseTranslations(prisma, english);
+  console.log(`✅ Seeded de + en names for ${count} catalogue exercises`);
 }
 
 // Generic Lebensmittel (#145): FoodsSeed.csv at the repo root, upserted on `seedKey`.
@@ -204,6 +223,14 @@ async function seedFoodsFromCsv() {
   console.log(`📋 Parsed ${foods.length} foods from CSV`);
   const { created, updated } = await seedFoods(prisma, foods);
   console.log(`✅ Seeded ${created + updated} foods (${created} new, ${updated} updated)`);
+
+  // SEED food names and portion labels per locale (#188): de from the rows just upserted,
+  // en from FoodsSeed-en.csv. Throws if any SEED food or portion would lack either locale.
+  const english = parseFoodTranslationsCsv(
+    fs.readFileSync(path.join(__dirname, '../../../FoodsSeed-en.csv'), 'utf-8'),
+  );
+  const translated = await seedFoodTranslations(prisma, english);
+  console.log(`✅ Seeded de + en names for ${translated} SEED foods`);
 }
 
 main()

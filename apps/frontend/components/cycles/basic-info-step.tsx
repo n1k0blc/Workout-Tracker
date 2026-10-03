@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { CycleFormData } from './cycle-wizard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,7 @@ export default function BasicInfoStep({
   updateFormData,
   onNext,
 }: BasicInfoStepProps) {
+  const t = useTranslations('BasicInfoStep');
   const [durationInput, setDurationInput] = useState(String(formData.duration));
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -27,19 +29,19 @@ export default function BasicInfoStep({
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-2">
-        <Label htmlFor="name">Zyklus-Name *</Label>
+        <Label htmlFor="name">{t('nameLabel')}</Label>
         <Input
           id="name"
           type="text"
           value={formData.name}
           onChange={(e) => updateFormData({ name: e.target.value })}
-          placeholder="z.B. Push/Pull/Legs 8 Wochen"
+          placeholder={t('namePlaceholder')}
           required
         />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="duration">Dauer (Wochen) *</Label>
+        <Label htmlFor="duration">{t('durationLabel')}</Label>
         <Input
           id="duration"
           type="number"
@@ -63,12 +65,12 @@ export default function BasicInfoStep({
           required
         />
         <p className="text-sm text-muted-foreground">
-          Wie viele Wochen soll dieser Zyklus dauern? (1-52)
+          {t('durationHint')}
         </p>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="startDate">Start-Datum *</Label>
+        <Label htmlFor="startDate">{t('startDateLabel')}</Label>
         <Input
           id="startDate"
           type="date"
@@ -80,7 +82,7 @@ export default function BasicInfoStep({
 
       <div className="pt-2">
         <Button type="submit" className="w-full" disabled={!isValid}>
-          Weiter
+          {t('next')}
         </Button>
       </div>
     </form>

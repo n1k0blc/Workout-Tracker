@@ -1,4 +1,8 @@
+'use client';
+
+import { useTranslations } from 'next-intl';
 import { formatVolume } from '@/lib/workoutStats';
+import { useUnits } from '@/lib/use-units';
 import { IconTrendingUp } from '@tabler/icons-react';
 
 interface VolumeSlideProps {
@@ -6,6 +10,8 @@ interface VolumeSlideProps {
 }
 
 export function VolumeSlide({ volume }: VolumeSlideProps) {
+  const t = useTranslations('WorkoutCompletion.volume');
+  const units = useUnits();
   return (
     <div className="text-center space-y-6 animate-fadeIn">
       <div className="flex justify-center">
@@ -13,22 +19,22 @@ export function VolumeSlide({ volume }: VolumeSlideProps) {
           <IconTrendingUp className="h-12 w-12 text-primary" />
         </div>
       </div>
-      
+
       <h2 className="text-2xl font-semibold text-foreground">
-        Gesamtvolumen
+        {t('title')}
       </h2>
-      
+
       <div className="space-y-2">
         <div className="text-6xl font-bold text-primary">
-          {formatVolume(volume)}
+          {formatVolume(units.volume(volume))}
         </div>
         <div className="text-xl text-muted-foreground">
-          kg bewegt
+          {t('unit', { unit: units.unit })}
         </div>
       </div>
-      
+
       <p className="text-muted-foreground max-w-md mx-auto">
-        Das ist die Summe aller Wiederholungen × Gewicht in diesem Workout
+        {t('description')}
       </p>
     </div>
   );

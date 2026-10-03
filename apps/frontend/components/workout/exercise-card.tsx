@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, type ReactNode } from 'react';
+import { useTranslations } from 'next-intl';
 import { ExerciseLog, SetLog, SetType, Exercise } from '@/types';
 import { useWorkout } from '@/lib/workout-context';
 import { getSetIndicatorSlots, resolveSetRows } from '@/lib/set-slots';
@@ -15,6 +16,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { WeightInput } from './weight-input';
+import { useUnits } from '@/lib/use-units';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -149,6 +152,9 @@ export default function ExerciseCard({
   readonly,
   defaultOpen,
 }: ExerciseCardProps) {
+  const t = useTranslations('ExerciseCard');
+  const units = useUnits();
+
   // Derive effective flags. For 'active' everything is on.
   // For 'edit' the caller decides (History: all structural/logging off; Blueprint: structural on, logging off).
   const effectiveAllowReorder = allowReorder ?? (mode === 'active');
@@ -261,9 +267,10 @@ export default function ExerciseCard({
   // Which side renders first, and its label. Per-exercise, session-only, not persisted --
   // for people who start with the right. It never moves data: the sides stay in named fields.
   const [sidesSwapped, setSidesSwapped] = useState(false);
-  const sideRows: ReadonlyArray<readonly ['L' | 'R', 'left' | 'right']> = sidesSwapped
-    ? [['R', 'right'], ['L', 'left']]
-    : [['L', 'left'], ['R', 'right']];
+  const sideLabel = { L: t('sideLeft'), R: t('sideRight') };
+  const sideRows: ReadonlyArray<readonly [string, 'left' | 'right']> = sidesSwapped
+    ? [[sideLabel.R, 'right'], [sideLabel.L, 'left']]
+    : [[sideLabel.L, 'left'], [sideLabel.R, 'right']];
   const trailingSide: 'left' | 'right' = sidesSwapped ? 'left' : 'right';
 
   type SideDraft = { weight: string; reps: string; rir: string };
@@ -912,12 +919,10 @@ export default function ExerciseCard({
           className="grid grid-cols-[0.75rem_minmax(0,1.1fr)_minmax(0,1fr)_minmax(0,0.7fr)] items-center gap-x-2"
         >
           <span className="text-[10px] font-medium text-muted-foreground">{label}</span>
-          <Input
-            type="number"
-            step="0.5"
+          <WeightInput
             inputMode="decimal"
-            value={draft[side].weight}
-            onChange={(e) => onChange(side, 'weight', e.target.value)}
+            valueKg={draft[side].weight}
+            onChangeKg={(kg) => onChange(side, 'weight', kg)}
             placeholder="0"
             className="h-7 text-base md:text-sm tabular-nums"
             disabled={opts.disabled}
@@ -954,7 +959,7 @@ export default function ExerciseCard({
         disabled: loading || isReadonly,
         footer: showCheckColumn && !bothSidesReady(setNumber) && (
           <p className="text-[10px] text-muted-foreground">
-            Beide Seiten mit Gewicht und Wdh ausfüllen, um den Satz zu loggen
+            {t('sidesIncompleteHint')}
           </p>
         ),
       },
@@ -978,8 +983,8 @@ export default function ExerciseCard({
         return (
           <div key={side} className="flex items-center gap-2">
             <span className="w-3 text-xs text-muted-foreground">{label}</span>
-            <span className="font-medium text-foreground tabular-nums">{s.weight} kg × {s.reps}</span>
-            {s.rir !== null && <span className="text-xs text-muted-foreground">RIR {s.rir}</span>}
+            <span className="font-medium text-foreground tabular-nums">{units.weight(s.weight)} {units.unit} × {s.reps}</span>
+            {s.rir !== null && <span className="text-xs text-muted-foreground">{t('rirLabel', { rir: s.rir })}</span>}
           </div>
         );
       })}
@@ -1002,7 +1007,7 @@ export default function ExerciseCard({
         onClick={() => handleLogSet(setNumber)}
         disabled={loading || waitingForSides}
         className="p-0.5 disabled:opacity-40"
-        title={waitingForSides ? 'Beide Seiten ausfüllen, um den Satz zu loggen' : 'Satz loggen (oder Swipe LTR)'}
+        title={waitingForSides ? t('logSetWaitingForSides') : t('logSet')}
       >
         <IconCheck className="size-4 text-muted-foreground/60 hover:text-primary" />
       </button>
@@ -1051,7 +1056,7 @@ export default function ExerciseCard({
             }}
             disabled={loading || isReadonly}
             className="flex items-center justify-center"
-            title={isWarmup ? 'Aufwärmen' : 'Arbeit'}
+            title={isWarmup ? t('setTypeWarmup') : t('setTypeWorking')}
           >
             <Badge variant={isWarmup ? 'outline' : 'default'} className="p-0.5">
               {isWarmup ? <IconFlame className="size-4" /> : <IconBarbell className="size-4" />}
@@ -1062,7 +1067,7 @@ export default function ExerciseCard({
             renderPerSideEntryCells(setNumber)
           ) : (
             <>
-              <Input type="number" step="0.5" inputMode="decimal" value={getEditValue(setNumber, 'weight')} onChange={(e) => handleRowValueChange(setNumber, null, 'weight', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-base md:text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} />
+              <WeightInput inputMode="decimal" valueKg={getEditValue(setNumber, 'weight')} onChangeKg={(kg) => handleRowValueChange(setNumber, null, 'weight', kg)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-base md:text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} />
               <Input type="number" inputMode="numeric" value={getEditValue(setNumber, 'reps')} onChange={(e) => handleRowValueChange(setNumber, null, 'reps', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-base md:text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} />
               <Input type="number" inputMode="numeric" value={getEditValue(setNumber, 'rir')} onChange={(e) => handleRowValueChange(setNumber, null, 'rir', e.target.value)} onBlur={commitIfNeeded} placeholder="" className="h-7 text-base md:text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} />
             </>
@@ -1127,7 +1132,7 @@ export default function ExerciseCard({
               }}
               disabled={loading || isReadonly}
               className="flex items-center justify-center"
-              title={isWarmup ? 'Aufwärmen' : 'Arbeit'}
+              title={isWarmup ? t('setTypeWarmup') : t('setTypeWorking')}
             >
               <Badge variant={isWarmup ? 'outline' : 'default'} className="p-0.5">
                 {isWarmup ? <IconFlame className="size-4" /> : <IconBarbell className="size-4" />}
@@ -1144,12 +1149,10 @@ export default function ExerciseCard({
             renderLoggedSideCells(perSide)
           ) : (
             <>
-              <Input
-                type="number"
-                step="0.5"
+              <WeightInput
                 inputMode="decimal"
-                value={isEditingThis ? editingValues.weight : set.weight.toString()}
-                onChange={(e) => handleRowValueChange(set.setNumber, set, 'weight', e.target.value)}
+                valueKg={isEditingThis ? editingValues.weight : set.weight.toString()}
+                onChangeKg={(kg) => handleRowValueChange(set.setNumber, set, 'weight', kg)}
                 placeholder="0"
                 className="h-7 text-base md:text-sm tabular-nums"
                 disabled={loading || isReadonly}
@@ -1181,7 +1184,7 @@ export default function ExerciseCard({
           {/* Check cell - fat only, no buttons (delete via swipe) */}
           {showCheckColumn && (
             <div className="flex justify-end">
-              <button disabled={loading} className="p-0.5" title="Geloggt (nicht entloggen möglich; Swipe RTL zum Löschen)">
+              <button disabled={loading} className="p-0.5" title={t('loggedTitle')}>
                 <IconCheck className="size-4 text-foreground stroke-[3]" />
               </button>
             </div>
@@ -1228,7 +1231,11 @@ export default function ExerciseCard({
                     <div
                       key={i}
                       className={`h-[2.5px] rounded-[1px] transition-colors ${isWarmup ? 'w-2' : 'w-4'} ${logged ? 'bg-foreground' : 'bg-muted-foreground/30'}`}
-                      title={`Satz ${slot}${isWarmup ? ' (Aufwärmen)' : ''}${logged ? ' geloggt' : ''}`}
+                      title={
+                        isWarmup
+                          ? (logged ? t('setLabelWarmupLogged', { number: slot }) : t('setLabelWarmup', { number: slot }))
+                          : (logged ? t('setLabelLogged', { number: slot }) : t('setLabel', { number: slot }))
+                      }
                     />
                   );
                 })}
@@ -1246,7 +1253,7 @@ export default function ExerciseCard({
                 onPointerDown={(e) => e.stopPropagation()}
                 className="size-8"
                 aria-pressed={sidesSwapped}
-                title={sidesSwapped ? 'Wieder mit links beginnen' : 'Mit rechts beginnen'}
+                title={sidesSwapped ? t('unswapSides') : t('swapSides')}
               >
                 <IconArrowsUpDown className="size-4" />
               </Button>
@@ -1263,7 +1270,7 @@ export default function ExerciseCard({
                 onPointerDown={(e) => e.stopPropagation()}
                 className="size-8"
                 disabled={hasLoggedSets && !onReplaceExercise}
-                title={hasLoggedSets && !onReplaceExercise ? 'Übung kann nicht ausgetauscht werden, wenn bereits Sätze geloggt wurden' : 'Übung austauschen'}
+                title={hasLoggedSets && !onReplaceExercise ? t('replaceExerciseDisabled') : t('replaceExercise')}
               >
                 <IconRefresh className="size-4" />
               </Button>
@@ -1276,7 +1283,7 @@ export default function ExerciseCard({
                 onClick={() => setShowDeleteConfirm(true)}
                 onPointerDown={(e) => e.stopPropagation()}
                 className="size-8 text-destructive hover:text-destructive"
-                title="Übung entfernen"
+                title={t('removeExercise')}
               >
                 <IconTrash className="size-4" />
               </Button>
@@ -1291,12 +1298,12 @@ export default function ExerciseCard({
             <div className={`grid ${colTemplate} items-center gap-x-2 px-1 pb-1 text-[10px] text-muted-foreground font-medium`}>
               <div></div>
               {showPerSideRows ? (
-                <div className="col-span-3">Links / Rechts</div>
+                <div className="col-span-3">{t('columnSides')}</div>
               ) : (
                 <>
-                  <div>Gewicht{exercise.isDoubleWeight ? ' (2x)' : ''}</div>
-                  <div>Wdh</div>
-                  <div>RIR</div>
+                  <div>{exercise.isDoubleWeight ? t('columnWeightDouble') : t('columnWeight')}</div>
+                  <div>{t('columnReps')}</div>
+                  <div>{t('columnRir')}</div>
                 </>
               )}
               {showCheckColumn && <div className="text-center">✓</div>}
@@ -1372,7 +1379,7 @@ export default function ExerciseCard({
                       }}
                       disabled={loading || isReadonly}
                       className="flex items-center justify-center"
-                      title={isWarmup ? 'Aufwärmen' : 'Arbeit'}
+                      title={isWarmup ? t('setTypeWarmup') : t('setTypeWorking')}
                     >
                       <Badge variant={isWarmup ? 'outline' : 'default'} className="p-0.5">
                         {isWarmup ? <IconFlame className="size-4" /> : <IconBarbell className="size-4" />}
@@ -1391,12 +1398,10 @@ export default function ExerciseCard({
                     ) : (
                       <>
                         {/* Weight cell - always input style; for logged: live editable via updateSet */}
-                        <Input
-                          type="number"
-                          step="0.5"
+                        <WeightInput
                           inputMode="decimal"
-                          value={isEditingThis ? editingValues.weight : (loggedSet ? loggedSet.weight.toString() : getEditValue(setNumber, 'weight'))}
-                          onChange={(e) => handleRowValueChange(setNumber, loggedSet ?? null, 'weight', e.target.value)}
+                          valueKg={isEditingThis ? editingValues.weight : (loggedSet ? loggedSet.weight.toString() : getEditValue(setNumber, 'weight'))}
+                          onChangeKg={(kg) => handleRowValueChange(setNumber, loggedSet ?? null, 'weight', kg)}
                           onBlur={commitIfNeeded}
                           placeholder="0"
                           className="h-7 text-base md:text-sm tabular-nums"
@@ -1437,7 +1442,7 @@ export default function ExerciseCard({
                     {showCheckColumn && (
                       <div className="flex justify-end">
                         {loggedSet ? (
-                          <button disabled={loading} className="p-0.5" title="Geloggt (nicht entloggen möglich; Swipe RTL zum Löschen)">
+                          <button disabled={loading} className="p-0.5" title={t('loggedTitle')}>
                             <IconCheck className="size-4 text-foreground stroke-[3]" />
                           </button>
                         ) : (
@@ -1488,12 +1493,12 @@ export default function ExerciseCard({
                 }
               }} disabled={loading} className="w-full mt-2 border-dashed text-muted-foreground hover:text-foreground h-8">
                 <IconPlus className="size-4 mr-2" />
-                Satz hinzufügen
+                {t('addSet')}
               </Button>
             )}
 
             {!hasPlannedSets && exercise.sets.length === 0 && additionalSetNumbers.length === 0 && (
-              <p className="text-muted-foreground text-sm text-center py-2">Noch keine Sätze geloggt</p>
+              <p className="text-muted-foreground text-sm text-center py-2">{t('noSetsLogged')}</p>
             )}
           </CardContent>
         )}
@@ -1503,19 +1508,22 @@ export default function ExerciseCard({
       <AlertDialog open={showDeleteConfirm} onOpenChange={(open) => !open && setShowDeleteConfirm(false)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Übung entfernen?</AlertDialogTitle>
+            <AlertDialogTitle>{t('deleteDialog.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Möchtest du <strong>{exercise.exerciseName}</strong> und alle zugehörigen Sätze entfernen?
+              {t.rich('deleteDialog.description', {
+                name: exercise.exerciseName,
+                strong: (chunks) => <strong>{chunks}</strong>,
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel>{t('deleteDialog.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleRemoveExercise}
               disabled={loading}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {loading ? 'Wird entfernt...' : 'Entfernen'}
+              {loading ? t('deleteDialog.confirming') : t('deleteDialog.confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { IconMinus, IconPlus } from '@tabler/icons-react';
 import {
@@ -59,6 +60,7 @@ export function QuantityEditorSheet({
   entry: DiaryEntry | null;
   onSaved: () => void;
 }) {
+  const t = useTranslations('QuantityEditorSheet');
   const isFoodBacked = entry?.foodId != null;
 
   const [multiplier, setMultiplier] = useState(1);
@@ -137,7 +139,7 @@ export function QuantityEditorSheet({
       onOpenChange(false);
       onSaved();
     } catch {
-      toast.error('Menge konnte nicht geändert werden');
+      toast.error(t('saveError'));
       setSaving(false);
     }
   }
@@ -146,7 +148,7 @@ export function QuantityEditorSheet({
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="mx-auto max-w-md">
         <DrawerHeader>
-          <DrawerTitle>Menge ändern</DrawerTitle>
+          <DrawerTitle>{t('title')}</DrawerTitle>
         </DrawerHeader>
 
         <div className="flex flex-col gap-5 px-4 pb-2">
@@ -169,7 +171,7 @@ export function QuantityEditorSheet({
 
           {isFoodBacked ? (
             !food || !amount ? (
-              <p className="py-4 text-sm text-muted-foreground">Lädt …</p>
+              <p className="py-4 text-sm text-muted-foreground">{t('loading')}</p>
             ) : (
               <QuantityStepper
                 portions={food.portions}
@@ -183,13 +185,13 @@ export function QuantityEditorSheet({
             <>
               <div className="flex items-center gap-3">
                 <span className="w-16 shrink-0 text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                  Menge
+                  {t('amount')}
                 </span>
                 <div className="flex items-center border">
                   <Button
                     variant="ghost"
                     size="icon"
-                    aria-label="Weniger"
+                    aria-label={t('less')}
                     disabled={multiplier - STEP < MIN}
                     onClick={() =>
                       setMultiplier((q) => Math.max(MIN, Math.round((q - STEP) * 100) / 100))
@@ -203,7 +205,7 @@ export function QuantityEditorSheet({
                   <Button
                     variant="ghost"
                     size="icon"
-                    aria-label="Mehr"
+                    aria-label={t('more')}
                     onClick={() => setMultiplier((q) => Math.round((q + STEP) * 100) / 100)}
                   >
                     <IconPlus />
@@ -232,17 +234,21 @@ export function QuantityEditorSheet({
           )}
 
           <div className="text-xs text-muted-foreground">
-            {formatKcal(preview.kcal)} kcal · {Math.round(preview.carbs)} KH ·{' '}
-            {Math.round(preview.protein)} P · {Math.round(preview.fat)} F
+            {t('macroLine', {
+              kcal: formatKcal(preview.kcal),
+              carbs: Math.round(preview.carbs),
+              protein: Math.round(preview.protein),
+              fat: Math.round(preview.fat),
+            })}
           </div>
         </div>
 
         <div className="mt-auto flex gap-2 border-t p-4">
           <Button className="flex-1" onClick={handleSave} disabled={!changed || saving}>
-            Übernehmen
+            {t('apply')}
           </Button>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Abbrechen
+            {t('cancel')}
           </Button>
         </div>
       </DrawerContent>

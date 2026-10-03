@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+import { useRouter } from '@/i18n/navigation';
 import { apiClient } from '@/lib/api';
 import { Exercise, HomeGym, ExerciseLog, SetType } from '@/types';
 import { ProtectedRoute } from '@/components/protected-route';
@@ -39,6 +40,7 @@ interface TemplateEditorScreenProps {
 
 export default function TemplateEditorScreen({ templateId }: TemplateEditorScreenProps) {
   const router = useRouter();
+  const t = useTranslations('TemplateEditorScreen');
 
   const [name, setName] = useState('');
   const [recommendedGymId, setRecommendedGymId] = useState<string>('');
@@ -184,12 +186,12 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
       }
     } catch (error) {
       console.error('Failed to load data for template editor:', error);
-      alert('Fehler beim Laden der Daten.');
+      alert(t('alerts.loadFailed'));
       router.push('/templates');
     } finally {
       setLoading(false);
     }
-  }, [templateId, router]);
+  }, [templateId, router, t]);
 
   useEffect(() => {
     loadData();
@@ -201,19 +203,19 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
 
   const handleSave = async () => {
     if (!name.trim()) {
-      alert('Bitte gib einen Namen für die Vorlage ein.');
+      alert(t('alerts.nameRequired'));
       return;
     }
 
     if (exercises.length === 0) {
-      alert('Bitte füge mindestens eine Übung hinzu.');
+      alert(t('alerts.atLeastOneExercise'));
       return;
     }
 
     // Validate every exercise has at least one set (template requirement).
     const hasEmpty = exercises.some((ex) => (ex.plannedSets?.length || 0) === 0);
     if (hasEmpty) {
-      alert('Jede Übung muss mindestens einen Satz haben.');
+      alert(t('alerts.everyExerciseNeedsSet'));
       return;
     }
 
@@ -252,7 +254,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
       router.push('/templates');
     } catch (error) {
       console.error('Failed to save template:', error);
-      alert('Fehler beim Speichern der Vorlage.');
+      alert(t('alerts.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -262,7 +264,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
     return (
       <ProtectedRoute>
         <div className="min-h-screen bg-background flex items-center justify-center">
-          <div className="text-lg text-muted-foreground">Lädt Vorlage...</div>
+          <div className="text-lg text-muted-foreground">{t('loading')}</div>
         </div>
       </ProtectedRoute>
     );
@@ -280,7 +282,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
               className="flex items-center gap-2 -ml-2"
             >
               <IconChevronLeft className="size-4" />
-              Zurück zu den Vorlagen
+              {t('backToTemplates')}
             </Button>
 
             {/* Header */}
@@ -289,13 +291,13 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
                 <div className="flex items-start justify-between mb-2">
                   <div>
                     <h2 className="text-2xl font-bold text-foreground">
-                      {templateId ? 'Vorlage bearbeiten' : 'Neue Vorlage erstellen'}
+                      {templateId ? t('editTitle') : t('newTitle')}
                     </h2>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Definiere Übungen und Sätze für diese Workout-Vorlage
+                      {t('subtitle')}
                     </p>
                   </div>
-                  <Badge variant="outline">{templateId ? 'Bearbeitung' : 'Neu'}</Badge>
+                  <Badge variant="outline">{templateId ? t('editingBadge') : t('newBadge')}</Badge>
                 </div>
               </CardContent>
             </Card>
@@ -304,7 +306,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
             <Card>
               <CardContent className="p-6 space-y-4">
                 <Field>
-                  <FieldLabel>Vorlagenname</FieldLabel>
+                  <FieldLabel>{t('nameLabel')}</FieldLabel>
                   {isReadonlyView ? (
                     <div className="px-3 py-2 text-sm font-medium border border-input bg-muted/30 rounded-md">
                       {name || '—'}
@@ -313,7 +315,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
                     <Input
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="z.B. Upper Body, Push Day, etc."
+                      placeholder={t('namePlaceholder')}
                       className="w-full"
                     />
                   )}
@@ -321,13 +323,13 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
 
                 {!isReadonlyView && (
                   <Field>
-                    <FieldLabel>Empfohlenes Studio (Optional)</FieldLabel>
+                    <FieldLabel>{t('recommendedGymLabel')}</FieldLabel>
                     <select
                       value={recommendedGymId}
                       onChange={(e) => setRecommendedGymId(e.target.value)}
                       className="w-full md:w-auto px-3 py-2 border border-input bg-background rounded-md focus:outline-none focus:ring-2 focus:ring-ring text-sm"
                     >
-                      <option value="">Kein empfohlenes Studio</option>
+                      <option value="">{t('noRecommendedGym')}</option>
                       {availableGyms.map((gym) => (
                         <option key={gym.id} value={gym.id}>
                           {gym.name}
@@ -421,7 +423,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
                         variant="outline"
                         onClick={() => setShowExerciseModal(true)}
                         className="h-14 w-14 rounded-lg p-0 flex items-center justify-center"
-                        aria-label="Übung hinzufügen"
+                        aria-label={t('addExercise')}
                       >
                         <IconPlus className="size-7" />
                       </Button>
@@ -433,14 +435,14 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
               <Card>
                 <CardContent className="p-8 flex flex-col items-center gap-4 text-center">
                   <p className="text-muted-foreground">
-                    Noch keine Übungen hinzugefügt
+                    {t('emptyExercises')}
                   </p>
                   {/* Large centered square + icon */}
                   <Button
                     variant="outline"
                     onClick={() => setShowExerciseModal(true)}
                     className="h-16 w-16 rounded-lg p-0 flex items-center justify-center"
-                    aria-label="Erste Übung hinzufügen"
+                    aria-label={t('addFirstExercise')}
                   >
                     <IconPlus className="size-8" />
                   </Button>
@@ -457,14 +459,14 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
                   disabled={saving}
                   className="flex-1"
                 >
-                  Abbrechen
+                  {t('cancel')}
                 </Button>
                 <Button
                   onClick={handleSave}
                   disabled={saving || exercises.length === 0}
                   className="flex-1"
                 >
-                  {saving ? 'Speichert...' : 'Speichern'}
+                  {saving ? t('saving') : t('save')}
                 </Button>
               </div>
             )}

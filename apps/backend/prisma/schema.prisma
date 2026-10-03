@@ -25,6 +25,13 @@ model User {
   targetCarbs   Int?
   targetProtein Int?
   targetFat     Int?
+  // Locale tracer bullet (#179): three independent preference axes, none derived from
+  // another at render time. `locale` drives next-intl routing/UI; `unitSystem` is seeded
+  // once at registration from the region subtag and never re-derived; `foodMarket` exists
+  // so the concept has a column, but gets no UI until a second market exists.
+  locale        Locale         @default(DE)
+  unitSystem    UnitSystem     @default(METRIC)
+  foodMarket    FoodMarket     @default(DE)
   exercises     Exercise[]
   homeGyms      HomeGym[]
   workouts      Workout[]
@@ -210,6 +217,20 @@ model Exercise {
   tricepsPercent    Int               @default(0)
   user              User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
   workoutExercises  WorkoutExercise[]
+  translations      ExerciseTranslation[]
+}
+
+// Per-locale display name of a catalogue Exercise (#187, ADR-0006). Custom exercises are user
+// content and have no rows here. The real FK + cascade means a translation can never outlive
+// its exercise; `Exercise.name` stays as the German source / last-resort fallback.
+model ExerciseTranslation {
+  id         String   @id @default(uuid())
+  exerciseId String
+  locale     Locale
+  name       String
+  exercise   Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@unique([exerciseId, locale])
 }
 
 // A named division of a user's eating day (Abschnitt): Frühstück, Mittagessen, Abendessen,
@@ -221,6 +242,11 @@ model MealSlot {
   id         String       @id @default(uuid())
   userId     String
   name       String
+  // One of the four default Abschnitte's keys (breakfast, lunch, dinner, snacks) while the
+  // user has not renamed it (#189, ADR-0008): the client renders the name from its message
+  // catalogue in the active locale. Renaming sets it to null for good; `name` is the German
+  // source and what a renamed slot keeps. Same idea as `Food.seedKey`, but a rendering key.
+  seedKey    String?
   order      Int
   archivedAt DateTime?
   createdAt  DateTime     @default(now())
@@ -312,9 +338,22 @@ model Food {
   portions     FoodPortion[]
   mealItems    MealItem[]
   favorites    FoodFavorite[]
+  translations FoodTranslation[]
 
   @@index([createdById])
   @@index([deletedAt])
+}
+
+// Per-locale display name of a SEED Food (#188, ADR-0007). OPEN_FOOD_FACTS and USER foods have
+// no rows here: imports stay German and user foods are user content. Cascades with its food.
+model FoodTranslation {
+  id     String @id @default(uuid())
+  foodId String
+  locale Locale
+  name   String
+  food   Food   @relation(fields: [foodId], references: [id], onDelete: Cascade)
+
+  @@unique([foodId, locale])
 }
 
 // A named amount of a Food ("1 Portion" = 40 g, "1 Esslöffel" = 12 g). `grams` is grams or
@@ -322,16 +361,29 @@ model Food {
 // `isDefault` when a food has any; `order` is 1-based and contiguous, written from array
 // position on every save (the client never sends it), like the workout tree.
 model FoodPortion {
-  id        String  @id @default(uuid())
-  foodId    String
-  label     String
-  grams     Float
-  order     Int
-  isDefault Boolean @default(false)
-  food      Food    @relation(fields: [foodId], references: [id], onDelete: Cascade)
+  id           String                   @id @default(uuid())
+  foodId       String
+  label        String
+  grams        Float
+  order        Int
+  isDefault    Boolean                  @default(false)
+  food         Food                     @relation(fields: [foodId], references: [id], onDelete: Cascade)
+  translations FoodPortionTranslation[]
 
   @@unique([foodId, order])
   @@index([foodId])
+}
+
+// Per-locale label of a SEED food's portion (#188, ADR-0007). The seed rewrites portions
+// wholesale, so these rows are re-created with them; the cascade keeps none orphaned.
+model FoodPortionTranslation {
+  id        String      @id @default(uuid())
+  portionId String
+  locale    Locale
+  label     String
+  portion   FoodPortion @relation(fields: [portionId], references: [id], onDelete: Cascade)
+
+  @@unique([portionId, locale])
 }
 
 enum FoodSource {
@@ -439,4 +491,18 @@ enum SetType {
 enum CycleStatus {
   ACTIVE
   COMPLETED
+}
+
+enum Locale {
+  DE
+  EN
+}
+
+enum UnitSystem {
+  METRIC
+  IMPERIAL
+}
+
+enum FoodMarket {
+  DE
 }

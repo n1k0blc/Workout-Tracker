@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Workout } from '@/types';
 import { barExerciseLine } from '@/lib/workout-bar-exercise';
 import { RestTimerDisplay } from '@/components/workout/rest-timer-display';
@@ -15,9 +16,10 @@ interface MinimizedWorkoutBarProps {
  * bubbling, so pausing the rest never also expands.
  */
 export function MinimizedWorkoutBar({ workout, onExpand }: MinimizedWorkoutBarProps) {
+  const t = useTranslations('ActiveWorkout');
   const name = workout.isFreeWorkout
-    ? workout.originTemplateName || 'Freies Workout'
-    : workout.workoutDayName || 'Workout';
+    ? workout.originTemplateName || t('freeWorkoutName')
+    : workout.workoutDayName || t('defaultName');
   const exercise = barExerciseLine(workout.exercises);
 
   return (
@@ -31,7 +33,7 @@ export function MinimizedWorkoutBar({ workout, onExpand }: MinimizedWorkoutBarPr
           onExpand();
         }
       }}
-      aria-label="Workout öffnen"
+      aria-label={t('openAria')}
       className="flex h-[72px] w-full cursor-pointer flex-col rounded-none bg-primary text-left text-primary-foreground"
     >
       {/* Pull-up handle -- same language as the collapsed set-progress bars, inverted. */}

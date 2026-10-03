@@ -1,13 +1,19 @@
+'use client';
+
+import { useTranslations } from 'next-intl';
 import { Workout, SetType } from '@/types';
 import { IconClipboardList, IconFlame, IconBarbell } from '@tabler/icons-react';
 import { Badge } from '@/components/ui/badge';
 import { setPerSide } from '@/lib/set-sides';
+import { useUnits } from '@/lib/use-units';
 
 interface SummarySlideProps {
   workout: Workout;
 }
 
 export function SummarySlide({ workout }: SummarySlideProps) {
+  const t = useTranslations('WorkoutCompletion.summary');
+  const units = useUnits();
   return (
     <div className="space-y-6 animate-fadeIn max-h-[400px] overflow-y-auto">
       <div className="text-center mb-6">
@@ -17,7 +23,7 @@ export function SummarySlide({ workout }: SummarySlideProps) {
           </div>
         </div>
         <h2 className="text-2xl font-semibold text-foreground">
-          Workout-Übersicht
+          {t('title')}
         </h2>
       </div>
 
@@ -53,11 +59,11 @@ export function SummarySlide({ workout }: SummarySlideProps) {
                       <Badge variant={isWarmup ? 'outline' : 'default'} className="text-xs px-1.5 py-0.5 shrink-0">
                         {isWarmup ? (
                           <>
-                            <IconFlame className="size-3 mr-1" /> Aufwärmen
+                            <IconFlame className="size-3 mr-1" /> {t('warmup')}
                           </>
                         ) : (
                           <>
-                            <IconBarbell className="size-3 mr-1" /> Arbeit
+                            <IconBarbell className="size-3 mr-1" /> {t('work')}
                           </>
                         )}
                       </Badge>
@@ -67,7 +73,7 @@ export function SummarySlide({ workout }: SummarySlideProps) {
                             <div key={label} className="flex items-center gap-2">
                               <span className="text-muted-foreground text-xs w-3">{label}</span>
                               <span className="font-semibold text-foreground tabular-nums">
-                                {side.weight}kg × {side.reps}
+                                {units.weight(side.weight)}{units.unit} × {side.reps}
                               </span>
                               {side.rir !== null && (
                                 <span className="text-muted-foreground text-xs">RIR {side.rir}</span>
@@ -78,7 +84,7 @@ export function SummarySlide({ workout }: SummarySlideProps) {
                       ) : (
                         <div className="flex items-center gap-3">
                           <span className="font-semibold text-foreground tabular-nums">
-                            {set.weight}kg × {set.reps}
+                            {units.weight(set.weight)}{units.unit} × {set.reps}
                           </span>
                           {set.rir !== undefined && set.rir !== null && (
                             <span className="text-muted-foreground text-xs">

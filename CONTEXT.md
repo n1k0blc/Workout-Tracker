@@ -72,6 +72,12 @@ say.
   and backfilled for older ones. An archived Abschnitt disappears from new days but still
   shows on past days that already have entries in it. Code: `MealSlot`.
 
+- **Abschnitt-Standardname** — the four default Abschnitte carry a `seedKey` (`breakfast`,
+  `lunch`, `dinner`, `snacks`) while untouched; the client renders their name from the message
+  catalogue in the active locale. Renaming one clears the key for good and the typed name wins.
+  See [ADR-0008](docs/adr/0008-default-abschnitte-render-from-the-catalogue-until-renamed.md).
+  Code: `MealSlot.seedKey`, `useSlotName`.
+
 - **Eintrag** — one logged item inside an Abschnitt on one calendar day: a name and its kcal,
   Kohlenhydrate, Protein and Fett. The nutrients are a **snapshot** taken when it is logged —
   a quantity change rescales them proportionally, they are never recomputed from a Lebensmittel
@@ -186,6 +192,38 @@ say.
   object as the day payload. `start` / `end` are the client's own calendar days, so the
   series is in the client's timezone; omitted, the window is the last 7 days up to the
   client's "today". No weight correlation. Code: `NutritionAnalyticsService`.
+
+### Fehlermeldungen (API errors)
+
+- **Fehlercode** — every API error is `{ statusCode, code, details?, errors? }` with **no**
+  human-readable `message` (see
+  [ADR-0009](docs/adr/0009-api-errors-carry-a-code-and-details-never-a-message.md)); the code
+  names the condition (`ERROR_CODES`). `useApiErrorMessage` maps it to `ApiErrors.codes.<CODE>` in
+  the user's locale, filling `details` (a weekday, a sum) into the text. Validation failures are
+  `VALIDATION_FAILED` plus `errors: [{ property, constraints }]` (`createValidationPipe`), mapped
+  per property and constraint name. An unmapped code logs a warning and falls back to the
+  caller's context message or `ApiErrors.generic`. Code: `ApiExceptionFilter`, `App*Exception`.
+
+### Übungen (exercise catalogue)
+
+- **Übung-Übersetzung** — the 115 catalogue Übungen (`isCustom = false`) show their name in the
+  user's locale, one `ExerciseTranslation` row per `(exercise, locale)` with a cascading foreign
+  key. The API resolves it from the `X-Locale` header (`@ClientLocale()`), so DTO shapes carry
+  just `name`. A missing translation falls back to `de`, then any row, never to empty, and logs
+  the gap; user-created Übungen are never translated. See
+  [ADR-0006](docs/adr/0006-catalogue-names-are-translated-server-side-per-locale.md). Code:
+  `ExerciseTranslation`, `resolveExerciseName`.
+
+### Lebensmittel (food library)
+
+- **Lebensmittel-Übersetzung** — the 289 `SEED` Lebensmittel and their Portionsgrößen show their
+  name / label in the user's locale, one `FoodTranslation` / `FoodPortionTranslation` row per
+  `(parent, locale)` with a cascading foreign key, resolved from `X-Locale` like Übungen.
+  `OPEN_FOOD_FACTS` and `USER` foods are never translated. Search matches translated names and
+  keeps the source grouping; barcode lookup stays global while text search will rank by market,
+  not filter. See
+  [ADR-0007](docs/adr/0007-seed-foods-are-translated-barcode-lookup-stays-global-search-ranks-by-market.md).
+  Code: `FoodTranslation`, `resolveFoodName`, `resolvePortionLabel`.
 
 ### Tracked nutrients
 

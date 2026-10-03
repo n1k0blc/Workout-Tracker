@@ -65,7 +65,9 @@ describe('toExerciseInputs ordering', () => {
   });
 
   it('rejects 0-based exercise ordering', () => {
-    expect(() => run([exercise(0, [1]), exercise(1, [1])])).toThrow(BadRequestException);
+    const call = () => run([exercise(0, [1]), exercise(1, [1])]);
+    expect(call).toThrow(BadRequestException);
+    expect(call).toThrow(expect.objectContaining({ code: 'WORKOUT_TREE_ORDER_INVALID' }));
   });
 
   it('rejects 0-based set ordering', () => {
@@ -89,8 +91,13 @@ describe('toExerciseInputs ordering', () => {
     );
   });
 
-  it('names the offending exercise so a bad client is debuggable', () => {
-    expect(() => run([exercise(1, [1]), exercise(3, [1])])).toThrow(/order/i);
+  it('reports where the order broke, as structured detail', () => {
+    expect(() => run([exercise(1, [1]), exercise(3, [1])])).toThrow(
+      expect.objectContaining({
+        code: 'WORKOUT_TREE_ORDER_INVALID',
+        details: { scope: 'exercises', position: 1, expected: 2, received: 3 },
+      }),
+    );
   });
 
   it('carries values through unchanged', () => {
@@ -176,29 +183,38 @@ describe('toExerciseInputs per-side shape (#100)', () => {
     expect(ex.sets[0].rir).toBeNull();
   });
 
-  it('rejects a unilateral set with no per-side data, naming the exercise and set', () => {
+  it('rejects a unilateral set with no per-side data, carrying the exercise and set as detail', () => {
     expect(() =>
       run([{ exerciseId: 'a', order: 1, sets: [set(1)] }] as WorkoutExerciseInputDto[], {
         a: { isUnilateral: true, name: 'Split Squat' },
       }),
-    ).toThrow(/Split Squat.*set 1/);
+    ).toThrow(
+      expect.objectContaining({
+        code: 'WORKOUT_SET_MISSING_SIDE_DATA',
+        details: { exerciseName: 'Split Squat', exercisePosition: 0, setNumber: 1 },
+      }),
+    );
   });
 
   it('rejects a unilateral set missing one side', () => {
-    expect(() => run([uni({ repsRight: undefined })], { a: { isUnilateral: true } })).toThrow(
-      BadRequestException,
-    );
+    const call = () => run([uni({ repsRight: undefined })], { a: { isUnilateral: true } });
+    expect(call).toThrow(BadRequestException);
+    expect(call).toThrow(expect.objectContaining({ code: 'WORKOUT_SET_MISSING_SIDE_DATA' }));
   });
 
   it('rejects a unilateral set with RIR on only one side', () => {
-    expect(() => run([uni({ rirLeft: 2 })], { a: { isUnilateral: true } })).toThrow(
-      BadRequestException,
-    );
+    const call = () => run([uni({ rirLeft: 2 })], { a: { isUnilateral: true } });
+    expect(call).toThrow(BadRequestException);
+    expect(call).toThrow(expect.objectContaining({ code: 'WORKOUT_SET_RIR_SIDE_MISMATCH' }));
   });
 
-  it('rejects a bilateral set that carries per-side data, naming the exercise', () => {
-    expect(() => run([uni()], { a: { isUnilateral: false, name: 'Bench Press' } })).toThrow(
-      /Bench Press/,
+  it('rejects a bilateral set that carries per-side data, carrying the exercise as detail', () => {
+    const call = () => run([uni()], { a: { isUnilateral: false, name: 'Bench Press' } });
+    expect(call).toThrow(
+      expect.objectContaining({
+        code: 'WORKOUT_SET_UNEXPECTED_SIDE_DATA',
+        details: { exerciseName: 'Bench Press', exercisePosition: 0 },
+      }),
     );
   });
 
@@ -243,7 +259,10 @@ describe('mapExercisesToResponse', () => {
       exerciseId: 'ex1',
       order: 1,
       exercise: {
+        id: 'ex1',
         name: 'Split Squat',
+        isCustom: true,
+        translations: [],
         equipment: Equipment.BODYWEIGHT,
         isUnilateral: true,
         isDoubleWeight: false,
@@ -271,6 +290,29 @@ describe('mapExercisesToResponse', () => {
       rirLeft: 2,
       rirRight: 2,
     });
+  });
+
+  it('resolves the catalogue exercise name in the requested locale; custom stays verbatim (#187)', () => {
+    const catalogue = loadedExercise();
+    catalogue.exercise = {
+      ...catalogue.exercise,
+      isCustom: false,
+      name: 'Kabel Crunch',
+      translations: [
+        { locale: 'DE', name: 'Kabel Crunch' },
+        { locale: 'EN', name: 'Cable Crunch' },
+      ],
+    };
+    const custom = loadedExercise();
+    custom.exercise = { ...custom.exercise, name: 'Mein Curl' };
+
+    const [en] = mapExercisesToResponse([catalogue], 'en');
+    const [de] = mapExercisesToResponse([catalogue], 'de');
+    const [verbatim] = mapExercisesToResponse([custom], 'en');
+
+    expect(en.exerciseName).toBe('Cable Crunch');
+    expect(de.exerciseName).toBe('Kabel Crunch');
+    expect(verbatim.exerciseName).toBe('Mein Curl');
   });
 
   it('carries the exercise equipment through to the response', () => {

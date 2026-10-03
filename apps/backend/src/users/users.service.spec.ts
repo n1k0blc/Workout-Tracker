@@ -43,9 +43,9 @@ describe('UsersService.updateHomeGym — cross-user access', () => {
   it('404s when the gym belongs to a different user', async () => {
     const { service, prisma } = makeService();
 
-    await expect(
-      service.updateHomeGym('user-1', 'gym-1', { name: 'Renamed' }),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    const result = service.updateHomeGym('user-1', 'gym-1', { name: 'Renamed' });
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'HOME_GYM_NOT_FOUND' });
     expect(prisma.homeGym.update).not.toHaveBeenCalled();
   });
 });
@@ -59,5 +59,101 @@ describe('UsersService.deleteHomeGym — cross-user access', () => {
     );
     expect(prisma.workoutDay.findFirst).not.toHaveBeenCalled();
     expect(prisma.homeGym.update).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Locale tracer bullet (#179): the Profil language select persists via `PATCH /users/me`,
+ * which spreads `UpdateUserDto` straight into the Prisma `data` object -- so the lowercase
+ * wire-type `locale` must be explicitly converted to the uppercase Prisma enum rather than
+ * passed through, and mapped back on the way out.
+ */
+describe('UsersService locale (#179)', () => {
+  describe('findById', () => {
+    it('maps the stored uppercase locale to the lowercase wire type', async () => {
+      const { service, prisma } = makeService();
+      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', email: 'a@b.com', locale: 'DE' });
+
+      const user = await service.findById('user-1');
+
+      expect(user.locale).toBe('de');
+    });
+  });
+
+  describe('updateUser', () => {
+    it('converts the lowercase locale to the Prisma enum before writing', async () => {
+      const { service, prisma } = makeService();
+      prisma.user.update.mockResolvedValue({ id: 'user-1', email: 'a@b.com', locale: 'EN' });
+
+      await service.updateUser('user-1', { locale: 'en' } as never);
+
+      expect(prisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ locale: 'EN' }) }),
+      );
+    });
+
+    it('maps the returned uppercase locale back to the lowercase wire type', async () => {
+      const { service, prisma } = makeService();
+      prisma.user.update.mockResolvedValue({ id: 'user-1', email: 'a@b.com', locale: 'EN' });
+
+      const user = await service.updateUser('user-1', { locale: 'en' } as never);
+
+      expect(user.locale).toBe('en');
+    });
+
+    it('leaves locale untouched when not part of the update', async () => {
+      const { service, prisma } = makeService();
+      prisma.user.update.mockResolvedValue({ id: 'user-1', email: 'a@b.com', locale: 'DE' });
+
+      await service.updateUser('user-1', { firstName: 'Sam' } as never);
+
+      expect(prisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ locale: undefined }) }),
+      );
+    });
+  });
+});
+
+/**
+ * Weight unit system (#186): `unitSystem` is an independent column, exposed on the DTO and
+ * writable through `PATCH /users/me`. The Prisma enum (METRIC/IMPERIAL) is the wire type.
+ */
+describe('UsersService unitSystem (#186)', () => {
+  it('selects unitSystem on findById', async () => {
+    const { service, prisma } = makeService();
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      email: 'a@b.com',
+      locale: 'DE',
+      unitSystem: 'IMPERIAL',
+    });
+
+    const user = await service.findById('user-1');
+
+    expect(user.unitSystem).toBe('IMPERIAL');
+    expect(prisma.user.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ unitSystem: true }),
+      }),
+    );
+  });
+
+  it('writes unitSystem without touching locale', async () => {
+    const { service, prisma } = makeService();
+    prisma.user.update.mockResolvedValue({
+      id: 'user-1',
+      email: 'a@b.com',
+      locale: 'DE',
+      unitSystem: 'IMPERIAL',
+    });
+
+    await service.updateUser('user-1', { unitSystem: 'IMPERIAL' } as never);
+
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ unitSystem: 'IMPERIAL', locale: undefined }),
+        select: expect.objectContaining({ unitSystem: true }),
+      }),
+    );
   });
 });

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useFormatter, useTranslations } from 'next-intl';
 import { IconBarcode, IconChevronRight, IconPlus, IconSearch } from '@tabler/icons-react';
 import { apiClient } from '@/lib/api';
 import { Food } from '@/types';
@@ -20,6 +21,8 @@ function subtitle(food: Food): string {
 }
 
 export default function FoodsTab() {
+  const t = useTranslations('FoodsTab');
+  const format = useFormatter();
   const [foods, setFoods] = useState<Food[]>([]);
   // Totals for the whole library, not the capped page the list renders (#146).
   const [totals, setTotals] = useState({ total: 0, ownTotal: 0 });
@@ -74,12 +77,12 @@ export default function FoodsTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          {totals.total.toLocaleString('de-DE')} Lebensmittel · {totals.ownTotal} eigene
-          {totals.total > foods.length && ` · ${foods.length} angezeigt`}
+          {t('count', { total: format.number(totals.total), own: totals.ownTotal })}
+          {totals.total > foods.length && ` · ${t('shown', { shown: foods.length })}`}
         </p>
         <Button size="sm" onClick={() => setEditing('create')}>
           <IconPlus data-icon="inline-start" />
-          Neu
+          {t('new')}
         </Button>
       </div>
 
@@ -88,13 +91,13 @@ export default function FoodsTab() {
         <Input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Lebensmittel suchen..."
+          placeholder={t('searchPlaceholder')}
           className="border-b-0"
         />
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label="Barcode scannen"
+          aria-label={t('scanBarcode')}
           onClick={() => setScannerOpen(true)}
         >
           <IconBarcode />
@@ -102,17 +105,19 @@ export default function FoodsTab() {
       </div>
 
       {loading && foods.length === 0 ? (
-        <p className="py-10 text-center text-sm text-muted-foreground">Lädt …</p>
+        <p className="py-10 text-center text-sm text-muted-foreground">{t('loading')}</p>
       ) : foods.length === 0 ? (
         <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">
-          {search.trim()
-            ? 'Keine Lebensmittel gefunden.'
-            : 'Noch keine Lebensmittel. Lege das erste an.'}
+          {search.trim() ? t('noResults') : t('empty')}
         </div>
       ) : (
         <div className="divide-y rounded-lg border bg-card">
           {rows.map((food) => {
-            const badge = foodSourceLabel(food);
+            const badge = foodSourceLabel(food, {
+              own: t('sourceOwn'),
+              system: t('sourceSystem'),
+              openFoodFacts: t('sourceOpenFoodFacts'),
+            });
             return (
               <div key={food.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50">
                 <button
@@ -146,16 +151,18 @@ export default function FoodsTab() {
 
       {/* ODbL attribution for the imported products (#146). */}
       <p className="text-xs text-muted-foreground">
-        Produktdaten teilweise aus{' '}
-        <a
-          href="https://world.openfoodfacts.org"
-          target="_blank"
-          rel="noreferrer noopener"
-          className="underline underline-offset-2"
-        >
-          Open Food Facts
-        </a>
-        , Lizenz ODbL.
+        {t.rich('attribution', {
+          link: (chunks) => (
+            <a
+              href="https://world.openfoodfacts.org"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="underline underline-offset-2"
+            >
+              {chunks}
+            </a>
+          ),
+        })}
       </p>
 
       {/* A hit opens the food rather than logging it -- this tab is library management. */}
@@ -169,9 +176,9 @@ export default function FoodsTab() {
         }}
         mode={{
           kind: 'pick',
-          label: 'Öffnen',
+          label: t('open'),
           // An imported food opens read-only, so "check it" is the honest word for it.
-          openFoodFactsLabel: 'Prüfen',
+          openFoodFactsLabel: t('check'),
           onPick: (food) => {
             setScannerOpen(false);
             setEditing(food);

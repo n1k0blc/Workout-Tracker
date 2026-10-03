@@ -1,10 +1,10 @@
+import { Injectable } from '@nestjs/common';
 import {
-  Injectable,
-  BadRequestException,
-  ConflictException,
-  UnauthorizedException,
-  InternalServerErrorException,
-} from '@nestjs/common';
+  AppBadRequestException,
+  AppConflictException,
+  AppUnauthorizedException,
+  AppInternalServerErrorException,
+} from '../common/errors/app-exceptions';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto, LoginDto, ChangePasswordDto } from './dto';
@@ -13,9 +13,12 @@ import { PasswordService } from './password.service';
 import { BreachedPasswordService } from './breached-password.service';
 import { RefreshTokenService, IssuedRefreshToken } from './refresh-token.service';
 import { defaultMealSlotCreateData } from '../nutrition/meal-slots.service';
-
-const BREACHED_PASSWORD_MESSAGE =
-  'This password has appeared in a known data breach. Please choose a different password.';
+import {
+  resolveRegisterLocale,
+  resolveUnitSystemFromAcceptLanguage,
+  toPrismaLocale,
+  withApiLocale,
+} from '../common/utils/locale.util';
 
 const USER_SELECT = {
   id: true,
@@ -26,6 +29,8 @@ const USER_SELECT = {
   height: true,
   weight: true,
   createdAt: true,
+  locale: true,
+  unitSystem: true,
   homeGyms: {
     select: { id: true, name: true, createdAt: true },
     orderBy: { name: 'asc' as const },
@@ -48,7 +53,10 @@ export class AuthService {
     private refreshTokenService: RefreshTokenService,
   ) {}
 
-  async register(registerDto: RegisterDto): Promise<AuthSession> {
+  async register(
+    registerDto: RegisterDto,
+    localeSignals: { localeHeader?: string; acceptLanguageHeader?: string } = {},
+  ): Promise<AuthSession> {
     const { email, password, firstName, lastName, dateOfBirth, height, weight, homeGyms } =
       registerDto;
 
@@ -57,18 +65,25 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new ConflictException('User with this email already exists');
+      throw new AppConflictException('EMAIL_ALREADY_REGISTERED');
     }
 
     if (await this.breachedPasswordService.isBreached(password)) {
-      throw new BadRequestException(BREACHED_PASSWORD_MESSAGE);
+      throw new AppBadRequestException('PASSWORD_BREACHED');
     }
 
     const passwordHash = await this.passwordService.hash(password);
 
+    // Locale tracer bullet (#179): no new registration fields. `locale` comes from the
+    // `[locale]` URL segment the form was submitted under (carried on X-Locale, same
+    // header sent with every request); `unitSystem` is seeded once from the browser's
+    // Accept-Language and never re-derived from locale afterward.
+    const locale = resolveRegisterLocale(localeSignals.localeHeader);
+    const unitSystem = resolveUnitSystemFromAcceptLanguage(localeSignals.acceptLanguageHeader);
+
     let user: UserDto;
     try {
-      user = await this.prisma.user.create({
+      const created = await this.prisma.user.create({
         data: {
           email,
           passwordHash,
@@ -77,6 +92,8 @@ export class AuthService {
           dateOfBirth: new Date(dateOfBirth),
           height,
           weight,
+          locale: toPrismaLocale(locale),
+          unitSystem,
           homeGyms: {
             create: homeGyms.map((gym) => ({
               name: gym.name,
@@ -92,8 +109,9 @@ export class AuthService {
         },
         select: USER_SELECT,
       });
+      user = withApiLocale(created);
     } catch {
-      throw new InternalServerErrorException('Failed to create user');
+      throw new AppInternalServerErrorException('USER_CREATION_FAILED');
     }
 
     return this.issueSession(user);
@@ -112,7 +130,7 @@ export class AuthService {
     });
 
     if (!userWithPassword) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new AppUnauthorizedException('INVALID_CREDENTIALS');
     }
 
     const isPasswordValid = await this.passwordService.verify(
@@ -121,7 +139,7 @@ export class AuthService {
     );
 
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new AppUnauthorizedException('INVALID_CREDENTIALS');
     }
 
     // Transparent upgrade: a successful legacy-bcrypt verify gets rehashed to argon2id.
@@ -133,10 +151,11 @@ export class AuthService {
       });
     }
 
-    const user = await this.prisma.user.findUniqueOrThrow({
+    const storedUser = await this.prisma.user.findUniqueOrThrow({
       where: { id: userWithPassword.id },
       select: USER_SELECT,
     });
+    const user: UserDto = withApiLocale(storedUser);
 
     return this.issueSession(user);
   }
@@ -160,7 +179,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException();
+      throw new AppUnauthorizedException('SESSION_USER_NOT_FOUND');
     }
 
     const isCurrentPasswordValid = await this.passwordService.verify(
@@ -168,11 +187,11 @@ export class AuthService {
       user.passwordHash,
     );
     if (!isCurrentPasswordValid) {
-      throw new UnauthorizedException('Current password is incorrect');
+      throw new AppUnauthorizedException('CURRENT_PASSWORD_INCORRECT');
     }
 
     if (await this.breachedPasswordService.isBreached(dto.newPassword)) {
-      throw new BadRequestException(BREACHED_PASSWORD_MESSAGE);
+      throw new AppBadRequestException('PASSWORD_BREACHED');
     }
 
     const newHash = await this.passwordService.hash(dto.newPassword);
@@ -196,7 +215,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('User not found');
+      throw new AppUnauthorizedException('SESSION_USER_NOT_FOUND');
     }
 
     return user;

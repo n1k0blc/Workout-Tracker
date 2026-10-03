@@ -1,9 +1,9 @@
+import { Injectable } from '@nestjs/common';
 import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  ConflictException,
-} from '@nestjs/common';
+  AppNotFoundException,
+  AppBadRequestException,
+  AppConflictException,
+} from '../common/errors/app-exceptions';
 import { Prisma } from '../../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -21,6 +21,7 @@ import { CreateWorkoutDto, SaveAsTemplateMode } from './dto/create-workout.dto';
 import { UpdateWorkoutDto } from './dto/update-workout.dto';
 import { WorkoutResponseDto, WorkoutListItemDto } from './dto/workout-response.dto';
 import { LastPerformanceDto, LastPerformanceSource } from './dto/last-performance.dto';
+import { ApiLocale, DEFAULT_LOCALE } from '../common/utils/locale.util';
 
 const WORKOUT_FULL_INCLUDE = {
   cycle: { select: { name: true } },
@@ -107,17 +108,21 @@ export class WorkoutsService {
     });
   }
 
-  async findById(id: string, userId: string): Promise<WorkoutResponseDto> {
+  async findById(
+    id: string,
+    userId: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<WorkoutResponseDto> {
     const workout = await this.prisma.workout.findUnique({
       where: { id },
       include: WORKOUT_FULL_INCLUDE,
     });
 
     if (!workout || workout.kind !== 'WORKOUT' || workout.userId !== userId) {
-      throw new NotFoundException('Workout not found');
+      throw new AppNotFoundException('WORKOUT_NOT_FOUND');
     }
 
-    return this.mapWorkoutToResponse(workout);
+    return this.mapWorkoutToResponse(workout, locale);
   }
 
   /**
@@ -193,9 +198,13 @@ export class WorkoutsService {
     return null;
   }
 
-  async create(dto: CreateWorkoutDto, userId: string): Promise<WorkoutResponseDto> {
+  async create(
+    dto: CreateWorkoutDto,
+    userId: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<WorkoutResponseDto> {
     if (!dto.isFreeWorkout && (!dto.cycleId || !dto.workoutDayId)) {
-      throw new BadRequestException('cycleId and workoutDayId are required for non-free workouts');
+      throw new AppBadRequestException('WORKOUT_CYCLE_CONTEXT_REQUIRED');
     }
 
     const ctx = await this.resolveSaveContext(dto, userId);
@@ -223,22 +232,25 @@ export class WorkoutsService {
       return workout.id;
     });
 
-    return this.findById(workoutId, userId);
+    return this.findById(workoutId, userId, locale);
   }
 
-  async update(id: string, dto: UpdateWorkoutDto, userId: string): Promise<WorkoutResponseDto> {
+  async update(
+    id: string,
+    dto: UpdateWorkoutDto,
+    userId: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<WorkoutResponseDto> {
     const existing = await this.prisma.workout.findUnique({ where: { id } });
     if (!existing || existing.kind !== 'WORKOUT' || existing.userId !== userId) {
-      throw new NotFoundException('Workout not found');
+      throw new AppNotFoundException('WORKOUT_NOT_FOUND');
     }
 
     const wantsSideEffect =
       dto.overwriteBlueprint ||
       (dto.saveAsTemplateMode && dto.saveAsTemplateMode !== SaveAsTemplateMode.NONE);
     if (wantsSideEffect && !dto.exercises) {
-      throw new BadRequestException(
-        'exercises must be provided when requesting a save side-effect',
-      );
+      throw new AppBadRequestException('WORKOUT_EXERCISES_REQUIRED_FOR_SIDE_EFFECT');
     }
 
     const ctx = await this.resolveSaveContext(dto, userId, existing);
@@ -269,13 +281,13 @@ export class WorkoutsService {
       }
     });
 
-    return this.findById(id, userId);
+    return this.findById(id, userId, locale);
   }
 
   async delete(id: string, userId: string): Promise<void> {
     const workout = await this.prisma.workout.findUnique({ where: { id } });
     if (!workout || workout.kind !== 'WORKOUT' || workout.userId !== userId) {
-      throw new NotFoundException('Workout not found');
+      throw new AppNotFoundException('WORKOUT_NOT_FOUND');
     }
 
     await this.prisma.workout.delete({ where: { id } });
@@ -302,7 +314,7 @@ export class WorkoutsService {
     if (dto.homeGymId) {
       const gym = await this.prisma.homeGym.findUnique({ where: { id: dto.homeGymId } });
       if (!gym || gym.userId !== userId) {
-        throw new NotFoundException('Home gym not found');
+        throw new AppNotFoundException('HOME_GYM_NOT_FOUND');
       }
     }
 
@@ -313,10 +325,10 @@ export class WorkoutsService {
         include: { cycle: { select: { userId: true, startDate: true } } },
       });
       if (!day || day.cycle.userId !== userId) {
-        throw new NotFoundException('Workout day not found');
+        throw new AppNotFoundException('WORKOUT_DAY_NOT_FOUND');
       }
       if (dto.cycleId && day.cycleId !== dto.cycleId) {
-        throw new BadRequestException('workoutDayId does not belong to cycleId');
+        throw new AppBadRequestException('WORKOUT_DAY_CYCLE_MISMATCH');
       }
 
       // A cycle built ahead of its start date (planned Thursday for next Monday) has nothing
@@ -324,7 +336,7 @@ export class WorkoutsService {
       const localDate = dto.localDate ?? existing?.localDate;
       const cycleStartLocalDate = instantToLocalDate(day.cycle.startDate);
       if (localDate && localDate < cycleStartLocalDate) {
-        throw new BadRequestException('Dieser Zyklus hat noch nicht begonnen.');
+        throw new AppBadRequestException('CYCLE_NOT_STARTED');
       }
 
       workoutDay = { id: day.id, cycleId: day.cycleId, plannedHomeGymId: day.plannedHomeGymId };
@@ -339,16 +351,16 @@ export class WorkoutsService {
         template.kind !== 'TEMPLATE' ||
         (template.isCustom && template.userId !== userId)
       ) {
-        throw new NotFoundException('Origin template not found');
+        throw new AppNotFoundException('ORIGIN_TEMPLATE_NOT_FOUND');
       }
     }
 
     if (dto.overwriteBlueprint) {
       if (!workoutDay) {
-        throw new BadRequestException('overwriteBlueprint requires a cycle workoutDayId');
+        throw new AppBadRequestException('OVERWRITE_BLUEPRINT_REQUIRES_WORKOUT_DAY');
       }
       if (!dto.homeGymId) {
-        throw new BadRequestException('overwriteBlueprint requires a home gym');
+        throw new AppBadRequestException('OVERWRITE_BLUEPRINT_REQUIRES_HOME_GYM');
       }
     }
 
@@ -356,12 +368,10 @@ export class WorkoutsService {
     if (dto.saveAsTemplateMode === SaveAsTemplateMode.OVERWRITE) {
       const originTemplateId = dto.originTemplateId ?? existing?.originTemplateId;
       if (!dto.overwriteTemplateId) {
-        throw new BadRequestException('overwriteTemplateId is required');
+        throw new AppBadRequestException('OVERWRITE_TEMPLATE_ID_REQUIRED');
       }
       if (dto.overwriteTemplateId !== originTemplateId) {
-        throw new BadRequestException(
-          "overwriteTemplateId must match the workout's origin template",
-        );
+        throw new AppBadRequestException('OVERWRITE_TEMPLATE_ID_MISMATCH');
       }
       const template = await this.prisma.workout.findUnique({
         where: { id: dto.overwriteTemplateId },
@@ -372,20 +382,20 @@ export class WorkoutsService {
         !template.isCustom ||
         template.userId !== userId
       ) {
-        throw new NotFoundException('Template not found');
+        throw new AppNotFoundException('WORKOUT_TEMPLATE_NOT_FOUND');
       }
       overwriteTemplate = { id: template.id };
     }
 
     if (dto.saveAsTemplateMode === SaveAsTemplateMode.NEW) {
       if (!dto.saveAsTemplateName) {
-        throw new BadRequestException('saveAsTemplateName is required');
+        throw new AppBadRequestException('SAVE_AS_TEMPLATE_NAME_REQUIRED');
       }
       const existingTemplate = await this.prisma.workout.findFirst({
         where: { kind: 'TEMPLATE', userId, name: dto.saveAsTemplateName },
       });
       if (existingTemplate) {
-        throw new ConflictException('A template with this name already exists');
+        throw new AppConflictException('TEMPLATE_NAME_TAKEN');
       }
     }
 
@@ -429,7 +439,7 @@ export class WorkoutsService {
     }
   }
 
-  private mapWorkoutToResponse(workout: any): WorkoutResponseDto {
+  private mapWorkoutToResponse(workout: any, locale: ApiLocale): WorkoutResponseDto {
     return {
       id: workout.id,
       date: workout.date,
@@ -444,7 +454,7 @@ export class WorkoutsService {
       workoutDayName: workout.workoutDay?.name,
       originTemplateId: workout.originTemplateId ?? undefined,
       originTemplateName: workout.originTemplate?.name,
-      exercises: mapExercisesToResponse(workout.exercises),
+      exercises: mapExercisesToResponse(workout.exercises, locale),
       createdAt: workout.createdAt,
     };
   }

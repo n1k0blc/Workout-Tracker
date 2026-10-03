@@ -1,0 +1,260 @@
+'use client';
+
+import { ProtectedRoute } from '@/components/protected-route';
+import { Link } from '@/i18n/navigation';
+import { useFormatter, useTranslations } from 'next-intl';
+import { useState, useEffect, useCallback } from 'react';
+import { apiClient } from '@/lib/api';
+import { WorkoutListItem } from '@/types';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Badge } from '@/components/ui/badge';
+import { GymTag } from '@/components/GymTag';
+import {
+  IconCalendar,
+  IconClock,
+  IconList,
+} from '@tabler/icons-react';
+
+type FilterType = '7days' | '30days' | '90days' | 'currentMonth' | 'currentYear' | 'custom';
+
+export default function HistoryPage() {
+  const t = useTranslations('HistoryPage');
+  const format = useFormatter();
+  const [workouts, setWorkouts] = useState<WorkoutListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filterType, setFilterType] = useState<FilterType>('30days');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+
+  const getDateRange = (): { startDate: string; endDate: string } => {
+    const now = new Date();
+    const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+    let startDate: Date;
+
+    switch (filterType) {
+      case '7days':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case '30days':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      case '90days':
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        break;
+      case 'currentMonth':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+        break;
+      case 'currentYear':
+        startDate = new Date(now.getFullYear(), 0, 1, 0, 0, 0);
+        break;
+      case 'custom':
+        if (customStartDate && customEndDate) {
+          return {
+            startDate: new Date(customStartDate).toISOString(),
+            endDate: new Date(customEndDate + 'T23:59:59').toISOString(),
+          };
+        }
+        // Fallback to 30 days if custom dates not set
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    }
+
+    startDate.setHours(0, 0, 0, 0);
+
+    return {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+    };
+  };
+
+  const loadWorkouts = useCallback(async () => {
+    if (filterType === 'custom' && (!customStartDate || !customEndDate)) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { startDate, endDate } = getDateRange();
+      const data = await apiClient.getWorkoutHistory({
+        startDate,
+        endDate,
+      });
+      setWorkouts(data);
+    } catch (error) {
+      console.error('Failed to load workouts:', error);
+    } finally {
+      setLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterType, customStartDate, customEndDate]);
+
+  useEffect(() => {
+    loadWorkouts();
+  }, [loadWorkouts]);
+
+  const formatDate = (dateStr: string) => {
+    return format.dateTime(new Date(dateStr), {
+      weekday: 'short',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  };
+
+  const formatDuration = (seconds: number | null) => {
+    if (!seconds) return '-';
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes}:${secs.toString().padStart(2, '0')} min`;
+  };
+
+  return (
+    <ProtectedRoute>
+      <div className="min-h-screen bg-background">
+        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+          <div className="px-4 py-6 sm:px-0">
+            <div className="space-y-6">
+              {/* Header */}
+              <div>
+                <h2 className="text-2xl font-bold text-foreground">
+                  {t('title')}
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {t('subtitle')}
+                </p>
+              </div>
+
+              {/* Filters */}
+              <div className="bg-card rounded-lg border p-6 space-y-4">
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground mb-3">
+                    {t('period')}
+                  </div>
+                  <ToggleGroup
+                    type="single"
+                    value={filterType}
+                    onValueChange={(value) => {
+                      if (value) setFilterType(value as FilterType);
+                    }}
+                    className="flex flex-wrap gap-2"
+                  >
+                    <ToggleGroupItem value="7days" aria-label={t('last7')}>
+                      {t('last7')}
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="30days" aria-label={t('last30')}>
+                      {t('last30')}
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="90days" aria-label={t('last90')}>
+                      {t('last90')}
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="currentMonth" aria-label={t('currentMonth')}>
+                      {t('currentMonth')}
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="currentYear" aria-label={t('currentYear')}>
+                      {t('currentYear')}
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="custom" aria-label={t('custom')}>
+                      {t('custom')}
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+
+                {/* Custom Date Range */}
+                {filterType === 'custom' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+                    <div>
+                      <div className="text-sm font-medium text-muted-foreground mb-2">
+                        {t('from')}
+                      </div>
+                      <input
+                        type="date"
+                        value={customStartDate}
+                        onChange={(e) => setCustomStartDate(e.target.value)}
+                        className="w-full"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-muted-foreground mb-2">
+                        {t('to')}
+                      </div>
+                      <input
+                        type="date"
+                        value={customEndDate}
+                        onChange={(e) => setCustomEndDate(e.target.value)}
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Workouts List */}
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-lg text-muted-foreground">{t('loading')}</div>
+                </div>
+              ) : workouts.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="text-sm text-muted-foreground mb-2">
+                    {t('found', { count: workouts.length })}
+                  </div>
+                  {workouts.map((workout) => (
+                    <div
+                      key={workout.id}
+                      className="block bg-card border rounded-lg p-6 hover:shadow-sm transition-shadow"
+                    >
+                      <div className="flex items-start justify-between">
+                        <Link href={`/history/${workout.id}`} className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-3 flex-wrap">
+                            <h3 className="text-lg font-semibold text-foreground">
+                              {workout.isFreeWorkout
+                                ? workout.originTemplateName || t('freeWorkout')
+                                : workout.workoutDayName || t('workout')}
+                            </h3>
+                            {workout.cycleName && (
+                              <Badge variant="secondary">{workout.cycleName}</Badge>
+                            )}
+                            <GymTag homeGym={workout.homeGym} />
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+                            <div className="flex items-center gap-1.5">
+                              <IconCalendar className="size-4" />
+                              <span>{formatDate(workout.date)}</span>
+                            </div>
+                            {workout.totalDuration && (
+                              <div className="flex items-center gap-1.5">
+                                <IconClock className="size-4" />
+                                <span>{formatDuration(workout.totalDuration)}</span>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-1.5">
+                              <IconList className="size-4" />
+                              <span>
+                                {t('exercises', { count: workout.exerciseCount })}
+                              </span>
+                            </div>
+                          </div>
+                        </Link>
+
+
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-card border rounded-lg p-12 text-center">
+                  <p className="text-muted-foreground">
+                    {t('empty')}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </main>
+      </div>
+    </ProtectedRoute>
+  );
+}

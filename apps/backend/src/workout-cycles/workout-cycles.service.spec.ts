@@ -76,9 +76,14 @@ describe('WorkoutCyclesService weekday uniqueness', () => {
   it('rejects moving a workout day onto a weekday another day in the cycle already holds', async () => {
     const { service, prisma } = makeService();
 
-    await expect(
-      service.updateWorkoutDay('cycle-1', 'day-2', { name: 'Pull', weekday: 1 }, 'user-1'),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    const result = service.updateWorkoutDay(
+      'cycle-1',
+      'day-2',
+      { name: 'Pull', weekday: 1 },
+      'user-1',
+    );
+    await expect(result).rejects.toBeInstanceOf(BadRequestException);
+    await expect(result).rejects.toMatchObject({ code: 'WORKOUT_DAY_WEEKDAY_TAKEN' });
 
     expect(prisma.workoutDay.update).not.toHaveBeenCalled();
   });
@@ -122,9 +127,14 @@ describe('WorkoutCyclesService weekday uniqueness', () => {
       }),
     );
 
-    await expect(
-      service.updateWorkoutDay('cycle-1', 'day-2', { name: 'Pull', weekday: 5 }, 'user-1'),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    const result = service.updateWorkoutDay(
+      'cycle-1',
+      'day-2',
+      { name: 'Pull', weekday: 5 },
+      'user-1',
+    );
+    await expect(result).rejects.toBeInstanceOf(BadRequestException);
+    await expect(result).rejects.toMatchObject({ code: 'WORKOUT_DAY_WEEKDAY_TAKEN' });
   });
 
   it('rethrows unrelated database errors instead of reporting them as a weekday conflict', async () => {
@@ -171,9 +181,14 @@ describe('WorkoutCyclesService weekday uniqueness', () => {
   it('rejects a move onto a taken weekday when no swap partner is confirmed', async () => {
     const { service, tx } = makeService();
 
-    await expect(
-      service.updateWorkoutDay('cycle-1', 'day-2', { name: 'Pull', weekday: 1 }, 'user-1'),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    const result = service.updateWorkoutDay(
+      'cycle-1',
+      'day-2',
+      { name: 'Pull', weekday: 1 },
+      'user-1',
+    );
+    await expect(result).rejects.toBeInstanceOf(BadRequestException);
+    await expect(result).rejects.toMatchObject({ code: 'WORKOUT_DAY_WEEKDAY_TAKEN' });
 
     expect(tx.workoutDay.update).not.toHaveBeenCalled();
   });
@@ -181,14 +196,14 @@ describe('WorkoutCyclesService weekday uniqueness', () => {
   it('rejects a swap confirmation naming the wrong partner', async () => {
     const { service, tx } = makeService();
 
-    await expect(
-      service.updateWorkoutDay(
-        'cycle-1',
-        'day-2',
-        { name: 'Pull', weekday: 1, swapWithWorkoutDayId: 'some-other-day' },
-        'user-1',
-      ),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    const result = service.updateWorkoutDay(
+      'cycle-1',
+      'day-2',
+      { name: 'Pull', weekday: 1, swapWithWorkoutDayId: 'some-other-day' },
+      'user-1',
+    );
+    await expect(result).rejects.toBeInstanceOf(BadRequestException);
+    await expect(result).rejects.toMatchObject({ code: 'WORKOUT_DAY_WEEKDAY_TAKEN' });
 
     expect(tx.workoutDay.update).not.toHaveBeenCalled();
   });
@@ -227,14 +242,14 @@ describe('WorkoutCyclesService weekday uniqueness', () => {
       }),
     );
 
-    await expect(
-      service.updateWorkoutDay(
-        'cycle-1',
-        'day-2',
-        { name: 'Pull', weekday: 1, swapWithWorkoutDayId: 'day-1' },
-        'user-1',
-      ),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    const result = service.updateWorkoutDay(
+      'cycle-1',
+      'day-2',
+      { name: 'Pull', weekday: 1, swapWithWorkoutDayId: 'day-1' },
+      'user-1',
+    );
+    await expect(result).rejects.toBeInstanceOf(BadRequestException);
+    await expect(result).rejects.toMatchObject({ code: 'CYCLE_CONCURRENT_MODIFICATION' });
   });
 
   it('rejects creating a cycle whose workout days share a weekday', async () => {
@@ -250,7 +265,9 @@ describe('WorkoutCyclesService weekday uniqueness', () => {
       ],
     } as CreateCycleDto;
 
-    await expect(service.create(dto, 'user-1')).rejects.toBeInstanceOf(BadRequestException);
+    const result = service.create(dto, 'user-1');
+    await expect(result).rejects.toBeInstanceOf(BadRequestException);
+    await expect(result).rejects.toMatchObject({ code: 'DUPLICATE_WEEKDAY_IN_CYCLE' });
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
@@ -379,9 +396,11 @@ describe('WorkoutCyclesService start-date re-anchor conflicts (#88)', () => {
     );
 
     // The re-anchor has no single weekday to blame, so it reports the generic race.
-    await expect(service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1')).rejects.toThrow(
-      'Eine andere Änderung an diesem Zyklus ist dazwischengekommen. Bitte versuche es erneut.',
-    );
+    await expect(
+      service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1'),
+    ).rejects.toMatchObject({
+      code: 'CYCLE_CONCURRENT_MODIFICATION',
+    });
   });
 
   it('answers 400, not 500, when a concurrent write wins the weekday index during re-anchoring', async () => {
@@ -395,11 +414,13 @@ describe('WorkoutCyclesService start-date re-anchor conflicts (#88)', () => {
       }),
     );
 
-    // Same message as the order race: the re-anchor never names a weekday itself, so it
-    // can't blame one -- and WEEKDAY_NAMES[undefined] must never reach the user.
-    await expect(service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1')).rejects.toThrow(
-      'Eine andere Änderung an diesem Zyklus ist dazwischengekommen. Bitte versuche es erneut.',
-    );
+    // Same code as the order race: the re-anchor never names a weekday itself, so it
+    // can't blame one.
+    await expect(
+      service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1'),
+    ).rejects.toMatchObject({
+      code: 'CYCLE_CONCURRENT_MODIFICATION',
+    });
   });
 
   it('rethrows unrelated database errors raised while re-anchoring', async () => {
@@ -475,10 +496,12 @@ describe('WorkoutCyclesService ownership scoping (#171)', () => {
   it("findById 404s on another user's cycle", async () => {
     const { service } = makeService();
 
-    await expect(service.findById('cycle-1', 'user-2')).rejects.toBeInstanceOf(NotFoundException);
+    const result = service.findById('cycle-1', 'user-2');
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'CYCLE_NOT_FOUND' });
   });
 
-  it("getCycleDetails 404s on another user's cycle, with its own message", async () => {
+  it("getCycleDetails 404s on another user's cycle, with its own code", async () => {
     // getCycleDetails does its own ownership check inline instead of going through
     // findById, so it needs its own coverage rather than inheriting findById's.
     const service = makeDetailsService();
@@ -489,7 +512,7 @@ describe('WorkoutCyclesService ownership scoping (#171)', () => {
     );
 
     await expect(result).rejects.toBeInstanceOf(NotFoundException);
-    await expect(result).rejects.toThrow('Zyklus nicht gefunden');
+    await expect(result).rejects.toMatchObject({ code: 'CYCLE_NOT_FOUND' });
   });
 
   it("update 404s on another user's cycle and writes nothing", async () => {
@@ -556,9 +579,9 @@ describe('WorkoutCyclesService ownership scoping (#171)', () => {
       workouts: [{ id: 'blueprint-x' }],
     });
 
-    await expect(
-      service.updateBlueprint('cycle-1', 'day-x', { exercises } as never, 'user-1'),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    const result = service.updateBlueprint('cycle-1', 'day-x', { exercises } as never, 'user-1');
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'WORKOUT_DAY_NOT_FOUND' });
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });

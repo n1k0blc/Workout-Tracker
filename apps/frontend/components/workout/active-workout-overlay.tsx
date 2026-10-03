@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter } from '@/i18n/navigation';
+import { routing } from '@/i18n/routing';
 import { useWorkout } from '@/lib/workout-context';
 import { Workout, PersonalRecord } from '@/types';
 import ActiveWorkoutScreen from '@/components/workout/active-workout-screen';
@@ -22,6 +23,19 @@ const EXPANDED_TRANSFORM = `translateY(-${BAR_HEIGHT}px)`;
 const MINIMIZED_TRANSFORM = `translateY(calc(100dvh - ${BAR_HEIGHT}px))`;
 const RESTING_TRANSITION =
   'transition-transform duration-[320ms] ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none';
+
+/**
+ * Strips a locale prefix off a raw `window.location.pathname` (unlike `usePathname` from
+ * `@/i18n/navigation`, which already returns the locale-agnostic path but lags a tick behind
+ * a just-completed popstate navigation -- see the `onPopState` handler below).
+ */
+function stripLocalePrefix(pathname: string): string {
+  for (const locale of routing.locales) {
+    if (pathname === `/${locale}`) return '/';
+    if (pathname.startsWith(`/${locale}/`)) return pathname.slice(1 + locale.length);
+  }
+  return pathname;
+}
 
 /**
  * The persistent home of a live workout (ADR-0001, issue #129). Mounted in the root
@@ -112,7 +126,7 @@ export function ActiveWorkoutOverlay() {
         minimizeWorkout();
         // The browser already popped our marker; if that left the guard screen
         // showing, swap it for the page to return to.
-        if (window.location.pathname.startsWith('/workout')) leaveWorkoutRoute();
+        if (stripLocalePrefix(window.location.pathname).startsWith('/workout')) leaveWorkoutRoute();
       }
     };
     window.addEventListener('popstate', onPopState);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useFormatter, useTranslations } from 'next-intl';
 import { IconBarcode, IconPlus, IconTrash, IconX, IconChevronRight } from '@tabler/icons-react';
 import {
   Dialog,
@@ -24,6 +25,7 @@ import { apiClient } from '@/lib/api';
 import { parseAmount } from '@/lib/nutrition';
 import { Food, FoodInput, SimilarFood } from '@/types';
 import { BarcodeCapture } from '@/components/nutrition/barcode-capture';
+import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
 
 interface PortionRow {
   key: string;
@@ -31,34 +33,6 @@ interface PortionRow {
   grams: string;
   isDefault: boolean;
 }
-
-/**
- * Common portion names, offered as a combobox (`<datalist>`) on the label field. They only
- * guide input -- any free text is still allowed, so oddball portions and the arbitrary
- * serving strings from the Open Food Facts import (#146) keep working.
- */
-const PORTION_LABEL_PRESETS = [
-  '1 Portion',
-  '1 Stück',
-  '1 Scheibe',
-  '1 Becher',
-  '1 Glas',
-  '1 Esslöffel',
-  '1 Teelöffel',
-  '1 Handvoll',
-  '1 Riegel',
-  '1 Aufstrich',
-  '1 Tasse',
-  '1 Packung',
-  '1 Dose',
-  '1 Flasche',
-  '1 Kugel',
-  '1 Teller',
-  '1 Kelle',
-  '1 Würfel',
-  '1 Zehe',
-  '1 Blatt',
-] as const;
 
 let portionKeySeq = 0;
 const newPortionKey = () => `p${++portionKeySeq}`;
@@ -72,26 +46,17 @@ function toRows(food: Food | undefined): PortionRow[] {
   }));
 }
 
-function fmt1(n: number): string {
-  return n.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-}
-
-function readOnlyReason(food: Food): { note: string; odbl: boolean; label: string | null } {
+function readOnlyReason(
+  food: Food,
+  t: ReturnType<typeof useTranslations>,
+): { note: string; odbl: boolean; label: string | null } {
   if (food.source === 'SEED') {
-    return { note: 'System-Einträge sind schreibgeschützt.', odbl: false, label: 'System' };
+    return { note: t('readOnlySeed'), odbl: false, label: t('sourceSystem') };
   }
   if (food.source === 'OPEN_FOOD_FACTS') {
-    return {
-      note: 'Importierte Einträge sind schreibgeschützt.',
-      odbl: true,
-      label: 'Open Food Facts',
-    };
+    return { note: t('readOnlyImported'), odbl: true, label: 'Open Food Facts' };
   }
-  return {
-    note: 'Von einer anderen Person angelegt und schreibgeschützt.',
-    odbl: false,
-    label: null,
-  };
+  return { note: t('readOnlyOther'), odbl: false, label: null };
 }
 
 export function FoodEditorDialog({
@@ -109,6 +74,8 @@ export function FoodEditorDialog({
   /** Receives the saved food, so a caller mid-flow can carry on with it (#149). */
   onChanged: (saved?: Food) => void;
 }) {
+  const t = useTranslations('FoodEditorDialog');
+  const apiError = useApiErrorMessage();
   const [forceForm, setForceForm] = useState(false); // "Eigene Kopie anlegen" from read-only
   const [name, setName] = useState('');
   const [barcode, setBarcode] = useState('');
@@ -208,7 +175,7 @@ export function FoodEditorDialog({
   async function handleSave() {
     setError('');
     if (!name.trim()) {
-      setError('Bitte gib einen Namen ein.');
+      setError(t('nameRequired'));
       return;
     }
     const nutrients = {
@@ -218,11 +185,11 @@ export function FoodEditorDialog({
       fat: parseAmount(fat),
     };
     if (Object.values(nutrients).some((v) => v === null)) {
-      setError('Kalorien und Makros müssen Zahlen ≥ 0 sein.');
+      setError(t('nutrientsInvalid'));
       return;
     }
     if (barcode.trim() && !/^\d{8,14}$/.test(barcode.trim())) {
-      setError('Barcode muss 8 bis 14 Ziffern haben.');
+      setError(t('barcodeInvalid'));
       return;
     }
     const parsedPortions = portions.map((p) => ({
@@ -231,11 +198,11 @@ export function FoodEditorDialog({
       isDefault: p.isDefault,
     }));
     if (parsedPortions.some((p) => !p.label || p.grams === null || p.grams <= 0)) {
-      setError('Jede Portionsgröße braucht eine Bezeichnung und eine Menge größer als 0.');
+      setError(t('portionInvalid'));
       return;
     }
     if (parsedPortions.length > 0 && parsedPortions.filter((p) => p.isDefault).length !== 1) {
-      setError('Markiere genau eine Portionsgröße als Standard.');
+      setError(t('portionDefault'));
       return;
     }
 
@@ -260,7 +227,7 @@ export function FoodEditorDialog({
       onChanged(saved);
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Speichern fehlgeschlagen.');
+      setError(apiError(err));
       setSaving(false);
     }
   }
@@ -272,15 +239,15 @@ export function FoodEditorDialog({
       onChanged();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Löschen fehlgeschlagen.');
+      setError(apiError(err));
     }
   }
 
   const title = isReadOnly
-    ? 'Lebensmittel'
+    ? t('titleReadOnly')
     : isEdit
-      ? 'Lebensmittel bearbeiten'
-      : 'Neues Lebensmittel';
+      ? t('titleEdit')
+      : t('titleCreate');
 
   return (
     // Non-modal while the scanner is up. The scanner is a full-screen overlay portaled to the
@@ -303,7 +270,7 @@ export function FoodEditorDialog({
               variant="ghost"
               size="icon-sm"
               className="text-destructive"
-              aria-label="Lebensmittel löschen"
+              aria-label={t('delete')}
               onClick={() => setConfirmDelete(true)}
             >
               <IconTrash />
@@ -323,14 +290,14 @@ export function FoodEditorDialog({
           <div className="space-y-5">
             <label className="block">
               <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                Name
+                {t('name')}
               </span>
               <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
               {similar.length > 0 && (
                 <div className="mt-2">
                   <SimilarList items={similar} />
                   <p className="mt-1.5 text-xs text-muted-foreground">
-                    Doppelte Einträge vermeiden: prüfe, ob einer davon passt.
+                    {t('avoidDuplicates')}
                   </p>
                 </div>
               )}
@@ -338,7 +305,7 @@ export function FoodEditorDialog({
 
             <label className="block">
               <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                EAN <span className="font-normal normal-case tracking-normal">(optional)</span>
+                {t('ean')} <span className="font-normal normal-case tracking-normal">{t('optional')}</span>
               </span>
               <div className="flex items-center gap-2 border-b border-b-input">
                 <Input
@@ -351,7 +318,7 @@ export function FoodEditorDialog({
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  aria-label="Barcode scannen"
+                  aria-label={t('scanBarcode')}
                   onClick={() => setScannerOpen(true)}
                 >
                   <IconBarcode />
@@ -366,19 +333,19 @@ export function FoodEditorDialog({
                 onChange={(e) => setIsLiquid(e.target.checked)}
                 className="size-4 accent-primary"
               />
-              <span className="text-sm">Flüssig (Werte je 100 ml)</span>
+              <span className="text-sm">{t('liquid')}</span>
             </label>
 
             <div>
               <div className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                Nährwerte je 100 {unit}
+                {t('nutrientsPer100', { unit })}
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-3.5">
                 {[
-                  { label: 'Kalorien', value: kcal, set: setKcal, suffix: 'kcal' },
-                  { label: 'Kohlenhydrate', value: carbs, set: setCarbs, suffix: 'g' },
-                  { label: 'Protein', value: protein, set: setProtein, suffix: 'g' },
-                  { label: 'Fett', value: fat, set: setFat, suffix: 'g' },
+                  { label: t('kcal'), value: kcal, set: setKcal, suffix: 'kcal' },
+                  { label: t('carbs'), value: carbs, set: setCarbs, suffix: 'g' },
+                  { label: t('protein'), value: protein, set: setProtein, suffix: 'g' },
+                  { label: t('fat'), value: fat, set: setFat, suffix: 'g' },
                 ].map((f) => (
                   <label key={f.label} className="block">
                     <span className="text-xs text-muted-foreground">{f.label}</span>
@@ -399,22 +366,22 @@ export function FoodEditorDialog({
 
             <div>
               <datalist id="food-portion-labels">
-                {PORTION_LABEL_PRESETS.map((v) => (
+                {(t.raw('portionPresets') as string[]).map((v) => (
                   <option key={v} value={v} />
                 ))}
               </datalist>
               <div className="mb-2.5 flex items-center justify-between">
                 <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-                  Portionsgrößen
+                  {t('portions')}
                 </span>
                 <Button variant="outline" size="xs" onClick={addPortion}>
                   <IconPlus data-icon="inline-start" />
-                  Größe
+                  {t('addPortion')}
                 </Button>
               </div>
               {portions.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  Keine Portionsgrößen. Ohne sie wird in Gramm gezählt.
+                  {t('noPortions')}
                 </p>
               ) : (
                 <div className="divide-y rounded-md border">
@@ -430,7 +397,7 @@ export function FoodEditorDialog({
                             ),
                           )
                         }
-                        placeholder="Portion, Stück, Scheibe …"
+                        placeholder={t('portionPlaceholder')}
                         className="h-9 flex-1"
                       />
                       <div className="flex w-24 items-baseline gap-1 border-b border-b-input">
@@ -456,13 +423,13 @@ export function FoodEditorDialog({
                         onClick={() => setDefaultPortion(p.key)}
                         aria-pressed={p.isDefault}
                       >
-                        Standard
+                        {t('portionDefaultButton')}
                       </Button>
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon-sm"
-                        aria-label="Portionsgröße entfernen"
+                        aria-label={t('removePortion')}
                         onClick={() => removePortion(p.key)}
                       >
                         <IconX />
@@ -478,15 +445,15 @@ export function FoodEditorDialog({
         <div className="mt-2 flex gap-2 border-t pt-4">
           {isReadOnly ? (
             <Button variant="outline" className="flex-1" onClick={startCopy}>
-              Eigene Kopie anlegen
+              {t('copy')}
             </Button>
           ) : (
             <>
               <Button className="flex-1" onClick={handleSave} disabled={saving}>
-                {saving ? 'Speichert …' : 'Speichern'}
+                {saving ? t('saving') : t('save')}
               </Button>
               <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Abbrechen
+                {t('cancel')}
               </Button>
             </>
           )}
@@ -506,15 +473,14 @@ export function FoodEditorDialog({
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Lebensmittel löschen?</AlertDialogTitle>
+            <AlertDialogTitle>{t('deleteTitle')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Es verschwindet aus der Suche. Bestehende Einträge und Mahlzeiten, die es
-              verwenden, bleiben erhalten.
+              {t('deleteDescription')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Löschen</AlertDialogAction>
+            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete}>{t('deleteConfirm')}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -523,6 +489,7 @@ export function FoodEditorDialog({
 }
 
 function SimilarList({ items }: { items: SimilarFood[] }) {
+  const t = useTranslations('FoodEditorDialog');
   return (
     <div className="divide-y rounded-md border bg-card">
       {items.map((f) => (
@@ -530,7 +497,7 @@ function SimilarList({ items }: { items: SimilarFood[] }) {
           <div className="min-w-0 flex-1">
             <div className="text-sm">{f.name}</div>
             <div className="mt-0.5 text-xs text-muted-foreground">
-              {Math.round(f.kcal)} kcal / 100 {f.isLiquid ? 'ml' : 'g'} · {f.usageCount}× genutzt
+              {Math.round(f.kcal)} kcal / 100 {f.isLiquid ? 'ml' : 'g'} · {t('usedTimes', { count: f.usageCount })}
             </div>
           </div>
           <IconChevronRight className="size-4 shrink-0 text-muted-foreground" />
@@ -541,7 +508,11 @@ function SimilarList({ items }: { items: SimilarFood[] }) {
 }
 
 function ReadOnlyView({ food, similar }: { food: Food; similar: SimilarFood[] }) {
-  const { note, odbl, label } = readOnlyReason(food);
+  const t = useTranslations('FoodEditorDialog');
+  const format = useFormatter();
+  const fmt1 = (n: number) =>
+    format.number(n, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const { note, odbl, label } = readOnlyReason(food, t);
   const unit = food.isLiquid ? 'ml' : 'g';
 
   return (
@@ -560,10 +531,10 @@ function ReadOnlyView({ food, similar }: { food: Food; similar: SimilarFood[] })
 
       <div className="grid grid-cols-2 rounded-lg border bg-card">
         {[
-          { label: 'Kalorien', value: `${Math.round(food.kcal)} kcal`, br: 'border-b border-r' },
-          { label: 'Kohlenhydrate', value: `${fmt1(food.carbs)} g`, br: 'border-b' },
-          { label: 'Protein', value: `${fmt1(food.protein)} g`, br: 'border-r' },
-          { label: 'Fett', value: `${fmt1(food.fat)} g`, br: '' },
+          { label: t('kcal'), value: `${Math.round(food.kcal)} kcal`, br: 'border-b border-r' },
+          { label: t('carbs'), value: `${fmt1(food.carbs)} g`, br: 'border-b' },
+          { label: t('protein'), value: `${fmt1(food.protein)} g`, br: 'border-r' },
+          { label: t('fat'), value: `${fmt1(food.fat)} g`, br: '' },
         ].map((c) => (
           <div key={c.label} className={`p-3.5 ${c.br}`}>
             <div className="text-xs text-muted-foreground">{c.label}</div>
@@ -571,13 +542,13 @@ function ReadOnlyView({ food, similar }: { food: Food; similar: SimilarFood[] })
           </div>
         ))}
       </div>
-      <div className="-mt-2 text-xs text-muted-foreground">Werte je 100 {unit}</div>
+      <div className="-mt-2 text-xs text-muted-foreground">{t('values100', { unit })}</div>
 
       <div className="rounded-md border p-3.5 text-sm">
         <div>{note}</div>
         {odbl && (
           <div className="mt-1 text-xs text-muted-foreground">
-            Daten von Open Food Facts, Lizenz ODbL. Zum Anpassen eine eigene Kopie anlegen.
+            {t('odbl')}
           </div>
         )}
       </div>
@@ -585,11 +556,11 @@ function ReadOnlyView({ food, similar }: { food: Food; similar: SimilarFood[] })
       {similar.length > 0 && (
         <div>
           <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-            Ähnliche eigene Einträge
+            {t('similarOwn')}
           </div>
           <SimilarList items={similar} />
           <p className="mt-1.5 text-xs text-muted-foreground">
-            Doppelte Einträge vermeiden: prüfe, ob einer davon passt.
+            {t('avoidDuplicates')}
           </p>
         </div>
       )}

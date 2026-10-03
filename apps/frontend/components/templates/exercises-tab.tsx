@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { apiClient } from '@/lib/api';
 import { Exercise, MuscleGroup, Equipment } from '@/types';
-import { MUSCLE_GROUP_LABELS } from '@/lib/exercise-utils';
+import { MUSCLE_GROUP_ORDER } from '@/lib/exercise-utils';
+import { useExerciseLabels } from '@/hooks/useExerciseLabels';
 import { ExerciseEditorDialog } from '@/components/exercises/exercise-editor-dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,6 +24,7 @@ import {
 import { IconPlus, IconTrash } from '@tabler/icons-react';
 
 export default function ExercisesTab() {
+  const t = useTranslations('ExercisesTab');
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -74,24 +77,11 @@ export default function ExercisesTab() {
       setDeleteExerciseId(null);
     } catch (error) {
       console.error('Failed to delete exercise:', error);
-      alert('Fehler beim Löschen der Übung. Möglicherweise wird sie noch verwendet.');
+      alert(t('deleteFailed'));
     }
   };
 
-  const muscleGroups = [
-    MuscleGroup.ABDOMEN,
-    MuscleGroup.LATISSIMUS,
-    MuscleGroup.TRAPEZIUS,
-    MuscleGroup.LOWER_BACK,
-    MuscleGroup.HAMSTRINGS,
-    MuscleGroup.GLUTES,
-    MuscleGroup.SHOULDERS,
-    MuscleGroup.BICEPS,
-    MuscleGroup.CHEST,
-    MuscleGroup.QUADRICEPS,
-    MuscleGroup.CALVES,
-    MuscleGroup.TRICEPS,
-  ];
+  const muscleGroups = MUSCLE_GROUP_ORDER;
 
   const equipments = [
     Equipment.CABLE,
@@ -103,28 +93,13 @@ export default function ExercisesTab() {
     Equipment.EZ_BAR,
   ];
 
-  const translateMuscleGroup = (mg: MuscleGroup): string => {
-    return MUSCLE_GROUP_LABELS[mg] || mg;
-  };
-
-  const translateEquipment = (eq: Equipment): string => {
-    const translations: Record<Equipment, string> = {
-      CABLE: 'Kabel',
-      MACHINE: 'Maschine',
-      DUMBBELL: 'Kurzhantel',
-      BARBELL: 'Langhantel',
-      BODYWEIGHT: 'Körpergewicht',
-      SMITH_MACHINE: 'Smith-Maschine',
-      EZ_BAR: 'EZ-Stange',
-    };
-    return translations[eq];
-  };
+  const { translateMuscleGroup, translateEquipment } = useExerciseLabels();
 
   return (
     <div className="space-y-6">
       {/* Header with count */}
       <div>
-        <p className="text-sm text-muted-foreground">{exercises.length} Übungen verfügbar</p>
+        <p className="text-sm text-muted-foreground">{t('availableCount', { count: exercises.length })}</p>
       </div>
 
       {/* Search */}
@@ -133,7 +108,7 @@ export default function ExercisesTab() {
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Übung suchen..."
+          placeholder={t('searchPlaceholder')}
         />
       </div>
 
@@ -143,7 +118,7 @@ export default function ExercisesTab() {
           {/* Muscle Group Filter */}
           <div>
             <div className="text-sm font-medium text-muted-foreground mb-3">
-              Muskelgruppe
+              {t('muscleGroup')}
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -151,7 +126,7 @@ export default function ExercisesTab() {
                 size="sm"
                 onClick={() => setMuscleGroupFilter(undefined)}
               >
-                Alle
+                {t('all')}
               </Button>
               {muscleGroups.map((mg) => (
                 <Button
@@ -169,7 +144,7 @@ export default function ExercisesTab() {
           {/* Equipment Filter */}
           <div>
             <div className="text-sm font-medium text-muted-foreground mb-3">
-              Equipment
+              {t('equipment')}
             </div>
             <div className="flex flex-wrap gap-2">
               <Button
@@ -177,7 +152,7 @@ export default function ExercisesTab() {
                 size="sm"
                 onClick={() => setEquipmentFilter(undefined)}
               >
-                Alle
+                {t('all')}
               </Button>
               {equipments.map((eq) => (
                 <Button
@@ -201,13 +176,13 @@ export default function ExercisesTab() {
         size="lg"
       >
         <IconPlus className="mr-2 size-5" />
-        Benutzerdefinierte Übung erstellen
+        {t('createCustomExercise')}
       </Button>
 
       {/* Exercise List */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <div className="text-lg text-muted-foreground">Lädt Übungen...</div>
+          <div className="text-lg text-muted-foreground">{t('loading')}</div>
         </div>
       ) : exercises.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -229,20 +204,20 @@ export default function ExercisesTab() {
                     <h3 className="font-semibold text-foreground truncate">{exercise.name}</h3>
                     <div className="mt-2 space-y-1 text-sm">
                       <div className="text-muted-foreground">
-                        <span className="font-medium text-foreground">Muskel:</span>{' '}
+                        <span className="font-medium text-foreground">{t('muscleLabel')}</span>{' '}
                         {translateMuscleGroup(exercise.primaryMuscle)}
                       </div>
                       <div className="text-muted-foreground">
-                        <span className="font-medium text-foreground">Equipment:</span>{' '}
+                        <span className="font-medium text-foreground">{t('equipmentLabel')}</span>{' '}
                         {translateEquipment(exercise.equipment)}
                       </div>
                       {(exercise.isUnilateral || exercise.isDoubleWeight) && (
                         <div className="flex gap-1.5 mt-2">
                           {exercise.isUnilateral && (
-                            <Badge variant="outline" className="text-xs">Unilateral</Badge>
+                            <Badge variant="outline" className="text-xs">{t('unilateral')}</Badge>
                           )}
                           {exercise.isDoubleWeight && (
-                            <Badge variant="outline" className="text-xs">2x Gewicht</Badge>
+                            <Badge variant="outline" className="text-xs">{t('doubleWeight')}</Badge>
                           )}
                         </div>
                       )}
@@ -251,14 +226,14 @@ export default function ExercisesTab() {
                   <div className="flex flex-col items-end gap-2 shrink-0">
                     {exercise.isCustom && (
                       <>
-                        <Badge variant="secondary" className="text-xs">Custom</Badge>
+                        <Badge variant="secondary" className="text-xs">{t('custom')}</Badge>
                         <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                           <Button
                             variant="ghost"
                             size="icon"
                             className="size-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                             onClick={() => setDeleteExerciseId(exercise.id)}
-                            title="Übung löschen"
+                            title={t('deleteExercise')}
                           >
                             <IconTrash className="size-4" />
                           </Button>
@@ -274,7 +249,7 @@ export default function ExercisesTab() {
       ) : (
         <Card>
           <CardContent className="p-12 text-center">
-            <p className="text-muted-foreground">Keine Übungen gefunden</p>
+            <p className="text-muted-foreground">{t('noExercisesFound')}</p>
           </CardContent>
         </Card>
       )}
@@ -303,19 +278,18 @@ export default function ExercisesTab() {
       <AlertDialog open={!!deleteExerciseId} onOpenChange={(open) => !open && setDeleteExerciseId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Übung löschen?</AlertDialogTitle>
+            <AlertDialogTitle>{t('deleteDialog.title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Möchten Sie diese benutzerdefinierte Übung wirklich löschen? Diese Aktion kann nicht
-              rückgängig gemacht werden.
+              {t('deleteDialog.description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel>{t('deleteDialog.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteExercise}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Löschen
+              {t('deleteDialog.confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

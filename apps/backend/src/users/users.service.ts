@@ -1,6 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { AppNotFoundException, AppConflictException } from '../common/errors/app-exceptions';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto, UserDto, CreateHomeGymDto, UpdateHomeGymDto, HomeGymDto } from './dto';
+import { toPrismaLocale, withApiLocale } from '../common/utils/locale.util';
 
 const ACTIVE_HOME_GYMS_SELECT = {
   homeGyms: {
@@ -30,15 +32,17 @@ export class UsersService {
         targetProtein: true,
         targetFat: true,
         createdAt: true,
+        locale: true,
+        unitSystem: true,
         ...ACTIVE_HOME_GYMS_SELECT,
       },
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new AppNotFoundException('USER_NOT_FOUND');
     }
 
-    return user;
+    return withApiLocale(user);
   }
 
   async updateUser(userId: string, updateUserDto: UpdateUserDto): Promise<UserDto> {
@@ -50,13 +54,17 @@ export class UsersService {
         select: { id: true },
       });
       if (existing && existing.id !== userId) {
-        throw new ConflictException('Email is already in use');
+        throw new AppConflictException('EMAIL_ALREADY_IN_USE');
       }
     }
 
     if (updateUserDto.dateOfBirth) {
       data.dateOfBirth = new Date(updateUserDto.dateOfBirth);
     }
+
+    // The DTO's `locale` is the lowercase wire type ('de'/'en'); the naive spread above
+    // would otherwise send that straight to Prisma, which expects the uppercase enum.
+    data.locale = updateUserDto.locale ? toPrismaLocale(updateUserDto.locale) : undefined;
 
     const updatedUser = await this.prisma.user.update({
       where: { id: userId },
@@ -74,11 +82,13 @@ export class UsersService {
         targetProtein: true,
         targetFat: true,
         createdAt: true,
+        locale: true,
+        unitSystem: true,
         ...ACTIVE_HOME_GYMS_SELECT,
       },
     });
 
-    return updatedUser;
+    return withApiLocale(updatedUser);
   }
 
   // Home Gym CRUD methods
@@ -105,7 +115,7 @@ export class UsersService {
     const gym = await this.prisma.homeGym.findUnique({ where: { id: gymId } });
 
     if (!gym || gym.deletedAt || gym.userId !== userId) {
-      throw new NotFoundException('Home gym not found');
+      throw new AppNotFoundException('HOME_GYM_NOT_FOUND');
     }
 
     return this.prisma.homeGym.update({
@@ -124,7 +134,7 @@ export class UsersService {
     const gym = await this.prisma.homeGym.findUnique({ where: { id: gymId } });
 
     if (!gym || gym.deletedAt || gym.userId !== userId) {
-      throw new NotFoundException('Home gym not found');
+      throw new AppNotFoundException('HOME_GYM_NOT_FOUND');
     }
 
     const plannedInActiveCycle = await this.prisma.workoutDay.findFirst({
@@ -132,9 +142,7 @@ export class UsersService {
     });
 
     if (plannedInActiveCycle) {
-      throw new ConflictException(
-        'Cannot delete a home gym that is planned for an active cycle day. Update those cycle days first.',
-      );
+      throw new AppConflictException('HOME_GYM_IN_USE_BY_ACTIVE_CYCLE');
     }
 
     await this.prisma.homeGym.update({

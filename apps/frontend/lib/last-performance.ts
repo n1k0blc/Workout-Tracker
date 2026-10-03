@@ -111,36 +111,37 @@ const PREFILL_TOAST_DURATION_MS = 6000;
 const PREFILL_TOAST_DURATION_LONG_MS = 10000;
 
 /**
- * The one prefill toast (issue #112). It carries the whole story: the date and gym the values
- * came from, a note when the cascade degraded to another gym, and a hint when history had a
- * different number of sets than the plan. It runs longer for those last two cases, because the
- * set-count hint is the only actionable fact in it. `hadGymContext` is whether a gym was passed
- * to the lookup -- without one, landing on "any home gym" is not a degradation.
+ * What the one prefill toast (issue #112) has to say, as data rather than a sentence: the date
+ * and gym the values came from, how far the lookup degraded from the asked-for gym, and whether
+ * history had a different number of sets than the plan. `usePrefillToast` words it in the user's
+ * locale. It runs longer for the last two cases, because the set-count hint is the only
+ * actionable fact in it. `hadGymContext` is whether a gym was passed to the lookup -- without
+ * one, landing on "any home gym" is not a degradation.
  */
-export function buildPrefillToastMessage(
+export interface PrefillToast {
+  /** `YYYY-MM-DD` the values were performed on. */
+  performedOn: string;
+  gymName: string | null;
+  /** Set when the lookup fell back from the asked-for gym; null when it did not. */
+  degraded: 'HOME_GYM' | 'ANY_GYM' | null;
+  setCountMismatch: boolean;
+  durationMs: number;
+}
+
+export function buildPrefillToast(
   result: LastPerformance,
   setCountMismatch: boolean,
   hadGymContext: boolean,
-): { message: string; durationMs: number } {
-  const [y, m, d] = result.performedOn.split('-');
-  const date = `${d}.${m}.${y}`;
-  const gym = result.gymName ?? 'Anderes Gym';
-
-  let message = `Werte vom ${date} (${gym}) übernommen.`;
-  const degraded = hadGymContext && result.source !== 'CURRENT_GYM';
-  if (degraded) {
-    message +=
-      result.source === 'HOME_GYM'
-        ? ' Kein Eintrag für dieses Gym – anderes Gym verwendet.'
-        : ' Kein Gym-Eintrag – letztes Training verwendet.';
-  }
-  if (setCountMismatch) {
-    message += ' Andere Satzanzahl als geplant – Sätze ggf. anpassen.';
-  }
+): PrefillToast {
+  const degraded = hadGymContext && result.source !== 'CURRENT_GYM' ? result.source : null;
 
   return {
-    message,
-    durationMs: degraded || setCountMismatch ? PREFILL_TOAST_DURATION_LONG_MS : PREFILL_TOAST_DURATION_MS,
+    performedOn: result.performedOn,
+    gymName: result.gymName,
+    degraded,
+    setCountMismatch,
+    durationMs:
+      degraded || setCountMismatch ? PREFILL_TOAST_DURATION_LONG_MS : PREFILL_TOAST_DURATION_MS,
   };
 }
 
@@ -149,7 +150,7 @@ export interface PlanPrefillDecision {
   sets: PlannedSet[];
   /** The one prefill toast, or `null` when nothing was imported (a never-performed swap only
    *  blanks stale numbers; an add with no history does nothing at all). */
-  toast: { message: string; durationMs: number } | null;
+  toast: PrefillToast | null;
 }
 
 /**
@@ -182,7 +183,7 @@ export function resolvePlanPrefill(
   if (map && map.changed) {
     return {
       sets: map.sets,
-      toast: buildPrefillToastMessage(result!, map.setCountMismatch, hadGymContext),
+      toast: buildPrefillToast(result!, map.setCountMismatch, hadGymContext),
     };
   }
   if (isSwap) {

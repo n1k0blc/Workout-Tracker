@@ -58,6 +58,6 @@ export function formatDuration(seconds: number): string {
 /**
  * Format volume number with thousand separators
  */
-export function formatVolume(kg: number): string {
-  return new Intl.NumberFormat('de-DE').format(Math.round(kg));
+export function formatVolume(volume: number): string {
+  return new Intl.NumberFormat('de-DE').format(Math.round(volume));
 }

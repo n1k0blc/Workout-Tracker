@@ -1,7 +1,6 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import {
   kcalFromMacros,
-  macroConsistencyHint,
   dailyTargetMacroHint,
   targetProgressPercent,
   remainingToTarget,
@@ -27,7 +26,6 @@ import {
   formatMetricValue,
   nutritionDailyAverage,
   nutritionTargetReached,
-  nutritionRangeLabel,
 } from './nutrition';
 import type { NutritionTrendDay } from '@/types';
 
@@ -50,46 +48,25 @@ describe('kcalFromMacros', () => {
   });
 });
 
-describe('macroConsistencyHint', () => {
-  it('states the macro-derived kcal and that the entered value is kept as-is', () => {
-    expect(macroConsistencyHint(540, { carbs: 48, protein: 22, fat: 24 })).toBe(
-      'Makros ergeben 496 kcal. Differenz zu 540 kcal wird übernommen wie eingegeben.',
-    );
-  });
-
-  it('fires in both directions (macros above the entered kcal too)', () => {
-    expect(macroConsistencyHint(400, { carbs: 48, protein: 22, fat: 24 })).toBe(
-      'Makros ergeben 496 kcal. Differenz zu 400 kcal wird übernommen wie eingegeben.',
-    );
-  });
-
-  it('is silent when the macros already match the entered kcal', () => {
-    expect(macroConsistencyHint(90, { carbs: 0, protein: 0, fat: 10 })).toBeNull();
-  });
-
-  it('is silent when no usable kcal has been entered yet', () => {
-    expect(macroConsistencyHint(0, { carbs: 48, protein: 22, fat: 24 })).toBeNull();
-    expect(macroConsistencyHint(NaN, { carbs: 1, protein: 1, fat: 1 })).toBeNull();
-  });
-});
-
 describe('dailyTargetMacroHint', () => {
   it('states how far the macro energy sits under the kcal target', () => {
-    expect(dailyTargetMacroHint(2400, { carbs: 260, protein: 150, fat: 80 })).toBe(
-      '40 kcal unter dem Kalorienziel. Die Tagesansicht rechnet immer mit den erfassten Einträgen.',
-    );
+    expect(dailyTargetMacroHint(2400, { carbs: 260, protein: 150, fat: 80 })).toEqual({
+      kind: 'under',
+      kcal: 40,
+    });
   });
 
-  it('flips to "über" when the macros carry more energy than the target', () => {
-    expect(dailyTargetMacroHint(2000, { carbs: 260, protein: 150, fat: 80 })).toBe(
-      '360 kcal über dem Kalorienziel. Die Tagesansicht rechnet immer mit den erfassten Einträgen.',
-    );
+  it('flips to "over" when the macros carry more energy than the target', () => {
+    expect(dailyTargetMacroHint(2000, { carbs: 260, protein: 150, fat: 80 })).toEqual({
+      kind: 'over',
+      kcal: 360,
+    });
   });
 
   it('says so when they line up exactly', () => {
-    expect(dailyTargetMacroHint(2360, { carbs: 260, protein: 150, fat: 80 })).toBe(
-      'Makros und Kalorienziel stimmen überein. Die Tagesansicht rechnet immer mit den erfassten Einträgen.',
-    );
+    expect(dailyTargetMacroHint(2360, { carbs: 260, protein: 150, fat: 80 })).toEqual({
+      kind: 'match',
+    });
   });
 
   it('is null without a positive kcal target', () => {
@@ -237,20 +214,22 @@ describe('formatQuantityLabel', () => {
   });
 });
 
+const sourceLabels = { own: 'Eigenes', system: 'System', openFoodFacts: 'Open Food Facts' };
+
 describe('foodSourceLabel', () => {
   it('marks the current user\'s own food', () => {
-    expect(foodSourceLabel({ editable: true, source: 'USER' })).toBe('Eigenes');
+    expect(foodSourceLabel({ editable: true, source: 'USER' }, sourceLabels)).toBe('Eigenes');
   });
 
   it('marks seeded and imported foods', () => {
-    expect(foodSourceLabel({ editable: false, source: 'SEED' })).toBe('System');
-    expect(foodSourceLabel({ editable: false, source: 'OPEN_FOOD_FACTS' })).toBe(
+    expect(foodSourceLabel({ editable: false, source: 'SEED' }, sourceLabels)).toBe('System');
+    expect(foodSourceLabel({ editable: false, source: 'OPEN_FOOD_FACTS' }, sourceLabels)).toBe(
       'Open Food Facts',
     );
   });
 
   it('shows nothing for another user\'s food', () => {
-    expect(foodSourceLabel({ editable: false, source: 'USER' })).toBeNull();
+    expect(foodSourceLabel({ editable: false, source: 'USER' }, sourceLabels)).toBeNull();
   });
 });
 
@@ -491,16 +470,26 @@ describe('withFavoriteOverrides', () => {
   });
 });
 
+const dayLabels = { today: 'Heute', yesterday: 'Gestern', tomorrow: 'Morgen' };
+const formatWeekdayDe = (date: Date) =>
+  new Intl.DateTimeFormat('de-DE', { weekday: 'long', timeZone: 'Europe/Berlin' }).format(date);
+
 describe('relativeDayLabel', () => {
   it('names today, yesterday and tomorrow', () => {
-    expect(relativeDayLabel('2026-09-07', '2026-09-07')).toBe('Heute');
-    expect(relativeDayLabel('2026-09-06', '2026-09-07')).toBe('Gestern');
-    expect(relativeDayLabel('2026-09-08', '2026-09-07')).toBe('Morgen');
+    expect(relativeDayLabel('2026-09-07', '2026-09-07', dayLabels, formatWeekdayDe)).toBe('Heute');
+    expect(relativeDayLabel('2026-09-06', '2026-09-07', dayLabels, formatWeekdayDe)).toBe(
+      'Gestern',
+    );
+    expect(relativeDayLabel('2026-09-08', '2026-09-07', dayLabels, formatWeekdayDe)).toBe(
+      'Morgen',
+    );
   });
 
   it('falls back to the weekday name further out', () => {
     process.env.TZ = 'Europe/Berlin';
-    expect(relativeDayLabel('2026-09-04', '2026-09-07')).toBe('Freitag');
+    expect(relativeDayLabel('2026-09-04', '2026-09-07', dayLabels, formatWeekdayDe)).toBe(
+      'Freitag',
+    );
   });
 });
 
@@ -554,13 +543,6 @@ describe('Ernährungs-Analytics helpers (#153)', () => {
     it('returns null when the metric has no positive target', () => {
       expect(nutritionTargetReached(series, 'kcal', null)).toBeNull();
       expect(nutritionTargetReached(series, 'kcal', 0)).toBeNull();
-    });
-  });
-
-  describe('nutritionRangeLabel', () => {
-    it('phrases the range for the legend line', () => {
-      expect(nutritionRangeLabel(7)).toBe('letzte 7 Tage');
-      expect(nutritionRangeLabel(30)).toBe('letzte 30 Tage');
     });
   });
 });

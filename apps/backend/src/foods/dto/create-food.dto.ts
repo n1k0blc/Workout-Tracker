@@ -48,7 +48,7 @@ export class CreateFoodDto {
   // EAN-8, EAN-13, UPC-A, GTIN-14 -- 8 to 14 digits.
   @IsOptional()
   @IsString()
-  @Matches(/^\d{8,14}$/, { message: 'Barcode muss 8 bis 14 Ziffern haben' })
+  @Matches(/^\d{8,14}$/)
   barcode?: string;
 
   @IsOptional()

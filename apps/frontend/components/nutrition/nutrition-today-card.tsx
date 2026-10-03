@@ -1,4 +1,5 @@
-import Link from 'next/link';
+import { useTranslations, useLocale } from 'next-intl';
+import { Link } from '@/i18n/navigation';
 import { IconChevronRight } from '@tabler/icons-react';
 import { MacroTargets, MacroTotals } from '@/types';
 import {
@@ -22,25 +23,27 @@ export function NutritionTodayCard({
   totals: MacroTotals;
   targets: MacroTargets;
 }) {
+  const t = useTranslations('NutritionTodayCard');
+  const locale = useLocale();
   const remaining = remainingToTarget(totals.kcal, targets.kcal);
 
   return (
     <Card>
       <CardContent className="p-6">
         <div className="flex items-start justify-between gap-3">
-          <div className="text-sm font-medium text-muted-foreground">Ernährung heute</div>
+          <div className="text-sm font-medium text-muted-foreground">{t('nutritionToday')}</div>
           <Link
             href="/nutrition"
             className="flex items-center gap-1 text-xs font-semibold uppercase tracking-[0.12em] text-foreground hover:underline"
           >
-            Details
+            {t('details')}
             <IconChevronRight className="size-3" />
           </Link>
         </div>
         <div className="mt-1.5 flex items-baseline gap-2">
-          <span className="text-3xl font-bold leading-none">{formatKcal(totals.kcal)}</span>
+          <span className="text-3xl font-bold leading-none">{formatKcal(totals.kcal, locale)}</span>
           <span className="text-sm text-muted-foreground">
-            {targets.kcal !== null ? `/ ${formatKcal(targets.kcal)} kcal` : 'kcal'}
+            {targets.kcal !== null ? `/ ${formatKcal(targets.kcal, locale)} kcal` : 'kcal'}
           </span>
         </div>
         <MacroProgressBar
@@ -51,7 +54,7 @@ export function NutritionTodayCard({
           <div className="text-xs text-muted-foreground">{formatMacroLineLong(totals)}</div>
           {remaining !== null && (
             <div className="shrink-0 text-xs font-semibold">
-              {formatKcal(remaining)} übrig
+              {t('remaining', { amount: formatKcal(remaining, locale) })}
             </div>
           )}
         </div>

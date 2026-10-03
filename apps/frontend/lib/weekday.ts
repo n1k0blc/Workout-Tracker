@@ -1,13 +1,12 @@
-/** `weekday` is 0 = Sunday .. 6 = Saturday, matching `Date.getDay()`. Mirrors the backend's `WEEKDAY_NAMES`. */
-export const WEEKDAY_NAMES = [
-  'Sonntag',
-  'Montag',
-  'Dienstag',
-  'Mittwoch',
-  'Donnerstag',
-  'Freitag',
-  'Samstag',
-];
+/**
+ * A UTC reference date that falls on the given weekday (0 = Sunday .. 6 = Saturday, matching
+ * `Date.getDay()`) -- 2023-01-01 was a Sunday. Feed it to `Intl.DateTimeFormat`/next-intl's
+ * `format.dateTime` with `{ weekday: 'long' | 'short', timeZone: 'UTC' }` to get a
+ * locale-correct weekday name for a bare weekday number. UTC avoids DST edge cases.
+ */
+export function weekdayReferenceDate(weekday: number): Date {
+  return new Date(Date.UTC(2023, 0, 1 + weekday));
+}
 
 /**
  * A cycle's own week starts on its `startDate`'s weekday, not on Monday -- days sort by

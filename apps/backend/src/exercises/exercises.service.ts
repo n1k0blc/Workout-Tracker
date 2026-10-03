@@ -1,9 +1,9 @@
+import { Injectable } from '@nestjs/common';
 import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-  BadRequestException,
-} from '@nestjs/common';
+  AppNotFoundException,
+  AppConflictException,
+  AppBadRequestException,
+} from '../common/errors/app-exceptions';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateExerciseDto, FilterExerciseDto, ExerciseDto, UpdateExerciseDto } from './dto';
 import {
@@ -13,10 +13,16 @@ import {
   MUSCLE_PERCENT_FIELD,
 } from '../common/muscle.util';
 import type { ExerciseShape } from '../workout-tree/workout-tree.service';
+import { ApiLocale, DEFAULT_LOCALE } from '../common/utils/locale.util';
+import {
+  EXERCISE_TRANSLATIONS_SELECT,
+  resolveExerciseName,
+} from '../common/utils/exercise-name.util';
 
 const EXERCISE_SELECT = {
   id: true,
   name: true,
+  translations: EXERCISE_TRANSLATIONS_SELECT,
   equipment: true,
   isUnilateral: true,
   isDoubleWeight: true,
@@ -40,6 +46,7 @@ const EXERCISE_SELECT = {
 type ExerciseRow = {
   id: string;
   name: string;
+  translations: { locale: 'DE' | 'EN'; name: string }[];
   equipment: string;
   isUnilateral: boolean;
   isDoubleWeight: boolean;
@@ -48,10 +55,11 @@ type ExerciseRow = {
   deletedAt: Date | null;
 } & MusclePercentages;
 
-function toDto(exercise: ExerciseRow, inUse: boolean): ExerciseDto {
-  const { deletedAt: _deletedAt, ...rest } = exercise;
+function toDto(exercise: ExerciseRow, inUse: boolean, locale: ApiLocale): ExerciseDto {
+  const { deletedAt: _deletedAt, translations: _translations, ...rest } = exercise;
   return {
     ...rest,
+    name: resolveExerciseName(exercise, locale),
     userId: rest.userId ?? undefined,
     primaryMuscle: derivePrimaryMuscle(exercise),
     inUse,
@@ -88,7 +96,7 @@ export class ExercisesService {
     const accessibleIds = new Set(accessible.map((e) => e.id));
 
     if (uniqueIds.some((id) => !accessibleIds.has(id))) {
-      throw new NotFoundException('One or more exercises not found');
+      throw new AppNotFoundException('EXERCISES_NOT_FOUND');
     }
 
     return new Map(accessible.map((e) => [e.id, { isUnilateral: e.isUnilateral, name: e.name }]));
@@ -142,9 +150,7 @@ export class ExercisesService {
 
     if (sum === 0) {
       if (!dto.primaryMuscle) {
-        throw new BadRequestException(
-          'Provide either muscle percentages summing to 100%, or a primaryMuscle',
-        );
+        throw new AppBadRequestException('EXERCISE_MUSCLE_PERCENTAGES_REQUIRED');
       }
       const field = MUSCLE_PERCENT_FIELD[dto.primaryMuscle] as keyof MusclePercentages;
       percentages[field] = 100;
@@ -152,15 +158,17 @@ export class ExercisesService {
     }
 
     if (sum !== 100) {
-      throw new BadRequestException(
-        `Muscle group percentages must sum to 100%. Current sum: ${sum}%`,
-      );
+      throw new AppBadRequestException('EXERCISE_MUSCLE_PERCENTAGES_INVALID_SUM', { sum });
     }
 
     return percentages;
   }
 
-  async findAll(filterDto: FilterExerciseDto, userId?: string): Promise<ExerciseDto[]> {
+  async findAll(
+    filterDto: FilterExerciseDto,
+    userId?: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<ExerciseDto[]> {
     const { search, primaryMuscle, equipment, includeCustom } = filterDto;
 
     const where: any = {
@@ -177,40 +185,45 @@ export class ExercisesService {
       where.equipment = equipment as any;
     }
 
-    if (search) {
-      where.name = {
-        contains: search,
-        mode: 'insensitive',
-      };
-    }
-
     const exercises = await this.prisma.exercise.findMany({
       where,
       select: EXERCISE_SELECT,
-      orderBy: [{ isCustom: 'asc' }, { name: 'asc' }],
     });
 
+    // Search and order act on the *resolved* name, so they run here rather than in SQL --
+    // the catalogue is ~115 rows plus one user's customs. ADR-0006 names this as the exit
+    // condition: revisit the read path if volumes ever outgrow it.
     const inUseIds = await this.findInUseIds(exercises.map((e) => e.id));
-    const dtos = exercises.map((e) => toDto(e as ExerciseRow, inUseIds.has(e.id)));
+    const needle = search?.toLowerCase();
+    const dtos = exercises
+      .map((e) => toDto(e as ExerciseRow, inUseIds.has(e.id), locale))
+      .filter((e) => !needle || e.name.toLowerCase().includes(needle))
+      .sort(
+        (a, b) => Number(a.isCustom) - Number(b.isCustom) || a.name.localeCompare(b.name, locale),
+      );
     return primaryMuscle ? dtos.filter((e) => e.primaryMuscle === primaryMuscle) : dtos;
   }
 
-  async findById(id: string, userId?: string): Promise<ExerciseDto> {
+  async findById(
+    id: string,
+    userId?: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<ExerciseDto> {
     const exercise = await this.prisma.exercise.findUnique({
       where: { id },
       select: EXERCISE_SELECT,
     });
 
     if (!exercise || exercise.deletedAt) {
-      throw new NotFoundException('Exercise not found');
+      throw new AppNotFoundException('EXERCISE_NOT_FOUND');
     }
 
     // Check if user has access to this exercise
     if (exercise.isCustom && exercise.userId !== userId) {
-      throw new NotFoundException('Exercise not found');
+      throw new AppNotFoundException('EXERCISE_NOT_FOUND');
     }
 
-    return toDto(exercise as ExerciseRow, await this.isInUse(id));
+    return toDto(exercise as ExerciseRow, await this.isInUse(id), locale);
   }
 
   async create(createExerciseDto: CreateExerciseDto, userId: string): Promise<ExerciseDto> {
@@ -230,7 +243,7 @@ export class ExercisesService {
     });
 
     if (existingExercise) {
-      throw new ConflictException('You already have a custom exercise with this name');
+      throw new AppConflictException('EXERCISE_NAME_TAKEN');
     }
 
     const percentages = this.validateAndNormalizeMusclePercentages(createExerciseDto);
@@ -248,7 +261,7 @@ export class ExercisesService {
       select: EXERCISE_SELECT,
     });
 
-    return toDto(exercise as ExerciseRow, false);
+    return toDto(exercise as ExerciseRow, false, DEFAULT_LOCALE);
   }
 
   async delete(id: string, userId: string): Promise<void> {
@@ -257,17 +270,17 @@ export class ExercisesService {
     });
 
     if (!exercise || exercise.deletedAt) {
-      throw new NotFoundException('Exercise not found');
+      throw new AppNotFoundException('EXERCISE_NOT_FOUND');
     }
 
     // A custom exercise owned by someone else: 404, not 409 -- don't leak that it exists.
     if (exercise.isCustom && exercise.userId !== userId) {
-      throw new NotFoundException('Exercise not found');
+      throw new AppNotFoundException('EXERCISE_NOT_FOUND');
     }
 
     // System exercises are public, read-only data -- this isn't an ownership leak.
     if (!exercise.isCustom) {
-      throw new ConflictException('System exercises cannot be deleted');
+      throw new AppConflictException('SYSTEM_EXERCISE_NOT_DELETABLE');
     }
 
     await this.prisma.exercise.update({
@@ -282,15 +295,15 @@ export class ExercisesService {
     });
 
     if (!exercise || exercise.deletedAt) {
-      throw new NotFoundException('Exercise not found');
+      throw new AppNotFoundException('EXERCISE_NOT_FOUND');
     }
 
     if (exercise.isCustom && exercise.userId !== userId) {
-      throw new NotFoundException('Exercise not found');
+      throw new AppNotFoundException('EXERCISE_NOT_FOUND');
     }
 
     if (!exercise.isCustom) {
-      throw new ConflictException('System exercises cannot be modified');
+      throw new AppConflictException('SYSTEM_EXERCISE_NOT_EDITABLE');
     }
 
     const inUse = await this.isInUse(id);
@@ -300,9 +313,7 @@ export class ExercisesService {
       updateDto.isUnilateral !== exercise.isUnilateral &&
       inUse
     ) {
-      throw new ConflictException(
-        'Diese Übung wird bereits in Sätzen verwendet – unilateral lässt sich nicht mehr ändern. Lege dafür eine neue Übung an.',
-      );
+      throw new AppConflictException('EXERCISE_UNILATERAL_CHANGE_BLOCKED');
     }
 
     const percentages = this.validateAndNormalizeMusclePercentages(updateDto);
@@ -319,6 +330,6 @@ export class ExercisesService {
       select: EXERCISE_SELECT,
     });
 
-    return toDto(updated as ExerciseRow, inUse);
+    return toDto(updated as ExerciseRow, inUse, DEFAULT_LOCALE);
   }
 }

@@ -1,9 +1,9 @@
+import { Injectable } from '@nestjs/common';
 import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  ConflictException,
-} from '@nestjs/common';
+  AppNotFoundException,
+  AppBadRequestException,
+  AppConflictException,
+} from '../common/errors/app-exceptions';
 import { PrismaService } from '../prisma/prisma.service';
 import { MealSlotDto, MealSlotListDto } from './dto';
 
@@ -14,20 +14,28 @@ import { MealSlotDto, MealSlotListDto } from './dto';
  * `AuthService.register` for new users, and the backfill in migration
  * `20260908071941_add_nutrition_meal_slots_and_diary_entries` for existing ones -- so the
  * "1-based, contiguous `order`" invariant cannot drift between the two.
+ *
+ * `seedKey` is the key the client's message catalogue (`SlotNames.<seedKey>`) renders the
+ * name by, in the active locale, for as long as the user has not renamed the Abschnitt (#189,
+ * ADR-0008). `name` stays the German source, like `Food.name`, and is what a renamed slot keeps.
  */
-export const DEFAULT_MEAL_SLOT_NAMES = [
-  'Frühstück',
-  'Mittagessen',
-  'Abendessen',
-  'Snacks',
+export const DEFAULT_MEAL_SLOTS = [
+  { seedKey: 'breakfast', name: 'Frühstück' },
+  { seedKey: 'lunch', name: 'Mittagessen' },
+  { seedKey: 'dinner', name: 'Abendessen' },
+  { seedKey: 'snacks', name: 'Snacks' },
 ] as const;
 
 /**
- * `{ name, order }` rows for the default Abschnitte. `order` is the array position + 1 --
- * 1-based and contiguous, the same invariant `WorkoutDay.order` carries.
+ * `{ name, seedKey, order }` rows for the default Abschnitte. `order` is the array position + 1
+ * -- 1-based and contiguous, the same invariant `WorkoutDay.order` carries.
  */
-export function defaultMealSlotCreateData(): { name: string; order: number }[] {
-  return DEFAULT_MEAL_SLOT_NAMES.map((name, index) => ({ name, order: index + 1 }));
+export function defaultMealSlotCreateData(): { name: string; seedKey: string; order: number }[] {
+  return DEFAULT_MEAL_SLOTS.map(({ name, seedKey }, index) => ({
+    name,
+    seedKey,
+    order: index + 1,
+  }));
 }
 
 /**
@@ -40,18 +48,33 @@ export function assertContiguousOrder(items: { order: number }[]): void {
   items.forEach((item, index) => {
     const expected = index + 1;
     if (item.order !== expected) {
-      throw new BadRequestException(
-        `Abschnitt-Reihenfolge muss 1-basiert, lückenlos und in Sende-Reihenfolge sein ` +
-          `(Position ${index} erwartet ${expected}, erhielt ${item.order})`,
-      );
+      throw new AppBadRequestException('MEAL_SLOT_ORDER_INVALID', {
+        position: index,
+        expected,
+        received: item.order,
+      });
     }
   });
 }
 
-type MealSlotRow = { id: string; name: string; order: number; archivedAt: Date | null };
+type MealSlotRow = {
+  id: string;
+  name: string;
+  seedKey: string | null;
+  order: number;
+  archivedAt: Date | null;
+};
+
+const SLOT_SELECT = { id: true, name: true, seedKey: true, order: true, archivedAt: true } as const;
 
 function toDto(row: MealSlotRow): MealSlotDto {
-  return { id: row.id, name: row.name, order: row.order, archived: row.archivedAt !== null };
+  return {
+    id: row.id,
+    name: row.name,
+    seedKey: row.seedKey,
+    order: row.order,
+    archived: row.archivedAt !== null,
+  };
 }
 
 @Injectable()
@@ -78,7 +101,7 @@ export class MealSlotsService {
     const rows = (await this.prisma.mealSlot.findMany({
       where: { userId },
       orderBy: { order: 'asc' },
-      select: { id: true, name: true, order: true, archivedAt: true },
+      select: SLOT_SELECT,
     })) as MealSlotRow[];
     return {
       active: rows.filter((r) => !r.archivedAt).map(toDto),
@@ -95,11 +118,11 @@ export class MealSlotsService {
 
     const created = (await this.prisma.mealSlot.create({
       data: { userId, name, order: parkedOrder },
-      select: { id: true, name: true, order: true, archivedAt: true },
+      select: SLOT_SELECT,
     })) as MealSlotRow;
 
     await this.renumber(userId, [...activeIds, created.id], archivedIds);
-    return { id: created.id, name: created.name, order: activeIds.length + 1, archived: false };
+    return { ...toDto(created), order: activeIds.length + 1 };
   }
 
   /**
@@ -110,7 +133,7 @@ export class MealSlotsService {
   async ensureActiveSlot(userId: string, name: string): Promise<MealSlotDto> {
     const existing = (await this.prisma.mealSlot.findFirst({
       where: { userId, name, archivedAt: null },
-      select: { id: true, name: true, order: true, archivedAt: true },
+      select: SLOT_SELECT,
     })) as MealSlotRow | null;
     if (existing) {
       return toDto(existing);
@@ -122,8 +145,10 @@ export class MealSlotsService {
     await this.findOwned(userId, id);
     const updated = (await this.prisma.mealSlot.update({
       where: { id },
-      data: { name },
-      select: { id: true, name: true, order: true, archivedAt: true },
+      // A typed name is the user's from now on: dropping seedKey stops the catalogue from
+      // overriding it when the locale changes (#189).
+      data: { name, seedKey: null },
+      select: SLOT_SELECT,
     })) as MealSlotRow;
     return toDto(updated);
   }
@@ -145,7 +170,7 @@ export class MealSlotsService {
         where: { userId, archivedAt: null },
       });
       if (activeCount <= 1) {
-        throw new ConflictException('Mindestens ein Abschnitt muss aktiv bleiben');
+        throw new AppConflictException('MEAL_SLOT_LAST_ACTIVE');
       }
     }
 
@@ -184,7 +209,7 @@ export class MealSlotsService {
       new Set(activeIds).size === activeIds.length &&
       activeIds.every((id) => currentSet.has(id));
     if (!sameSet) {
-      throw new BadRequestException('slots muss genau die aktuell aktiven Abschnitte enthalten');
+      throw new AppBadRequestException('MEAL_SLOT_REORDER_SET_MISMATCH');
     }
 
     const archivedIds = (
@@ -203,17 +228,17 @@ export class MealSlotsService {
     return (await this.prisma.mealSlot.findMany({
       where: { userId },
       orderBy: { order: 'asc' },
-      select: { id: true, name: true, order: true, archivedAt: true },
+      select: SLOT_SELECT,
     })) as MealSlotRow[];
   }
 
   private async findOwned(userId: string, id: string): Promise<MealSlotRow> {
     const slot = (await this.prisma.mealSlot.findFirst({
       where: { id, userId },
-      select: { id: true, name: true, order: true, archivedAt: true },
+      select: SLOT_SELECT,
     })) as MealSlotRow | null;
     if (!slot) {
-      throw new NotFoundException('Abschnitt nicht gefunden');
+      throw new AppNotFoundException('MEAL_SLOT_NOT_FOUND');
     }
     return slot;
   }

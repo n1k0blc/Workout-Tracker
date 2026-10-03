@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useFormatter } from 'next-intl';
 import { Badge } from '@/components/ui/badge';
 import { IconTrendingUp, IconTrendingDown } from '@tabler/icons-react';
 
@@ -10,9 +11,13 @@ interface TrendIndicatorProps {
 }
 
 export default function TrendIndicator({ change, className = '' }: TrendIndicatorProps) {
+  const format = useFormatter();
   const isPositive = change > 0;
   const isNeutral = change === 0;
-  const formattedChange = Math.abs(change).toFixed(1);
+  const formattedChange = format.number(Math.abs(change), {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
 
   if (isNeutral) {
     return (

@@ -10,8 +10,8 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  BadRequestException,
 } from '@nestjs/common';
+import { AppBadRequestException } from '../common/errors/app-exceptions';
 import { WorkoutsService } from './workouts.service';
 import {
   WorkoutEngineService,
@@ -29,6 +29,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ClientToday } from '../common/decorators/client-today.decorator';
 import { Today } from '../common/utils/today.util';
+import { ClientLocale } from '../common/decorators/client-locale.decorator';
+import { ApiLocale } from '../common/utils/locale.util';
 
 // Logging is now fully client-side (§3.3): the per-set lifecycle endpoints
 // (start/logSet/updateSet/deleteSet/addExercise/removeExercise/reorder/replaceExercise/
@@ -46,8 +48,9 @@ export class WorkoutsController {
   async getSuggestedWorkout(
     @CurrentUser() user: { id: string },
     @ClientToday() today: Today,
+    @ClientLocale() locale: ApiLocale,
   ): Promise<SuggestedWorkout | null> {
-    return this.workoutEngineService.getSuggestedWorkout(user.id, today);
+    return this.workoutEngineService.getSuggestedWorkout(user.id, today, locale);
   }
 
   @Get('cycle/workouts')
@@ -66,7 +69,7 @@ export class WorkoutsController {
     @Query('excludeWorkoutId') excludeWorkoutId?: string,
   ): Promise<LastPerformanceDto | null> {
     if (!exerciseId) {
-      throw new BadRequestException('exerciseId is required');
+      throw new AppBadRequestException('EXERCISE_ID_REQUIRED');
     }
     return this.workoutsService.findExerciseLastPerformance(
       user.id,
@@ -92,16 +95,18 @@ export class WorkoutsController {
   async findOne(
     @Param('id') id: string,
     @CurrentUser() user: { id: string },
+    @ClientLocale() locale: ApiLocale,
   ): Promise<WorkoutResponseDto> {
-    return this.workoutsService.findById(id, user.id);
+    return this.workoutsService.findById(id, user.id, locale);
   }
 
   @Post()
   async create(
     @Body() createDto: CreateWorkoutDto,
     @CurrentUser() user: { id: string },
+    @ClientLocale() locale: ApiLocale,
   ): Promise<WorkoutResponseDto> {
-    return this.workoutsService.create(createDto, user.id);
+    return this.workoutsService.create(createDto, user.id, locale);
   }
 
   @Patch(':id')
@@ -109,8 +114,9 @@ export class WorkoutsController {
     @Param('id') id: string,
     @Body() updateDto: UpdateWorkoutDto,
     @CurrentUser() user: { id: string },
+    @ClientLocale() locale: ApiLocale,
   ): Promise<WorkoutResponseDto> {
-    return this.workoutsService.update(id, updateDto, user.id);
+    return this.workoutsService.update(id, updateDto, user.id, locale);
   }
 
   @Delete(':id')

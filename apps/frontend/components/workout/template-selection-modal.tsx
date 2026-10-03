@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { apiClient } from '@/lib/api';
 import { WorkoutTemplate } from '@/types';
 import {
@@ -25,6 +26,7 @@ export default function TemplateSelectionModal({
   onClose,
   onProceedToDetails,
 }: TemplateSelectionModalProps) {
+  const t = useTranslations('WorkoutStart');
   const [templates, setTemplates] = useState<WorkoutTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'system' | 'custom'>('all');
@@ -61,7 +63,7 @@ export default function TemplateSelectionModal({
       <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-0">
         {/* Header */}
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
-          <DialogTitle>Workout-Vorlage wählen</DialogTitle>
+          <DialogTitle>{t('templateModal.title')}</DialogTitle>
         </DialogHeader>
 
         {/* Filter Tabs */}
@@ -74,7 +76,7 @@ export default function TemplateSelectionModal({
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
-            Alle ({templates.length})
+            {t('templateModal.filterAll', { count: templates.length })}
           </button>
           <button
             onClick={() => setFilter('system')}
@@ -84,7 +86,7 @@ export default function TemplateSelectionModal({
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
-            System ({systemTemplates.length})
+            {t('templateModal.filterSystem', { count: systemTemplates.length })}
           </button>
           <button
             onClick={() => setFilter('custom')}
@@ -94,7 +96,7 @@ export default function TemplateSelectionModal({
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
-            Benutzerdefiniert ({customTemplates.length})
+            {t('templateModal.filterCustom', { count: customTemplates.length })}
           </button>
         </div>
 
@@ -102,7 +104,7 @@ export default function TemplateSelectionModal({
         <div className="flex-1 overflow-y-auto p-6">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="text-muted-foreground">Lädt Vorlagen...</div>
+              <div className="text-muted-foreground">{t('templateModal.loading')}</div>
             </div>
           ) : filteredTemplates.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -129,26 +131,22 @@ export default function TemplateSelectionModal({
                       </h4>
                       {!template.isCustom && (
                         <Badge variant="secondary" className="text-xs shrink-0">
-                          System
+                          {t('templateModal.systemBadge')}
                         </Badge>
                       )}
                     </div>
                     <div className="space-y-1 text-sm text-muted-foreground">
                       <div className="flex items-center gap-2">
                         <IconDumbbell className="size-4" />
-                        <span>
-                          {template.totalExercises} {template.totalExercises === 1 ? 'Übung' : 'Übungen'}
-                        </span>
+                        <span>{t('templateModal.exerciseCount', { count: template.totalExercises ?? 0 })}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <IconClock className="size-4" />
-                        <span>
-                          {template.totalSets} {template.totalSets === 1 ? 'Satz' : 'Sätze'}
-                        </span>
+                        <span>{t('templateModal.setCount', { count: template.totalSets ?? 0 })}</span>
                       </div>
                       {template.recommendedGymName && (
                         <div className="text-xs text-muted-foreground mt-2">
-                          Empfohlenes Gym: {template.recommendedGymName}
+                          {t('templateModal.recommendedGym', { name: template.recommendedGymName })}
                         </div>
                       )}
                     </div>
@@ -158,7 +156,7 @@ export default function TemplateSelectionModal({
             </div>
           ) : (
             <div className="text-center py-12 text-muted-foreground">
-              Keine Vorlagen gefunden
+              {t('templateModal.empty')}
             </div>
           )}
         </div>
@@ -168,7 +166,7 @@ export default function TemplateSelectionModal({
           {onProceedToDetails ? (
             <div className="flex gap-3">
               <Button variant="outline" onClick={onClose} className="flex-1">
-                Zurück
+                {t('common.back')}
               </Button>
               <Button
                 onClick={() => {
@@ -182,12 +180,12 @@ export default function TemplateSelectionModal({
                 disabled={!selectedTemplateId}
                 className="flex-1"
               >
-                Weiter zu Workout Details
+                {t('templateModal.next')}
               </Button>
             </div>
           ) : (
             <Button variant="outline" onClick={onClose} className="w-full">
-              Abbrechen
+              {t('common.cancel')}
             </Button>
           )}
         </div>

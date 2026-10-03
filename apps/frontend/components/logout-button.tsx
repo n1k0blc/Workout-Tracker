@@ -1,7 +1,8 @@
 'use client';
 
 import { type ComponentProps, useCallback, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+import { useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useWorkout } from '@/lib/workout-context';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,7 @@ type LogoutButtonProps = Omit<ComponentProps<typeof Button>, 'onClick'> & {
  * only interrupts the session; it resumes on the next sign-in with that account.
  */
 export function LogoutButton({ children, onRequestConfirm, ...props }: LogoutButtonProps) {
+  const t = useTranslations('LogoutButton');
   const router = useRouter();
   const { logout } = useAuth();
   const { activeWorkout, isPastWorkout } = useWorkout();
@@ -61,17 +63,15 @@ export function LogoutButton({ children, onRequestConfirm, ...props }: LogoutBut
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Laufendes Workout</AlertDialogTitle>
+            <AlertDialogTitle>{t('title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Du hast ein laufendes Workout mit noch nicht gespeicherten Sätzen.
-              Meldest du dich ab, wird die Sitzung unterbrochen — fortsetzen kannst du
-              sie nur auf diesem Gerät mit demselben Konto.
+              {t('description')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Abbrechen</AlertDialogCancel>
+            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
             <AlertDialogAction variant="destructive" onClick={() => void runLogout()}>
-              Abmelden
+              {t('confirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

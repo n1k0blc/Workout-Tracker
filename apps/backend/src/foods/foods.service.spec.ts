@@ -165,6 +165,7 @@ describe('FoodsService.findAll — visibility', () => {
           OR: [
             { name: { contains: 'hafer', mode: 'insensitive' } },
             { brand: { contains: 'hafer', mode: 'insensitive' } },
+            { translations: { some: { name: { contains: 'hafer', mode: 'insensitive' } } } },
           ],
         }),
       }),
@@ -225,6 +226,7 @@ describe('FoodsService.findAll - search matches brand too', () => {
           OR: [
             { name: { contains: 'Oatly', mode: 'insensitive' } },
             { brand: { contains: 'Oatly', mode: 'insensitive' } },
+            { translations: { some: { name: { contains: 'Oatly', mode: 'insensitive' } } } },
           ],
         }),
       }),
@@ -258,17 +260,126 @@ describe('FoodsService.findAll — search ranking (#155)', () => {
     expect(result.items).toHaveLength(5);
   });
 
-  it('asks the database for name order within every source group', async () => {
+  it('asks the database for capped name order in the own and rest groups', async () => {
     const { service, prisma } = makeService({ findMany: [] });
 
     await service.findAll('user-1', 'milch');
 
     expect(prisma.food.findMany).toHaveBeenCalledTimes(3);
-    for (const call of prisma.food.findMany.mock.calls) {
-      const args = call[0] as { orderBy?: unknown; take?: unknown };
+    const capped = prisma.food.findMany.mock.calls
+      .map((c) => c[0] as { where: Record<string, unknown>; orderBy?: unknown; take?: unknown })
+      .filter((args) => args.where.source !== 'SEED');
+    expect(capped).toHaveLength(2);
+    for (const args of capped) {
       expect(args.orderBy).toEqual({ name: 'asc' });
       expect(args.take).toBe(200);
     }
+  });
+});
+
+const seedFood = (id: string, de: string, en: string, portion?: [string, string]) => ({
+  ...SEED_FOOD,
+  id,
+  name: de,
+  translations: [
+    { locale: 'DE' as const, name: de },
+    { locale: 'EN' as const, name: en },
+  ],
+  portions: portion
+    ? [
+        {
+          id: `${id}-p`,
+          label: portion[0],
+          grams: 100,
+          order: 1,
+          isDefault: true,
+          translations: [
+            { locale: 'DE' as const, label: portion[0] },
+            { locale: 'EN' as const, label: portion[1] },
+          ],
+        },
+      ]
+    : [],
+});
+
+describe('FoodsService — translated SEED foods (#188, ADR-0007)', () => {
+  it('shows SEED names and portion labels in the requested locale', async () => {
+    const { service } = makeService({
+      findMany: [seedFood('s-banane', 'Banane', 'Banana', ['1 Stück', '1 piece'])],
+    });
+
+    const [food] = (await service.findAll('user-1', undefined, 'en')).items;
+
+    expect(food.name).toBe('Banana');
+    expect(food.portions[0].label).toBe('1 piece');
+  });
+
+  it('leaves OPEN_FOOD_FACTS and USER foods verbatim even if stray rows exist', async () => {
+    const stray = [{ locale: 'EN' as const, name: 'Stray' }];
+    const { service } = makeService({
+      findMany: [
+        { ...OWN_FOOD, translations: stray },
+        { ...OFF_FOOD, translations: stray },
+      ],
+    });
+
+    const names = (await service.findAll('user-1', undefined, 'en')).items.map((f) => f.name);
+
+    expect(names).toEqual(['Haferflocken', 'Haferdrink']);
+  });
+
+  it('orders the SEED group by the translated name, after own foods and before the rest', async () => {
+    const { service } = makeService({
+      findMany: [
+        { ...OFF_FOOD, id: 'off', name: 'Apfeltasche' },
+        seedFood('s-zitrone', 'Zitrone', 'Apricot'),
+        seedFood('s-apfel', 'Apfel', 'Zucchini'),
+        { ...OWN_FOOD, id: 'own', name: 'Zimt' },
+      ],
+    });
+
+    const result = await service.findAll('user-1', undefined, 'en');
+
+    // 'Apricot' < 'Zucchini' in English although 'Apfel' < 'Zitrone' in German.
+    expect(result.items.map((f) => f.id)).toEqual(['own', 's-zitrone', 's-apfel', 'off']);
+  });
+
+  it('matches a search against translated names, so an English query finds the staple', async () => {
+    const { service, prisma } = makeService({ findMany: [] });
+
+    await service.findAll('user-1', 'apple', 'en');
+
+    const where = prisma.food.findMany.mock.calls[0][0].where as { OR: unknown[] };
+    expect(where.OR).toContainEqual({
+      translations: { some: { name: { contains: 'apple', mode: 'insensitive' } } },
+    });
+  });
+
+  it('resolves a SEED food by id and through listByIds in the requested locale', async () => {
+    const banana = seedFood('s-banane', 'Banane', 'Banana');
+    const { service, prisma } = makeService({ findUnique: banana, findMany: [banana] });
+
+    expect((await service.findById('s-banane', 'user-1', 'en')).name).toBe('Banana');
+    expect((await service.findById('s-banane', 'user-1')).name).toBe('Banane');
+    expect((await service.listByIds('user-1', ['s-banane'], 'en'))[0].name).toBe('Banana');
+    expect(prisma.food.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({ translations: expect.anything() }),
+      }),
+    );
+  });
+
+  it('keeps barcode lookup global: no market filter, name still translated', async () => {
+    const banana = { ...seedFood('s-banane', 'Banane', 'Banana'), barcode: '4006381333931' };
+    const { service, prisma } = makeService({ findFirst: banana });
+
+    const result = await service.lookupByBarcode('user-1', '4006381333931', 'en');
+
+    expect(prisma.food.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { barcode: '4006381333931' } }),
+    );
+    expect(result.status).toBe('local');
+    expect(result.food?.name).toBe('Banana');
   });
 });
 
@@ -286,7 +397,9 @@ describe('FoodsService.findById — resolves soft-deleted', () => {
 
   it('404s when the id is unknown', async () => {
     const { service } = makeService({ findUnique: null });
-    await expect(service.findById('nope', 'user-1')).rejects.toBeInstanceOf(NotFoundException);
+    const result = service.findById('nope', 'user-1');
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'FOOD_NOT_FOUND' });
   });
 });
 
@@ -315,9 +428,9 @@ describe('FoodsService.create', () => {
       },
     });
 
-    await expect(
-      service.create('user-1', baseCreateDto({ barcode: '4008713700086' })),
-    ).rejects.toBeInstanceOf(ConflictException);
+    const result = service.create('user-1', baseCreateDto({ barcode: '4008713700086' }));
+    await expect(result).rejects.toBeInstanceOf(ConflictException);
+    await expect(result).rejects.toMatchObject({ code: 'FOOD_BARCODE_TAKEN' });
   });
 
   it('writes portions with order from array position and requires exactly one default', async () => {
@@ -350,29 +463,29 @@ describe('FoodsService.create', () => {
   it('rejects a portion list with no default or with more than one default', async () => {
     const { service } = makeService();
 
-    await expect(
-      service.create(
-        'user-1',
-        baseCreateDto({
-          portions: [
-            { label: 'a', grams: 1 },
-            { label: 'b', grams: 2 },
-          ],
-        }),
-      ),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    const noDefault = service.create(
+      'user-1',
+      baseCreateDto({
+        portions: [
+          { label: 'a', grams: 1 },
+          { label: 'b', grams: 2 },
+        ],
+      }),
+    );
+    await expect(noDefault).rejects.toBeInstanceOf(BadRequestException);
+    await expect(noDefault).rejects.toMatchObject({ code: 'FOOD_PORTION_DEFAULT_COUNT_INVALID' });
 
-    await expect(
-      service.create(
-        'user-1',
-        baseCreateDto({
-          portions: [
-            { label: 'a', grams: 1, isDefault: true },
-            { label: 'b', grams: 2, isDefault: true },
-          ],
-        }),
-      ),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    const twoDefaults = service.create(
+      'user-1',
+      baseCreateDto({
+        portions: [
+          { label: 'a', grams: 1, isDefault: true },
+          { label: 'b', grams: 2, isDefault: true },
+        ],
+      }),
+    );
+    await expect(twoDefaults).rejects.toBeInstanceOf(BadRequestException);
+    await expect(twoDefaults).rejects.toMatchObject({ code: 'FOOD_PORTION_DEFAULT_COUNT_INVALID' });
   });
 });
 
@@ -380,17 +493,17 @@ describe('FoodsService.update / softDelete — creator-only, read-only globals',
   it('403s when a USER food is edited by someone other than its creator', async () => {
     const { service, prisma } = makeService({ findUnique: { ...OTHER_USER_FOOD } });
 
-    await expect(service.update('user-1', 'food-other', baseCreateDto())).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    const result = service.update('user-1', 'food-other', baseCreateDto());
+    await expect(result).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(result).rejects.toMatchObject({ code: 'FOOD_NOT_OWNER' });
     expect(prisma.food.update).not.toHaveBeenCalled();
   });
 
   it('403s on a SEED food for everyone', async () => {
     const { service } = makeService({ findUnique: { ...SEED_FOOD } });
-    await expect(service.update('user-1', 'food-seed', baseCreateDto())).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    const result = service.update('user-1', 'food-seed', baseCreateDto());
+    await expect(result).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(result).rejects.toMatchObject({ code: 'FOOD_READ_ONLY_SOURCE' });
   });
 
   it('403s on an OPEN_FOOD_FACTS food for everyone', async () => {
@@ -496,9 +609,9 @@ describe('FoodsService.lookupByBarcode — the miss chain', () => {
   it('rejects a barcode that fails its check digit before touching the library', async () => {
     const { service, prisma, offLookup } = makeService();
 
-    await expect(service.lookupByBarcode('user-1', '4025500287956')).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
+    const result = service.lookupByBarcode('user-1', '4025500287956');
+    await expect(result).rejects.toBeInstanceOf(BadRequestException);
+    await expect(result).rejects.toMatchObject({ code: 'BARCODE_INVALID' });
     expect(prisma.food.findFirst).not.toHaveBeenCalled();
     expect(offLookup.lookup).not.toHaveBeenCalled();
   });

@@ -1,5 +1,7 @@
+// @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from './client';
+import { ApiError } from './errors';
 
 function mockFetch() {
   const fetchMock = vi.fn().mockResolvedValue({
@@ -36,6 +38,30 @@ describe('client timezone header', () => {
   });
 });
 
+describe('client locale header (#179)', () => {
+  afterEach(() => {
+    window.history.pushState({}, '', '/');
+  });
+
+  it('tells the server which [locale] URL segment the request was made under, on every request', async () => {
+    window.history.pushState({}, '', '/de/dashboard');
+    const fetchMock = mockFetch();
+
+    await apiClient.getSuggestedWorkout();
+
+    expect(sentHeaders(fetchMock)['X-Locale']).toBe('de');
+  });
+
+  it('falls back to the routing default when the pathname carries no recognised locale', async () => {
+    window.history.pushState({}, '', '/');
+    const fetchMock = mockFetch();
+
+    await apiClient.getSuggestedWorkout();
+
+    expect(sentHeaders(fetchMock)['X-Locale']).toBe('en');
+  });
+});
+
 describe('shared session refresh on concurrent 401s (#158)', () => {
   // Simulates the 15-minute access cookie expiring while several requests are in flight:
   // every one of them 401s, but only one may rotate the refresh token or the rest arrive
@@ -50,7 +76,7 @@ describe('shared session refresh on concurrent 401s (#158)', () => {
         return { ok: refreshOk, status: refreshOk ? 200 : 401, text: async () => '' };
       }
       if (!tokenValid) {
-        return { ok: false, status: 401, json: async () => ({ message: 'Unauthorized' }) };
+        return { ok: false, status: 401, json: async () => ({ statusCode: 401, code: 'UNAUTHORIZED' }) };
       }
       return { ok: true, status: 200, text: async () => 'null' };
     });
@@ -100,7 +126,7 @@ describe('shared session refresh on concurrent 401s (#158)', () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
       status: 401,
-      json: async () => ({ message: 'Invalid credentials' }),
+      json: async () => ({ statusCode: 401, code: 'INVALID_CREDENTIALS' }),
     });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -135,5 +161,73 @@ describe('favorites endpoints (#148)', () => {
     await apiClient.getPickerRecent();
     expect(sentCall(all)[0]).toContain('/nutrition/picker/recent');
     expect(sentCall(all)[0]).not.toContain('scope');
+  });
+});
+
+describe('client error responses (#190, #191)', () => {
+  function failWith(status: number, body: unknown) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status, json: async () => body }),
+    );
+  }
+
+  it('throws an ApiError carrying the status and the machine-readable code', async () => {
+    failWith(404, { statusCode: 404, code: 'CYCLE_NOT_FOUND' });
+
+    const error = await apiClient.getSuggestedWorkout().catch((e) => e);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ status: 404, code: 'CYCLE_NOT_FOUND' });
+  });
+
+  it('carries structured details and validation field errors', async () => {
+    failWith(400, {
+      statusCode: 400,
+      code: 'VALIDATION_FAILED',
+      errors: [{ property: 'email', constraints: ['isEmail'] }],
+    });
+    const validation = await apiClient.getSuggestedWorkout().catch((e) => e);
+    expect(validation.fieldErrors).toEqual([{ property: 'email', constraints: ['isEmail'] }]);
+
+    failWith(400, { statusCode: 400, code: 'EXERCISE_MUSCLE_PERCENTAGES_INVALID_SUM', details: { sum: 90 } });
+    const detailed = await apiClient.getSuggestedWorkout().catch((e) => e);
+    expect(detailed.details).toEqual({ sum: 90 });
+  });
+
+  it('has no server text to show: message is just the code, or the status', async () => {
+    failWith(404, { statusCode: 404, code: 'CYCLE_NOT_FOUND' });
+    expect((await apiClient.getSuggestedWorkout().catch((e) => e)).message).toBe('CYCLE_NOT_FOUND');
+
+    failWith(500, {});
+    expect((await apiClient.getSuggestedWorkout().catch((e) => e)).message).toBe('HTTP 500');
+  });
+
+  it('still produces an ApiError when the body is not JSON', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        json: async () => {
+          throw new Error('not json');
+        },
+      }),
+    );
+
+    const error = await apiClient.getSuggestedWorkout().catch((e) => e);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error.status).toBe(502);
+    expect(error.code).toBeUndefined();
+  });
+
+  it('keeps the code of an /auth/* 401, so a wrong password maps to its own message', async () => {
+    failWith(401, { statusCode: 401, code: 'INVALID_CREDENTIALS' });
+
+    const error = await apiClient.login({ email: 'a@b.com', password: 'wrong' }).catch((e) => e);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ status: 401, code: 'INVALID_CREDENTIALS' });
   });
 });

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations, useFormatter, useLocale } from 'next-intl';
 import {
   LineChart,
   Line,
@@ -15,6 +16,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import ScrollableChart from './scrollable-chart';
 import { tooltipContentStyle, tooltipItemStyle, tooltipLabelStyle } from './chart-styles';
 import { fromLocalDateString } from '@/lib/local-date';
+import { weekdayReferenceDate } from '@/lib/weekday';
 import {
   NUTRITION_METRICS,
   metricTarget,
@@ -24,15 +26,6 @@ import {
   nutritionTargetReached,
 } from '@/lib/nutrition';
 import type { NutritionMetric, NutritionTrend } from '@/types';
-
-const WEEKDAY_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
-
-/** A `YYYY-MM-DD` day as `"07.09."` for the tooltip header -- read as a local day, not UTC. */
-function formatDayLabel(localDate: string): string {
-  return new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit' }).format(
-    fromLocalDateString(localDate),
-  );
-}
 
 interface NutritionTrendChartProps {
   trend: NutritionTrend | null;
@@ -54,8 +47,22 @@ export default function NutritionTrendChart({
   rangeLabel,
   loading = false,
 }: NutritionTrendChartProps) {
+  const t = useTranslations('NutritionTrendChart');
+  const format = useFormatter();
+  const locale = useLocale();
   const [metric, setMetric] = useState<NutritionMetric>('kcal');
-  const metricConfig = NUTRITION_METRICS.find((m) => m.key === metric)!;
+
+  // NUTRITION_METRICS (lib/nutrition.ts) carries the metric order and keys; its `label` field
+  // is a plain German string and only consumed here, so this in-scope chart localizes it
+  // directly rather than reaching into the shared lib.
+  const metricLabels: Record<NutritionMetric, string> = {
+    kcal: t('metricKcal'),
+    carbs: t('metricCarbs'),
+    protein: t('metricProtein'),
+    fat: t('metricFat'),
+  };
+  const localizedMetrics = NUTRITION_METRICS.map((m) => ({ ...m, label: metricLabels[m.key] }));
+  const metricConfig = localizedMetrics.find((m) => m.key === metric)!;
 
   const days = trend?.days ?? [];
   const rawTarget = metricTarget(trend?.targets ?? null, metric);
@@ -64,22 +71,28 @@ export default function NutritionTrendChart({
   const average = nutritionDailyAverage(days, metric);
   const reached = nutritionTargetReached(days, metric, target);
 
+  /** A `YYYY-MM-DD` day as e.g. `"07.09."` for the tooltip header -- read as a local day, not UTC. */
+  const formatDayLabel = (localDate: string): string =>
+    format.dateTime(fromLocalDateString(localDate), { day: '2-digit', month: '2-digit' });
+
+  const shortWeekdayName = (weekday: number): string =>
+    format.dateTime(weekdayReferenceDate(weekday), { weekday: 'short', timeZone: 'UTC' });
+
   const yTickFormatter = (value: number) =>
-    metric === 'kcal' ? formatKcal(value) : String(Math.round(value));
+    metric === 'kcal' ? formatKcal(value, locale) : String(Math.round(value));
 
   // recharts hands the tick formatter the index among *rendered* ticks, not the data row, so
   // look the weekday up by the tick's date value.
   const weekdayByDate = new Map(days.map((d) => [d.date, d.weekday]));
-  const xTickFormatter = (value: string) =>
-    WEEKDAY_SHORT[weekdayByDate.get(value) ?? 0] ?? '';
+  const xTickFormatter = (value: string) => shortWeekdayName(weekdayByDate.get(value) ?? 0);
 
   return (
     <Card>
       <CardContent className="p-6">
-        <h3 className="text-lg font-semibold text-foreground mb-4">Ernährung</h3>
+        <h3 className="text-lg font-semibold text-foreground mb-4">{t('nutrition')}</h3>
 
         <div className="mb-5 flex w-fit border border-border">
-          {NUTRITION_METRICS.map((m, i) => (
+          {localizedMetrics.map((m, i) => (
             <button
               key={m.key}
               type="button"
@@ -99,10 +112,10 @@ export default function NutritionTrendChart({
         </div>
 
         {loading ? (
-          <div className="py-16 text-center text-sm text-muted-foreground">Lädt Ernährungsdaten…</div>
+          <div className="py-16 text-center text-sm text-muted-foreground">{t('loading')}</div>
         ) : days.length === 0 ? (
           <div className="py-16 text-center text-sm text-muted-foreground">
-            Noch keine Ernährungsdaten für den ausgewählten Zeitraum.
+            {t('noData')}
           </div>
         ) : (
           <>
@@ -126,7 +139,7 @@ export default function NutritionTrendChart({
                     contentStyle={tooltipContentStyle}
                     itemStyle={tooltipItemStyle}
                     labelStyle={tooltipLabelStyle}
-                    formatter={(value) => [formatMetricValue(value as number, metric), metricConfig.label]}
+                    formatter={(value) => [formatMetricValue(value as number, metric, locale), metricConfig.label]}
                     labelFormatter={(label) => formatDayLabel(label as string)}
                   />
                   {target !== null && (
@@ -136,7 +149,7 @@ export default function NutritionTrendChart({
                       strokeDasharray="6 4"
                       ifOverflow="extendDomain"
                       label={{
-                        value: `ZIEL ${formatMetricValue(target, metric)}`,
+                        value: t('goalPrefix', { value: formatMetricValue(target, metric, locale) }),
                         position: 'insideTopRight',
                         fill: 'var(--muted-foreground)',
                         fontSize: 10,
@@ -159,21 +172,21 @@ export default function NutritionTrendChart({
             <div className="mt-4 flex items-center gap-2">
               <span className="h-0.5 w-3.5 flex-none bg-foreground" />
               <span className="text-[11px] text-muted-foreground">
-                {metricConfig.label} pro Tag · {rangeLabel}
+                {t('metricPerDay', { metric: metricConfig.label, rangeLabel })}
               </span>
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-3 border-t border-border pt-4">
               <div>
-                <div className="text-[11px] text-muted-foreground">Ø pro Tag</div>
+                <div className="text-[11px] text-muted-foreground">{t('avgPerDay')}</div>
                 <div className="mt-1 text-[17px] font-semibold text-foreground">
-                  {formatMetricValue(average, metric)}
+                  {formatMetricValue(average, metric, locale)}
                 </div>
               </div>
               <div>
-                <div className="text-[11px] text-muted-foreground">Ziel erreicht</div>
+                <div className="text-[11px] text-muted-foreground">{t('goalReached')}</div>
                 <div className="mt-1 text-[17px] font-semibold text-foreground">
-                  {reached ? `${reached.hit} von ${reached.total} Tagen` : 'Kein Ziel gesetzt'}
+                  {reached ? t('hitOfTotal', { hit: reached.hit, total: reached.total }) : t('noGoalSet')}
                 </div>
               </div>
             </div>

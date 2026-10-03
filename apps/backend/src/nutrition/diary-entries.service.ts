@@ -1,9 +1,9 @@
+import { Injectable } from '@nestjs/common';
 import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-  BadRequestException,
-} from '@nestjs/common';
+  AppNotFoundException,
+  AppConflictException,
+  AppBadRequestException,
+} from '../common/errors/app-exceptions';
 import { PrismaService } from '../prisma/prisma.service';
 import { scalePer100 } from '../common/utils/nutrition.util';
 import { MealsService } from '../meals/meals.service';
@@ -44,6 +44,7 @@ type DiaryEntryRow = {
 type MealSlotRow = {
   id: string;
   name: string;
+  seedKey: string | null;
   order: number;
   archivedAt: Date | null;
 };
@@ -136,7 +137,7 @@ export class DiaryEntriesService {
       this.prisma.mealSlot.findMany({
         where: { userId },
         orderBy: { order: 'asc' },
-        select: { id: true, name: true, order: true, archivedAt: true },
+        select: { id: true, name: true, seedKey: true, order: true, archivedAt: true },
       }) as Promise<MealSlotRow[]>,
       this.prisma.diaryEntry.findMany({
         where: { userId, localDate },
@@ -162,6 +163,7 @@ export class DiaryEntriesService {
       slotDtos.push({
         id: slot.id,
         name: slot.name,
+        seedKey: slot.seedKey,
         order: slot.order,
         archived: slot.archivedAt !== null,
         totals: slotEntries.reduce(addNutrients, { ...ZERO_TOTALS }),
@@ -256,7 +258,7 @@ export class DiaryEntriesService {
     })) as FoodRow[];
     const foodById = new Map(foods.map((f) => [f.id, f]));
     if (foodById.size !== foodIds.length) {
-      throw new NotFoundException('Ein Lebensmittel wurde nicht gefunden');
+      throw new AppNotFoundException('MEAL_ITEM_FOOD_NOT_FOUND');
     }
 
     const data = dto.items.map((item) => {
@@ -295,7 +297,7 @@ export class DiaryEntriesService {
 
     const meal = await this.meals.findById(dto.mealId, userId);
     if (meal.deleted) {
-      throw new NotFoundException('Mahlzeit nicht gefunden');
+      throw new AppNotFoundException('MEAL_NOT_FOUND');
     }
 
     const data = meal.items.map((item) => {
@@ -395,7 +397,7 @@ export class DiaryEntriesService {
 
   private assertDistinctDays(fromDate: string, toDate: string): void {
     if (fromDate === toDate) {
-      throw new BadRequestException('Quell- und Zieltag sind identisch');
+      throw new AppBadRequestException('DIARY_COPY_SAME_DAY');
     }
   }
 
@@ -415,7 +417,7 @@ export class DiaryEntriesService {
       where: { id, userId },
     })) as DiaryEntryRow | null;
     if (!entry) {
-      throw new NotFoundException('Eintrag nicht gefunden');
+      throw new AppNotFoundException('DIARY_ENTRY_NOT_FOUND');
     }
 
     const ratio = quantity / entry.quantity;
@@ -442,7 +444,7 @@ export class DiaryEntriesService {
   async deleteEntry(userId: string, id: string): Promise<void> {
     const { count } = await this.prisma.diaryEntry.deleteMany({ where: { id, userId } });
     if (count === 0) {
-      throw new NotFoundException('Eintrag nicht gefunden');
+      throw new AppNotFoundException('DIARY_ENTRY_NOT_FOUND');
     }
   }
 
@@ -453,10 +455,10 @@ export class DiaryEntriesService {
       select: { id: true, archivedAt: true },
     });
     if (!slot) {
-      throw new NotFoundException('Abschnitt nicht gefunden');
+      throw new AppNotFoundException('MEAL_SLOT_NOT_FOUND');
     }
     if (slot.archivedAt) {
-      throw new ConflictException('Abschnitt ist archiviert');
+      throw new AppConflictException('MEAL_SLOT_ARCHIVED');
     }
   }
 }

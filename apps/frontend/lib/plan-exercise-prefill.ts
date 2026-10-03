@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { toast } from 'sonner';
+import { usePrefillToast } from '@/hooks/usePrefillToast';
 import { apiClient } from '@/lib/api';
 import { LastPerformance, PlannedSet } from '@/types';
 import { resolvePlanPrefill } from '@/lib/last-performance';
@@ -49,6 +49,7 @@ export function usePlanExercisePrefill<T extends PlanEntry>({
   makeSetId,
   onApply,
 }: UsePlanExercisePrefillOptions<T>) {
+  const showPrefillToast = usePrefillToast();
   const exercisesRef = useRef(exercises);
   useEffect(() => {
     exercisesRef.current = exercises;
@@ -82,10 +83,8 @@ export function usePlanExercisePrefill<T extends PlanEntry>({
       );
       onApplyRef.current(next);
 
-      if (decision.toast) {
-        toast.info(decision.toast.message, { duration: decision.toast.durationMs });
-      }
+      if (decision.toast) showPrefillToast(decision.toast);
     },
-    [setsKey, gymId, makeSetId],
+    [setsKey, gymId, makeSetId, showPrefillToast],
   );
 }

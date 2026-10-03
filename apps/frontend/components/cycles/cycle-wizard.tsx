@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+import { useRouter } from '@/i18n/navigation';
 import { apiClient } from '@/lib/api';
 import { SetType } from '@/types';
 import BasicInfoStep from './basic-info-step';
@@ -11,6 +12,7 @@ import ReviewStep from './review-step';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { withArrayPositionOrder } from '@/lib/workout-order';
+import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
 
 export interface BlueprintSetData {
   order: number;
@@ -59,6 +61,8 @@ export interface CycleFormData {
 
 export default function CycleWizard() {
   const router = useRouter();
+  const t = useTranslations('CycleWizard');
+  const apiError = useApiErrorMessage();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -112,7 +116,7 @@ export default function CycleWizard() {
       await apiClient.createCycle(payload);
       router.push('/cycles');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Fehler beim Erstellen des Zyklus');
+      setError(apiError(err, t('createError')));
     } finally {
       setLoading(false);
     }
@@ -121,13 +125,13 @@ export default function CycleWizard() {
   const getStepTitle = () => {
     switch (currentStep) {
       case 1:
-        return 'Basis-Informationen';
+        return t('steps.basicInfo');
       case 2:
-        return 'Trainingstage auswählen';
+        return t('steps.workoutDays');
       case 3:
-        return 'Blueprint erstellen';
+        return t('steps.blueprint');
       case 4:
-        return 'Überprüfen & Erstellen';
+        return t('steps.review');
       default:
         return '';
     }
@@ -141,7 +145,7 @@ export default function CycleWizard() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-foreground">
-                Neuer Trainingszyklus
+                {t('title')}
               </h1>
               <p className="text-sm text-muted-foreground mt-1">{getStepTitle()}</p>
             </div>
@@ -149,7 +153,7 @@ export default function CycleWizard() {
               variant="ghost"
               onClick={() => router.push('/cycles')}
             >
-              Abbrechen
+              {t('cancel')}
             </Button>
           </div>
 
@@ -166,7 +170,7 @@ export default function CycleWizard() {
               ))}
             </div>
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Schritt {currentStep} von {totalSteps}</span>
+              <span>{t('stepProgress', { current: currentStep, total: totalSteps })}</span>
             </div>
           </div>
         </div>

@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useFormatter, useTranslations } from 'next-intl';
+import { useRouter } from '@/i18n/navigation';
 import { IconChevronRight, IconPlus } from '@tabler/icons-react';
 import { apiClient } from '@/lib/api';
 import { MealListItem } from '@/types';
@@ -11,14 +12,9 @@ import { Button } from '@/components/ui/button';
 import { FavoriteStar } from '@/components/nutrition/favorite-star';
 import { cn } from '@/lib/utils';
 
-function totalsLine(meal: MealListItem): string {
-  const { kcal, carbs, protein, fat } = meal.totals;
-  return `${formatKcal(kcal)} kcal · ${Math.round(carbs)} KH · ${Math.round(
-    protein,
-  )} P · ${Math.round(fat)} F`;
-}
-
 export default function MealsTab() {
+  const t = useTranslations('MealsTab');
+  const format = useFormatter();
   const router = useRouter();
   const [meals, setMeals] = useState<MealListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -54,12 +50,11 @@ export default function MealsTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          {total.toLocaleString('de-DE')} {total === 1 ? 'Mahlzeit' : 'Mahlzeiten'} ·{' '}
-          {mineTotal} eigene
+          {t('count', { total, mine: mineTotal })}
         </p>
         <Button size="sm" onClick={() => router.push('/templates/meals/new')}>
           <IconPlus data-icon="inline-start" />
-          Neu
+          {t('new')}
         </Button>
       </div>
 
@@ -73,16 +68,14 @@ export default function MealsTab() {
             : 'border-border bg-transparent text-muted-foreground',
         )}
       >
-        Nur meine
+        {t('mineOnly')}
       </button>
 
       {loading && meals.length === 0 ? (
-        <p className="py-10 text-center text-sm text-muted-foreground">Lädt …</p>
+        <p className="py-10 text-center text-sm text-muted-foreground">{t('loading')}</p>
       ) : meals.length === 0 ? (
         <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">
-          {mineOnly
-            ? 'Du hast noch keine Mahlzeiten angelegt.'
-            : 'Noch keine Mahlzeiten. Lege die erste an.'}
+          {mineOnly ? t('emptyMine') : t('empty')}
         </div>
       ) : (
         <div className="divide-y rounded-lg border bg-card">
@@ -98,7 +91,12 @@ export default function MealsTab() {
                   <div className="mt-0.5 truncate text-xs text-muted-foreground">
                     {mealIngredientPreview(meal.ingredientNames)}
                   </div>
-                  <div className="mt-1 text-xs">{totalsLine(meal)}</div>
+                  <div className="mt-1 text-xs">{t('totals', {
+                      kcal: formatKcal(meal.totals.kcal),
+                      carbs: format.number(Math.round(meal.totals.carbs)),
+                      protein: format.number(Math.round(meal.totals.protein)),
+                      fat: format.number(Math.round(meal.totals.fat)),
+                    })}</div>
                 </div>
                 <IconChevronRight className="size-4 shrink-0 text-muted-foreground" />
               </button>

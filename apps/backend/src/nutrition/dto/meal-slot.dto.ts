@@ -16,6 +16,8 @@ import { Type } from 'class-transformer';
 export class MealSlotDto {
   id: string;
   name: string;
+  /** Set while the name is still the untouched default: the client renders it from its catalogue. */
+  seedKey: string | null;
   order: number;
   archived: boolean;
 }

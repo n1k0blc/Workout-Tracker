@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { IconChevronRight, IconTrash } from '@tabler/icons-react';
 import { DiaryEntry } from '@/types';
 import { formatKcal } from '@/lib/nutrition';
@@ -22,15 +23,18 @@ export function DiaryEntryRow({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const t = useTranslations('DiaryEntryRow');
   const [dragX, setDragX] = useState(0);
   const [dragging, setDragging] = useState(false);
   const start = useRef<{ x: number; y: number } | null>(null);
   const axis = useRef<'undecided' | 'horizontal' | 'vertical'>('undecided');
   const swiped = useRef(false);
 
-  const macroLine = `${Math.round(entry.carbs)} KH · ${Math.round(entry.protein)} P · ${Math.round(
-    entry.fat,
-  )} F`;
+  const macroLine = t('macroLine', {
+    carbs: Math.round(entry.carbs),
+    protein: Math.round(entry.protein),
+    fat: Math.round(entry.fat),
+  });
 
   function onPointerDown(e: React.PointerEvent) {
     start.current = { x: e.clientX, y: e.clientY };
@@ -72,7 +76,7 @@ export function DiaryEntryRow({
         aria-hidden={dragX === 0}
       >
         <IconTrash className="size-5" />
-        <span className="text-[10px] font-semibold uppercase tracking-wider">Löschen</span>
+        <span className="text-[10px] font-semibold uppercase tracking-wider">{t('delete')}</span>
       </div>
 
       <button

@@ -180,9 +180,12 @@ describe('DiaryEntriesService.createEntry — snapshot on create', () => {
   it("rejects logging into an Abschnitt that is not the user's", async () => {
     const { service, prisma } = makeService({ slot: null });
 
-    await expect(
-      service.createEntry('user-1', baseCreateDto({ mealSlotId: 'someone-elses-slot' })),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    const result = service.createEntry(
+      'user-1',
+      baseCreateDto({ mealSlotId: 'someone-elses-slot' }),
+    );
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'MEAL_SLOT_NOT_FOUND' });
 
     expect(prisma.mealSlot.findFirst).toHaveBeenCalledWith({
       where: { id: 'someone-elses-slot', userId: 'user-1' },
@@ -196,9 +199,9 @@ describe('DiaryEntriesService.createEntry — snapshot on create', () => {
       slot: { id: 'slot-1', archivedAt: new Date('2026-01-01') },
     });
 
-    await expect(service.createEntry('user-1', baseCreateDto())).rejects.toBeInstanceOf(
-      ConflictException,
-    );
+    const result = service.createEntry('user-1', baseCreateDto());
+    await expect(result).rejects.toBeInstanceOf(ConflictException);
+    await expect(result).rejects.toMatchObject({ code: 'MEAL_SLOT_ARCHIVED' });
     expect(prisma.diaryEntry.create).not.toHaveBeenCalled();
   });
 });
@@ -251,9 +254,9 @@ describe('DiaryEntriesService.updateEntryQuantity — proportional rescale', () 
   it("404s on another user's entry and does not write", async () => {
     const { service, prisma } = makeService({ entry: null });
 
-    await expect(service.updateEntryQuantity('user-1', 'entry-1', 2)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    const result = service.updateEntryQuantity('user-1', 'entry-1', 2);
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'DIARY_ENTRY_NOT_FOUND' });
 
     expect(prisma.diaryEntry.findFirst).toHaveBeenCalledWith({
       where: { id: 'entry-1', userId: 'user-1' },
@@ -305,9 +308,15 @@ describe('DiaryEntriesService.deleteEntry — scoped hard delete', () => {
 
 describe('DiaryEntriesService.getDay — day read model', () => {
   const slots = [
-    { id: 'slot-1', name: 'Frühstück', order: 1, archivedAt: null },
-    { id: 'slot-2', name: 'Mittagessen', order: 2, archivedAt: null },
-    { id: 'slot-3', name: 'Zweites Frühstück', order: 3, archivedAt: new Date('2026-01-01') },
+    { id: 'slot-1', name: 'Frühstück', seedKey: 'breakfast', order: 1, archivedAt: null },
+    { id: 'slot-2', name: 'Mittagessen', seedKey: null, order: 2, archivedAt: null },
+    {
+      id: 'slot-3',
+      name: 'Zweites Frühstück',
+      seedKey: null,
+      order: 3,
+      archivedAt: new Date('2026-01-01'),
+    },
   ];
 
   it('groups entries under their slot and totals per slot and per day', async () => {
@@ -330,6 +339,14 @@ describe('DiaryEntriesService.getDay — day read model', () => {
     const fruehstueck = day.slots.find((s) => s.id === 'slot-1')!;
     expect(fruehstueck.totals).toEqual({ kcal: 500, carbs: 50, protein: 25, fat: 13 });
     expect(fruehstueck.entries.map((e) => e.id)).toEqual(['e1', 'e2']);
+  });
+
+  it('carries each slot seedKey so the client can render the default names (#189)', async () => {
+    const { service } = makeService({ slots, entries: [] });
+
+    const day = await service.getDay('user-1', '2026-09-07');
+
+    expect(day.slots.map((s) => s.seedKey)).toEqual(['breakfast', null]);
   });
 
   it('hides an archived slot with no entries but keeps one that has them', async () => {
@@ -643,15 +660,15 @@ describe('DiaryEntriesService.createFromFoodBatch — snapshot math', () => {
   it('404s (and writes nothing) when an item references an unknown food', async () => {
     const { service, prisma } = makeService({ foods: [FOOD] });
 
-    await expect(
-      service.createFromFoodBatch(
-        'user-1',
-        batchDto([
-          { foodId: 'food-oats', grams: 40 },
-          { foodId: 'food-ghost', grams: 40 },
-        ]),
-      ),
-    ).rejects.toBeInstanceOf(NotFoundException);
+    const result = service.createFromFoodBatch(
+      'user-1',
+      batchDto([
+        { foodId: 'food-oats', grams: 40 },
+        { foodId: 'food-ghost', grams: 40 },
+      ]),
+    );
+    await expect(result).rejects.toBeInstanceOf(NotFoundException);
+    await expect(result).rejects.toMatchObject({ code: 'MEAL_ITEM_FOOD_NOT_FOUND' });
     expect(prisma.diaryEntry.createMany).not.toHaveBeenCalled();
   });
 
@@ -849,13 +866,13 @@ describe('DiaryEntriesService.copySlot — one Abschnitt from another day', () =
   it('rejects copying a day onto itself', async () => {
     const { service } = makeService();
 
-    await expect(
-      service.copySlot('user-1', {
-        fromDate: '2026-09-07',
-        toDate: '2026-09-07',
-        mealSlotId: 'slot-1',
-      }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    const result = service.copySlot('user-1', {
+      fromDate: '2026-09-07',
+      toDate: '2026-09-07',
+      mealSlotId: 'slot-1',
+    });
+    await expect(result).rejects.toBeInstanceOf(BadRequestException);
+    await expect(result).rejects.toMatchObject({ code: 'DIARY_COPY_SAME_DAY' });
   });
 });
 

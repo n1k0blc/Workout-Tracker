@@ -1,31 +1,19 @@
 import { PersonalRecord } from '@/types';
 
-export function formatPRType(type: string): string {
-  switch (type) {
-    case 'weight':
-      return 'Gewicht';
-    case 'reps':
-      return 'Wiederholungen';
-    case 'volume':
-      return 'Volumen';
-    case 'one_rm':
-      return '1RM';
-    default:
-      return type;
-  }
-}
-
-export function formatPRValue(pr: PersonalRecord): string {
+/**
+ * The raw numeric value and unit key for a PR, locale-neutral. `PersonalRecordCard` (its only
+ * caller) localizes the unit word and rounds/formats the number itself via `useFormatter()`.
+ */
+export function prValueParts(pr: PersonalRecord): { value: number; unit: 'kg' | 'reps' } {
   switch (pr.type) {
     case 'weight':
-      return `${pr.value} kg`;
+      return { value: pr.value, unit: 'kg' };
     case 'reps':
-      return `${pr.value} Wdh`;
+      return { value: pr.value, unit: 'reps' };
     case 'volume':
-      return `${Math.round(pr.value)} kg`;
     case 'one_rm':
-      return `${Math.round(pr.value)} kg`;
+      return { value: Math.round(pr.value), unit: 'kg' };
     default:
-      return `${pr.value}`;
+      return { value: pr.value, unit: 'kg' };
   }
 }

@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { AppNotFoundException, AppConflictException } from '../common/errors/app-exceptions';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   WorkoutTreeService,
@@ -9,6 +10,7 @@ import {
 } from '../workout-tree/workout-tree.service';
 import { WorkoutTemplateDto, CreateWorkoutTemplateDto, UpdateWorkoutTemplateDto } from './dto';
 import { ExercisesService } from '../exercises/exercises.service';
+import { ApiLocale, DEFAULT_LOCALE } from '../common/utils/locale.util';
 
 const TEMPLATE_INCLUDE = {
   ...WORKOUT_EXERCISE_TREE_INCLUDE,
@@ -23,7 +25,7 @@ export class WorkoutTemplatesService {
     private exercisesService: ExercisesService,
   ) {}
 
-  async findAll(userId: string): Promise<WorkoutTemplateDto[]> {
+  async findAll(userId: string, locale: ApiLocale = DEFAULT_LOCALE): Promise<WorkoutTemplateDto[]> {
     const templates = await this.prisma.workout.findMany({
       where: {
         kind: 'TEMPLATE',
@@ -33,33 +35,41 @@ export class WorkoutTemplatesService {
       orderBy: [{ isCustom: 'asc' }, { name: 'asc' }],
     });
 
-    return templates.map((template) => this.mapToDto(template));
+    return templates.map((template) => this.mapToDto(template, locale));
   }
 
-  async findOne(id: string, userId: string): Promise<WorkoutTemplateDto> {
+  async findOne(
+    id: string,
+    userId: string,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<WorkoutTemplateDto> {
     const template = await this.prisma.workout.findUnique({
       where: { id },
       include: TEMPLATE_INCLUDE,
     });
 
     if (!template || template.kind !== 'TEMPLATE') {
-      throw new NotFoundException('Workout template not found');
+      throw new AppNotFoundException('WORKOUT_TEMPLATE_NOT_FOUND');
     }
 
     if (template.isCustom && template.userId !== userId) {
-      throw new NotFoundException('Workout template not found');
+      throw new AppNotFoundException('WORKOUT_TEMPLATE_NOT_FOUND');
     }
 
-    return this.mapToDto(template);
+    return this.mapToDto(template, locale);
   }
 
-  async create(userId: string, createDto: CreateWorkoutTemplateDto): Promise<WorkoutTemplateDto> {
+  async create(
+    userId: string,
+    createDto: CreateWorkoutTemplateDto,
+    locale: ApiLocale = DEFAULT_LOCALE,
+  ): Promise<WorkoutTemplateDto> {
     const existing = await this.prisma.workout.findFirst({
       where: { kind: 'TEMPLATE', userId, name: createDto.name },
     });
 
     if (existing) {
-      throw new ConflictException('A template with this name already exists');
+      throw new AppConflictException('TEMPLATE_NAME_TAKEN');
     }
 
     const exercisesById = await this.exercisesService.validateAccessible(
@@ -86,26 +96,27 @@ export class WorkoutTemplatesService {
       return template.id;
     });
 
-    return this.findOne(templateId, userId);
+    return this.findOne(templateId, userId, locale);
   }
 
   async update(
     id: string,
     userId: string,
     updateDto: UpdateWorkoutTemplateDto,
+    locale: ApiLocale = DEFAULT_LOCALE,
   ): Promise<WorkoutTemplateDto> {
     const template = await this.prisma.workout.findUnique({ where: { id } });
 
     if (!template || template.kind !== 'TEMPLATE') {
-      throw new NotFoundException('Workout template not found');
+      throw new AppNotFoundException('WORKOUT_TEMPLATE_NOT_FOUND');
     }
 
     if (template.isCustom && template.userId !== userId) {
-      throw new NotFoundException('Workout template not found');
+      throw new AppNotFoundException('WORKOUT_TEMPLATE_NOT_FOUND');
     }
 
     if (!template.isCustom) {
-      throw new ConflictException('System templates cannot be edited');
+      throw new AppConflictException('SYSTEM_TEMPLATE_NOT_EDITABLE');
     }
 
     if (updateDto.name && updateDto.name !== template.name) {
@@ -114,7 +125,7 @@ export class WorkoutTemplatesService {
       });
 
       if (existing) {
-        throw new ConflictException('A template with this name already exists');
+        throw new AppConflictException('TEMPLATE_NAME_TAKEN');
       }
     }
 
@@ -146,29 +157,29 @@ export class WorkoutTemplatesService {
       }
     });
 
-    return this.findOne(id, userId);
+    return this.findOne(id, userId, locale);
   }
 
   async delete(id: string, userId: string): Promise<void> {
     const template = await this.prisma.workout.findUnique({ where: { id } });
 
     if (!template || template.kind !== 'TEMPLATE') {
-      throw new NotFoundException('Workout template not found');
+      throw new AppNotFoundException('WORKOUT_TEMPLATE_NOT_FOUND');
     }
 
     if (template.isCustom && template.userId !== userId) {
-      throw new NotFoundException('Workout template not found');
+      throw new AppNotFoundException('WORKOUT_TEMPLATE_NOT_FOUND');
     }
 
     if (!template.isCustom) {
-      throw new ConflictException('System templates cannot be deleted');
+      throw new AppConflictException('SYSTEM_TEMPLATE_NOT_DELETABLE');
     }
 
     await this.prisma.workout.delete({ where: { id } });
   }
 
-  private mapToDto(template: any): WorkoutTemplateDto {
-    const exercises = mapExercisesToResponse(template.exercises);
+  private mapToDto(template: any, locale: ApiLocale): WorkoutTemplateDto {
+    const exercises = mapExercisesToResponse(template.exercises, locale);
 
     return {
       id: template.id,

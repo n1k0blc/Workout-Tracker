@@ -5,14 +5,16 @@ import {
   MaxLength,
   IsDateString,
   IsInt,
+  IsIn,
   IsNumber,
   Min,
   Max,
 } from 'class-validator';
+import { ApiLocale, SUPPORTED_LOCALES } from '../../common/utils/locale.util';
 
 export class UpdateUserDto {
   @IsOptional()
-  @IsEmail({}, { message: 'Please provide a valid email address' })
+  @IsEmail()
   email?: string;
 
   @IsOptional()
@@ -67,4 +69,15 @@ export class UpdateUserDto {
   @Min(1)
   @Max(2000)
   targetFat?: number | null;
+
+  // Locale tracer bullet (#179): the Profil language select. `@IsIn`, not `@IsEnum` --
+  // ApiLocale is a lowercase string union on the DTO side, not a TS/Prisma enum.
+  @IsOptional()
+  @IsIn(SUPPORTED_LOCALES)
+  locale?: ApiLocale;
+
+  // Weight unit system (#186): independent of `locale`, never re-derived from it.
+  @IsOptional()
+  @IsIn(['METRIC', 'IMPERIAL'])
+  unitSystem?: 'METRIC' | 'IMPERIAL';
 }
