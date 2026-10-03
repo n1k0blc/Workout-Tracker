@@ -15,6 +15,15 @@ overrides:
   # exercised at runtime) - 3.22.0 is the patched version for
   # GHSA-3f6p-5ww8-9rcr / GHSA-rgwj-5xj2-c3m3 (issue #170).
   mysql2: ^3.22.0
+  # Transitive via shadcn (a frontend runtime dependency) and its @dotenvx/dotenvx.
+  # 7.29.1 patches GHSA-rfgv-xxqx-mfg5 (DoS) and GHSA-w293-vg96-wgc3 (TLS validation bypass).
+  undici: ^7.29.1
+  # Transitive via minimatch from jest, @nestjs/cli and eslint, on three major lines that
+  # their minimatch versions need, so one override per line. Patched versions of
+  # GHSA-qhr7-859c-m2p7 and GHSA-6j4f-fj2g-mc7p.
+  brace-expansion@^1: ^1.1.20
+  brace-expansion@^2: ^2.1.6
+  brace-expansion@^5: ^5.0.11
 
 onlyBuiltDependencies:
   - '@parcel/watcher'
@@ -45,3 +54,8 @@ auditConfig:
     # upstream at deepmerge-ts >=8.0.0, which @prisma/config only picks up
     # once we're on Prisma 8 (tracked separately in #174, not this issue).
     - GHSA-ggr8-5vv4-36mx
+    # braces <=3.0.3 (GHSA-vfj7-8cjw-p6xm): no patched version exists upstream. Reached only
+    # through micromatch -> fast-glob from eslint-config-next (dev) and from shadcn's CLI
+    # scaffolding (ts-morph); neither handles untrusted input in this app. Remove once braces
+    # publishes a fix.
+    - GHSA-vfj7-8cjw-p6xm
