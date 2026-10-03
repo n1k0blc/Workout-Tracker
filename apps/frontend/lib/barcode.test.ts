@@ -47,11 +47,15 @@ describe('barcodeError', () => {
   });
 
   it('names a wrong check digit once the code is long enough to have one', () => {
-    expect(barcodeError('4025500287956')).toMatch(/Prüfziffer/);
+    expect(barcodeError('4025500287956')).toBe('checkDigit');
   });
 
   it('rejects non-digits immediately', () => {
-    expect(barcodeError('40255abc')).toMatch(/Ziffern/);
+    expect(barcodeError('40255abc')).toBe('notDigits');
+  });
+
+  it('names a code of an impossible length', () => {
+    expect(barcodeError('123456789')).toBe('wrongLength');
   });
 
   it('says nothing about a code that is valid', () => {

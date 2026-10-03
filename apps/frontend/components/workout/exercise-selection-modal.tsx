@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import { Exercise, MuscleGroup, Equipment } from '@/types';
 import { apiClient } from '@/lib/api';
 import { MUSCLE_GROUP_ORDER } from '@/lib/exercise-utils';
@@ -125,19 +126,20 @@ export default function ExerciseSelectionModal({
   ];
 
   const { translateMuscleGroup, translateEquipment } = useExerciseLabels();
+  const t = useTranslations('ExerciseSelectionModal');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
         {/* Header */}
         <DialogHeader className="px-6 py-4 border-b shrink-0 relative">
-          <DialogTitle>Übung hinzufügen</DialogTitle>
+          <DialogTitle>{t('title')}</DialogTitle>
           <DialogClose asChild>
             <Button
               variant="ghost"
               size="icon"
               className="absolute right-4 top-1/2 -translate-y-1/2"
-              aria-label="Schließen"
+              aria-label={t('close')}
             >
               <IconX className="size-4" />
             </Button>
@@ -150,7 +152,7 @@ export default function ExerciseSelectionModal({
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Übung suchen..."
+            placeholder={t('searchPlaceholder')}
             className="w-full"
           />
         </div>
@@ -160,7 +162,7 @@ export default function ExerciseSelectionModal({
           {/* Muscle Group Filter - horizontal scrollable */}
           <div className="mb-3">
             <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-              Muskelgruppe
+              {t('muscleGroup')}
             </label>
             <div className="flex gap-1.5 overflow-x-auto pb-2 -mx-1 px-1">
               <Button
@@ -169,7 +171,7 @@ export default function ExerciseSelectionModal({
                 onClick={() => setMuscleGroupFilter(undefined)}
                 className="flex-shrink-0 whitespace-nowrap"
               >
-                Alle
+                {t('all')}
               </Button>
               {muscleGroups.map((mg) => (
                 <Button
@@ -188,7 +190,7 @@ export default function ExerciseSelectionModal({
           {/* Equipment Filter - horizontal scrollable */}
           <div>
             <label className="block text-sm font-medium text-muted-foreground mb-1.5">
-              Equipment
+              {t('equipment')}
             </label>
             <div className="flex gap-1.5 overflow-x-auto pb-2 -mx-1 px-1">
               <Button
@@ -197,7 +199,7 @@ export default function ExerciseSelectionModal({
                 onClick={() => setEquipmentFilter(undefined)}
                 className="flex-shrink-0 whitespace-nowrap"
               >
-                Alle
+                {t('all')}
               </Button>
               {equipments.map((eq) => (
                 <Button
@@ -222,7 +224,7 @@ export default function ExerciseSelectionModal({
             className="w-full"
           >
             <IconPlus className="mr-2 size-4" />
-            Benutzerdefinierte Übung erstellen
+            {t('createCustom')}
           </Button>
         </div>
 
@@ -230,7 +232,7 @@ export default function ExerciseSelectionModal({
         <div className="flex-1 overflow-y-auto p-6">
           {loading ? (
             <div className="text-center py-8 text-muted-foreground">
-              Lädt Übungen...
+              {t('loading')}
             </div>
           ) : filteredExercises.length > 0 ? (
             <div className="space-y-2">
@@ -247,7 +249,7 @@ export default function ExerciseSelectionModal({
                     {translateMuscleGroup(exercise.primaryMuscle)} • {translateEquipment(exercise.equipment)}
                     {exercise.isCustom && (
                       <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
-                        Custom
+                        {t('custom')}
                       </Badge>
                     )}
                   </div>
@@ -256,7 +258,7 @@ export default function ExerciseSelectionModal({
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
-              Keine Übungen gefunden
+              {t('empty')}
             </div>
           )}
         </div>

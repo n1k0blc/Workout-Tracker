@@ -8,9 +8,9 @@ import { reorderExerciseLogs, toExercisePayload } from '@/lib/workout-order';
 import { aggregateSetSides } from '@/lib/set-sides';
 import { replaceExerciseInList } from '@/lib/exercise-replace';
 import { toLocalDateString } from '@/lib/local-date';
-import { blankPlanValues, buildPrefillToastMessage, mapLastPerformanceOntoPlan } from '@/lib/last-performance';
+import { blankPlanValues, buildPrefillToast, mapLastPerformanceOntoPlan } from '@/lib/last-performance';
+import { usePrefillToast } from '@/hooks/usePrefillToast';
 import { draftStorageKeys, claimDraftForUser, DraftMeta } from '@/lib/workout-draft-storage';
-import { toast } from 'sonner';
 
 /** One entry per set actually logged during a *live* session, in completion order. Drives
  *  rest-attribution (§3.5): when a new set completes, the previous entry's set gets its `rest`
@@ -126,6 +126,7 @@ function generateLocalId(prefix: string): string {
 
 export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth();
+  const showPrefillToast = usePrefillToast();
   // Every localStorage key holding this session's state is namespaced by the
   // signed-in account (issue #127), so a second user on the same device never
   // resumes the first user's workout.
@@ -739,8 +740,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setActiveWorkoutDirectly({ ...current, exercises }, isPastWorkout, pastWorkoutDuration);
 
     if (map && map.changed) {
-      const { message, durationMs } = buildPrefillToastMessage(result!, map.setCountMismatch, !!gymId);
-      toast.info(message, { duration: durationMs });
+      showPrefillToast(buildPrefillToast(result!, map.setCountMismatch, !!gymId));
     }
   };
 

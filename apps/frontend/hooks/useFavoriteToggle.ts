@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api';
 
@@ -15,6 +16,7 @@ export type FavoriteKind = 'food' | 'meal';
  * Favoriten tab. Callers that don't need that can omit it.
  */
 export function useFavoriteToggle(onToggled?: () => void) {
+  const t = useTranslations('FavoriteToggle');
   const [overrides, setOverrides] = useState<Map<string, boolean>>(() => new Map());
 
   const effectiveFavorite = useCallback(
@@ -37,10 +39,10 @@ export function useFavoriteToggle(onToggled?: () => void) {
         onToggled?.();
       } catch {
         setOverrides((m) => new Map(m).set(key, current));
-        toast.error('Favorit konnte nicht gespeichert werden');
+        toast.error(t('saveError'));
       }
     },
-    [onToggled],
+    [onToggled, t],
   );
 
   const reset = useCallback(() => setOverrides(new Map()), []);

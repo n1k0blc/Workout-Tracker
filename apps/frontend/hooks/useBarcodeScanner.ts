@@ -21,17 +21,32 @@ export type ScannerState = 'starting' | 'scanning' | 'unavailable';
 /** How often to run the decoder. ~8/s reads fast without pinning a phone's CPU. */
 const DECODE_INTERVAL_MS = 120;
 
-const CAMERA_MESSAGES: Record<string, string> = {
-  NotAllowedError: 'Kamerazugriff wurde abgelehnt.',
-  NotFoundError: 'Dieses Gerät hat keine nutzbare Kamera.',
-  NotReadableError: 'Die Kamera wird bereits von einer anderen App verwendet.',
-  OverconstrainedError: 'Keine passende Kamera gefunden.',
-  SecurityError: 'Kamerazugriff ist in diesem Kontext nicht erlaubt.',
+/**
+ * Why the camera is unavailable. A key, not a sentence: the viewfinder words it in the user's
+ * locale (`BarcodeCapture.camera.<reason>`).
+ */
+export type CameraReason =
+  | 'denied'
+  | 'noCamera'
+  | 'inUse'
+  | 'noMatch'
+  | 'blocked'
+  | 'failed'
+  | 'insecure'
+  | 'decoder'
+  | 'preview';
+
+const CAMERA_REASONS: Record<string, CameraReason> = {
+  NotAllowedError: 'denied',
+  NotFoundError: 'noCamera',
+  NotReadableError: 'inUse',
+  OverconstrainedError: 'noMatch',
+  SecurityError: 'blocked',
 };
 
-function cameraMessage(error: unknown): string {
+function cameraReason(error: unknown): CameraReason {
   const name = (error as { name?: string } | null)?.name ?? '';
-  return CAMERA_MESSAGES[name] ?? 'Die Kamera konnte nicht gestartet werden.';
+  return CAMERA_REASONS[name] ?? 'failed';
 }
 
 export function useBarcodeScanner({
@@ -46,7 +61,7 @@ export function useBarcodeScanner({
   const streamRef = useRef<MediaStream | null>(null);
   const readerRef = useRef<BarcodeReader | null>(null);
   const [state, setState] = useState<ScannerState>('starting');
-  const [reason, setReason] = useState<string | null>(null);
+  const [reason, setReason] = useState<CameraReason | null>(null);
   const [insecureContext, setInsecureContext] = useState(false);
 
   // Held in a ref so a new callback identity never restarts the camera mid-scan.
@@ -70,10 +85,10 @@ export function useBarcodeScanner({
     let cancelled = false;
     let timer: ReturnType<typeof setInterval> | null = null;
 
-    const fail = (message: string, insecure = false) => {
+    const fail = (why: CameraReason, insecure = false) => {
       if (cancelled) return;
       setInsecureContext(insecure);
-      setReason(message);
+      setReason(why);
       setState('unavailable');
     };
 
@@ -85,10 +100,7 @@ export function useBarcodeScanner({
       // Plain HTTP hides `mediaDevices` entirely, so this is not a permission problem and
       // saying "allow camera access" would send someone hunting through settings for nothing.
       if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
-        fail(
-          'Die Kamera braucht HTTPS. Über eine unverschlüsselte Verbindung gibt der Browser sie nicht frei.',
-          true,
-        );
+        fail('insecure', true);
         return;
       }
 
@@ -98,7 +110,7 @@ export function useBarcodeScanner({
           video: { facingMode: { ideal: 'environment' } },
         });
       } catch (error) {
-        fail(cameraMessage(error));
+        fail(cameraReason(error));
         return;
       }
       if (cancelled) {
@@ -111,7 +123,7 @@ export function useBarcodeScanner({
         readerRef.current ??= await createBarcodeReader();
       } catch {
         stop();
-        fail('Der Barcode-Decoder konnte nicht geladen werden.');
+        fail('decoder');
         return;
       }
       if (cancelled) return;
@@ -119,7 +131,7 @@ export function useBarcodeScanner({
       const video = videoRef.current;
       if (!video) {
         stop();
-        fail('Die Kameravorschau konnte nicht gestartet werden.');
+        fail('preview');
         return;
       }
       video.srcObject = stream;

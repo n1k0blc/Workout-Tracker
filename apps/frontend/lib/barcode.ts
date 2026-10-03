@@ -45,6 +45,9 @@ export function normalizeBarcode(raw: string): string | null {
   return digits.length === 12 ? `0${digits}` : digits;
 }
 
+/** Which mistake the manual EAN field has; the UI words it (`BarcodeCapture.errors.<code>`). */
+export type BarcodeErrorCode = 'notDigits' | 'wrongLength' | 'checkDigit';
+
 /**
  * Why the EAN field's contents were refused, or null when there is nothing specific to say.
  * Called on submit, so that a wrong code is named precisely -- a bad check digit and a
@@ -53,14 +56,14 @@ export function normalizeBarcode(raw: string): string | null {
  * generic "not finished yet" message instead of claiming the check digit is wrong, which a
  * code with no check digit position cannot be.
  */
-export function barcodeError(raw: string): string | null {
+export function barcodeError(raw: string): BarcodeErrorCode | null {
   const digits = digitsOf(raw);
   if (digits.length === 0) return null;
-  if (!/^\d+$/.test(digits)) return 'Eine EAN besteht nur aus Ziffern.';
+  if (!/^\d+$/.test(digits)) return 'notDigits';
   if (digits.length < SHORTEST) return null;
   if (normalizeBarcode(digits)) return null;
   if (!SUPPORTED_LENGTHS.includes(digits.length)) {
-    return 'Eine EAN hat 8 oder 13 Ziffern (UPC 12).';
+    return 'wrongLength';
   }
-  return 'Die Prüfziffer stimmt nicht. Bitte die Nummer prüfen.';
+  return 'checkDigit';
 }

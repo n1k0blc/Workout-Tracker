@@ -512,7 +512,7 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
         onOpenChange={setScannerOpen}
         mode={{
           kind: 'pick',
-          label: 'Als Zutat',
+          label: t('asIngredient'),
           onPick: (food) => {
             addFood(food);
             setScannerOpen(false);

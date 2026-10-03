@@ -2,6 +2,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, act, cleanup } from '@testing-library/react';
 import { useEffect } from 'react';
+import { NextIntlClientProvider } from 'next-intl';
+import messages from '@/messages/de.json';
 
 vi.mock('@/lib/api', () => ({
   apiClient: {
@@ -76,9 +78,11 @@ describe('active workout timer while editing a logged set', () => {
 
   it('does not drop back to 0 when a logged set is edited', async () => {
     render(
-      <WorkoutProvider>
-        <Probe />
-      </WorkoutProvider>,
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <WorkoutProvider>
+          <Probe />
+        </WorkoutProvider>
+      </NextIntlClientProvider>,
     );
 
     // Start a live session and let the clock run for 5s.
@@ -108,9 +112,11 @@ describe('active workout timer while editing a logged set', () => {
 
   it('stays paused when a logged set is edited', async () => {
     render(
-      <WorkoutProvider>
-        <Probe />
-      </WorkoutProvider>,
+      <NextIntlClientProvider locale="de" messages={messages}>
+        <WorkoutProvider>
+          <Probe />
+        </WorkoutProvider>
+      </NextIntlClientProvider>,
     );
 
     await act(async () => {

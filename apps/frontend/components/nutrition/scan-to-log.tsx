@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api';
 import { Food } from '@/types';
@@ -30,13 +31,15 @@ export function ScanToLog({
   /** The user dismissed the scanner without logging anything -- see {@link ScanFlow}. */
   onCancel?: () => void;
 }) {
+  const t = useTranslations('ScanToLog');
+
   async function logScanned(food: Food, grams: number, quantityLabel: string) {
     await apiClient.createDiaryEntriesBatch({
       mealSlotId: slotId,
       localDate: date,
       items: [{ foodId: food.id, grams, quantityLabel }],
     });
-    toast.success(`${food.name} zu ${slotName} hinzugefügt`, { description: quantityLabel });
+    toast.success(t('added', { food: food.name, slot: slotName }), { description: quantityLabel });
     onLogged();
   }
 

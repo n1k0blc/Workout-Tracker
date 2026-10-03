@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import {
   Drawer,
@@ -18,15 +18,6 @@ import { NutritionDay } from '@/types';
 import { fromLocalDateString, toLocalDateString } from '@/lib/local-date';
 import { formatKcal, relativeDayLabel } from '@/lib/nutrition';
 import { useSlotName } from '@/hooks/useSlotName';
-
-function formatFullDate(localDate: string): string {
-  return new Intl.DateTimeFormat('de-DE', {
-    weekday: 'short',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(fromLocalDateString(localDate));
-}
 
 /**
  * "Von einem anderen Tag kopieren" (#151): pick a previous day and copy that day's entries
@@ -52,6 +43,14 @@ export function CopyFromDaySheet({
   onCopied: () => void;
 }) {
   const t = useTranslations('CopyFromDaySheet');
+  const format = useFormatter();
+  const formatFullDate = (localDate: string) =>
+    format.dateTime(fromLocalDateString(localDate), {
+      weekday: 'short',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
   const slotLabel = useSlotName();
   const [sourceDates, setSourceDates] = useState<string[] | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
@@ -98,12 +97,12 @@ export function CopyFromDaySheet({
         if (active) setPreview(day);
       })
       .catch(() => {
-        if (active) toast.error('Vorschau konnte nicht geladen werden');
+        if (active) toast.error(t('previewError'));
       });
     return () => {
       active = false;
     };
-  }, [picked]);
+  }, [picked, t]);
 
   const pick = useCallback((day: Date | undefined) => {
     setPreview(null);
@@ -122,42 +121,39 @@ export function CopyFromDaySheet({
         const { count } = await action();
         onOpenChange(false);
         onCopied();
-        toast(
-          count === 0
-            ? 'Nichts zu übernehmen'
-            : `${count} ${count === 1 ? 'Eintrag' : 'Einträge'} übernommen`,
-        );
+        toast(count === 0 ? t('nothingToCopy') : t('copied', { count }));
       } catch {
-        toast.error('Übernehmen fehlgeschlagen');
+        toast.error(t('copyError'));
         setBusy(false);
       }
     },
-    [onOpenChange, onCopied],
+    [onOpenChange, onCopied, t],
   );
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="mx-auto max-w-md">
         <DrawerHeader>
-          <DrawerTitle>Von einem anderen Tag kopieren</DrawerTitle>
+          <DrawerTitle>{t('title')}</DrawerTitle>
           <DrawerDescription>
-            Überträgt Einträge auf{' '}
-            {relativeDayLabel(
-              date,
-              toLocalDateString(new Date()),
-              { today: t('today'), yesterday: t('yesterday'), tomorrow: t('tomorrow') },
-              (d) => new Intl.DateTimeFormat('de-DE', { weekday: 'long' }).format(d),
-            )}{' '}
-            · {formatFullDate(date)}. Kopien sind eigenständige Schnappschüsse.
+            {t('description', {
+              day: relativeDayLabel(
+                date,
+                toLocalDateString(new Date()),
+                { today: t('today'), yesterday: t('yesterday'), tomorrow: t('tomorrow') },
+                (d) => format.dateTime(d, { weekday: 'long' }),
+              ),
+              date: formatFullDate(date),
+            })}
           </DrawerDescription>
         </DrawerHeader>
 
         <div className="flex flex-col gap-4 overflow-y-auto px-4 pb-2">
           {sourceDates === null ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Lädt …</p>
+            <p className="py-8 text-center text-sm text-muted-foreground">{t('loading')}</p>
           ) : sourceDates.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              Keine früheren Tage mit Einträgen.
+              {t('noSources')}
             </p>
           ) : (
             <>
@@ -178,11 +174,11 @@ export function CopyFromDaySheet({
                   </div>
                   {preview === null ? (
                     <p className="border bg-card p-4 text-center text-sm text-muted-foreground">
-                      Lädt …
+                      {t('loading')}
                     </p>
                   ) : preview.slots.length === 0 ? (
                     <p className="border bg-card p-4 text-center text-sm text-muted-foreground">
-                      Nichts erfasst
+                      {t('nothingLogged')}
                     </p>
                   ) : (
                     <div className="divide-y border bg-card">
@@ -198,8 +194,7 @@ export function CopyFromDaySheet({
                             {slotLabel(s)}
                           </span>
                           <span className="shrink-0 text-xs text-muted-foreground">
-                            {s.entries.length}{' '}
-                            {s.entries.length === 1 ? 'Eintrag' : 'Einträge'} ·{' '}
+                            {t('entries', { count: s.entries.length })} ·{' '}
                             {formatKcal(s.totals.kcal)} kcal
                           </span>
                         </div>
@@ -223,7 +218,7 @@ export function CopyFromDaySheet({
               )
             }
           >
-            Nur {slotName} übernehmen
+            {t('onlySlot', { slot: slotName })}
           </Button>
           <Button
             variant="outline"
@@ -233,7 +228,7 @@ export function CopyFromDaySheet({
               picked && run(() => apiClient.copyDiaryDay({ fromDate: picked, toDate: date }))
             }
           >
-            Ganzen Tag übernehmen
+            {t('wholeDay')}
           </Button>
         </div>
       </DrawerContent>

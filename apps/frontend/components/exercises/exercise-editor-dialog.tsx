@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { MuscleGroup, Equipment, Exercise } from '@/types';
 import { apiClient } from '@/lib/api';
 import { MUSCLE_GROUP_ORDER, createIsolationPreset, validateMusclePercentages } from '@/lib/exercise-utils';
@@ -82,6 +83,7 @@ export function ExerciseEditorDialog({
   // and show why, in both edit and view mode, instead of only failing on save.
   const unilateralLocked = !!exercise?.inUse;
   const { translateMuscleGroup, translateEquipment } = useExerciseLabels();
+  const t = useTranslations('ExerciseEditorDialog');
   const apiError = useApiErrorMessage();
 
   const [name, setName] = useState('');
@@ -150,12 +152,12 @@ export function ExerciseEditorDialog({
     setError('');
 
     if (!name.trim()) {
-      setError('Bitte gib einen Namen ein');
+      setError(t('nameRequired'));
       return;
     }
 
     if (!validation.valid) {
-      setError(`Muskelgruppen-Prozente müssen 100% ergeben (aktuell: ${validation.sum}%)`);
+      setError(t('percentagesInvalid', { sum: validation.sum }));
       return;
     }
 
@@ -189,14 +191,14 @@ export function ExerciseEditorDialog({
   };
 
   const title = isViewMode
-    ? 'Übung anzeigen'
+    ? t('titleView')
     : isEditMode
-    ? 'Übung bearbeiten'
-    : 'Benutzerdefinierte Übung erstellen';
+    ? t('titleEdit')
+    : t('titleCreate');
 
   const submitLabel = isEditMode
-    ? loading ? 'Wird gespeichert...' : 'Speichern'
-    : loading ? 'Wird erstellt...' : 'Erstellen';
+    ? loading ? t('saving') : t('save')
+    : loading ? t('creating') : t('create');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -215,12 +217,12 @@ export function ExerciseEditorDialog({
           {/* Basic Info */}
           <div className="space-y-4">
             <div>
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="name">{t('name')}</Label>
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="z.B. Incline Dumbbell Press"
+                placeholder={t('namePlaceholder')}
                 autoFocus
                 disabled={isViewMode}
                 readOnly={isViewMode}
@@ -229,7 +231,7 @@ export function ExerciseEditorDialog({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="muscleGroup">Hauptmuskelgruppe</Label>
+                <Label htmlFor="muscleGroup">{t('primaryMuscle')}</Label>
                 <select
                   id="muscleGroup"
                   value={muscleGroup}
@@ -246,7 +248,7 @@ export function ExerciseEditorDialog({
               </div>
 
               <div>
-                <Label htmlFor="equipment">Equipment</Label>
+                <Label htmlFor="equipment">{t('equipment')}</Label>
                 <select
                   id="equipment"
                   value={equipment}
@@ -275,13 +277,12 @@ export function ExerciseEditorDialog({
                     className="h-4 w-4 accent-primary disabled:opacity-60"
                   />
                   <Label htmlFor="isUnilateral" className="text-sm cursor-pointer">
-                    Unilateral
+                    {t('unilateral')}
                   </Label>
                 </div>
                 {unilateralLocked && (
                   <p className="text-xs text-muted-foreground max-w-[16rem]">
-                    Wird bereits in Sätzen verwendet – nicht mehr änderbar. Lege dafür
-                    eine neue Übung an.
+                    {t('unilateralLocked')}
                   </p>
                 )}
               </div>
@@ -295,7 +296,7 @@ export function ExerciseEditorDialog({
                   className="h-4 w-4 accent-primary disabled:opacity-60"
                 />
                 <Label htmlFor="isDoubleWeight" className="text-sm cursor-pointer">
-                  Doppeltes Gewicht
+                  {t('doubleWeight')}
                 </Label>
               </div>
             </div>
@@ -304,7 +305,7 @@ export function ExerciseEditorDialog({
           {/* Muscle Distribution */}
           <div className="border-t pt-5">
             <div className="flex items-center justify-between mb-3">
-              <Label>Muskelgruppen-Verteilung</Label>
+              <Label>{t('distribution')}</Label>
               {!isViewMode && (
                 <Button
                   type="button"
@@ -312,7 +313,7 @@ export function ExerciseEditorDialog({
                   size="sm"
                   onClick={handleIsolationPreset}
                 >
-                  Isolation (100%)
+                  {t('isolation')}
                 </Button>
               )}
             </div>
@@ -320,7 +321,7 @@ export function ExerciseEditorDialog({
             {/* Progress Bar */}
             <div className="mb-4">
               <div className="flex justify-between text-xs mb-1.5">
-                <span className="text-muted-foreground">Gesamt</span>
+                <span className="text-muted-foreground">{t('total')}</span>
                 <span
                   className={`font-semibold ${
                     validation.valid
@@ -397,7 +398,7 @@ export function ExerciseEditorDialog({
                 type="button"
                 onClick={() => onOpenChange(false)}
               >
-                Schließen
+                {t('close')}
               </Button>
             ) : (
               <>
@@ -407,7 +408,7 @@ export function ExerciseEditorDialog({
                   onClick={() => onOpenChange(false)}
                   disabled={loading}
                 >
-                  Abbrechen
+                  {t('cancel')}
                 </Button>
                 <Button
                   type="submit"

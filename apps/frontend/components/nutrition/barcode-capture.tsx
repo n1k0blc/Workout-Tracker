@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslations } from 'next-intl';
 import { IconCameraOff, IconX } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { barcodeError, normalizeBarcode } from '@/lib/barcode';
-import { useBarcodeScanner } from '@/hooks/useBarcodeScanner';
+import { useBarcodeScanner, type CameraReason } from '@/hooks/useBarcodeScanner';
 
 /**
  * Getting one barcode out of a person (#149), screens 06 / 06b.
@@ -54,6 +55,7 @@ export function BarcodeCapture({
   busy?: boolean;
   children?: React.ReactNode;
 }) {
+  const t = useTranslations('BarcodeCapture');
   const [manual, setManual] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -90,7 +92,8 @@ export function BarcodeCapture({
   function submitManual() {
     const barcode = normalizeBarcode(manual);
     if (!barcode) {
-      setError(barcodeError(manual) ?? 'Bitte eine vollständige EAN eingeben.');
+      const code = barcodeError(manual);
+      setError(code ? t(`errors.${code}`) : t('incomplete'));
       return;
     }
     setError(null);
@@ -106,20 +109,20 @@ export function BarcodeCapture({
       className="pointer-events-auto fixed inset-0 z-50 flex flex-col bg-zinc-950 text-zinc-50"
       role="dialog"
       aria-modal="true"
-      aria-label="Barcode scannen"
+      aria-label={t('ariaLabel')}
     >
       <header className="relative flex h-16 shrink-0 items-center justify-between px-2">
         <Button
           variant="ghost"
           size="icon"
-          aria-label="Scanner schließen"
+          aria-label={t('close')}
           className="text-zinc-50 hover:bg-white/10 hover:text-zinc-50"
           onClick={() => onOpenChange(false)}
         >
           <IconX />
         </Button>
         <div className="absolute left-1/2 -translate-x-1/2 text-lg font-semibold uppercase tracking-[0.05em]">
-          Barcode
+          {t('title')}
         </div>
         <div className="w-10" />
       </header>
@@ -143,7 +146,7 @@ export function BarcodeCapture({
         <div className="absolute inset-x-4 bottom-4">
           <label className="block">
             <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-400">
-              EAN manuell eingeben
+              {t('manualLabel')}
             </span>
             <div className="mt-1.5 flex items-center gap-2">
               <Input
@@ -154,8 +157,8 @@ export function BarcodeCapture({
                 }}
                 onKeyDown={(e) => e.key === 'Enter' && submitManual()}
                 inputMode="numeric"
-                placeholder="13-stellige Nummer"
-                aria-label="EAN manuell eingeben"
+                placeholder={t('manualPlaceholder')}
+                aria-label={t('manualLabel')}
                 className="border-b-white/30 font-mono text-zinc-50 placeholder:text-zinc-500"
               />
               <Button
@@ -164,7 +167,7 @@ export function BarcodeCapture({
                 onClick={submitManual}
                 disabled={busy}
               >
-                Suchen
+                {t('search')}
               </Button>
             </div>
           </label>
@@ -194,6 +197,7 @@ export function CaptureSheet({ children }: { children: React.ReactNode }) {
 
 /** The corner-bracketed frame and scan line the camera image sits behind. */
 function Viewfinder({ starting }: { starting: boolean }) {
+  const t = useTranslations('BarcodeCapture');
   const corner = 'absolute size-8 border-zinc-50';
   return (
     <>
@@ -205,7 +209,7 @@ function Viewfinder({ starting }: { starting: boolean }) {
         <div className="absolute inset-x-2 top-1/2 h-0.5 bg-zinc-50" />
       </div>
       <div className="absolute inset-x-0 top-[calc(44%+110px)] text-center text-xs uppercase tracking-[0.12em] text-zinc-400">
-        {starting ? 'Kamera wird gestartet …' : 'EAN im Rahmen halten'}
+        {starting ? t('starting') : t('holdInFrame')}
       </div>
     </>
   );
@@ -215,23 +219,23 @@ function CameraUnavailable({
   reason,
   insecureContext,
 }: {
-  reason: string | null;
+  reason: CameraReason | null;
   insecureContext: boolean;
 }) {
+  const t = useTranslations('BarcodeCapture');
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 px-8 pb-40 text-center">
       <div className="flex items-center gap-2 text-destructive">
         <IconCameraOff className="size-4" />
-        <span className="text-[10px] font-semibold uppercase tracking-[0.15em]">Keine Kamera</span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.15em]">{t('noCamera')}</span>
       </div>
       <p className="text-sm text-zinc-200">
-        {reason ?? 'Kamerazugriff ist nicht erlaubt oder nicht verfügbar.'} Du kannst die EAN
-        eingeben.
+        {reason ? t(`camera.${reason}`) : t('cameraFallback')} {t('canTypeEan')}
       </p>
       <p className="text-xs text-zinc-400">
         {insecureContext
-          ? 'Die Seite über HTTPS oder localhost öffnen und erneut versuchen.'
-          : 'Zugriff in den Browser-Einstellungen erlauben und erneut versuchen.'}
+          ? t('needsSecure')
+          : t('allowAccess')}
       </p>
     </div>
   );

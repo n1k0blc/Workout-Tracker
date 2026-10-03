@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 import {
   IconAlertTriangle,
   IconCheck,
@@ -62,10 +62,6 @@ type Phase =
   | { step: 'looking-up'; barcode: string }
   | { step: 'result'; lookup: BarcodeLookup };
 
-function fmt1(value: number): string {
-  return value.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-}
-
 export function BarcodeScannerSheet({
   open,
   onOpenChange,
@@ -89,6 +85,7 @@ export function BarcodeScannerSheet({
    */
   initialResult?: BarcodeLookup | null;
 }) {
+  const t = useTranslations('BarcodeScannerSheet');
   const apiError = useApiErrorMessage();
   const [phase, setPhase] = useState<Phase>(
     initialResult ? { step: 'result', lookup: initialResult } : { step: 'scanning' },
@@ -136,7 +133,7 @@ export function BarcodeScannerSheet({
       {phase.step === 'looking-up' && (
         <CaptureSheet>
           <p className="py-2 text-sm text-muted-foreground">
-            <span className="font-mono">{phase.barcode}</span> wird geprüft …
+            <span className="font-mono">{phase.barcode}</span> {t('checking')}
           </p>
         </CaptureSheet>
       )}
@@ -175,22 +172,25 @@ function ResultBody({
   onOpenFood?: (food: Food) => void;
   onRescan: () => void;
 }) {
+  const t = useTranslations('BarcodeScannerSheet');
   if (lookup.status === 'notFound' || !lookup.food) {
     return (
       <>
         <ResultLabel icon={<IconSearch className="size-4" />} muted>
-          Kein Treffer
+          {t('noHit')}
         </ResultLabel>
         <p className="mt-2.5 text-sm">
-          Zu <span className="font-mono">{lookup.barcode}</span> gibt es weder ein eigenes
-          Lebensmittel noch einen Open-Food-Facts-Eintrag.
+          {t.rich('noHitText', {
+            barcode: lookup.barcode,
+            mono: (chunks) => <span className="font-mono">{chunks}</span>,
+          })}
         </p>
         <div className="mt-3.5 flex gap-2">
           <Button className="flex-1" onClick={() => onCreateFood(lookup.barcode)}>
-            Lebensmittel anlegen
+            {t('createFood')}
           </Button>
           <Button variant="outline" onClick={onRescan}>
-            Erneut
+            {t('again')}
           </Button>
         </div>
       </>
@@ -219,6 +219,9 @@ function FoodResult({
   onRescan: () => void;
 }) {
   const t = useTranslations('BarcodeScannerSheet');
+  const format = useFormatter();
+  const fmt1 = (value: number) =>
+    format.number(value, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const stops = useMemo(() => buildQuantityStops(food.portions), [food.portions]);
   const [amount, setAmount] = useState(() => {
     const index = defaultQuantityStopIndex(
@@ -257,7 +260,7 @@ function FoodResult({
       // surface underneath, and scanning the next item should not need the button again.
       onRescan();
     } catch {
-      setError('Der Eintrag konnte nicht gespeichert werden.');
+      setError(t('saveError'));
     } finally {
       setSaving(false);
     }
@@ -274,7 +277,7 @@ function FoodResult({
           )
         }
       >
-        Treffer ·{' '}
+        {t('hit')} ·{' '}
         {food.editable ? t('ownFoodHit') : (sourceLabel ?? t('foodHit'))}
       </ResultLabel>
 
@@ -294,25 +297,29 @@ function FoodResult({
 
       {fromOpenFoodFacts ? (
         <p className="mt-2.5 text-xs text-muted-foreground">
-          {Math.round(food.kcal)} kcal · {fmt1(food.carbs)} g KH · {fmt1(food.protein)} g Protein ·{' '}
-          {fmt1(food.fat)} g Fett je 100 {unit}
+          {t('kcalLine', {
+            kcal: Math.round(food.kcal),
+            carbs: fmt1(food.carbs),
+            protein: fmt1(food.protein),
+            fat: fmt1(food.fat),
+            unit,
+          })}
         </p>
       ) : (
         <>
           <div className="mt-3.5 grid grid-cols-4 border">
             <Per100Cell value={String(Math.round(food.kcal))} label="kcal" border="border-r" />
-            <Per100Cell value={fmt1(food.carbs)} label="KH g" border="border-r" />
-            <Per100Cell value={fmt1(food.protein)} label="Prot. g" border="border-r" />
-            <Per100Cell value={fmt1(food.fat)} label="Fett g" border="" />
+            <Per100Cell value={fmt1(food.carbs)} label={t('cellCarbs')} border="border-r" />
+            <Per100Cell value={fmt1(food.protein)} label={t('cellProtein')} border="border-r" />
+            <Per100Cell value={fmt1(food.fat)} label={t('cellFat')} border="" />
           </div>
-          <div className="mt-1.5 text-xs text-muted-foreground">Werte je 100 {unit}</div>
+          <div className="mt-1.5 text-xs text-muted-foreground">{t('values100', { unit })}</div>
         </>
       )}
 
       {fromOpenFoodFacts && (
         <p className="mt-3 border-t pt-2.5 text-xs text-muted-foreground">
-          Daten aus Open Food Facts (ODbL). Werte können unvollständig sein — vor dem Speichern
-          prüfen.
+          {t('odbl')}
         </p>
       )}
 
@@ -327,15 +334,15 @@ function FoodResult({
           />
           <div className="flex gap-2">
             <Button className="flex-1" onClick={log} disabled={saving}>
-              {saving ? 'Speichert …' : `Zu ${mode.slotName}`}
+              {saving ? t('saving') : t('addTo', { slot: mode.slotName })}
             </Button>
             {onOpenFood && (
               <Button variant="outline" onClick={() => onOpenFood(food)}>
-                Prüfen
+                {t('check')}
               </Button>
             )}
             <Button variant="outline" onClick={onRescan}>
-              Erneut
+              {t('again')}
             </Button>
           </div>
         </div>
@@ -345,7 +352,7 @@ function FoodResult({
             {(fromOpenFoodFacts && mode.openFoodFactsLabel) || mode.label}
           </Button>
           <Button variant="outline" onClick={onRescan}>
-            Erneut
+            {t('again')}
           </Button>
         </div>
       )}
