@@ -88,12 +88,14 @@ export async function seedFoodTranslations(
     }
   }
 
+  // Only foods the seed manages: a keyless legacy SEED row is not ours to count.
+  const seeded = { source: 'SEED', seedKey: { not: null } } as const;
   for (const locale of ['DE', 'EN'] as const) {
     const names = await prisma.foodTranslation.count({
-      where: { locale, food: { source: 'SEED' } },
+      where: { locale, food: seeded },
     });
     const labels = await prisma.foodPortionTranslation.count({
-      where: { locale, portion: { food: { source: 'SEED' } } },
+      where: { locale, portion: { food: seeded } },
     });
     if (names !== foods.length || labels !== portionCount) {
       throw new Error(
