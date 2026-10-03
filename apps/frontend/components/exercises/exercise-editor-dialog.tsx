@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { IconLoader2 } from '@tabler/icons-react';
+import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
 
 interface ExerciseEditorDialogProps {
   open: boolean;
@@ -81,6 +82,7 @@ export function ExerciseEditorDialog({
   // and show why, in both edit and view mode, instead of only failing on save.
   const unilateralLocked = !!exercise?.inUse;
   const { translateMuscleGroup, translateEquipment } = useExerciseLabels();
+  const apiError = useApiErrorMessage();
 
   const [name, setName] = useState('');
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup>(MuscleGroup.CHEST);
@@ -180,7 +182,7 @@ export function ExerciseEditorDialog({
       onSuccess?.(result);
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ein Fehler ist aufgetreten');
+      setError(apiError(err));
     } finally {
       setLoading(false);
     }

@@ -193,6 +193,16 @@ say.
   series is in the client's timezone; omitted, the window is the last 7 days up to the
   client's "today". No weight correlation. Code: `NutritionAnalyticsService`.
 
+### Fehlermeldungen (API errors)
+
+- **Fehlercode** — every API error carries a stable `code` (`ERROR_CODES`); the frontend never
+  shows the API's `message`. `useApiErrorMessage` maps the code to `ApiErrors.codes.<CODE>` in the
+  user's locale. Validation failures carry `code: VALIDATION_FAILED` plus
+  `errors: [{ property, constraints }]` (`createValidationPipe`), mapped per property and
+  constraint name. An unmapped code logs a warning and falls back to the caller's context message
+  or `ApiErrors.generic`. Parameters of the old messages (a weekday, a sum) are not carried, so
+  the localized text is static.
+
 ### Übungen (exercise catalogue)
 
 - **Übung-Übersetzung** — the 115 catalogue Übungen (`isCustom = false`) show their name in the

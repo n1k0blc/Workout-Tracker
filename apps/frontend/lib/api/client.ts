@@ -57,6 +57,8 @@ import { clientTimeZone } from '@/lib/local-date';
 import { clientLocale } from '@/lib/client-locale';
 import type { UnitSystem } from '@/lib/units';
 
+import { ApiError } from './errors';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 class ApiClient {
@@ -161,12 +163,29 @@ class ApiClient {
         this.redirecting = true;
         window.location.href = `/${clientLocale()}/login`;
       }
-      throw new Error('Unauthorized');
+      if (isAuthEndpoint) {
+        // A real auth failure (wrong password, ...): its code is what the form shows (#190).
+        const body = await response.json().catch(() => ({}));
+        throw new ApiError(
+          body.message || 'Unauthorized',
+          401,
+          typeof body.code === 'string' ? body.code : undefined,
+        );
+      }
+      throw new ApiError('Unauthorized', 401);
     }
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Unknown error' }));
-      throw new Error(error.message || `HTTP ${response.status}`);
+      // Validation failures carry `message: string[]` of generated English; keep it joined for
+      // logs, but the UI reads `code` / `errors` instead (#190).
+      const message = Array.isArray(error.message) ? error.message.join('; ') : error.message;
+      throw new ApiError(
+        message || `HTTP ${response.status}`,
+        response.status,
+        typeof error.code === 'string' ? error.code : undefined,
+        Array.isArray(error.errors) ? error.errors : [],
+      );
     }
 
     // Handle empty responses (e.g., 204 No Content or null responses)

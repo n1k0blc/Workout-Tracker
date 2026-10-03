@@ -9,12 +9,14 @@ import { Input } from '@/components/ui/input';
 import { DatePicker } from '@/components/date-picker';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
 
 interface HomeGymInput {
   name: string;
 }
 
 export default function RegisterPage() {
+  const apiError = useApiErrorMessage();
   const { register } = useAuth();
   const [step, setStep] = useState<1 | 2>(1);
   const [error, setError] = useState('');
@@ -130,7 +132,7 @@ export default function RegisterPage() {
       // login/page.tsx for why crossing locales needs a full page load.
       window.location.href = `/${user.locale}/dashboard`;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Registrierung fehlgeschlagen');
+      setError(apiError(err));
     } finally {
       setLoading(false);
     }

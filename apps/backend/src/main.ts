@@ -1,9 +1,9 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { registerCspReportParser } from './security/csp-report.parser';
+import { createValidationPipe } from './common/errors/validation-pipe';
 import { isLocalDevOrigin } from './common/utils/dev-cors';
 
 async function bootstrap() {
@@ -88,13 +88,7 @@ async function bootstrap() {
   }
 
   // Enable validation pipes globally
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-    }),
-  );
+  app.useGlobalPipes(createValidationPipe());
 
   const port = process.env.PORT || 3001;
   // Bind to 0.0.0.0 so it's reachable from other devices on the local network (iPhone etc.)

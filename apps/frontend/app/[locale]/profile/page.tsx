@@ -47,9 +47,11 @@ import {
   DialogTrigger,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
 
 export default function ProfilePage() {
   const t = useTranslations('Profile');
+  const apiError = useApiErrorMessage();
   const format = useFormatter();
   const router = useRouter();
   const { user, logout } = useAuth();
@@ -200,7 +202,7 @@ export default function ProfilePage() {
       // Reload user data
       window.location.reload();
     } catch (err: any) {
-      setError(err.message || t('profileData.updateError'));
+      setError(apiError(err, t('profileData.updateError')));
     } finally {
       setLoading(false);
     }
@@ -240,7 +242,7 @@ export default function ProfilePage() {
       setIsEditingTargets(false);
       window.location.reload();
     } catch (err: any) {
-      setError(err.message || t('targets.saveError'));
+      setError(apiError(err, t('targets.saveError')));
     } finally {
       setTargetsLoading(false);
     }
@@ -259,7 +261,7 @@ export default function ProfilePage() {
       setNewGymName('');
       setSuccess(t('gyms.added'));
     } catch (err: any) {
-      setError(err.message || t('gyms.addError'));
+      setError(apiError(err, t('gyms.addError')));
     } finally {
       setLoading(false);
     }
@@ -279,7 +281,7 @@ export default function ProfilePage() {
       setEditingGymName('');
       setSuccess(t('gyms.updated'));
     } catch (err: any) {
-      setError(err.message || t('gyms.updateError'));
+      setError(apiError(err, t('gyms.updateError')));
     } finally {
       setLoading(false);
     }
@@ -299,7 +301,7 @@ export default function ProfilePage() {
       setHomeGyms(homeGyms.filter((g) => g.id !== id));
       setSuccess(t('gyms.deleted'));
     } catch (err: any) {
-      setError(err.message || t('gyms.deleteError'));
+      setError(apiError(err, t('gyms.deleteError')));
     } finally {
       setLoading(false);
     }
@@ -336,7 +338,7 @@ export default function ProfilePage() {
       await logout();
       router.push('/login');
     } catch (err: any) {
-      setPasswordError(err.message || t('security.changeError'));
+      setPasswordError(apiError(err, t('security.changeError')));
     } finally {
       setPasswordLoading(false);
     }
@@ -362,7 +364,7 @@ export default function ProfilePage() {
       await apiClient.updateProfile({ locale: next });
       window.location.href = `/${next}/profile`;
     } catch (err: any) {
-      setError(err.message || t('language.updateError'));
+      setError(apiError(err, t('language.updateError')));
       setLocaleSaving(false);
     }
   };
@@ -379,7 +381,7 @@ export default function ProfilePage() {
       await apiClient.updateProfile({ unitSystem: next });
       window.location.reload();
     } catch (err: any) {
-      setError(err.message || t('units.updateError'));
+      setError(apiError(err, t('units.updateError')));
       setUnitSaving(false);
     }
   };

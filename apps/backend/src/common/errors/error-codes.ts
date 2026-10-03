@@ -1,9 +1,10 @@
 /**
  * Every machine-readable error code the API can return, grouped by the module that throws it.
  * A code names the *condition* an exception represents, not its (still German/English-mixed)
- * message text -- this is the expand half of an expand-contract migration (#178): the
- * frontend keeps reading `message` exactly as it does today, and can start keying off `code`
- * once a later ticket wires that up.
+ * message text -- the expand half of an expand-contract migration (#178). The frontend now
+ * migrates (#190): it never displays `message`, and maps `code` to `ApiErrors.codes.<CODE>` in
+ * its message catalogue. Adding a code here without a de + en entry fails the frontend's
+ * `useApiErrorMessage` test, which iterates this list.
  *
  * The same code is reused across call sites that check the literal same condition (e.g.
  * `CYCLE_NOT_FOUND` fires from three different services), even where their message text
@@ -22,6 +23,9 @@ export const ERROR_CODES = [
   'REFRESH_TOKEN_EXPIRED',
   'REFRESH_TOKEN_ALREADY_ROTATED',
   'REFRESH_TOKEN_REUSE_DETECTED',
+
+  // Validation (class-validator failures; carries per-property `errors`, see validation-pipe.ts)
+  'VALIDATION_FAILED',
 
   // CSRF
   'CSRF_TOKEN_INVALID',

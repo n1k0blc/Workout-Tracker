@@ -17,6 +17,7 @@ import {
   formatQuantityLabel,
 } from '@/lib/nutrition';
 import { useFavoriteToggle } from '@/hooks/useFavoriteToggle';
+import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
 import { BarcodeLookup, Food } from '@/types';
 import { BarcodeCapture, CaptureSheet } from './barcode-capture';
 import { FavoriteStar } from './favorite-star';
@@ -88,6 +89,7 @@ export function BarcodeScannerSheet({
    */
   initialResult?: BarcodeLookup | null;
 }) {
+  const apiError = useApiErrorMessage();
   const [phase, setPhase] = useState<Phase>(
     initialResult ? { step: 'result', lookup: initialResult } : { step: 'scanning' },
   );
@@ -100,11 +102,9 @@ export function BarcodeScannerSheet({
       setPhase({ step: 'result', lookup: await apiClient.lookupBarcode(barcode) });
     } catch (error) {
       setPhase({ step: 'scanning' });
-      setLookupError(
-        error instanceof Error ? error.message : 'Der Barcode konnte nicht geprüft werden.',
-      );
+      setLookupError(apiError(error));
     }
-  }, []);
+  }, [apiError]);
 
   function rescan() {
     setLookupError(null);

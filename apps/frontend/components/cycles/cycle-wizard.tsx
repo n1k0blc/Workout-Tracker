@@ -12,6 +12,7 @@ import ReviewStep from './review-step';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { withArrayPositionOrder } from '@/lib/workout-order';
+import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
 
 export interface BlueprintSetData {
   order: number;
@@ -61,6 +62,7 @@ export interface CycleFormData {
 export default function CycleWizard() {
   const router = useRouter();
   const t = useTranslations('CycleWizard');
+  const apiError = useApiErrorMessage();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -114,7 +116,7 @@ export default function CycleWizard() {
       await apiClient.createCycle(payload);
       router.push('/cycles');
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('createError'));
+      setError(apiError(err, t('createError')));
     } finally {
       setLoading(false);
     }

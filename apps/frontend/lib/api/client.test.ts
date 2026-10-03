@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from './client';
+import { ApiError } from './errors';
 
 function mockFetch() {
   const fetchMock = vi.fn().mockResolvedValue({
@@ -160,5 +161,65 @@ describe('favorites endpoints (#148)', () => {
     await apiClient.getPickerRecent();
     expect(sentCall(all)[0]).toContain('/nutrition/picker/recent');
     expect(sentCall(all)[0]).not.toContain('scope');
+  });
+});
+
+describe('client error responses (#190)', () => {
+  function failWith(status: number, body: unknown) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status, json: async () => body }),
+    );
+  }
+
+  it('throws an ApiError carrying the status and the machine-readable code', async () => {
+    failWith(404, { statusCode: 404, message: 'Workout cycle not found', code: 'CYCLE_NOT_FOUND' });
+
+    const error = await apiClient.getSuggestedWorkout().catch((e) => e);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ status: 404, code: 'CYCLE_NOT_FOUND' });
+  });
+
+  it('carries validation field errors and joins the generated message[] for logs', async () => {
+    failWith(400, {
+      statusCode: 400,
+      code: 'VALIDATION_FAILED',
+      message: ['email must be an email', 'password is too short'],
+      errors: [{ property: 'email', constraints: ['isEmail'] }],
+    });
+
+    const error = await apiClient.getSuggestedWorkout().catch((e) => e);
+
+    expect(error.fieldErrors).toEqual([{ property: 'email', constraints: ['isEmail'] }]);
+    expect(error.message).toBe('email must be an email; password is too short');
+  });
+
+  it('still produces an ApiError when the body is not JSON', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 502,
+        json: async () => {
+          throw new Error('not json');
+        },
+      }),
+    );
+
+    const error = await apiClient.getSuggestedWorkout().catch((e) => e);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error.status).toBe(502);
+    expect(error.code).toBeUndefined();
+  });
+
+  it('keeps the code of an /auth/* 401, so a wrong password maps to its own message', async () => {
+    failWith(401, { statusCode: 401, message: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
+
+    const error = await apiClient.login({ email: 'a@b.com', password: 'wrong' }).catch((e) => e);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ status: 401, code: 'INVALID_CREDENTIALS' });
   });
 });

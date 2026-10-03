@@ -3,6 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import messages from '@/messages/de.json';
+import { ApiError } from '@/lib/api/errors';
 
 // Radix Select relies on pointer-capture and scroll APIs jsdom doesn't implement.
 beforeAll(() => {
@@ -121,9 +122,26 @@ describe('ProfilePage language select', () => {
     const englishOption = await screen.findByText('English');
     fireEvent.click(englishOption);
 
-    await waitFor(() => expect(screen.getByText('network down')).toBeTruthy());
+    // The context message, never the raw error text (#190).
+    await waitFor(() => expect(screen.getByText('Fehler beim Ändern der Sprache')).toBeTruthy());
+    expect(screen.queryByText('network down')).toBeNull();
     expect(window.location.href).toBe('');
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it('shows the catalogue text for the API error code instead of the API message', async () => {
+    updateProfile.mockRejectedValueOnce(
+      new ApiError('Email is already in use', 409, 'EMAIL_ALREADY_IN_USE'),
+    );
+    renderProfilePage();
+
+    fireEvent.click(await screen.findByRole('combobox', { name: 'Sprache' }));
+    fireEvent.click(await screen.findByText('English'));
+
+    await waitFor(() =>
+      expect(screen.getByText('Diese E-Mail-Adresse wird bereits verwendet.')).toBeTruthy(),
+    );
+    expect(screen.queryByText('Email is already in use')).toBeNull();
   });
 });
 

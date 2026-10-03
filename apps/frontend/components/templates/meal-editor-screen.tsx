@@ -62,6 +62,7 @@ import {
 } from '@/components/nutrition/picker-tabs';
 import { usePickerLists } from '@/hooks/usePickerLists';
 import { ScanFlow } from '@/components/nutrition/scan-flow';
+import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
 
 /** Where Speichern, Abbrechen and Löschen all return to. */
 const MEALS_TAB = '/templates?tab=meals';
@@ -147,6 +148,7 @@ function signature(name: string, items: EditorItem[]): string {
  */
 export default function MealEditorScreen({ mealId }: { mealId?: string }) {
   const t = useTranslations('MealEditorScreen');
+  const apiError = useApiErrorMessage();
   const router = useRouter();
   const isEdit = mealId != null;
 
@@ -308,7 +310,7 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
       toast.success(isEdit ? t('saved') : t('created'));
       router.push(MEALS_TAB);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('saveError'));
+      setError(apiError(err, t('saveError')));
       setSaving(false);
     }
   }
@@ -321,7 +323,7 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
       toast.success(t('deleted'));
       router.push(MEALS_TAB);
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('deleteError'));
+      setError(apiError(err, t('deleteError')));
     }
   }
 

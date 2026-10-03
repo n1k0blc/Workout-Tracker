@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
 
 export default function LoginPage() {
+  const apiError = useApiErrorMessage();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -31,7 +33,7 @@ export default function LoginPage() {
       const user = await login({ email, password });
       window.location.href = `/${user.locale}/dashboard`;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login fehlgeschlagen');
+      setError(apiError(err));
     } finally {
       setLoading(false);
     }

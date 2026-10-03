@@ -24,6 +24,7 @@ import { apiClient } from '@/lib/api';
 import { parseAmount } from '@/lib/nutrition';
 import { Food, FoodInput, SimilarFood } from '@/types';
 import { BarcodeCapture } from '@/components/nutrition/barcode-capture';
+import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
 
 interface PortionRow {
   key: string;
@@ -109,6 +110,7 @@ export function FoodEditorDialog({
   /** Receives the saved food, so a caller mid-flow can carry on with it (#149). */
   onChanged: (saved?: Food) => void;
 }) {
+  const apiError = useApiErrorMessage();
   const [forceForm, setForceForm] = useState(false); // "Eigene Kopie anlegen" from read-only
   const [name, setName] = useState('');
   const [barcode, setBarcode] = useState('');
@@ -260,7 +262,7 @@ export function FoodEditorDialog({
       onChanged(saved);
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Speichern fehlgeschlagen.');
+      setError(apiError(err));
       setSaving(false);
     }
   }
@@ -272,7 +274,7 @@ export function FoodEditorDialog({
       onChanged();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Löschen fehlgeschlagen.');
+      setError(apiError(err));
     }
   }
 
