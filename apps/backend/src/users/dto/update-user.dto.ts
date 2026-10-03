@@ -14,7 +14,7 @@ import { ApiLocale, SUPPORTED_LOCALES } from '../../common/utils/locale.util';
 
 export class UpdateUserDto {
   @IsOptional()
-  @IsEmail({}, { message: 'Please provide a valid email address' })
+  @IsEmail()
   email?: string;
 
   @IsOptional()

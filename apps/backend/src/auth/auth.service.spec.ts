@@ -126,7 +126,11 @@ describe('AuthService locale and unitSystem (#179)', () => {
   describe('register', () => {
     it('persists the locale carried on X-Locale and maps it back on the returned user', async () => {
       const { service, prisma } = makeService({ breached: false });
-      prisma.user.create.mockResolvedValue({ id: 'user-1', email: 'new@example.com', locale: 'EN' });
+      prisma.user.create.mockResolvedValue({
+        id: 'user-1',
+        email: 'new@example.com',
+        locale: 'EN',
+      });
 
       const session = await service.register(baseRegisterDto(), { localeHeader: 'en' });
 

@@ -69,7 +69,7 @@ export class WorkoutsController {
     @Query('excludeWorkoutId') excludeWorkoutId?: string,
   ): Promise<LastPerformanceDto | null> {
     if (!exerciseId) {
-      throw new AppBadRequestException('exerciseId is required', 'EXERCISE_ID_REQUIRED');
+      throw new AppBadRequestException('EXERCISE_ID_REQUIRED');
     }
     return this.workoutsService.findExerciseLastPerformance(
       user.id,

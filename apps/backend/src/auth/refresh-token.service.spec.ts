@@ -118,7 +118,6 @@ describe('RefreshTokenService.rotate', () => {
     const service = new RefreshTokenService(prisma as any);
 
     const result = service.rotate('raw-token');
-    await expect(result).rejects.toThrow('Refresh token expired');
     await expect(result).rejects.toMatchObject({ code: 'REFRESH_TOKEN_EXPIRED' });
     expect(rows.get('row-seed')?.revokedAt).toBeNull();
   });
@@ -135,7 +134,6 @@ describe('RefreshTokenService.rotate', () => {
     const service = new RefreshTokenService(prisma as any);
 
     const result = service.rotate('raw-token');
-    await expect(result).rejects.toThrow('Refresh token reuse detected');
     await expect(result).rejects.toMatchObject({ code: 'REFRESH_TOKEN_REUSE_DETECTED' });
     expect(rows.get('row-older')?.revokedAt).not.toBeNull();
   });
@@ -147,7 +145,6 @@ describe('RefreshTokenService.rotate', () => {
     const service = new RefreshTokenService(prisma as any);
 
     const result = service.rotate('raw-token');
-    await expect(result).rejects.toThrow('Refresh token already rotated');
     await expect(result).rejects.toMatchObject({ code: 'REFRESH_TOKEN_ALREADY_ROTATED' });
     // The other session must survive -- this wasn't treated as theft.
     expect(rows.get('row-other')?.revokedAt).toBeNull();
@@ -217,9 +214,9 @@ describe('RefreshTokenService reuse detection spares newer sessions (#161)', () 
     // outside the service's collision grace period, so this is treated as a genuine reuse
     // signal rather than a benign race.
     jest.setSystemTime(t0 + 1_000 + 10_000);
-    await expect(service.rotate(session1First.rawToken)).rejects.toThrow(
-      'Refresh token reuse detected',
-    );
+    await expect(service.rotate(session1First.rawToken)).rejects.toMatchObject({
+      code: 'REFRESH_TOKEN_REUSE_DETECTED',
+    });
 
     // Session 1's current token predates the compromise reveal and must die with it.
     await expect(service.rotate(session1Second.rawToken)).rejects.toThrow(UnauthorizedException);
@@ -241,7 +238,9 @@ describe('RefreshTokenService reuse detection spares newer sessions (#161)', () 
     });
     const service = new RefreshTokenService(prisma as any);
 
-    await expect(service.rotate('raw-token')).rejects.toThrow('Refresh token reuse detected');
+    await expect(service.rotate('raw-token')).rejects.toMatchObject({
+      code: 'REFRESH_TOKEN_REUSE_DETECTED',
+    });
 
     expect(rows.get('row-newer')?.revokedAt).toBeNull();
   });
@@ -334,7 +333,9 @@ describe('RefreshTokenService rejection logging (#160)', () => {
     });
     const service = new RefreshTokenService(prisma as any);
 
-    await expect(service.rotate('raw-token')).rejects.toThrow('Refresh token reuse detected');
+    await expect(service.rotate('raw-token')).rejects.toMatchObject({
+      code: 'REFRESH_TOKEN_REUSE_DETECTED',
+    });
 
     expect(loggedLines()).toEqual([
       expect.stringMatching(/superseded token reused.*user-1.*ended 1 session/),

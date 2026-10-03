@@ -35,7 +35,7 @@ export class CsrfMiddleware implements NestMiddleware {
     const headerToken = req.header(CSRF_HEADER);
 
     if (!cookieToken || !headerToken || !timingSafeEqualStrings(cookieToken, headerToken)) {
-      throw new AppForbiddenException('Invalid or missing CSRF token', 'CSRF_TOKEN_INVALID');
+      throw new AppForbiddenException('CSRF_TOKEN_INVALID');
     }
 
     next();

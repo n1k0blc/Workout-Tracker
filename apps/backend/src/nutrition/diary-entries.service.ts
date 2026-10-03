@@ -258,10 +258,7 @@ export class DiaryEntriesService {
     })) as FoodRow[];
     const foodById = new Map(foods.map((f) => [f.id, f]));
     if (foodById.size !== foodIds.length) {
-      throw new AppNotFoundException(
-        'Ein Lebensmittel wurde nicht gefunden',
-        'MEAL_ITEM_FOOD_NOT_FOUND',
-      );
+      throw new AppNotFoundException('MEAL_ITEM_FOOD_NOT_FOUND');
     }
 
     const data = dto.items.map((item) => {
@@ -300,7 +297,7 @@ export class DiaryEntriesService {
 
     const meal = await this.meals.findById(dto.mealId, userId);
     if (meal.deleted) {
-      throw new AppNotFoundException('Mahlzeit nicht gefunden', 'MEAL_NOT_FOUND');
+      throw new AppNotFoundException('MEAL_NOT_FOUND');
     }
 
     const data = meal.items.map((item) => {
@@ -400,7 +397,7 @@ export class DiaryEntriesService {
 
   private assertDistinctDays(fromDate: string, toDate: string): void {
     if (fromDate === toDate) {
-      throw new AppBadRequestException('Quell- und Zieltag sind identisch', 'DIARY_COPY_SAME_DAY');
+      throw new AppBadRequestException('DIARY_COPY_SAME_DAY');
     }
   }
 
@@ -420,7 +417,7 @@ export class DiaryEntriesService {
       where: { id, userId },
     })) as DiaryEntryRow | null;
     if (!entry) {
-      throw new AppNotFoundException('Eintrag nicht gefunden', 'DIARY_ENTRY_NOT_FOUND');
+      throw new AppNotFoundException('DIARY_ENTRY_NOT_FOUND');
     }
 
     const ratio = quantity / entry.quantity;
@@ -447,7 +444,7 @@ export class DiaryEntriesService {
   async deleteEntry(userId: string, id: string): Promise<void> {
     const { count } = await this.prisma.diaryEntry.deleteMany({ where: { id, userId } });
     if (count === 0) {
-      throw new AppNotFoundException('Eintrag nicht gefunden', 'DIARY_ENTRY_NOT_FOUND');
+      throw new AppNotFoundException('DIARY_ENTRY_NOT_FOUND');
     }
   }
 
@@ -458,10 +455,10 @@ export class DiaryEntriesService {
       select: { id: true, archivedAt: true },
     });
     if (!slot) {
-      throw new AppNotFoundException('Abschnitt nicht gefunden', 'MEAL_SLOT_NOT_FOUND');
+      throw new AppNotFoundException('MEAL_SLOT_NOT_FOUND');
     }
     if (slot.archivedAt) {
-      throw new AppConflictException('Abschnitt ist archiviert', 'MEAL_SLOT_ARCHIVED');
+      throw new AppConflictException('MEAL_SLOT_ARCHIVED');
     }
   }
 }

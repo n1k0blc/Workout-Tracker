@@ -39,7 +39,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new AppNotFoundException('User not found', 'USER_NOT_FOUND');
+      throw new AppNotFoundException('USER_NOT_FOUND');
     }
 
     return withApiLocale(user);
@@ -54,7 +54,7 @@ export class UsersService {
         select: { id: true },
       });
       if (existing && existing.id !== userId) {
-        throw new AppConflictException('Email is already in use', 'EMAIL_ALREADY_IN_USE');
+        throw new AppConflictException('EMAIL_ALREADY_IN_USE');
       }
     }
 
@@ -115,7 +115,7 @@ export class UsersService {
     const gym = await this.prisma.homeGym.findUnique({ where: { id: gymId } });
 
     if (!gym || gym.deletedAt || gym.userId !== userId) {
-      throw new AppNotFoundException('Home gym not found', 'HOME_GYM_NOT_FOUND');
+      throw new AppNotFoundException('HOME_GYM_NOT_FOUND');
     }
 
     return this.prisma.homeGym.update({
@@ -134,7 +134,7 @@ export class UsersService {
     const gym = await this.prisma.homeGym.findUnique({ where: { id: gymId } });
 
     if (!gym || gym.deletedAt || gym.userId !== userId) {
-      throw new AppNotFoundException('Home gym not found', 'HOME_GYM_NOT_FOUND');
+      throw new AppNotFoundException('HOME_GYM_NOT_FOUND');
     }
 
     const plannedInActiveCycle = await this.prisma.workoutDay.findFirst({
@@ -142,10 +142,7 @@ export class UsersService {
     });
 
     if (plannedInActiveCycle) {
-      throw new AppConflictException(
-        'Cannot delete a home gym that is planned for an active cycle day. Update those cycle days first.',
-        'HOME_GYM_IN_USE_BY_ACTIVE_CYCLE',
-      );
+      throw new AppConflictException('HOME_GYM_IN_USE_BY_ACTIVE_CYCLE');
     }
 
     await this.prisma.homeGym.update({

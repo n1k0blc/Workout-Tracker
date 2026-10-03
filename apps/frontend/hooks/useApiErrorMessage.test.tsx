@@ -23,7 +23,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('useApiErrorMessage — codes', () => {
   it('shows the catalogue text in the active locale, never the API message', () => {
-    const error = new ApiError('Cycle not found', 404, 'CYCLE_NOT_FOUND');
+    const error = new ApiError(404, 'CYCLE_NOT_FOUND');
     expect(messageFor('en', error)).toBe('Cycle not found.');
     expect(messageFor('de', error)).toBe('Zyklus nicht gefunden.');
   });
@@ -31,8 +31,9 @@ describe('useApiErrorMessage — codes', () => {
   it('has a non-empty message in both locales for every code the API can return', () => {
     for (const code of ERROR_CODES) {
       for (const locale of ['de', 'en'] as const) {
-        const text = messageFor(locale, new ApiError('raw backend text', 400, code));
-        expect(text, `${code} (${locale})`).not.toBe('raw backend text');
+        const text = messageFor(locale, new ApiError(400, code));
+        expect(text, `${code} (${locale})`).not.toBe(code);
+        expect(text, `${code} (${locale})`).not.toContain('{');
         expect(text.length, `${code} (${locale})`).toBeGreaterThan(0);
       }
     }
@@ -40,7 +41,7 @@ describe('useApiErrorMessage — codes', () => {
 
   it('falls back to the generic message for an unknown code and logs the gap', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const error = new ApiError('raw backend text', 500, 'SOMETHING_NEW');
+    const error = new ApiError(500, 'SOMETHING_NEW');
 
     expect(messageFor('en', error)).toBe('Something went wrong. Please try again.');
     expect(messageFor('de', error)).toBe('Etwas ist schiefgelaufen. Bitte versuche es erneut.');
@@ -49,7 +50,7 @@ describe('useApiErrorMessage — codes', () => {
 
   it('prefers the caller context message over the generic one when the code is unmapped', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const error = new ApiError('raw', 500);
+    const error = new ApiError(500);
     expect(messageFor('en', error, 'Could not save the gym.')).toBe('Could not save the gym.');
   });
 
@@ -61,9 +62,30 @@ describe('useApiErrorMessage — codes', () => {
   });
 });
 
+describe('useApiErrorMessage — details', () => {
+  it('fills the message parameters from the structured details', () => {
+    const sum = new ApiError(400, 'EXERCISE_MUSCLE_PERCENTAGES_INVALID_SUM', [], { sum: 90 });
+    expect(messageFor('en', sum)).toBe(
+      'The muscle percentages must add up to 100% (currently 90%).',
+    );
+    expect(messageFor('de', sum)).toContain('90');
+  });
+
+  it('turns a weekday number into the locale weekday name', () => {
+    const taken = new ApiError(400, 'WORKOUT_DAY_WEEKDAY_TAKEN', [], { weekday: 1 });
+    expect(messageFor('en', taken)).toBe('Monday is already taken in this cycle.');
+    expect(messageFor('de', taken)).toBe('Montag ist in diesem Zyklus bereits belegt.');
+  });
+
+  it('still produces text when a code that expects details arrives without them', () => {
+    const bare = new ApiError(400, 'EXERCISE_MUSCLE_PERCENTAGES_INVALID_SUM');
+    expect(messageFor('en', bare).length).toBeGreaterThan(0);
+  });
+});
+
 describe('useApiErrorMessage — validation', () => {
   const failed = (errors: { property: string; constraints: string[] }[]) =>
-    new ApiError('email must be an email', 400, 'VALIDATION_FAILED', errors);
+    new ApiError(400, 'VALIDATION_FAILED', errors);
 
   it('maps property + constraint, preferring the property-specific entry', () => {
     const error = failed([

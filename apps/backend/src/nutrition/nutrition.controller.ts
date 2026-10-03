@@ -64,10 +64,7 @@ export class NutritionController {
   ): Promise<NutritionDayDto> {
     const localDate = date ?? today.localDate;
     if (!isLocalDate(localDate)) {
-      throw new AppBadRequestException(
-        'date must be a calendar date in YYYY-MM-DD form',
-        'NUTRITION_DAY_DATE_INVALID',
-      );
+      throw new AppBadRequestException('NUTRITION_DAY_DATE_INVALID');
     }
     return this.diaryEntries.getDay(user.id, localDate);
   }
@@ -89,10 +86,7 @@ export class NutritionController {
       !isLocalDate(start) ||
       !isLocalDate(end)
     ) {
-      throw new AppBadRequestException(
-        'start und end müssen Kalendertage in YYYY-MM-DD-Form sein',
-        'NUTRITION_ANALYTICS_RANGE_INVALID',
-      );
+      throw new AppBadRequestException('NUTRITION_ANALYTICS_RANGE_INVALID');
     }
     return this.nutritionAnalytics.getTrend(user.id, start, end);
   }
@@ -158,10 +152,7 @@ export class NutritionController {
       slot = await this.mealSlots.setArchived(user.id, id, dto.archived);
     }
     if (!slot) {
-      throw new AppBadRequestException(
-        'name oder archived muss angegeben werden',
-        'MEAL_SLOT_UPDATE_EMPTY',
-      );
+      throw new AppBadRequestException('MEAL_SLOT_UPDATE_EMPTY');
     }
     return slot;
   }

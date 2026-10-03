@@ -292,7 +292,7 @@ export class AnalyticsService {
         select: { id: true, name: true, startDate: true },
       });
       if (!found) {
-        throw new AppNotFoundException('Cycle not found', 'CYCLE_NOT_FOUND');
+        throw new AppNotFoundException('CYCLE_NOT_FOUND');
       }
       cycle = found;
       where.cycleId = filter.cycleId;

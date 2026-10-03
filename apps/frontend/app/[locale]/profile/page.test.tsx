@@ -131,7 +131,7 @@ describe('ProfilePage language select', () => {
 
   it('shows the catalogue text for the API error code instead of the API message', async () => {
     updateProfile.mockRejectedValueOnce(
-      new ApiError('Email is already in use', 409, 'EMAIL_ALREADY_IN_USE'),
+      new ApiError(409, 'EMAIL_ALREADY_IN_USE'),
     );
     renderProfilePage();
 
@@ -141,7 +141,7 @@ describe('ProfilePage language select', () => {
     await waitFor(() =>
       expect(screen.getByText('Diese E-Mail-Adresse wird bereits verwendet.')).toBeTruthy(),
     );
-    expect(screen.queryByText('Email is already in use')).toBeNull();
+    expect(screen.queryByText('EMAIL_ALREADY_IN_USE')).toBeNull();
   });
 });
 

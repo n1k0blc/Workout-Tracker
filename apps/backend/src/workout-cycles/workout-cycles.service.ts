@@ -12,11 +12,7 @@ import {
 import { setWorkingVolume } from '../common/utils/volume.util';
 import { calculateCycleWeek, getCurrentDate } from '../common/utils/date.util';
 import { Today, localDateToInstant } from '../common/utils/today.util';
-import {
-  WEEKDAY_NAMES,
-  cycleStartWeekday,
-  getWeekdayDistanceFromCycleStart,
-} from '../common/utils/weekday.util';
+import { cycleStartWeekday, getWeekdayDistanceFromCycleStart } from '../common/utils/weekday.util';
 import { ExercisesService } from '../exercises/exercises.service';
 import {
   CreateCycleDto,
@@ -127,7 +123,7 @@ export class WorkoutCyclesService {
     });
 
     if (!cycle || cycle.userId !== userId) {
-      throw new AppNotFoundException('Workout cycle not found', 'CYCLE_NOT_FOUND');
+      throw new AppNotFoundException('CYCLE_NOT_FOUND');
     }
 
     return this.mapCycleToResponse(cycle, locale);
@@ -143,10 +139,7 @@ export class WorkoutCyclesService {
     });
 
     if (existingActiveCycle) {
-      throw new AppBadRequestException(
-        'Es existiert bereits ein aktiver Zyklus. Bitte beende diesen zuerst.',
-        'ACTIVE_CYCLE_ALREADY_EXISTS',
-      );
+      throw new AppBadRequestException('ACTIVE_CYCLE_ALREADY_EXISTS');
     }
 
     const { name, duration, startDate, workoutDays } = createCycleDto;
@@ -154,10 +147,9 @@ export class WorkoutCyclesService {
     const weekdays = workoutDays.map((day) => day.weekday);
     const duplicateWeekday = weekdays.find((weekday, i) => weekdays.indexOf(weekday) !== i);
     if (duplicateWeekday !== undefined) {
-      throw new AppBadRequestException(
-        `Zwei Trainingstage liegen auf ${WEEKDAY_NAMES[duplicateWeekday]}. Pro Zyklus ist jeder Wochentag nur einmal erlaubt.`,
-        'DUPLICATE_WEEKDAY_IN_CYCLE',
-      );
+      throw new AppBadRequestException('DUPLICATE_WEEKDAY_IN_CYCLE', {
+        weekday: duplicateWeekday,
+      });
     }
 
     const allExerciseIds = workoutDays.flatMap((day) => day.exercises.map((e) => e.exerciseId));
@@ -267,12 +259,12 @@ export class WorkoutCyclesService {
     });
 
     if (!workoutDay || workoutDay.cycleId !== cycleId) {
-      throw new AppNotFoundException('Workout day not found', 'WORKOUT_DAY_NOT_FOUND');
+      throw new AppNotFoundException('WORKOUT_DAY_NOT_FOUND');
     }
 
     const blueprint = workoutDay.workouts[0];
     if (!blueprint) {
-      throw new AppNotFoundException('Blueprint not found', 'BLUEPRINT_NOT_FOUND');
+      throw new AppNotFoundException('BLUEPRINT_NOT_FOUND');
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -301,7 +293,7 @@ export class WorkoutCyclesService {
     });
 
     if (!workoutDay || workoutDay.cycleId !== cycleId) {
-      throw new AppNotFoundException('Workout day not found', 'WORKOUT_DAY_NOT_FOUND');
+      throw new AppNotFoundException('WORKOUT_DAY_NOT_FOUND');
     }
 
     // The weekday decides which workout is recommended, so two days in one cycle sharing a
@@ -319,10 +311,10 @@ export class WorkoutCyclesService {
       // A plain move can't land on a taken weekday -- the editor has to ask the user to swap
       // with the specific day that holds it first, and confirm that by passing its id back.
       if (updateWorkoutDayDto.swapWithWorkoutDayId !== conflict.id) {
-        throw new AppBadRequestException(
-          `${WEEKDAY_NAMES[updateWorkoutDayDto.weekday]} ist in diesem Zyklus bereits durch "${conflict.name}" belegt.`,
-          'WORKOUT_DAY_WEEKDAY_TAKEN',
-        );
+        throw new AppBadRequestException('WORKOUT_DAY_WEEKDAY_TAKEN', {
+          weekday: updateWorkoutDayDto.weekday,
+          conflictName: conflict.name,
+        });
       }
 
       // Exchange weekdays (and their derived `order`) atomically -- names, plans and planned
@@ -394,16 +386,10 @@ export class WorkoutCyclesService {
       return await write();
     } catch (error) {
       if (weekday !== null && isWeekdayConflict(error)) {
-        throw new AppBadRequestException(
-          `${WEEKDAY_NAMES[weekday]} ist in diesem Zyklus bereits belegt.`,
-          'WORKOUT_DAY_WEEKDAY_TAKEN',
-        );
+        throw new AppBadRequestException('WORKOUT_DAY_WEEKDAY_TAKEN', { weekday });
       }
       if (isWeekdayConflict(error) || isOrderConflict(error)) {
-        throw new AppBadRequestException(
-          'Eine andere Änderung an diesem Zyklus ist dazwischengekommen. Bitte versuche es erneut.',
-          'CYCLE_CONCURRENT_MODIFICATION',
-        );
+        throw new AppBadRequestException('CYCLE_CONCURRENT_MODIFICATION');
       }
       throw error;
     }
@@ -417,10 +403,7 @@ export class WorkoutCyclesService {
     const cycle = await this.findById(id, userId);
 
     if (cycle.status === 'COMPLETED') {
-      throw new AppBadRequestException(
-        'Dieser Zyklus wurde bereits beendet.',
-        'CYCLE_ALREADY_COMPLETED',
-      );
+      throw new AppBadRequestException('CYCLE_ALREADY_COMPLETED');
     }
 
     await this.prisma.workoutCycle.update({
@@ -453,7 +436,7 @@ export class WorkoutCyclesService {
     });
 
     if (!cycle || cycle.userId !== userId) {
-      throw new AppNotFoundException('Zyklus nicht gefunden', 'CYCLE_NOT_FOUND');
+      throw new AppNotFoundException('CYCLE_NOT_FOUND');
     }
 
     const endDate = new Date(cycle.startDate);

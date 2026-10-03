@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { AppBadRequestException } from '../common/errors/app-exceptions';
+import { AppBadRequestException, ErrorDetails } from '../common/errors/app-exceptions';
 import { Prisma } from '../../generated/prisma/client';
 import { SetType, Equipment } from '../common/types';
 import {
@@ -73,7 +73,7 @@ const SIDE_KEYS = [
 function deriveSetAggregates(
   set: SetInput,
   shape: ExerciseShape,
-  exerciseLabel: string,
+  exercise: { name: string; position: number },
   setNumber: number,
 ): SetInput {
   const carriesSideData = SIDE_KEYS.some((key) => set[key] != null);
@@ -81,26 +81,28 @@ function deriveSetAggregates(
   if (!shape.isUnilateral) {
     if (carriesSideData) {
       // Every set carrying side data is equally at fault, so this names the exercise, not a set.
-      throw new AppBadRequestException(
-        `${exerciseLabel} is a bilateral exercise; its sets must not carry per-side values`,
-        'WORKOUT_SET_UNEXPECTED_SIDE_DATA',
-      );
+      throw new AppBadRequestException('WORKOUT_SET_UNEXPECTED_SIDE_DATA', {
+        exerciseName: exercise.name,
+        exercisePosition: exercise.position,
+      });
     }
     return set;
   }
 
   const { repsLeft, repsRight, weightLeft, weightRight, rirLeft, rirRight } = set;
   if (repsLeft == null || repsRight == null || weightLeft == null || weightRight == null) {
-    throw new AppBadRequestException(
-      `${exerciseLabel}, set ${setNumber}: a unilateral exercise needs reps and weight for both sides`,
-      'WORKOUT_SET_MISSING_SIDE_DATA',
-    );
+    throw new AppBadRequestException('WORKOUT_SET_MISSING_SIDE_DATA', {
+      exerciseName: exercise.name,
+      exercisePosition: exercise.position,
+      setNumber,
+    });
   }
   if ((rirLeft == null) !== (rirRight == null)) {
-    throw new AppBadRequestException(
-      `${exerciseLabel}, set ${setNumber}: RIR is set for only one side; provide both or neither`,
-      'WORKOUT_SET_RIR_SIDE_MISMATCH',
-    );
+    throw new AppBadRequestException('WORKOUT_SET_RIR_SIDE_MISMATCH', {
+      exerciseName: exercise.name,
+      exercisePosition: exercise.position,
+      setNumber,
+    });
   }
 
   return {
@@ -183,15 +185,16 @@ export class WorkoutTreeService {
  * mean silently choosing one of the two sequences the client sent. There is no safe way to
  * guess which was intended, so it is the client's bug to fix.
  */
-function assertOrderMatchesPosition(items: { order: number }[], label: string): void {
+function assertOrderMatchesPosition(items: { order: number }[], where: ErrorDetails): void {
   items.forEach((item, index) => {
     const expected = index + 1;
     if (item.order !== expected) {
-      throw new AppBadRequestException(
-        `${label}: order must be 1-based, contiguous, and match the order the items were sent in ` +
-          `(expected ${expected} at position ${index}, received ${item.order})`,
-        'WORKOUT_TREE_ORDER_INVALID',
-      );
+      throw new AppBadRequestException('WORKOUT_TREE_ORDER_INVALID', {
+        ...where,
+        position: index,
+        expected,
+        received: item.order,
+      });
     }
   });
 }
@@ -210,9 +213,9 @@ export function toExerciseInputs(
   dtos: WorkoutExerciseInputDto[],
   shapesById: Map<string, ExerciseShape>,
 ): ExerciseInput[] {
-  assertOrderMatchesPosition(dtos, 'exercises');
+  assertOrderMatchesPosition(dtos, { scope: 'exercises' });
   dtos.forEach((ex, index) =>
-    assertOrderMatchesPosition(ex.sets, `exercise at position ${index}: sets`),
+    assertOrderMatchesPosition(ex.sets, { scope: 'sets', exercisePosition: index }),
   );
 
   // `order` is checked above and then dropped -- past this point the array is the ordering.
@@ -226,7 +229,7 @@ export function toExerciseInputs(
       );
     }
 
-    const exerciseLabel = `exercise "${shape.name}" (position ${exerciseIndex})`;
+    const exercise = { name: shape.name, position: exerciseIndex };
     return {
       exerciseId: ex.exerciseId,
       sets: ex.sets.map((set, setIndex) =>
@@ -246,7 +249,7 @@ export function toExerciseInputs(
             completedAt: set.completedAt ? new Date(set.completedAt) : null,
           },
           shape,
-          exerciseLabel,
+          exercise,
           setIndex + 1,
         ),
       ),

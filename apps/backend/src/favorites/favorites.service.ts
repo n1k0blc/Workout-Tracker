@@ -24,7 +24,7 @@ export class FavoritesService {
         select: { id: true },
       });
       if (!food) {
-        throw new AppNotFoundException('Lebensmittel nicht gefunden', 'FOOD_NOT_FOUND');
+        throw new AppNotFoundException('FOOD_NOT_FOUND');
       }
       await this.prisma.foodFavorite.upsert({
         where: { userId_foodId: { userId, foodId } },
@@ -43,7 +43,7 @@ export class FavoritesService {
         select: { id: true },
       });
       if (!meal) {
-        throw new AppNotFoundException('Mahlzeit nicht gefunden', 'MEAL_NOT_FOUND');
+        throw new AppNotFoundException('MEAL_NOT_FOUND');
       }
       await this.prisma.mealFavorite.upsert({
         where: { userId_mealId: { userId, mealId } },

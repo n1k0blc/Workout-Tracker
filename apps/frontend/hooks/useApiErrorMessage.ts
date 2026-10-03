@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback } from 'react';
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 import { ApiError } from '@/lib/api/errors';
+import { weekdayReferenceDate } from '@/lib/weekday';
 
 /**
  * The user-facing text for a failed API call (#190). The API's own `message` is German/English
@@ -16,6 +17,7 @@ import { ApiError } from '@/lib/api/errors';
  */
 export function useApiErrorMessage() {
   const t = useTranslations('ApiErrors');
+  const format = useFormatter();
 
   return useCallback(
     (error: unknown, fallback?: string): string => {
@@ -37,13 +39,29 @@ export function useApiErrorMessage() {
         if (messages.size > 0) return [...messages].join(' ');
       }
 
-      if (error.code && t.has(`codes.${error.code}`)) return t(`codes.${error.code}`);
+      if (error.code && t.has(`codes.${error.code}`)) {
+        // `details` are the message's parameters; a weekday arrives as its number and is named in
+        // the user's locale. A code whose parameters did not arrive falls through to the generic.
+        const values = { ...error.details };
+        if (typeof values.weekday === 'number') {
+          values.weekday = format.dateTime(weekdayReferenceDate(values.weekday), {
+            weekday: 'long',
+            timeZone: 'UTC',
+          });
+        }
+        try {
+          return t(`codes.${error.code}`, values);
+        } catch {
+          console.warn(`[i18n] ApiErrors.codes.${error.code} could not be filled from its details`);
+          return generic;
+        }
+      }
 
       console.warn(
         `[i18n] no ApiErrors message for status ${error.status} code ${error.code ?? '-'}`,
       );
       return generic;
     },
-    [t],
+    [t, format],
   );
 }

@@ -153,7 +153,7 @@ export class MealsService {
       this.favorites.favoriteMealIds(userId),
     ]);
     if (!meal) {
-      throw new AppNotFoundException('Mahlzeit nicht gefunden', 'MEAL_NOT_FOUND');
+      throw new AppNotFoundException('MEAL_NOT_FOUND');
     }
     return this.toDto(meal, userId, locale, favoriteIds);
   }
@@ -225,7 +225,7 @@ export class MealsService {
       where: { id },
     })) as MealCheckRow | null;
     if (!meal || meal.deletedAt) {
-      throw new AppNotFoundException('Mahlzeit nicht gefunden', 'MEAL_NOT_FOUND');
+      throw new AppNotFoundException('MEAL_NOT_FOUND');
     }
     this.assertOwner(meal, userId);
     await this.assertFoodsExist(dto.items);
@@ -250,7 +250,7 @@ export class MealsService {
       where: { id },
     })) as MealCheckRow | null;
     if (!meal || meal.deletedAt) {
-      throw new AppNotFoundException('Mahlzeit nicht gefunden', 'MEAL_NOT_FOUND');
+      throw new AppNotFoundException('MEAL_NOT_FOUND');
     }
     this.assertOwner(meal, userId);
     await this.prisma.meal.update({ where: { id }, data: { deletedAt: new Date() } });
@@ -300,10 +300,7 @@ export class MealsService {
 
   private assertOwner(meal: MealCheckRow, userId: string): void {
     if (meal.createdById !== userId) {
-      throw new AppForbiddenException(
-        'Nur der Ersteller kann diese Mahlzeit ändern',
-        'MEAL_NOT_OWNER',
-      );
+      throw new AppForbiddenException('MEAL_NOT_OWNER');
     }
   }
 
@@ -312,10 +309,7 @@ export class MealsService {
     const ids = Array.from(new Set(items.map((i) => i.foodId)));
     const found = await this.prisma.food.count({ where: { id: { in: ids } } });
     if (found !== ids.length) {
-      throw new AppNotFoundException(
-        'Ein Lebensmittel wurde nicht gefunden',
-        'MEAL_ITEM_FOOD_NOT_FOUND',
-      );
+      throw new AppNotFoundException('MEAL_ITEM_FOOD_NOT_FOUND');
     }
   }
 }

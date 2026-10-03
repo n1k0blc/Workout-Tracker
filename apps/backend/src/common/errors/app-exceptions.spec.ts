@@ -1,4 +1,4 @@
-import { HttpStatus, NotFoundException } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
 import {
   AppBadRequestException,
   AppConflictException,
@@ -8,53 +8,41 @@ import {
   AppUnauthorizedException,
 } from './app-exceptions';
 
-describe('App*Exception (issue #178)', () => {
-  it('adds code to the response body without disturbing message/error/statusCode', () => {
-    const exception = new AppNotFoundException('Cycle not found', 'CYCLE_NOT_FOUND');
+/**
+ * The contract half of the error-code migration (#191): an exception is a status, a `code`, and
+ * optional structured `details` -- no human-readable text, in any language.
+ */
+describe('App*Exception (issues #178, #191)', () => {
+  it('carries a code and no prose in its response body', () => {
+    const exception = new AppNotFoundException('CYCLE_NOT_FOUND');
 
-    expect(exception.getResponse()).toEqual({
-      message: 'Cycle not found',
-      error: 'Not Found',
-      statusCode: HttpStatus.NOT_FOUND,
-      code: 'CYCLE_NOT_FOUND',
-    });
-  });
-
-  it('keeps the exact body a plain NotFoundException would have produced, plus code', () => {
-    const plain = new NotFoundException('Cycle not found');
-    const withCode = new AppNotFoundException('Cycle not found', 'CYCLE_NOT_FOUND');
-
-    expect(withCode.getResponse()).toEqual({
-      ...(plain.getResponse() as object),
-      code: 'CYCLE_NOT_FOUND',
-    });
-  });
-
-  it('preserves getStatus() and message from the underlying Nest exception class', () => {
-    const exception = new AppNotFoundException('Cycle not found', 'CYCLE_NOT_FOUND');
     expect(exception.getStatus()).toBe(HttpStatus.NOT_FOUND);
-    expect(exception.message).toBe('Cycle not found');
+    expect(exception.getResponse()).toEqual({ code: 'CYCLE_NOT_FOUND' });
     expect(exception.code).toBe('CYCLE_NOT_FOUND');
   });
 
-  it.each([
-    [AppBadRequestException, HttpStatus.BAD_REQUEST, 'Bad Request'] as const,
-    [AppConflictException, HttpStatus.CONFLICT, 'Conflict'] as const,
-    [AppUnauthorizedException, HttpStatus.UNAUTHORIZED, 'Unauthorized'] as const,
-    [AppForbiddenException, HttpStatus.FORBIDDEN, 'Forbidden'] as const,
-    [
-      AppInternalServerErrorException,
-      HttpStatus.INTERNAL_SERVER_ERROR,
-      'Internal Server Error',
-    ] as const,
-  ])('%p produces the matching status/error/code', (ExceptionClass, status, error) => {
-    const exception = new ExceptionClass('some message', 'CYCLE_NOT_FOUND');
-    expect(exception.getStatus()).toBe(status);
-    expect(exception.getResponse()).toEqual({
-      message: 'some message',
-      error,
-      statusCode: status,
-      code: 'CYCLE_NOT_FOUND',
+  it('adds structured details when the condition has parameters', () => {
+    const exception = new AppBadRequestException('EXERCISE_MUSCLE_PERCENTAGES_INVALID_SUM', {
+      sum: 90,
     });
+
+    expect(exception.getResponse()).toEqual({
+      code: 'EXERCISE_MUSCLE_PERCENTAGES_INVALID_SUM',
+      details: { sum: 90 },
+    });
+    expect(exception.details).toEqual({ sum: 90 });
+  });
+
+  it.each([
+    [AppNotFoundException, HttpStatus.NOT_FOUND] as const,
+    [AppBadRequestException, HttpStatus.BAD_REQUEST] as const,
+    [AppConflictException, HttpStatus.CONFLICT] as const,
+    [AppUnauthorizedException, HttpStatus.UNAUTHORIZED] as const,
+    [AppForbiddenException, HttpStatus.FORBIDDEN] as const,
+    [AppInternalServerErrorException, HttpStatus.INTERNAL_SERVER_ERROR] as const,
+  ])('%p keeps its HTTP status', (ExceptionClass, status) => {
+    const exception = new ExceptionClass('CYCLE_NOT_FOUND');
+    expect(exception.getStatus()).toBe(status);
+    expect(exception.getResponse()).toEqual({ code: 'CYCLE_NOT_FOUND' });
   });
 });

@@ -1,14 +1,12 @@
 /**
  * Every machine-readable error code the API can return, grouped by the module that throws it.
- * A code names the *condition* an exception represents, not its (still German/English-mixed)
- * message text -- the expand half of an expand-contract migration (#178). The frontend now
- * migrates (#190): it never displays `message`, and maps `code` to `ApiErrors.codes.<CODE>` in
- * its message catalogue. Adding a code here without a de + en entry fails the frontend's
- * `useApiErrorMessage` test, which iterates this list.
+ * A code names the *condition* an exception represents. The API sends the code and structured
+ * `details` and no human-readable text (#191, ADR-0009); the frontend maps `code` to
+ * `ApiErrors.codes.<CODE>` in its message catalogue, and adding a code here without a de + en
+ * entry fails the frontend's `useApiErrorMessage` test, which iterates this list.
  *
  * The same code is reused across call sites that check the literal same condition (e.g.
- * `CYCLE_NOT_FOUND` fires from three different services), even where their message text
- * differs -- that inconsistency is exactly what codes are meant to paper over.
+ * `CYCLE_NOT_FOUND` fires from three different services).
  */
 export const ERROR_CODES = [
   // Auth
@@ -23,6 +21,14 @@ export const ERROR_CODES = [
   'REFRESH_TOKEN_EXPIRED',
   'REFRESH_TOKEN_ALREADY_ROTATED',
   'REFRESH_TOKEN_REUSE_DETECTED',
+
+  // Generic: Nest built-ins and unexpected failures that carry no code of their own (api-exception.filter.ts)
+  'UNAUTHORIZED',
+  'FORBIDDEN',
+  'NOT_FOUND',
+  'TOO_MANY_REQUESTS',
+  'REQUEST_FAILED',
+  'INTERNAL_ERROR',
 
   // Validation (class-validator failures; carries per-property `errors`, see validation-pipe.ts)
   'VALIDATION_FAILED',

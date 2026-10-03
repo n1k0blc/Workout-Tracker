@@ -69,7 +69,7 @@ export class RefreshTokenService {
 
     if (!existing) {
       this.logger.warn(`Refresh rejected: unknown token (hash ${hashPrefix(tokenHash)})`);
-      throw new AppUnauthorizedException('Invalid refresh token', 'REFRESH_TOKEN_INVALID');
+      throw new AppUnauthorizedException('REFRESH_TOKEN_INVALID');
     }
 
     const nextRawToken = generateOpaqueToken();
@@ -105,17 +105,14 @@ export class RefreshTokenService {
         this.logger.warn(
           `Refresh rejected: expired token (hash ${hashPrefix(tokenHash)}, user ${existing.userId})`,
         );
-        throw new AppUnauthorizedException('Refresh token expired', 'REFRESH_TOKEN_EXPIRED');
+        throw new AppUnauthorizedException('REFRESH_TOKEN_EXPIRED');
       }
 
       if (Date.now() - current.revokedAt.getTime() <= REUSE_GRACE_PERIOD_MS) {
         this.logger.warn(
           `Refresh rejected: superseded token (hash ${hashPrefix(tokenHash)}, user ${existing.userId})`,
         );
-        throw new AppUnauthorizedException(
-          'Refresh token already rotated',
-          'REFRESH_TOKEN_ALREADY_ROTATED',
-        );
+        throw new AppUnauthorizedException('REFRESH_TOKEN_ALREADY_ROTATED');
       }
 
       const { count: endedCount } = await tx.refreshToken.updateMany({
@@ -130,10 +127,7 @@ export class RefreshTokenService {
         `Refresh rejected: superseded token reused (hash ${hashPrefix(tokenHash)}, ` +
           `user ${existing.userId}) - ended ${endedCount} session(s)`,
       );
-      throw new AppUnauthorizedException(
-        'Refresh token reuse detected',
-        'REFRESH_TOKEN_REUSE_DETECTED',
-      );
+      throw new AppUnauthorizedException('REFRESH_TOKEN_REUSE_DETECTED');
     });
 
     return { userId: existing.userId, rawToken: nextRawToken, expiresAt: nextExpiresAt };

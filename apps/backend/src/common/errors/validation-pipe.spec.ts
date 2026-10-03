@@ -24,26 +24,23 @@ class Body {
 
 const meta: ArgumentMetadata = { type: 'body', metatype: Body };
 
-async function failure(value: unknown): Promise<{ response: any; message: string[] }> {
+async function failure(value: unknown): Promise<{ response: any }> {
   const pipe = createValidationPipe();
   try {
     await pipe.transform(value, meta);
   } catch (e) {
     expect(e).toBeInstanceOf(BadRequestException);
     const response = (e as BadRequestException).getResponse() as any;
-    return { response, message: response.message };
+    return { response };
   }
   throw new Error('expected a validation failure');
 }
 
 describe('createValidationPipe — machine-readable validation errors (#190)', () => {
-  it('keeps the response shape existing clients read: statusCode, error and message[]', async () => {
-    const { response, message } = await failure({ email: 'nope', password: 'x', items: [] });
+  it('sends no generated prose: the body is just the code and the per-property errors', async () => {
+    const { response } = await failure({ email: 'nope', password: 'x', items: [] });
 
-    expect(response.statusCode).toBe(400);
-    expect(response.error).toBe('Bad Request');
-    expect(message).toContain('Please provide a valid email address');
-    expect(message).toContain('password must be longer than or equal to 8 characters');
+    expect(Object.keys(response).sort()).toEqual(['code', 'errors']);
   });
 
   it('adds code and per-property constraint keys that behave like codes', async () => {

@@ -3,6 +3,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { registerCspReportParser } from './security/csp-report.parser';
+import { ApiExceptionFilter } from './common/errors/api-exception.filter';
 import { createValidationPipe } from './common/errors/validation-pipe';
 import { isLocalDevOrigin } from './common/utils/dev-cors';
 
@@ -86,6 +87,9 @@ async function bootstrap() {
       maxAge: 3600,
     });
   }
+
+  // No human-readable text in any error body (#191)
+  app.useGlobalFilters(new ApiExceptionFilter());
 
   // Enable validation pipes globally
   app.useGlobalPipes(createValidationPipe());

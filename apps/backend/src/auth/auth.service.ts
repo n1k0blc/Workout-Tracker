@@ -20,9 +20,6 @@ import {
   withApiLocale,
 } from '../common/utils/locale.util';
 
-const BREACHED_PASSWORD_MESSAGE =
-  'This password has appeared in a known data breach. Please choose a different password.';
-
 const USER_SELECT = {
   id: true,
   email: true,
@@ -68,14 +65,11 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new AppConflictException(
-        'User with this email already exists',
-        'EMAIL_ALREADY_REGISTERED',
-      );
+      throw new AppConflictException('EMAIL_ALREADY_REGISTERED');
     }
 
     if (await this.breachedPasswordService.isBreached(password)) {
-      throw new AppBadRequestException(BREACHED_PASSWORD_MESSAGE, 'PASSWORD_BREACHED');
+      throw new AppBadRequestException('PASSWORD_BREACHED');
     }
 
     const passwordHash = await this.passwordService.hash(password);
@@ -117,7 +111,7 @@ export class AuthService {
       });
       user = withApiLocale(created);
     } catch {
-      throw new AppInternalServerErrorException('Failed to create user', 'USER_CREATION_FAILED');
+      throw new AppInternalServerErrorException('USER_CREATION_FAILED');
     }
 
     return this.issueSession(user);
@@ -136,7 +130,7 @@ export class AuthService {
     });
 
     if (!userWithPassword) {
-      throw new AppUnauthorizedException('Invalid credentials', 'INVALID_CREDENTIALS');
+      throw new AppUnauthorizedException('INVALID_CREDENTIALS');
     }
 
     const isPasswordValid = await this.passwordService.verify(
@@ -145,7 +139,7 @@ export class AuthService {
     );
 
     if (!isPasswordValid) {
-      throw new AppUnauthorizedException('Invalid credentials', 'INVALID_CREDENTIALS');
+      throw new AppUnauthorizedException('INVALID_CREDENTIALS');
     }
 
     // Transparent upgrade: a successful legacy-bcrypt verify gets rehashed to argon2id.
@@ -185,7 +179,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new AppUnauthorizedException('Unauthorized', 'SESSION_USER_NOT_FOUND');
+      throw new AppUnauthorizedException('SESSION_USER_NOT_FOUND');
     }
 
     const isCurrentPasswordValid = await this.passwordService.verify(
@@ -193,14 +187,11 @@ export class AuthService {
       user.passwordHash,
     );
     if (!isCurrentPasswordValid) {
-      throw new AppUnauthorizedException(
-        'Current password is incorrect',
-        'CURRENT_PASSWORD_INCORRECT',
-      );
+      throw new AppUnauthorizedException('CURRENT_PASSWORD_INCORRECT');
     }
 
     if (await this.breachedPasswordService.isBreached(dto.newPassword)) {
-      throw new AppBadRequestException(BREACHED_PASSWORD_MESSAGE, 'PASSWORD_BREACHED');
+      throw new AppBadRequestException('PASSWORD_BREACHED');
     }
 
     const newHash = await this.passwordService.hash(dto.newPassword);
@@ -224,7 +215,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new AppUnauthorizedException('User not found', 'SESSION_USER_NOT_FOUND');
+      throw new AppUnauthorizedException('SESSION_USER_NOT_FOUND');
     }
 
     return user;

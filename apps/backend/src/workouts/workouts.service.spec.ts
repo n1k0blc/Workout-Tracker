@@ -205,7 +205,9 @@ describe('WorkoutsService per-side aggregates (#100)', () => {
       ],
     } as CreateWorkoutDto;
 
-    await expect(service.create(dto, 'user-1')).rejects.toThrow(/bilateral/);
+    await expect(service.create(dto, 'user-1')).rejects.toMatchObject({
+      code: 'WORKOUT_SET_UNEXPECTED_SIDE_DATA',
+    });
   });
 });
 
@@ -229,7 +231,6 @@ describe('WorkoutsService cycle start boundary', () => {
     } as CreateWorkoutDto;
 
     const result = service.create(dto, 'user-1');
-    await expect(result).rejects.toThrow('Dieser Zyklus hat noch nicht begonnen.');
     await expect(result).rejects.toMatchObject({ code: 'CYCLE_NOT_STARTED' });
   });
 
@@ -271,9 +272,9 @@ describe('WorkoutsService cycle start boundary', () => {
 
     // The existing workout's own localDate (2026-08-15) is what's left to compare
     // once the edit doesn't supply a new one.
-    await expect(service.update('workout-1', dto, 'user-1')).rejects.toThrow(
-      'Dieser Zyklus hat noch nicht begonnen.',
-    );
+    await expect(service.update('workout-1', dto, 'user-1')).rejects.toMatchObject({
+      code: 'CYCLE_NOT_STARTED',
+    });
   });
 });
 

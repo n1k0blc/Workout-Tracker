@@ -195,13 +195,14 @@ say.
 
 ### Fehlermeldungen (API errors)
 
-- **Fehlercode** — every API error carries a stable `code` (`ERROR_CODES`); the frontend never
-  shows the API's `message`. `useApiErrorMessage` maps the code to `ApiErrors.codes.<CODE>` in the
-  user's locale. Validation failures carry `code: VALIDATION_FAILED` plus
-  `errors: [{ property, constraints }]` (`createValidationPipe`), mapped per property and
-  constraint name. An unmapped code logs a warning and falls back to the caller's context message
-  or `ApiErrors.generic`. Parameters of the old messages (a weekday, a sum) are not carried, so
-  the localized text is static.
+- **Fehlercode** — every API error is `{ statusCode, code, details?, errors? }` with **no**
+  human-readable `message` (see
+  [ADR-0009](docs/adr/0009-api-errors-carry-a-code-and-details-never-a-message.md)); the code
+  names the condition (`ERROR_CODES`). `useApiErrorMessage` maps it to `ApiErrors.codes.<CODE>` in
+  the user's locale, filling `details` (a weekday, a sum) into the text. Validation failures are
+  `VALIDATION_FAILED` plus `errors: [{ property, constraints }]` (`createValidationPipe`), mapped
+  per property and constraint name. An unmapped code logs a warning and falls back to the
+  caller's context message or `ApiErrors.generic`. Code: `ApiExceptionFilter`, `App*Exception`.
 
 ### Übungen (exercise catalogue)
 

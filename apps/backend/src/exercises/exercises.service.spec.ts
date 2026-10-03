@@ -76,8 +76,8 @@ describe('ExercisesService.update — isUnilateral toggle guard', () => {
       .catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(ConflictException);
-    // A clear German message the editor can surface, not a bare status code.
-    expect((error as ConflictException).message).toMatch(/unilateral lässt sich nicht mehr ändern/);
+    // A code the editor maps to a message, not a bare status.
+    expect(error).toMatchObject({ code: 'EXERCISE_UNILATERAL_CHANGE_BLOCKED' });
     expect(prisma.exercise.update).not.toHaveBeenCalled();
   });
 

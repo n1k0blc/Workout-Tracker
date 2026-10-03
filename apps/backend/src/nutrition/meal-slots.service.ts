@@ -48,11 +48,11 @@ export function assertContiguousOrder(items: { order: number }[]): void {
   items.forEach((item, index) => {
     const expected = index + 1;
     if (item.order !== expected) {
-      throw new AppBadRequestException(
-        `Abschnitt-Reihenfolge muss 1-basiert, lückenlos und in Sende-Reihenfolge sein ` +
-          `(Position ${index} erwartet ${expected}, erhielt ${item.order})`,
-        'MEAL_SLOT_ORDER_INVALID',
-      );
+      throw new AppBadRequestException('MEAL_SLOT_ORDER_INVALID', {
+        position: index,
+        expected,
+        received: item.order,
+      });
     }
   });
 }
@@ -170,10 +170,7 @@ export class MealSlotsService {
         where: { userId, archivedAt: null },
       });
       if (activeCount <= 1) {
-        throw new AppConflictException(
-          'Mindestens ein Abschnitt muss aktiv bleiben',
-          'MEAL_SLOT_LAST_ACTIVE',
-        );
+        throw new AppConflictException('MEAL_SLOT_LAST_ACTIVE');
       }
     }
 
@@ -212,10 +209,7 @@ export class MealSlotsService {
       new Set(activeIds).size === activeIds.length &&
       activeIds.every((id) => currentSet.has(id));
     if (!sameSet) {
-      throw new AppBadRequestException(
-        'slots muss genau die aktuell aktiven Abschnitte enthalten',
-        'MEAL_SLOT_REORDER_SET_MISMATCH',
-      );
+      throw new AppBadRequestException('MEAL_SLOT_REORDER_SET_MISMATCH');
     }
 
     const archivedIds = (
@@ -244,7 +238,7 @@ export class MealSlotsService {
       select: SLOT_SELECT,
     })) as MealSlotRow | null;
     if (!slot) {
-      throw new AppNotFoundException('Abschnitt nicht gefunden', 'MEAL_SLOT_NOT_FOUND');
+      throw new AppNotFoundException('MEAL_SLOT_NOT_FOUND');
     }
     return slot;
   }

@@ -91,8 +91,13 @@ describe('toExerciseInputs ordering', () => {
     );
   });
 
-  it('names the offending exercise so a bad client is debuggable', () => {
-    expect(() => run([exercise(1, [1]), exercise(3, [1])])).toThrow(/order/i);
+  it('reports where the order broke, as structured detail', () => {
+    expect(() => run([exercise(1, [1]), exercise(3, [1])])).toThrow(
+      expect.objectContaining({
+        code: 'WORKOUT_TREE_ORDER_INVALID',
+        details: { scope: 'exercises', position: 1, expected: 2, received: 3 },
+      }),
+    );
   });
 
   it('carries values through unchanged', () => {
@@ -178,12 +183,17 @@ describe('toExerciseInputs per-side shape (#100)', () => {
     expect(ex.sets[0].rir).toBeNull();
   });
 
-  it('rejects a unilateral set with no per-side data, naming the exercise and set', () => {
+  it('rejects a unilateral set with no per-side data, carrying the exercise and set as detail', () => {
     expect(() =>
       run([{ exerciseId: 'a', order: 1, sets: [set(1)] }] as WorkoutExerciseInputDto[], {
         a: { isUnilateral: true, name: 'Split Squat' },
       }),
-    ).toThrow(/Split Squat.*set 1/);
+    ).toThrow(
+      expect.objectContaining({
+        code: 'WORKOUT_SET_MISSING_SIDE_DATA',
+        details: { exerciseName: 'Split Squat', exercisePosition: 0, setNumber: 1 },
+      }),
+    );
   });
 
   it('rejects a unilateral set missing one side', () => {
@@ -198,10 +208,14 @@ describe('toExerciseInputs per-side shape (#100)', () => {
     expect(call).toThrow(expect.objectContaining({ code: 'WORKOUT_SET_RIR_SIDE_MISMATCH' }));
   });
 
-  it('rejects a bilateral set that carries per-side data, naming the exercise', () => {
+  it('rejects a bilateral set that carries per-side data, carrying the exercise as detail', () => {
     const call = () => run([uni()], { a: { isUnilateral: false, name: 'Bench Press' } });
-    expect(call).toThrow(/Bench Press/);
-    expect(call).toThrow(expect.objectContaining({ code: 'WORKOUT_SET_UNEXPECTED_SIDE_DATA' }));
+    expect(call).toThrow(
+      expect.objectContaining({
+        code: 'WORKOUT_SET_UNEXPECTED_SIDE_DATA',
+        details: { exerciseName: 'Bench Press', exercisePosition: 0 },
+      }),
+    );
   });
 
   it('leaves a bilateral set with no per-side data untouched', () => {

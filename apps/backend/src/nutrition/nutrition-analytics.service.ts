@@ -29,10 +29,7 @@ export class NutritionAnalyticsService {
    */
   async getTrend(userId: string, start: string, end: string): Promise<NutritionTrendDto> {
     if (end < start) {
-      throw new AppBadRequestException(
-        'end darf nicht vor start liegen',
-        'NUTRITION_TREND_RANGE_INVERTED',
-      );
+      throw new AppBadRequestException('NUTRITION_TREND_RANGE_INVERTED');
     }
 
     // Zero-fill first: this also bounds the response (an over-long range is a 400, not an
@@ -40,10 +37,9 @@ export class NutritionAnalyticsService {
     const days: NutritionTrendDayDto[] = [];
     for (let date = start; date <= end; date = addLocalDays(date, 1)) {
       if (days.length >= MAX_RANGE_DAYS) {
-        throw new AppBadRequestException(
-          `Zeitraum darf höchstens ${MAX_RANGE_DAYS} Tage umfassen`,
-          'NUTRITION_TREND_RANGE_TOO_LONG',
-        );
+        throw new AppBadRequestException('NUTRITION_TREND_RANGE_TOO_LONG', {
+          maxDays: MAX_RANGE_DAYS,
+        });
       }
       days.push({
         date,

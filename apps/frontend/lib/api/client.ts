@@ -165,27 +165,13 @@ class ApiClient {
       }
       if (isAuthEndpoint) {
         // A real auth failure (wrong password, ...): its code is what the form shows (#190).
-        const body = await response.json().catch(() => ({}));
-        throw new ApiError(
-          body.message || 'Unauthorized',
-          401,
-          typeof body.code === 'string' ? body.code : undefined,
-        );
+        throw ApiError.fromBody(401, await response.json().catch(() => ({})));
       }
-      throw new ApiError('Unauthorized', 401);
+      throw new ApiError(401);
     }
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ message: 'Unknown error' }));
-      // Validation failures carry `message: string[]` of generated English; keep it joined for
-      // logs, but the UI reads `code` / `errors` instead (#190).
-      const message = Array.isArray(error.message) ? error.message.join('; ') : error.message;
-      throw new ApiError(
-        message || `HTTP ${response.status}`,
-        response.status,
-        typeof error.code === 'string' ? error.code : undefined,
-        Array.isArray(error.errors) ? error.errors : [],
-      );
+      throw ApiError.fromBody(response.status, await response.json().catch(() => ({})));
     }
 
     // Handle empty responses (e.g., 204 No Content or null responses)

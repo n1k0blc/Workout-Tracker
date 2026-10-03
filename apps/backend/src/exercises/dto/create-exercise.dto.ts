@@ -24,16 +24,16 @@ export enum Equipment {
 
 export class CreateExerciseDto {
   @IsString()
-  @MaxLength(100, { message: 'Exercise name must not exceed 100 characters' })
+  @MaxLength(100)
   name: string;
 
   // Used only as a convenience: if no percentages are provided, this muscle is set to 100%.
   // Not stored directly -- the percent distribution is the single source of truth (§3.7).
   @IsOptional()
-  @IsEnum(MuscleGroup, { message: 'Invalid muscle group' })
+  @IsEnum(MuscleGroup)
   primaryMuscle?: MuscleGroup;
 
-  @IsEnum(Equipment, { message: 'Invalid equipment type' })
+  @IsEnum(Equipment)
   equipment: Equipment;
 
   @IsOptional()

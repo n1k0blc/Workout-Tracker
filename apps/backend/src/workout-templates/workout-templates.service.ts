@@ -49,11 +49,11 @@ export class WorkoutTemplatesService {
     });
 
     if (!template || template.kind !== 'TEMPLATE') {
-      throw new AppNotFoundException('Workout template not found', 'WORKOUT_TEMPLATE_NOT_FOUND');
+      throw new AppNotFoundException('WORKOUT_TEMPLATE_NOT_FOUND');
     }
 
     if (template.isCustom && template.userId !== userId) {
-      throw new AppNotFoundException('Workout template not found', 'WORKOUT_TEMPLATE_NOT_FOUND');
+      throw new AppNotFoundException('WORKOUT_TEMPLATE_NOT_FOUND');
     }
 
     return this.mapToDto(template, locale);
@@ -69,10 +69,7 @@ export class WorkoutTemplatesService {
     });
 
     if (existing) {
-      throw new AppConflictException(
-        'A template with this name already exists',
-        'TEMPLATE_NAME_TAKEN',
-      );
+      throw new AppConflictException('TEMPLATE_NAME_TAKEN');
     }
 
     const exercisesById = await this.exercisesService.validateAccessible(
@@ -111,18 +108,15 @@ export class WorkoutTemplatesService {
     const template = await this.prisma.workout.findUnique({ where: { id } });
 
     if (!template || template.kind !== 'TEMPLATE') {
-      throw new AppNotFoundException('Workout template not found', 'WORKOUT_TEMPLATE_NOT_FOUND');
+      throw new AppNotFoundException('WORKOUT_TEMPLATE_NOT_FOUND');
     }
 
     if (template.isCustom && template.userId !== userId) {
-      throw new AppNotFoundException('Workout template not found', 'WORKOUT_TEMPLATE_NOT_FOUND');
+      throw new AppNotFoundException('WORKOUT_TEMPLATE_NOT_FOUND');
     }
 
     if (!template.isCustom) {
-      throw new AppConflictException(
-        'System templates cannot be edited',
-        'SYSTEM_TEMPLATE_NOT_EDITABLE',
-      );
+      throw new AppConflictException('SYSTEM_TEMPLATE_NOT_EDITABLE');
     }
 
     if (updateDto.name && updateDto.name !== template.name) {
@@ -131,10 +125,7 @@ export class WorkoutTemplatesService {
       });
 
       if (existing) {
-        throw new AppConflictException(
-          'A template with this name already exists',
-          'TEMPLATE_NAME_TAKEN',
-        );
+        throw new AppConflictException('TEMPLATE_NAME_TAKEN');
       }
     }
 
@@ -173,18 +164,15 @@ export class WorkoutTemplatesService {
     const template = await this.prisma.workout.findUnique({ where: { id } });
 
     if (!template || template.kind !== 'TEMPLATE') {
-      throw new AppNotFoundException('Workout template not found', 'WORKOUT_TEMPLATE_NOT_FOUND');
+      throw new AppNotFoundException('WORKOUT_TEMPLATE_NOT_FOUND');
     }
 
     if (template.isCustom && template.userId !== userId) {
-      throw new AppNotFoundException('Workout template not found', 'WORKOUT_TEMPLATE_NOT_FOUND');
+      throw new AppNotFoundException('WORKOUT_TEMPLATE_NOT_FOUND');
     }
 
     if (!template.isCustom) {
-      throw new AppConflictException(
-        'System templates cannot be deleted',
-        'SYSTEM_TEMPLATE_NOT_DELETABLE',
-      );
+      throw new AppConflictException('SYSTEM_TEMPLATE_NOT_DELETABLE');
     }
 
     await this.prisma.workout.delete({ where: { id } });

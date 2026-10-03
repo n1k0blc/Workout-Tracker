@@ -72,7 +72,7 @@ export class AuthController {
   ): Promise<{ ok: true }> {
     const currentRefreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
     if (!currentRefreshToken) {
-      throw new AppUnauthorizedException('No refresh token', 'REFRESH_TOKEN_MISSING');
+      throw new AppUnauthorizedException('REFRESH_TOKEN_MISSING');
     }
 
     const { accessToken, refreshToken } = await this.authService.refresh(currentRefreshToken);

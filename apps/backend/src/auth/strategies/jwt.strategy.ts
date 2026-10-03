@@ -31,7 +31,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const user = await this.authService.validateUser(payload.sub);
 
     if (!user) {
-      throw new AppUnauthorizedException('Unauthorized', 'SESSION_USER_NOT_FOUND');
+      throw new AppUnauthorizedException('SESSION_USER_NOT_FOUND');
     }
 
     return user;

@@ -76,7 +76,7 @@ describe('shared session refresh on concurrent 401s (#158)', () => {
         return { ok: refreshOk, status: refreshOk ? 200 : 401, text: async () => '' };
       }
       if (!tokenValid) {
-        return { ok: false, status: 401, json: async () => ({ message: 'Unauthorized' }) };
+        return { ok: false, status: 401, json: async () => ({ statusCode: 401, code: 'UNAUTHORIZED' }) };
       }
       return { ok: true, status: 200, text: async () => 'null' };
     });
@@ -126,7 +126,7 @@ describe('shared session refresh on concurrent 401s (#158)', () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
       status: 401,
-      json: async () => ({ message: 'Invalid credentials' }),
+      json: async () => ({ statusCode: 401, code: 'INVALID_CREDENTIALS' }),
     });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -164,7 +164,7 @@ describe('favorites endpoints (#148)', () => {
   });
 });
 
-describe('client error responses (#190)', () => {
+describe('client error responses (#190, #191)', () => {
   function failWith(status: number, body: unknown) {
     vi.stubGlobal(
       'fetch',
@@ -173,7 +173,7 @@ describe('client error responses (#190)', () => {
   }
 
   it('throws an ApiError carrying the status and the machine-readable code', async () => {
-    failWith(404, { statusCode: 404, message: 'Workout cycle not found', code: 'CYCLE_NOT_FOUND' });
+    failWith(404, { statusCode: 404, code: 'CYCLE_NOT_FOUND' });
 
     const error = await apiClient.getSuggestedWorkout().catch((e) => e);
 
@@ -181,18 +181,26 @@ describe('client error responses (#190)', () => {
     expect(error).toMatchObject({ status: 404, code: 'CYCLE_NOT_FOUND' });
   });
 
-  it('carries validation field errors and joins the generated message[] for logs', async () => {
+  it('carries structured details and validation field errors', async () => {
     failWith(400, {
       statusCode: 400,
       code: 'VALIDATION_FAILED',
-      message: ['email must be an email', 'password is too short'],
       errors: [{ property: 'email', constraints: ['isEmail'] }],
     });
+    const validation = await apiClient.getSuggestedWorkout().catch((e) => e);
+    expect(validation.fieldErrors).toEqual([{ property: 'email', constraints: ['isEmail'] }]);
 
-    const error = await apiClient.getSuggestedWorkout().catch((e) => e);
+    failWith(400, { statusCode: 400, code: 'EXERCISE_MUSCLE_PERCENTAGES_INVALID_SUM', details: { sum: 90 } });
+    const detailed = await apiClient.getSuggestedWorkout().catch((e) => e);
+    expect(detailed.details).toEqual({ sum: 90 });
+  });
 
-    expect(error.fieldErrors).toEqual([{ property: 'email', constraints: ['isEmail'] }]);
-    expect(error.message).toBe('email must be an email; password is too short');
+  it('has no server text to show: message is just the code, or the status', async () => {
+    failWith(404, { statusCode: 404, code: 'CYCLE_NOT_FOUND' });
+    expect((await apiClient.getSuggestedWorkout().catch((e) => e)).message).toBe('CYCLE_NOT_FOUND');
+
+    failWith(500, {});
+    expect((await apiClient.getSuggestedWorkout().catch((e) => e)).message).toBe('HTTP 500');
   });
 
   it('still produces an ApiError when the body is not JSON', async () => {
@@ -215,7 +223,7 @@ describe('client error responses (#190)', () => {
   });
 
   it('keeps the code of an /auth/* 401, so a wrong password maps to its own message', async () => {
-    failWith(401, { statusCode: 401, message: 'Invalid credentials', code: 'INVALID_CREDENTIALS' });
+    failWith(401, { statusCode: 401, code: 'INVALID_CREDENTIALS' });
 
     const error = await apiClient.login({ email: 'a@b.com', password: 'wrong' }).catch((e) => e);
 
