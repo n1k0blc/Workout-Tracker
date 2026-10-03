@@ -730,6 +730,8 @@ export interface DiaryEntry {
 export interface NutritionDaySlot {
   id: string;
   name: string;
+  /** Set while the name is the untouched default: render it via `useSlotName` (#189). */
+  seedKey: string | null;
   order: number;
   /** True for an archived Abschnitt; only returned on days that already have entries in it. */
   archived: boolean;
@@ -740,6 +742,8 @@ export interface NutritionDaySlot {
 export interface MealSlot {
   id: string;
   name: string;
+  /** Set while the name is the untouched default: render it via `useSlotName` (#189). */
+  seedKey: string | null;
   order: number;
   archived: boolean;
 }

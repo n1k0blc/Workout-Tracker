@@ -14,11 +14,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { apiClient } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { useSlotName } from '@/hooks/useSlotName';
 import { kcalFromMacros, parseAmount } from '@/lib/nutrition';
 
 export interface QuickEntrySlot {
   id: string;
   name: string;
+  seedKey: string | null;
 }
 
 /**
@@ -43,6 +45,7 @@ export function QuickEntrySheet({
   onCreated: () => void;
 }) {
   const t = useTranslations('QuickEntrySheet');
+  const slotLabel = useSlotName();
   const [slotId, setSlotId] = useState<string | null>(defaultSlotId);
   const [name, setName] = useState('');
   const [kcal, setKcal] = useState('');
@@ -182,7 +185,7 @@ export function QuickEntrySheet({
                       : 'border-border bg-transparent text-foreground',
                   )}
                 >
-                  {slot.name}
+                  {slotLabel(slot)}
                 </button>
               ))}
             </div>

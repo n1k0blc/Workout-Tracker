@@ -355,6 +355,12 @@
     "undoError": "Restore failed",
     "deleteError": "Entry could not be deleted"
   },
+  "SlotNames": {
+    "breakfast": "Breakfast",
+    "lunch": "Lunch",
+    "dinner": "Dinner",
+    "snacks": "Snacks"
+  },
   "MealSlotRow": {
     "nothingLoggedYet": "Nothing logged yet",
     "archived": "archived",

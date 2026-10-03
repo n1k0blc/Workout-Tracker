@@ -30,6 +30,8 @@ export class DiaryEntryDto {
 export class NutritionDaySlotDto {
   id: string;
   name: string;
+  // Set while the name is the untouched default: the client renders it from its catalogue (#189).
+  seedKey: string | null;
   order: number;
   // True for a slot #142 has archived. Archived slots are returned only on days that already
   // have entries in them, so history stays intact.

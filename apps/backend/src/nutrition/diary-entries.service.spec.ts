@@ -308,9 +308,15 @@ describe('DiaryEntriesService.deleteEntry — scoped hard delete', () => {
 
 describe('DiaryEntriesService.getDay — day read model', () => {
   const slots = [
-    { id: 'slot-1', name: 'Frühstück', order: 1, archivedAt: null },
-    { id: 'slot-2', name: 'Mittagessen', order: 2, archivedAt: null },
-    { id: 'slot-3', name: 'Zweites Frühstück', order: 3, archivedAt: new Date('2026-01-01') },
+    { id: 'slot-1', name: 'Frühstück', seedKey: 'breakfast', order: 1, archivedAt: null },
+    { id: 'slot-2', name: 'Mittagessen', seedKey: null, order: 2, archivedAt: null },
+    {
+      id: 'slot-3',
+      name: 'Zweites Frühstück',
+      seedKey: null,
+      order: 3,
+      archivedAt: new Date('2026-01-01'),
+    },
   ];
 
   it('groups entries under their slot and totals per slot and per day', async () => {
@@ -333,6 +339,14 @@ describe('DiaryEntriesService.getDay — day read model', () => {
     const fruehstueck = day.slots.find((s) => s.id === 'slot-1')!;
     expect(fruehstueck.totals).toEqual({ kcal: 500, carbs: 50, protein: 25, fat: 13 });
     expect(fruehstueck.entries.map((e) => e.id)).toEqual(['e1', 'e2']);
+  });
+
+  it('carries each slot seedKey so the client can render the default names (#189)', async () => {
+    const { service } = makeService({ slots, entries: [] });
+
+    const day = await service.getDay('user-1', '2026-09-07');
+
+    expect(day.slots.map((s) => s.seedKey)).toEqual(['breakfast', null]);
   });
 
   it('hides an archived slot with no entries but keeps one that has them', async () => {

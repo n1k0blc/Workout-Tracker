@@ -72,6 +72,12 @@ say.
   and backfilled for older ones. An archived Abschnitt disappears from new days but still
   shows on past days that already have entries in it. Code: `MealSlot`.
 
+- **Abschnitt-Standardname** — the four default Abschnitte carry a `seedKey` (`breakfast`,
+  `lunch`, `dinner`, `snacks`) while untouched; the client renders their name from the message
+  catalogue in the active locale. Renaming one clears the key for good and the typed name wins.
+  See [ADR-0008](docs/adr/0008-default-abschnitte-render-from-the-catalogue-until-renamed.md).
+  Code: `MealSlot.seedKey`, `useSlotName`.
+
 - **Eintrag** — one logged item inside an Abschnitt on one calendar day: a name and its kcal,
   Kohlenhydrate, Protein and Fett. The nutrients are a **snapshot** taken when it is logged —
   a quantity change rescales them proportionally, they are never recomputed from a Lebensmittel

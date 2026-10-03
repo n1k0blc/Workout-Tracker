@@ -39,6 +39,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { apiClient } from '@/lib/api';
 import { MealSlot } from '@/types';
+import { useSlotName } from '@/hooks/useSlotName';
 
 /**
  * "Abschnitte verwalten" (design screen 02): rename, reorder (drag), add and archive the
@@ -56,6 +57,7 @@ export function ManageSlotsSheet({
   onChanged: () => void;
 }) {
   const t = useTranslations('ManageSlotsSheet');
+  const slotName = useSlotName();
   const [active, setActive] = useState<MealSlot[] | null>(null);
   const [archived, setArchived] = useState<MealSlot[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -123,7 +125,7 @@ export function ManageSlotsSheet({
 
   function saveRename(slot: MealSlot) {
     const name = editValue.trim();
-    if (!name || name === slot.name) {
+    if (!name || name === slotName(slot)) {
       setEditingId(null);
       return;
     }
@@ -131,7 +133,7 @@ export function ManageSlotsSheet({
       try {
         await apiClient.renameMealSlot(slot.id, name);
         setActive((prev) =>
-          prev ? prev.map((s) => (s.id === slot.id ? { ...s, name } : s)) : prev,
+          prev ? prev.map((s) => (s.id === slot.id ? { ...s, name, seedKey: null } : s)) : prev,
         );
         setEditingId(null);
       } catch {
@@ -213,7 +215,7 @@ export function ManageSlotsSheet({
                       onEditValueChange={setEditValue}
                       onStartEdit={() => {
                         setEditingId(slot.id);
-                        setEditValue(slot.name);
+                        setEditValue(slotName(slot));
                       }}
                       onCancelEdit={() => setEditingId(null)}
                       onConfirmEdit={() => saveRename(slot)}
@@ -249,7 +251,7 @@ export function ManageSlotsSheet({
                 {archived.map((slot) => (
                   <div key={slot.id} className="flex items-center gap-3 px-3 py-3">
                     <span className="flex-1 text-sm uppercase tracking-wide text-muted-foreground">
-                      {slot.name}
+                      {slotName(slot)}
                     </span>
                     <Button
                       variant="outline"
@@ -305,6 +307,7 @@ function SortableSlotRow({
   onArchive: () => void;
 }) {
   const t = useTranslations('ManageSlotsSheet');
+  const displayName = useSlotName()(slot);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: slot.id,
     disabled: dragDisabled,
@@ -362,12 +365,12 @@ function SortableSlotRow({
       ) : (
         <>
           <span className="flex-1 text-sm font-semibold uppercase tracking-wide">
-            {slot.name}
+            {displayName}
           </span>
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label={t('rename', { name: slot.name })}
+            aria-label={t('rename', { name: displayName })}
             disabled={disabled}
             onClick={onStartEdit}
           >
@@ -376,7 +379,7 @@ function SortableSlotRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label={t('archive', { name: slot.name })}
+            aria-label={t('archive', { name: displayName })}
             disabled={disabled || !canArchive}
             onClick={onArchive}
           >

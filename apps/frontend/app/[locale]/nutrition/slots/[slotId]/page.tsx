@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSlotName } from '@/hooks/useSlotName';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { useParams, useSearchParams } from 'next/navigation';
@@ -147,6 +148,8 @@ export default function AbschnittPage() {
   }, [load]);
 
   const slot: NutritionDaySlot | undefined = day?.slots.find((s) => s.id === slotId);
+  const slotLabel = useSlotName();
+  const displayName = slot ? slotLabel(slot) : undefined;
 
   async function handleDelete(entry: DiaryEntry) {
     try {
@@ -191,7 +194,7 @@ export default function AbschnittPage() {
             </Link>
           </Button>
           <div className="absolute left-1/2 -translate-x-1/2 text-lg font-semibold uppercase tracking-[0.05em]">
-            {slot?.name ?? t('fallbackTitle')}
+            {displayName ?? t('fallbackTitle')}
           </div>
           <div className="flex items-center">
             {slot && !slot.archived && (
@@ -283,7 +286,7 @@ export default function AbschnittPage() {
           open={pickerOpen}
           onOpenChange={setPickerOpen}
           slotId={slot.id}
-          slotName={slot.name}
+          slotName={displayName ?? ''}
           date={date}
           onCommitted={load}
         />
@@ -293,7 +296,7 @@ export default function AbschnittPage() {
           open={scanOpen}
           onOpenChange={setScanOpen}
           slotId={slot.id}
-          slotName={slot.name}
+          slotName={displayName ?? ''}
           date={date}
           onLogged={load}
           // Dismissing the scanner returns to the picker it was opened from, so the user can
@@ -306,7 +309,7 @@ export default function AbschnittPage() {
           open={copyOpen}
           onOpenChange={setCopyOpen}
           slotId={slot.id}
-          slotName={slot.name}
+          slotName={displayName ?? ''}
           date={date}
           onCopied={load}
         />
@@ -316,7 +319,7 @@ export default function AbschnittPage() {
         onOpenChange={setQuickOpen}
         slots={(day?.slots ?? [])
           .filter((s) => !s.archived)
-          .map((s) => ({ id: s.id, name: s.name }))}
+          .map((s) => ({ id: s.id, name: s.name, seedKey: s.seedKey }))}
         defaultSlotId={slotId}
         date={date}
         onCreated={load}

@@ -355,6 +355,12 @@
     "undoError": "Wiederherstellen fehlgeschlagen",
     "deleteError": "Eintrag konnte nicht gelöscht werden"
   },
+  "SlotNames": {
+    "breakfast": "Frühstück",
+    "lunch": "Mittagessen",
+    "dinner": "Abendessen",
+    "snacks": "Snacks"
+  },
   "MealSlotRow": {
     "nothingLoggedYet": "Noch nichts erfasst",
     "archived": "archiviert",

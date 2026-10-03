@@ -17,9 +17,11 @@ import { MealSlotRow } from '@/components/nutrition/meal-slot-row';
 import { FoodPickerSheet } from '@/components/nutrition/food-picker-sheet';
 import { ScanToLog } from '@/components/nutrition/scan-to-log';
 import { ManageSlotsSheet } from '@/components/nutrition/manage-slots-sheet';
+import { useSlotName } from '@/hooks/useSlotName';
 
 export default function NutritionPage() {
   const t = useTranslations('NutritionPage');
+  const slotName = useSlotName();
   const today = useMemo(() => toLocalDateString(new Date()), []);
   // The Abschnitt page's back arrow links here with `?date=` so leaving it returns to the day
   // it was opened from, not always today.
@@ -99,7 +101,7 @@ export default function NutritionPage() {
                       slot={slot}
                       date={date}
                       onQuickAdd={() => {
-                        setPickerSlot({ id: slot.id, name: slot.name });
+                        setPickerSlot({ id: slot.id, name: slotName(slot) });
                         setPickerOpen(true);
                       }}
                     />

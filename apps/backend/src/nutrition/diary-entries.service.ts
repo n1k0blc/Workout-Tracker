@@ -44,6 +44,7 @@ type DiaryEntryRow = {
 type MealSlotRow = {
   id: string;
   name: string;
+  seedKey: string | null;
   order: number;
   archivedAt: Date | null;
 };
@@ -136,7 +137,7 @@ export class DiaryEntriesService {
       this.prisma.mealSlot.findMany({
         where: { userId },
         orderBy: { order: 'asc' },
-        select: { id: true, name: true, order: true, archivedAt: true },
+        select: { id: true, name: true, seedKey: true, order: true, archivedAt: true },
       }) as Promise<MealSlotRow[]>,
       this.prisma.diaryEntry.findMany({
         where: { userId, localDate },
@@ -162,6 +163,7 @@ export class DiaryEntriesService {
       slotDtos.push({
         id: slot.id,
         name: slot.name,
+        seedKey: slot.seedKey,
         order: slot.order,
         archived: slot.archivedAt !== null,
         totals: slotEntries.reduce(addNutrients, { ...ZERO_TOTALS }),

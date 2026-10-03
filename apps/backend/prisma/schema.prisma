@@ -242,6 +242,11 @@ model MealSlot {
   id         String       @id @default(uuid())
   userId     String
   name       String
+  // One of the four default Abschnitte's keys (breakfast, lunch, dinner, snacks) while the
+  // user has not renamed it (#189, ADR-0008): the client renders the name from its message
+  // catalogue in the active locale. Renaming sets it to null for good; `name` is the German
+  // source and what a renamed slot keeps. Same idea as `Food.seedKey`, but a rendering key.
+  seedKey    String?
   order      Int
   archivedAt DateTime?
   createdAt  DateTime     @default(now())

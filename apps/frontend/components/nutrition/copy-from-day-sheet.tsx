@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { NutritionDay } from '@/types';
 import { fromLocalDateString, toLocalDateString } from '@/lib/local-date';
 import { formatKcal, relativeDayLabel } from '@/lib/nutrition';
+import { useSlotName } from '@/hooks/useSlotName';
 
 function formatFullDate(localDate: string): string {
   return new Intl.DateTimeFormat('de-DE', {
@@ -51,6 +52,7 @@ export function CopyFromDaySheet({
   onCopied: () => void;
 }) {
   const t = useTranslations('CopyFromDaySheet');
+  const slotLabel = useSlotName();
   const [sourceDates, setSourceDates] = useState<string[] | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
   const [preview, setPreview] = useState<NutritionDay | null>(null);
@@ -193,7 +195,7 @@ export function CopyFromDaySheet({
                           )}
                         >
                           <span className="truncate text-[13px] font-medium uppercase tracking-[0.05em]">
-                            {s.name}
+                            {slotLabel(s)}
                           </span>
                           <span className="shrink-0 text-xs text-muted-foreground">
                             {s.entries.length}{' '}
