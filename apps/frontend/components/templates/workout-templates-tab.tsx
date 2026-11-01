@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { IconPlus, IconTrash, IconBarbell, IconClock, IconTag } from '@tabler/icons-react';
+import { notify } from '@/lib/toast';
 
 export default function WorkoutTemplatesTab() {
   const router = useRouter();
@@ -52,7 +53,7 @@ export default function WorkoutTemplatesTab() {
       setDeleteTemplateId(null);
     } catch (error) {
       console.error('Failed to delete template:', error);
-      alert(t('deleteFailed'));
+      notify.error(t('deleteFailed'));
     }
   };
 

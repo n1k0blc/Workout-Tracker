@@ -39,8 +39,9 @@ export function useFormErrors({ fields, codeFields = {} }: Options) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [focusRequest, setFocusRequest] = useState(0);
   // A callback ref held in state rather than a ref object, so the hook's result can be read
-  // during render (react-hooks/refs).
-  const [formElement, bindForm] = useState<HTMLFormElement | null>(null);
+  // during render (react-hooks/refs). Any container works, not only a `<form>`: a dialog or a
+  // page section holding the fields is enough.
+  const [formElement, bindForm] = useState<HTMLElement | null>(null);
 
   // Focus after the render that put aria-invalid on the fields.
   useEffect(() => {

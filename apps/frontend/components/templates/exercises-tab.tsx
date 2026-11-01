@@ -22,6 +22,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
+import { notify } from '@/lib/toast';
 
 export default function ExercisesTab() {
   const t = useTranslations('ExercisesTab');
@@ -77,7 +78,7 @@ export default function ExercisesTab() {
       setDeleteExerciseId(null);
     } catch (error) {
       console.error('Failed to delete exercise:', error);
-      alert(t('deleteFailed'));
+      notify.error(t('deleteFailed'));
     }
   };
 

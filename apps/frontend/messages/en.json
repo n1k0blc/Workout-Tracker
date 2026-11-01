@@ -156,6 +156,12 @@
       "homeGyms": {
         "arrayMinSize": "Please add at least one home gym.",
         "arrayMaxSize": "You can add at most 10 gyms."
+      },
+      "name": {
+        "isNotEmpty": "Please enter a name."
+      },
+      "templateName": {
+        "isNotEmpty": "Please enter a template name."
       }
     }
   },
@@ -233,6 +239,8 @@
       "empty": "No gyms added yet",
       "editDialogTitle": "Edit gym",
       "deleteConfirm": "Really delete this gym? This isn't possible if the gym is used in workouts.",
+      "deleteDialogTitle": "Delete gym?",
+      "deleteSubmit": "Delete",
       "added": "Gym added successfully",
       "addError": "Failed to add gym",
       "updated": "Gym updated successfully",
@@ -992,11 +1000,8 @@
     "back": "Back",
     "nextToReview": "Next to Review",
     "alerts": {
-      "templateNameRequired": "Please enter a template name",
       "atLeastOneExercise": "Add at least one exercise",
       "templateCreated": "Template created successfully!",
-      "templateNameExists": "A template with this name already exists",
-      "templateSaveFailed": "Failed to save template",
       "templateEmpty": "This template contains no exercises",
       "templateLoadFailed": "Failed to load template"
     },
@@ -1044,13 +1049,8 @@
     },
     "alerts": {
       "loadFailed": "Failed to load data",
-      "nameRequired": "Please enter a workout name",
-      "saveFailed": "Failed to save blueprint",
-      "templateNameRequired": "Please enter a template name",
       "atLeastOneExercise": "Add at least one exercise",
-      "templateCreated": "Template created successfully!",
-      "templateNameExists": "A template with this name already exists",
-      "templateSaveFailed": "Failed to save template"
+      "templateCreated": "Template created successfully!"
     },
     "saveTemplateDialog": {
       "title": "Save blueprint as template",
@@ -1142,10 +1142,8 @@
     "save": "Save",
     "alerts": {
       "loadFailed": "Failed to load data.",
-      "nameRequired": "Please enter a name for the template.",
       "atLeastOneExercise": "Please add at least one exercise.",
-      "everyExerciseNeedsSet": "Every exercise must have at least one set.",
-      "saveFailed": "Failed to save template."
+      "everyExerciseNeedsSet": "Every exercise must have at least one set."
     }
   },
   "CycleDetailPage": {

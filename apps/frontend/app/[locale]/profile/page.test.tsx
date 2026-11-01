@@ -35,10 +35,12 @@ const baseUser = {
   unitSystem: 'METRIC' as 'METRIC' | 'IMPERIAL',
 };
 
-const { push, logout, updateProfile } = vi.hoisted(() => ({
+const { push, logout, updateProfile, getHomeGyms, deleteHomeGym } = vi.hoisted(() => ({
   push: vi.fn(),
   logout: vi.fn(),
   updateProfile: vi.fn(),
+  getHomeGyms: vi.fn(),
+  deleteHomeGym: vi.fn(),
 }));
 
 vi.mock('@/i18n/navigation', () => ({
@@ -57,16 +59,17 @@ vi.mock('@/lib/workout-context', () => ({
 
 vi.mock('@/lib/api/client', () => ({
   apiClient: {
-    getHomeGyms: vi.fn().mockResolvedValue([]),
+    getHomeGyms,
     updateProfile,
     createHomeGym: vi.fn(),
     updateHomeGym: vi.fn(),
-    deleteHomeGym: vi.fn(),
+    deleteHomeGym,
     changePassword: vi.fn(),
   },
 }));
 
 updateProfile.mockResolvedValue({ ...baseUser, locale: 'en' });
+getHomeGyms.mockResolvedValue([]);
 
 import ProfilePage from './page';
 
@@ -200,5 +203,51 @@ describe('ProfilePage unit system', () => {
     await waitFor(() =>
       expect(updateProfile).toHaveBeenCalledWith(expect.objectContaining({ weight: 100, height: 180 })),
     );
+  });
+});
+
+/** Deleting a gym is destructive: an app dialog asks first (#231), and No means nothing is sent. */
+describe('ProfilePage gym deletion', () => {
+  beforeEach(() => {
+    getHomeGyms.mockResolvedValue([{ id: 'g1', name: 'Downtown Gym' }]);
+    deleteHomeGym.mockResolvedValue(undefined);
+  });
+  afterEach(() => {
+    cleanup();
+    deleteHomeGym.mockReset();
+    getHomeGyms.mockReset();
+    getHomeGyms.mockResolvedValue([]);
+  });
+
+  async function openDeleteDialog() {
+    await screen.findByText('Downtown Gym');
+    const row = screen.getByText('Downtown Gym').closest('div.flex.items-center') as HTMLElement;
+    const buttons = row.querySelectorAll('button');
+    fireEvent.click(buttons[buttons.length - 1]);
+    return screen.findByRole('alertdialog');
+  }
+
+  it('asks in a dialog and deletes only after confirmation', async () => {
+    renderProfilePage();
+
+    const dialog = await openDeleteDialog();
+    expect(dialog.textContent).toContain(messages.Profile.gyms.deleteConfirm);
+    expect(deleteHomeGym).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Löschen' }));
+
+    await waitFor(() => expect(deleteHomeGym).toHaveBeenCalledWith('g1'));
+    await waitFor(() => expect(screen.queryByText('Downtown Gym')).toBeNull());
+  });
+
+  it('deletes nothing when the dialog is cancelled', async () => {
+    renderProfilePage();
+
+    await openDeleteDialog();
+    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(deleteHomeGym).not.toHaveBeenCalled();
+    expect(screen.getByText('Downtown Gym')).toBeTruthy();
   });
 });

@@ -10,7 +10,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Field, FieldLabel } from '@/components/ui/field';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
+import { notify } from '@/lib/toast';
+import { useFormErrors } from '@/hooks/useFormErrors';
 import ExerciseCard from '@/components/workout/exercise-card';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import { IconChevronLeft, IconPlus } from '@tabler/icons-react';
@@ -41,6 +43,10 @@ interface TemplateEditorScreenProps {
 export default function TemplateEditorScreen({ templateId }: TemplateEditorScreenProps) {
   const router = useRouter();
   const t = useTranslations('TemplateEditorScreen');
+  const [form, formRef] = useFormErrors({
+    fields: ['name'],
+    codeFields: { TEMPLATE_NAME_TAKEN: 'name' },
+  });
 
   const [name, setName] = useState('');
   const [recommendedGymId, setRecommendedGymId] = useState<string>('');
@@ -186,7 +192,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
       }
     } catch (error) {
       console.error('Failed to load data for template editor:', error);
-      alert(t('alerts.loadFailed'));
+      notify.error(t('alerts.loadFailed'));
       router.push('/templates');
     } finally {
       setLoading(false);
@@ -202,20 +208,19 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
   // add/remove/replace/reorder/add-set/edit-set surface.
 
   const handleSave = async () => {
-    if (!name.trim()) {
-      alert(t('alerts.nameRequired'));
+    if (!form.setConstraints({ name: name.trim() ? null : 'isNotEmpty' })) {
       return;
     }
 
     if (exercises.length === 0) {
-      alert(t('alerts.atLeastOneExercise'));
+      notify.warning(t('alerts.atLeastOneExercise'));
       return;
     }
 
     // Validate every exercise has at least one set (template requirement).
     const hasEmpty = exercises.some((ex) => (ex.plannedSets?.length || 0) === 0);
     if (hasEmpty) {
-      alert(t('alerts.everyExerciseNeedsSet'));
+      notify.warning(t('alerts.everyExerciseNeedsSet'));
       return;
     }
 
@@ -254,7 +259,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
       router.push('/templates');
     } catch (error) {
       console.error('Failed to save template:', error);
-      alert(t('alerts.saveFailed'));
+      form.showApiError(error);
     } finally {
       setSaving(false);
     }
@@ -305,7 +310,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
             {/* Template Metadata (Name + Recommended Gym) */}
             <Card>
               <CardContent className="p-6 space-y-4">
-                <Field>
+                <Field ref={formRef}>
                   <FieldLabel>{t('nameLabel')}</FieldLabel>
                   {isReadonlyView ? (
                     <div className="px-3 py-2 text-sm font-medium border border-input bg-muted/30 rounded-md">
@@ -314,11 +319,16 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
                   ) : (
                     <Input
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        form.clear('name');
+                      }}
                       placeholder={t('namePlaceholder')}
                       className="w-full"
+                      {...form.fieldProps('name')}
                     />
                   )}
+                  <FieldError id={form.errorId('name')}>{form.errors.name}</FieldError>
                 </Field>
 
                 {!isReadonlyView && (
