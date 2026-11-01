@@ -192,10 +192,9 @@ export default function EditWorkoutPage() {
                     date={workoutDate ? new Date(workoutDate) : null}
                     onSelect={(date) => {
                       if (date) {
-                        const y = date.getFullYear();
-                        const m = String(date.getMonth() + 1).padStart(2, '0');
-                        const d = String(date.getDate()).padStart(2, '0');
-                        setWorkoutDate(`${y}-${m}-${d}`);
+                        // DatePicker hands back the picked day as UTC midnight, so the day is
+                        // read in UTC; the local clock would be the previous day west of Greenwich.
+                        setWorkoutDate(date.toISOString().slice(0, 10));
                       } else {
                         setWorkoutDate('');
                       }
