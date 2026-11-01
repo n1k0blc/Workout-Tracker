@@ -39,7 +39,6 @@ export default function CyclesPage() {
   const [completeConfirm, setCompleteConfirm] = useState<string | null>(null);
   const [completing, setCompleting] = useState<string | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
-  const [creatingNew, setCreatingNew] = useState(false);
 
   useEffect(() => {
     loadCycles();
@@ -57,24 +56,8 @@ export default function CyclesPage() {
     }
   };
 
-  const handleCreateNewCycle = async () => {
-    setCreatingNew(true);
-    try {
-      const data = await apiClient.getCycles();
-      const hasActiveCycle = data.some((c) => c.status === 'ACTIVE');
-      
-      if (hasActiveCycle) {
-        notify.warning(t('alerts.activeCycleExists'));
-      } else {
-        router.push('/cycles/new');
-      }
-    } catch (error) {
-      console.error('Failed to check active cycles:', error);
-      notify.error(t('alerts.checkFailed'));
-    } finally {
-      setCreatingNew(false);
-    }
-  };
+  // No check here: the wizard route itself refuses to open while a Zyklus is active (#226).
+  const handleCreateNewCycle = () => router.push('/cycles/new');
 
   const handleCompleteCycle = async (cycleId: string) => {
     setCompleting(cycleId);
@@ -131,12 +114,9 @@ export default function CyclesPage() {
                     {t('subtitle')}
                   </p>
                 </div>
-                <Button
-                  onClick={handleCreateNewCycle}
-                  disabled={creatingNew}
-                >
+                <Button onClick={handleCreateNewCycle}>
                   <IconPlus className="mr-2 size-4" />
-                  {creatingNew ? t('checking') : t('newCycle')}
+                  {t('newCycle')}
                 </Button>
               </div>
 
@@ -352,11 +332,7 @@ export default function CyclesPage() {
                     <p className="text-muted-foreground mb-6">
                       {t('emptyDescription')}
                     </p>
-                    <Button
-                      onClick={handleCreateNewCycle}
-                      disabled={creatingNew}
-                      size="lg"
-                    >
+                    <Button onClick={handleCreateNewCycle} size="lg">
                       <IconPlus className="mr-2 size-4" />
                       {t('createCycle')}
                     </Button>

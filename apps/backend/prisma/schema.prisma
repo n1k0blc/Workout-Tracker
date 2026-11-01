@@ -85,6 +85,11 @@ model WorkoutCycle {
   workouts    Workout[]
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   workoutDays WorkoutDay[]
+
+  // A user has at most one ACTIVE cycle. Enforced by a partial unique index that Prisma cannot
+  // express: "WorkoutCycle_userId_active_key" ON ("userId") WHERE status = 'ACTIVE', created in
+  // migration 20261102120000_workout_cycle_unique_active_per_user. Prisma 7's `migrate dev`
+  // leaves it alone -- do not re-create or drop it by hand.
 }
 
 model WorkoutDay {

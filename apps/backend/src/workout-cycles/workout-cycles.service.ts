@@ -27,15 +27,26 @@ import { ApiLocale, DEFAULT_LOCALE } from '../common/utils/locale.util';
 
 const WEEKDAY_UNIQUE_INDEX = 'WorkoutDay_cycleId_weekday_key';
 const ORDER_UNIQUE_INDEX = 'WorkoutDay_cycleId_order_key';
+// Partial unique index on WorkoutCycle(userId) WHERE status = 'ACTIVE' -- raw SQL in a
+// migration, so it has no counterpart in schema.prisma.
+const ACTIVE_CYCLE_UNIQUE_INDEX = 'WorkoutCycle_userId_active_key';
 
-/** Whether `error` is a P2002 raised by the given WorkoutDay unique index, and nothing else. */
+/** Whether `error` is a P2002 raised by the given unique index, and nothing else. */
 function isUniqueIndexConflict(error: unknown, indexName: string, fields: string[]): boolean {
   if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
     return false;
   }
-  // `meta.target` is the index name on Postgres, but has been a field-name array on other
-  // connectors and older client versions -- match either shape.
-  const target = error.meta?.target;
+  // With the Prisma 7 `pg` driver adapter (what the app runs on) the index name is only at
+  // `meta.driverAdapterError.cause.constraint.index` -- `meta.target` is absent. Older
+  // connectors put the index name, or a field-name array, in `meta.target`. Match all three.
+  const meta = error.meta as
+    | {
+        target?: unknown;
+        driverAdapterError?: { cause?: { constraint?: { index?: unknown } } };
+      }
+    | undefined;
+  if (meta?.driverAdapterError?.cause?.constraint?.index === indexName) return true;
+  const target = meta?.target;
   return Array.isArray(target)
     ? fields.every((field) => target.includes(field))
     : target === indexName;
@@ -43,6 +54,11 @@ function isUniqueIndexConflict(error: unknown, indexName: string, fields: string
 
 function isWeekdayConflict(error: unknown): boolean {
   return isUniqueIndexConflict(error, WEEKDAY_UNIQUE_INDEX, ['cycleId', 'weekday']);
+}
+
+/** A P2002 on the one-active-Zyklus-per-user partial index. */
+function isActiveCycleConflict(error: unknown): boolean {
+  return isUniqueIndexConflict(error, ACTIVE_CYCLE_UNIQUE_INDEX, ['userId']);
 }
 
 /**
@@ -157,35 +173,45 @@ export class WorkoutCyclesService {
 
     const startWeekday = cycleStartWeekday(startDate);
 
-    const cycleId = await this.prisma.$transaction(async (tx) => {
-      const cycle = await tx.workoutCycle.create({
-        data: { name, duration, startDate: new Date(startDate), userId },
+    const cycleId = await this.prisma
+      .$transaction(async (tx) => {
+        const cycle = await tx.workoutCycle.create({
+          data: { name, duration, startDate: new Date(startDate), userId },
+        });
+
+        for (const day of workoutDays) {
+          const workoutDay = await tx.workoutDay.create({
+            data: {
+              cycleId: cycle.id,
+              weekday: day.weekday,
+              order: getWeekdayDistanceFromCycleStart(day.weekday, startWeekday),
+              name: day.name,
+              plannedHomeGymId: day.plannedHomeGymId || null,
+            },
+          });
+
+          const blueprint = await tx.workout.create({
+            data: { kind: 'BLUEPRINT', userId, workoutDayId: workoutDay.id },
+          });
+
+          await this.workoutTreeService.replaceTree(
+            tx,
+            blueprint.id,
+            toExerciseInputs(day.exercises, exercisesById),
+          );
+        }
+
+        return cycle.id;
+      })
+      .catch((error: unknown) => {
+        // The check above reads before it writes, so two simultaneous requests can both pass it.
+        // The partial unique index on (userId) WHERE status = 'ACTIVE' is the actual authority;
+        // the request that loses it answers the same 400 the check does, not a driver-level 500.
+        if (isActiveCycleConflict(error)) {
+          throw new AppBadRequestException('ACTIVE_CYCLE_ALREADY_EXISTS');
+        }
+        throw error;
       });
-
-      for (const day of workoutDays) {
-        const workoutDay = await tx.workoutDay.create({
-          data: {
-            cycleId: cycle.id,
-            weekday: day.weekday,
-            order: getWeekdayDistanceFromCycleStart(day.weekday, startWeekday),
-            name: day.name,
-            plannedHomeGymId: day.plannedHomeGymId || null,
-          },
-        });
-
-        const blueprint = await tx.workout.create({
-          data: { kind: 'BLUEPRINT', userId, workoutDayId: workoutDay.id },
-        });
-
-        await this.workoutTreeService.replaceTree(
-          tx,
-          blueprint.id,
-          toExerciseInputs(day.exercises, exercisesById),
-        );
-      }
-
-      return cycle.id;
-    });
 
     return this.findById(cycleId, userId, locale);
   }
