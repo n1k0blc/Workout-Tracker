@@ -7,6 +7,7 @@ import { AuthProvider } from "@/lib/auth-context";
 import { WorkoutProvider } from "@/lib/workout-context";
 import { MobileNav } from "@/components/mobile-nav";
 import { ActiveWorkoutOverlay } from "@/components/workout/active-workout-overlay";
+import { ClientTimeZoneProvider } from "@/components/client-time-zone-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "next-themes";
 import { cn } from "@/lib/utils";
@@ -68,22 +69,24 @@ export default async function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <NextIntlClientProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-            nonce={nonce}
-          >
-            <AuthProvider>
-              <WorkoutProvider>
-                <Toaster />
-                <MobileNav />
-                {children}
-                <ActiveWorkoutOverlay />
-              </WorkoutProvider>
-            </AuthProvider>
-          </ThemeProvider>
+          <ClientTimeZoneProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+              nonce={nonce}
+            >
+              <AuthProvider>
+                <WorkoutProvider>
+                  <Toaster />
+                  <MobileNav />
+                  {children}
+                  <ActiveWorkoutOverlay />
+                </WorkoutProvider>
+              </AuthProvider>
+            </ThemeProvider>
+          </ClientTimeZoneProvider>
         </NextIntlClientProvider>
       </body>
     </html>
