@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { useTranslations, useFormatter } from 'next-intl';
 import { apiClient } from '@/lib/api';
 import { weekdayReferenceDate } from '@/lib/weekday';
+import { notify } from '@/lib/toast';
 import { WorkoutCycle } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -63,13 +64,13 @@ export default function CyclesPage() {
       const hasActiveCycle = data.some((c) => c.status === 'ACTIVE');
       
       if (hasActiveCycle) {
-        alert(t('alerts.activeCycleExists'));
+        notify.warning(t('alerts.activeCycleExists'));
       } else {
         router.push('/cycles/new');
       }
     } catch (error) {
       console.error('Failed to check active cycles:', error);
-      alert(t('alerts.checkFailed'));
+      notify.error(t('alerts.checkFailed'));
     } finally {
       setCreatingNew(false);
     }
@@ -83,7 +84,7 @@ export default function CyclesPage() {
       setCompleteConfirm(null);
     } catch (error) {
       console.error('Failed to complete cycle:', error);
-      alert(t('alerts.completeFailed'));
+      notify.error(t('alerts.completeFailed'));
     } finally {
       setCompleting(null);
     }

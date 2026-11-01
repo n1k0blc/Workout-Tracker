@@ -17,6 +17,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { FieldError } from '@/components/ui/field';
+import { notify } from '@/lib/toast';
+import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
+import { useFormErrors } from '@/hooks/useFormErrors';
 import type { ExerciseLog } from '@/types';
 import { replacePlanExerciseInList } from '@/lib/exercise-replace';
 import { usePlanExercisePrefill } from '@/lib/plan-exercise-prefill';
@@ -59,6 +63,12 @@ export default function BlueprintEditorStep({
   onBack,
 }: BlueprintEditorStepProps) {
   const t = useTranslations('BlueprintEditorStep');
+  const apiError = useApiErrorMessage();
+  // The template name in the save-as-template dialog; a taken name belongs under that field.
+  const [templateForm, templateFormRef] = useFormErrors({
+    fields: ['templateName'],
+    codeFields: { TEMPLATE_NAME_TAKEN: 'templateName' },
+  });
   const format = useFormatter();
   const [showExerciseModal, setShowExerciseModal] = useState(false);
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -220,8 +230,7 @@ export default function BlueprintEditorStep({
   };
 
   const handleSaveAsTemplate = async () => {
-    if (!templateName.trim()) {
-      alert(t('alerts.templateNameRequired'));
+    if (!templateForm.setConstraints({ templateName: templateName.trim() ? null : 'isNotEmpty' })) {
       return;
     }
 
@@ -230,7 +239,7 @@ export default function BlueprintEditorStep({
     }
 
     if (currentDay.blueprint.exercises.length === 0) {
-      alert(t('alerts.atLeastOneExercise'));
+      notify.warning(t('alerts.atLeastOneExercise'));
       return;
     }
 
@@ -255,17 +264,12 @@ export default function BlueprintEditorStep({
       };
 
       await apiClient.createWorkoutTemplate(templateData);
-      alert(t('alerts.templateCreated'));
+      notify.success(t('alerts.templateCreated'));
       setShowSaveTemplateModal(false);
       setTemplateName('');
     } catch (error: unknown) {
       console.error('Failed to save template:', error);
-      const err = error as { response?: { status?: number } };
-      if (err.response?.status === 409) {
-        alert(t('alerts.templateNameExists'));
-      } else {
-        alert(t('alerts.templateSaveFailed'));
-      }
+      templateForm.showApiError(error);
     } finally {
       setSavingTemplate(false);
     }
@@ -280,7 +284,7 @@ export default function BlueprintEditorStep({
 
       // Check if template has exercises
       if (!template.exercises || template.exercises.length === 0) {
-        alert(t('alerts.templateEmpty'));
+        notify.warning(t('alerts.templateEmpty'));
         return;
       }
 
@@ -315,7 +319,7 @@ export default function BlueprintEditorStep({
       setShowTemplateSelectionModal(false);
     } catch (error) {
       console.error('Failed to load template:', error);
-      alert(t('alerts.templateLoadFailed'));
+      notify.error(apiError(error, t('alerts.templateLoadFailed')));
     }
   };
 
@@ -617,6 +621,7 @@ export default function BlueprintEditorStep({
           setShowSaveTemplateModal(open);
           if (!open) {
             setTemplateName('');
+            templateForm.clear('templateName');
           }
         }}
       >
@@ -624,21 +629,30 @@ export default function BlueprintEditorStep({
           <DialogHeader>
             <DialogTitle>{t('saveTemplateDialog.title')}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <div ref={templateFormRef} className="space-y-4 py-2">
             <p className="text-sm text-muted-foreground">
               {t('saveTemplateDialog.description')}
             </p>
-            <Input
-              value={templateName}
-              onChange={(e) => setTemplateName(e.target.value)}
-              placeholder={t('saveTemplateDialog.namePlaceholder')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !savingTemplate) {
-                  handleSaveAsTemplate();
-                }
-              }}
-              autoFocus
-            />
+            <div>
+              <Input
+                value={templateName}
+                onChange={(e) => {
+                  setTemplateName(e.target.value);
+                  templateForm.clear('templateName');
+                }}
+                placeholder={t('saveTemplateDialog.namePlaceholder')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !savingTemplate) {
+                    handleSaveAsTemplate();
+                  }
+                }}
+                autoFocus
+                {...templateForm.fieldProps('templateName')}
+              />
+              <FieldError id={templateForm.errorId('templateName')} className="mt-1">
+                {templateForm.errors.templateName}
+              </FieldError>
+            </div>
           </div>
           <DialogFooter className="flex gap-3">
             <Button
@@ -646,6 +660,7 @@ export default function BlueprintEditorStep({
               onClick={() => {
                 setShowSaveTemplateModal(false);
                 setTemplateName('');
+                templateForm.clear('templateName');
               }}
               disabled={savingTemplate}
             >

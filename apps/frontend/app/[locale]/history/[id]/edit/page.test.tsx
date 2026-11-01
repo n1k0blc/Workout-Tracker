@@ -19,6 +19,9 @@ vi.mock('@/i18n/navigation', () => ({
   useRouter: () => router,
 }));
 
+const notify = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn(), info: vi.fn(), success: vi.fn() }));
+vi.mock('@/lib/toast', () => ({ notify }));
+
 vi.mock('@/lib/api', () => ({
   apiClient: { getWorkout, updateWorkout },
 }));
@@ -90,3 +93,43 @@ describe.each(['America/New_York', 'America/Los_Angeles', 'Pacific/Honolulu', 'E
     });
   },
 );
+
+/** Failures are a toast (#231), never a native alert(): the page stays put or leaves, unblocked. */
+describe('editing a past workout, when the server fails', () => {
+  const workout = {
+    id: 'w1',
+    date: '2026-08-15T10:00:00.000Z',
+    localDate: '2026-08-15',
+    totalDuration: 3600,
+    isFreeWorkout: true,
+    exercises: [],
+  };
+
+  afterEach(() => {
+    cleanup();
+    getWorkout.mockReset();
+    updateWorkout.mockReset();
+    push.mockClear();
+    notify.error.mockClear();
+  });
+
+  it('toasts the save error and stays on the page', async () => {
+    getWorkout.mockResolvedValue(workout);
+    updateWorkout.mockRejectedValue(new Error('boom'));
+    renderEditPage();
+
+    await screen.findByText('Workout bearbeiten');
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(notify.error).toHaveBeenCalledWith('Fehler beim Speichern des Workouts'));
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('toasts the load error and returns to the history', async () => {
+    getWorkout.mockRejectedValue(new Error('boom'));
+    renderEditPage();
+
+    await waitFor(() => expect(notify.error).toHaveBeenCalledWith('Fehler beim Laden des Workouts'));
+    expect(push).toHaveBeenCalledWith('/history');
+  });
+});

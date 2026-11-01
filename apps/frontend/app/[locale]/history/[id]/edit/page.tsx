@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { DatePicker } from '@/components/date-picker';
 import ExerciseCard from '@/components/workout/exercise-card';
+import { notify } from '@/lib/toast';
 import {
   IconChevronLeft,
 } from '@tabler/icons-react';
@@ -76,7 +77,7 @@ export default function EditWorkoutPage() {
       setWorkoutDate(data.localDate);
     } catch (error) {
       console.error('Failed to load workout:', error);
-      alert(t('loadError'));
+      notify.error(t('loadError'));
       if (fromCycle && cycleId) {
         router.push(`/cycles/${cycleId}`);
       } else {
@@ -123,7 +124,7 @@ export default function EditWorkoutPage() {
       navigateBack();
     } catch (error) {
       console.error('Failed to save workout:', error);
-      alert(t('saveError'));
+      notify.error(t('saveError'));
     } finally {
       setSaving(false);
     }

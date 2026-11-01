@@ -47,6 +47,16 @@ import {
   DialogTrigger,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
 
 export default function ProfilePage() {
@@ -89,6 +99,7 @@ export default function ProfilePage() {
   const [newGymName, setNewGymName] = useState('');
   const [editingGymId, setEditingGymId] = useState<string | null>(null);
   const [editingGymName, setEditingGymName] = useState('');
+  const [deleteGymId, setDeleteGymId] = useState<string | null>(null);
 
   // Language (#179). foodMarket also exists on User but gets no UI until a second market does.
   const [localeValue, setLocaleValue] = useState<'de' | 'en'>('de');
@@ -288,10 +299,7 @@ export default function ProfilePage() {
   };
 
   const handleDeleteGym = async (id: string) => {
-    if (!confirm(t('gyms.deleteConfirm'))) {
-      return;
-    }
-
+    setDeleteGymId(null);
     setError('');
     setSuccess('');
     setLoading(true);
@@ -778,7 +786,7 @@ export default function ProfilePage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleDeleteGym(gym.id)}
+                        onClick={() => setDeleteGymId(gym.id)}
                         disabled={loading}
                         className="text-destructive hover:text-destructive"
                       >
@@ -825,6 +833,25 @@ export default function ProfilePage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Gym Confirmation */}
+        <AlertDialog open={!!deleteGymId} onOpenChange={(open) => !open && setDeleteGymId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t('gyms.deleteDialogTitle')}</AlertDialogTitle>
+              <AlertDialogDescription>{t('gyms.deleteConfirm')}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteGymId && handleDeleteGym(deleteGymId)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {t('gyms.deleteSubmit')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Security Section */}
         <Card className="mb-6">

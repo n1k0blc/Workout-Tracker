@@ -55,6 +55,9 @@ import { plannedSideFields } from '@/lib/set-sides';
 import { addPlannedSet } from '@/lib/planned-sets';
 import type { PlannedSet } from '@/types';
 import { weekdayReferenceDate } from '@/lib/weekday';
+import { notify } from '@/lib/toast';
+import { useFormErrors } from '@/hooks/useFormErrors';
+import { FieldError } from '@/components/ui/field';
 
 export default function EditBlueprintPage() {
   const params = useParams();
@@ -62,6 +65,13 @@ export default function EditBlueprintPage() {
   const { user } = useAuth();
   const t = useTranslations('EditBlueprintPage');
   const format = useFormatter();
+  // Two small forms, each with its own errors: the day's name on the page, and the template
+  // name in the save-as-template dialog (a taken name belongs under that field).
+  const [dayForm, dayFormRef] = useFormErrors({ fields: ['name'] });
+  const [templateForm, templateFormRef] = useFormErrors({
+    fields: ['templateName'],
+    codeFields: { TEMPLATE_NAME_TAKEN: 'templateName' },
+  });
   const cycleId = params.id as string;
   const workoutDayId = params.workoutDayId as string;
 
@@ -138,7 +148,7 @@ export default function EditBlueprintPage() {
       }
     } catch (error) {
       console.error('Failed to load data:', error);
-      alert(t('alerts.loadFailed'));
+      notify.error(t('alerts.loadFailed'));
       router.push('/cycles');
     } finally {
       setLoading(false);
@@ -220,8 +230,7 @@ export default function EditBlueprintPage() {
   };
 
   const handleSave = async () => {
-    if (!workoutDayName.trim()) {
-      alert(t('alerts.nameRequired'));
+    if (!dayForm.setConstraints({ name: workoutDayName.trim() ? null : 'isNotEmpty' })) {
       return;
     }
 
@@ -269,7 +278,7 @@ export default function EditBlueprintPage() {
       router.push('/cycles');
     } catch (error) {
       console.error('Failed to save blueprint:', error);
-      alert(t('alerts.saveFailed'));
+      dayForm.showApiError(error);
     } finally {
       setSaving(false);
     }
@@ -288,13 +297,12 @@ export default function EditBlueprintPage() {
   };
 
   const handleSaveAsTemplate = async () => {
-    if (!templateName.trim()) {
-      alert(t('alerts.templateNameRequired'));
+    if (!templateForm.setConstraints({ templateName: templateName.trim() ? null : 'isNotEmpty' })) {
       return;
     }
 
     if (exercises.length === 0) {
-      alert(t('alerts.atLeastOneExercise'));
+      notify.warning(t('alerts.atLeastOneExercise'));
       return;
     }
 
@@ -318,17 +326,12 @@ export default function EditBlueprintPage() {
       };
 
       await apiClient.createWorkoutTemplate(templateData);
-      alert(t('alerts.templateCreated'));
+      notify.success(t('alerts.templateCreated'));
       setShowSaveTemplateModal(false);
       setTemplateName('');
     } catch (error: unknown) {
       console.error('Failed to save template:', error);
-      const err = error as { response?: { status?: number } };
-      if (err.response?.status === 409) {
-        alert(t('alerts.templateNameExists'));
-      } else {
-        alert(t('alerts.templateSaveFailed'));
-      }
+      templateForm.showApiError(error);
     } finally {
       setSavingTemplate(false);
     }
@@ -401,17 +404,24 @@ export default function EditBlueprintPage() {
                   {t('settings.title')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
+                <div ref={dayFormRef}>
                   <Label className="block text-sm font-medium text-foreground mb-2">
                     {t('settings.nameLabel')}
                   </Label>
                   <Input
                     type="text"
                     value={workoutDayName}
-                    onChange={(e) => setWorkoutDayName(e.target.value)}
+                    onChange={(e) => {
+                      setWorkoutDayName(e.target.value);
+                      dayForm.clear('name');
+                    }}
                     className="w-full"
                     placeholder={t('settings.namePlaceholder')}
+                    {...dayForm.fieldProps('name')}
                   />
+                  <FieldError id={dayForm.errorId('name')} className="mt-1">
+                    {dayForm.errors.name}
+                  </FieldError>
                 </div>
                 <div>
                   <Label className="block text-sm font-medium text-foreground mb-2">
@@ -601,27 +611,39 @@ export default function EditBlueprintPage() {
       {/* Save Template Modal (shadcn) */}
       <Dialog open={showSaveTemplateModal} onOpenChange={(open) => {
         setShowSaveTemplateModal(open);
-        if (!open) setTemplateName('');
+        if (!open) {
+          setTemplateName('');
+          templateForm.clear('templateName');
+        }
       }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{t('saveTemplateDialog.title')}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <div ref={templateFormRef} className="space-y-4 py-2">
             <p className="text-sm text-muted-foreground">
               {t('saveTemplateDialog.description')}
             </p>
-            <Input
-              value={templateName}
-              onChange={(e) => setTemplateName(e.target.value)}
-              placeholder={t('saveTemplateDialog.namePlaceholder')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !savingTemplate) {
-                  handleSaveAsTemplate();
-                }
-              }}
-              autoFocus
-            />
+            <div>
+              <Input
+                value={templateName}
+                onChange={(e) => {
+                  setTemplateName(e.target.value);
+                  templateForm.clear('templateName');
+                }}
+                placeholder={t('saveTemplateDialog.namePlaceholder')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !savingTemplate) {
+                    handleSaveAsTemplate();
+                  }
+                }}
+                autoFocus
+                {...templateForm.fieldProps('templateName')}
+              />
+              <FieldError id={templateForm.errorId('templateName')} className="mt-1">
+                {templateForm.errors.templateName}
+              </FieldError>
+            </div>
           </div>
           <DialogFooter className="flex gap-3">
             <Button
@@ -629,6 +651,7 @@ export default function EditBlueprintPage() {
               onClick={() => {
                 setShowSaveTemplateModal(false);
                 setTemplateName('');
+                templateForm.clear('templateName');
               }}
               disabled={savingTemplate}
             >

@@ -156,6 +156,12 @@
       "homeGyms": {
         "arrayMinSize": "Bitte füge mindestens ein Home Gym hinzu.",
         "arrayMaxSize": "Du kannst höchstens 10 Studios hinzufügen."
+      },
+      "name": {
+        "isNotEmpty": "Bitte gib einen Namen ein."
+      },
+      "templateName": {
+        "isNotEmpty": "Bitte gib einen Namen für die Vorlage ein."
       }
     }
   },
@@ -233,6 +239,8 @@
       "empty": "Noch keine Gyms hinzugefügt",
       "editDialogTitle": "Gym bearbeiten",
       "deleteConfirm": "Gym wirklich löschen? Dies ist nicht möglich, wenn das Gym in Workouts verwendet wird.",
+      "deleteDialogTitle": "Gym löschen?",
+      "deleteSubmit": "Löschen",
       "added": "Gym erfolgreich hinzugefügt",
       "addError": "Fehler beim Hinzufügen des Gyms",
       "updated": "Gym erfolgreich aktualisiert",
@@ -992,11 +1000,8 @@
     "back": "Zurück",
     "nextToReview": "Weiter zur Überprüfung",
     "alerts": {
-      "templateNameRequired": "Bitte gib einen Vorlagen-Namen ein",
       "atLeastOneExercise": "Füge mindestens eine Übung hinzu",
       "templateCreated": "Vorlage erfolgreich erstellt!",
-      "templateNameExists": "Eine Vorlage mit diesem Namen existiert bereits",
-      "templateSaveFailed": "Fehler beim Speichern der Vorlage",
       "templateEmpty": "Diese Vorlage enthält keine Übungen",
       "templateLoadFailed": "Fehler beim Laden der Vorlage"
     },
@@ -1044,13 +1049,8 @@
     },
     "alerts": {
       "loadFailed": "Fehler beim Laden der Daten",
-      "nameRequired": "Bitte gib einen Workout-Namen ein",
-      "saveFailed": "Fehler beim Speichern des Blueprints",
-      "templateNameRequired": "Bitte gib einen Vorlagen-Namen ein",
       "atLeastOneExercise": "Füge mindestens eine Übung hinzu",
-      "templateCreated": "Vorlage erfolgreich erstellt!",
-      "templateNameExists": "Eine Vorlage mit diesem Namen existiert bereits",
-      "templateSaveFailed": "Fehler beim Speichern der Vorlage"
+      "templateCreated": "Vorlage erfolgreich erstellt!"
     },
     "saveTemplateDialog": {
       "title": "Blueprint als Vorlage speichern",
@@ -1142,10 +1142,8 @@
     "save": "Speichern",
     "alerts": {
       "loadFailed": "Fehler beim Laden der Daten.",
-      "nameRequired": "Bitte gib einen Namen für die Vorlage ein.",
       "atLeastOneExercise": "Bitte füge mindestens eine Übung hinzu.",
-      "everyExerciseNeedsSet": "Jede Übung muss mindestens einen Satz haben.",
-      "saveFailed": "Fehler beim Speichern der Vorlage."
+      "everyExerciseNeedsSet": "Jede Übung muss mindestens einen Satz haben."
     }
   },
   "CycleDetailPage": {
