@@ -586,3 +586,83 @@ describe('WorkoutCyclesService ownership scoping (#171)', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * A P2002 as the Prisma 7 `pg` driver adapter really raises it (captured from a real
+ * database): `meta.target` is absent, and the violated index sits under
+ * `driverAdapterError.cause.constraint.index`.
+ */
+function driverAdapterConflict(modelName: string, index: string) {
+  return new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+    code: 'P2002',
+    clientVersion: '7.9.1',
+    meta: {
+      modelName,
+      driverAdapterError: {
+        name: 'DriverAdapterError',
+        cause: { kind: 'UniqueConstraintViolation', constraint: { index }, table: modelName },
+      },
+    },
+  });
+}
+
+describe('WorkoutCyclesService one active cycle per user (#226)', () => {
+  it('maps the weekday index loss to a 400 in the shape the driver adapter really raises', async () => {
+    const { service, prisma } = makeService();
+    prisma.workoutDay.update.mockRejectedValueOnce(
+      driverAdapterConflict('WorkoutDay', 'WorkoutDay_cycleId_weekday_key'),
+    );
+
+    const result = service.updateWorkoutDay(
+      'cycle-1',
+      'day-2',
+      { name: 'Pull', weekday: 5 },
+      'user-1',
+    );
+    await expect(result).rejects.toMatchObject({ code: 'WORKOUT_DAY_WEEKDAY_TAKEN' });
+  });
+
+  const dto = {
+    name: 'Push/Pull',
+    duration: 8,
+    startDate: '2026-08-03',
+    workoutDays: [{ weekday: 1, name: 'Push', exercises }],
+  } as CreateCycleDto;
+
+  it('rejects creating a cycle while the user already has an active one', async () => {
+    const { service, prisma } = makeService();
+    prisma.workoutCycle.findFirst.mockResolvedValueOnce({ id: 'cycle-0', status: 'ACTIVE' });
+
+    const result = service.create(dto, 'user-1');
+    await expect(result).rejects.toBeInstanceOf(BadRequestException);
+    await expect(result).rejects.toMatchObject({ code: 'ACTIVE_CYCLE_ALREADY_EXISTS' });
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('answers 400, not 500, when a concurrent request wins the active-cycle index between check and insert', async () => {
+    const { service, tx } = makeService();
+
+    // The check reads and then writes, so another request can insert its active cycle in
+    // between and leave the partial unique index to reject this one.
+    tx.workoutCycle.create.mockRejectedValueOnce(
+      driverAdapterConflict('WorkoutCycle', 'WorkoutCycle_userId_active_key'),
+    );
+
+    const result = service.create(dto, 'user-1');
+    await expect(result).rejects.toBeInstanceOf(BadRequestException);
+    await expect(result).rejects.toMatchObject({ code: 'ACTIVE_CYCLE_ALREADY_EXISTS' });
+  });
+
+  it('rethrows unrelated database errors instead of reporting them as an active-cycle conflict', async () => {
+    const { service, tx } = makeService();
+    const failure = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+      code: 'P2002',
+      clientVersion: '6.19.2',
+      meta: { target: 'WorkoutDay_cycleId_weekday_key' },
+    });
+    tx.workoutDay.create.mockRejectedValueOnce(failure);
+
+    await expect(service.create(dto, 'user-1')).rejects.toBe(failure);
+  });
+});
