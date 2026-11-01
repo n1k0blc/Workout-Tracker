@@ -115,7 +115,10 @@ export const config = {
   // (next.config.ts rewrites /api/:path* to the backend): without it, next-intl's
   // localePrefix:"always" 307-redirects every unprefixed /api/* call to /en/api/*,
   // which no longer matches that rewrite and silently breaks every request (#179).
+  // `wasm` is the same story for the barcode scanner's zxing decoder, fetched from
+  // /zxing_reader.wasm: a locale redirect there leaves Safari/iOS with a viewfinder that
+  // never reads a code (#220).
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml|woff2?)$).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml|woff2?|wasm)$).*)",
   ],
 };
