@@ -65,4 +65,25 @@ describe('LoginPage', () => {
     await waitFor(() => expect(notify.error).toHaveBeenCalledWith('Incorrect email or password.'));
     expect(screen.queryByRole('alert')).toBeNull();
   });
+
+  it('keeps the password between 8 and 100 characters, like the server (#225)', async () => {
+    login.mockResolvedValue({ locale: 'en' });
+    fireEvent.change(field('Email address'), { target: { value: 'max@example.com' } });
+
+    for (const [length, message] of [
+      [7, 'The password must be at least 8 characters long.'],
+      [101, 'The password can be at most 100 characters long.'],
+    ] as const) {
+      fireEvent.change(field('Password'), { target: { value: 'a'.repeat(length) } });
+      submit();
+      expect(screen.getByRole('alert').textContent).toBe(message);
+    }
+    expect(login).not.toHaveBeenCalled();
+
+    fireEvent.change(field('Password'), { target: { value: 'a'.repeat(100) } });
+    submit();
+    await waitFor(() =>
+      expect(login).toHaveBeenCalledWith({ email: 'max@example.com', password: 'a'.repeat(100) }),
+    );
+  });
 });

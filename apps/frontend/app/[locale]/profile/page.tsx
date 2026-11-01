@@ -36,7 +36,7 @@ import { LogoutButton } from '@/components/logout-button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DatePicker } from '@/components/date-picker';
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -57,11 +57,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
+import { useApiErrorMessage, useValidationMessage } from '@/hooks/useApiErrorMessage';
+import { useFormErrors } from '@/hooks/useFormErrors';
+import { checkEmail, checkPassword } from '@/lib/field-rules';
 
 export default function ProfilePage() {
   const t = useTranslations('Profile');
   const apiError = useApiErrorMessage();
+  const validationMessage = useValidationMessage();
   const format = useFormatter();
   const router = useRouter();
   const { user, logout } = useAuth();
@@ -91,7 +94,10 @@ export default function ProfilePage() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
-  const [passwordError, setPasswordError] = useState('');
+  const [passwordForm, passwordFormRef] = useFormErrors({
+    fields: ['currentPassword', 'newPassword', 'confirmNewPassword'],
+    codeFields: { CURRENT_PASSWORD_INCORRECT: 'currentPassword', PASSWORD_BREACHED: 'newPassword' },
+  });
   const [passwordLoading, setPasswordLoading] = useState(false);
 
   // HomeGyms
@@ -163,9 +169,12 @@ export default function ProfilePage() {
         throw new Error(t('profileData.validationAllFields'));
       }
 
-      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailPattern.test(email)) {
-        throw new Error(t('profileData.validationInvalidEmail'));
+      const emailProblem = checkEmail(email);
+      if (emailProblem) {
+        // Not thrown: the catch below shows only API errors' text, so a thrown Error would
+        // surface as its generic fallback instead of this message.
+        setError(validationMessage('email', emailProblem) ?? apiError(undefined));
+        return;
       }
 
       // Typed values are exact in the user's own unit and converted once; untouched
@@ -316,22 +325,17 @@ export default function ProfilePage() {
   };
 
   const handleChangePassword = async () => {
-    setPasswordError('');
-
-    if (!currentPassword || !newPassword || !confirmNewPassword) {
-      setPasswordError(t('security.validationAllFields'));
-      return;
-    }
-
-    if (newPassword.length < 8) {
-      setPasswordError(t('security.validationMinLength'));
-      return;
-    }
-
-    if (newPassword !== confirmNewPassword) {
-      setPasswordError(t('security.validationMismatch'));
-      return;
-    }
+    const valid = passwordForm.setConstraints({
+      currentPassword: checkPassword(currentPassword),
+      newPassword: checkPassword(newPassword),
+      confirmNewPassword:
+        confirmNewPassword === ''
+          ? 'isNotEmpty'
+          : confirmNewPassword !== newPassword
+            ? 'passwordsDiffer'
+            : null,
+    });
+    if (!valid) return;
 
     setPasswordLoading(true);
 
@@ -346,7 +350,7 @@ export default function ProfilePage() {
       await logout();
       router.push('/login');
     } catch (err: any) {
-      setPasswordError(apiError(err, t('security.changeError')));
+      passwordForm.showApiError(err);
     } finally {
       setPasswordLoading(false);
     }
@@ -863,7 +867,11 @@ export default function ProfilePage() {
                 onOpenChange={(open) => {
                   setIsPasswordDialogOpen(open);
                   if (!open) {
-                    setPasswordError('');
+                    passwordForm.setConstraints({
+                      currentPassword: null,
+                      newPassword: null,
+                      confirmNewPassword: null,
+                    });
                     setCurrentPassword('');
                     setNewPassword('');
                     setConfirmNewPassword('');
@@ -881,42 +889,60 @@ export default function ProfilePage() {
                     <DialogTitle>{t('security.changePassword')}</DialogTitle>
                   </DialogHeader>
 
-                  {passwordError && (
-                    <Alert variant="destructive">
-                      <AlertDescription>{passwordError}</AlertDescription>
-                    </Alert>
-                  )}
-
-                  <div className="space-y-4 py-4">
+                  <div ref={passwordFormRef} className="space-y-4 py-4">
                     <Field>
-                      <FieldLabel>{t('security.currentPassword')}</FieldLabel>
+                      <FieldLabel htmlFor="current-password">{t('security.currentPassword')}</FieldLabel>
                       <Input
+                        id="current-password"
                         type="password"
                         value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        onChange={(e) => {
+                          setCurrentPassword(e.target.value);
+                          passwordForm.clear('currentPassword');
+                        }}
                         autoComplete="current-password"
+                        {...passwordForm.fieldProps('currentPassword')}
                       />
+                      <FieldError id={passwordForm.errorId('currentPassword')}>
+                        {passwordForm.errors.currentPassword}
+                      </FieldError>
                     </Field>
                     <Field>
-                      <FieldLabel>{t('security.newPassword')}</FieldLabel>
+                      <FieldLabel htmlFor="new-password">{t('security.newPassword')}</FieldLabel>
                       <Input
+                        id="new-password"
                         type="password"
                         value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
+                        onChange={(e) => {
+                          setNewPassword(e.target.value);
+                          passwordForm.clear('newPassword');
+                        }}
                         autoComplete="new-password"
+                        {...passwordForm.fieldProps('newPassword')}
                       />
+                      <FieldError id={passwordForm.errorId('newPassword')}>
+                        {passwordForm.errors.newPassword}
+                      </FieldError>
                     </Field>
                     <Field>
-                      <FieldLabel>{t('security.confirmNewPassword')}</FieldLabel>
+                      <FieldLabel htmlFor="confirm-new-password">{t('security.confirmNewPassword')}</FieldLabel>
                       <Input
+                        id="confirm-new-password"
                         type="password"
                         value={confirmNewPassword}
-                        onChange={(e) => setConfirmNewPassword(e.target.value)}
+                        onChange={(e) => {
+                          setConfirmNewPassword(e.target.value);
+                          passwordForm.clear('confirmNewPassword');
+                        }}
                         autoComplete="new-password"
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') handleChangePassword();
                         }}
+                        {...passwordForm.fieldProps('confirmNewPassword')}
                       />
+                      <FieldError id={passwordForm.errorId('confirmNewPassword')}>
+                        {passwordForm.errors.confirmNewPassword}
+                      </FieldError>
                     </Field>
                   </div>
 
