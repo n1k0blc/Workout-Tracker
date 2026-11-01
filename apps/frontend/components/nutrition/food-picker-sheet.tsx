@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { IconBarcode, IconMinus, IconPlus, IconSearch } from '@tabler/icons-react';
@@ -68,6 +68,31 @@ function toPickerRow(item: PickerItem): PickerRow {
 
 let basketSeq = 0;
 
+/**
+ * The picker's unsaved selection. It lives in the page rather than in the sheet because the
+ * scanner round-trip closes and reopens the sheet, and a scanned food has to land in the same
+ * basket -- see `ScanToLog`. The page calls `clear` when it opens the picker fresh; resuming
+ * after a scan deliberately does not.
+ */
+export function useFoodBasket() {
+  const [items, setItems] = useState<BasketItem[]>([]);
+  const addFood = useCallback((food: Food, grams: number, label: string) => {
+    setItems((prev) => [
+      ...prev,
+      { key: `b${++basketSeq}`, kind: 'food', title: food.name, foodId: food.id, grams, label },
+    ]);
+  }, []);
+  const addMeal = useCallback((meal: MealListItem, factor: number) => {
+    setItems((prev) => [
+      ...prev,
+      { key: `b${++basketSeq}`, kind: 'meal', title: meal.name, mealId: meal.id, factor },
+    ]);
+  }, []);
+  const clear = useCallback(() => setItems([]), []);
+  return { items, addFood, addMeal, clear };
+}
+export type FoodBasket = ReturnType<typeof useFoodBasket>;
+
 function foodRowSubtitle(food: Food): string {
   const unit = food.isLiquid ? 'ml' : 'g';
   const def = food.portions.find((p) => p.isDefault);
@@ -90,6 +115,7 @@ export function FoodPickerSheet({
   slotId,
   slotName,
   date,
+  basket: basketState,
   onCommitted,
   onScanRequest,
 }: {
@@ -98,6 +124,7 @@ export function FoodPickerSheet({
   slotId: string;
   slotName: string;
   date: string;
+  basket: FoodBasket;
   onCommitted: () => void;
   /**
    * The scan button. The scanner itself belongs to the page, not in here -- see the comment on
@@ -112,7 +139,8 @@ export function FoodPickerSheet({
   const [meals, setMeals] = useState<MealListItem[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
-  const [basket, setBasket] = useState<BasketItem[]>([]);
+  const { items: basket, addFood: addToBasket, addMeal: addMealToBasket, clear: clearBasket } =
+    basketState;
   const [committing, setCommitting] = useState(false);
 
   const { favorites, recents, effectiveFavorite, toggleFavorite } = usePickerLists({
@@ -125,7 +153,6 @@ export function FoodPickerSheet({
       setSearch('');
       setTab('lebensmittel');
       setExpandedKey(null);
-      setBasket([]);
       setCommitting(false);
     }
   }, [open]);
@@ -217,24 +244,12 @@ export function FoodPickerSheet({
   const recentRows = useMemo(() => (recents ?? []).map(toPickerRow), [recents]);
 
   function addFood(food: Food, grams: number, label: string) {
-    setBasket((prev) => [
-      ...prev,
-      { key: `b${++basketSeq}`, kind: 'food', title: food.name, foodId: food.id, grams, label },
-    ]);
+    addToBasket(food, grams, label);
     setExpandedKey(null);
   }
 
   function addMeal(meal: MealListItem, factor: number) {
-    setBasket((prev) => [
-      ...prev,
-      {
-        key: `b${++basketSeq}`,
-        kind: 'meal',
-        title: meal.name,
-        mealId: meal.id,
-        factor,
-      },
-    ]);
+    addMealToBasket(meal, factor);
     setExpandedKey(null);
   }
 
@@ -268,6 +283,7 @@ export function FoodPickerSheet({
           }),
         ),
       ]);
+      clearBasket();
       onOpenChange(false);
       onCommitted();
     } catch {
