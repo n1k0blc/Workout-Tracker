@@ -898,7 +898,6 @@
   "CyclesPage": {
     "title": "Trainingszyklen",
     "subtitle": "Verwalte deine Trainingszyklen und Blueprints",
-    "checking": "Prüfe...",
     "newCycle": "Neuer Zyklus",
     "loading": "Lädt Zyklen...",
     "activeCycles": "Aktive Zyklen",
@@ -929,12 +928,12 @@
       "confirm": "Beenden"
     },
     "alerts": {
-      "activeCycleExists": "Es existiert bereits ein aktiver Zyklus. Bitte beende diesen zuerst.",
-      "checkFailed": "Fehler beim Prüfen der aktiven Zyklen",
       "completeFailed": "Fehler beim Beenden des Zyklus"
     }
   },
   "CycleWizard": {
+    "checking": "Prüfe...",
+    "activeCycleExists": "Es existiert bereits ein aktiver Zyklus. Bitte beende diesen zuerst.",
     "title": "Neuer Trainingszyklus",
     "cancel": "Abbrechen",
     "stepProgress": "Schritt {current} von {total}",

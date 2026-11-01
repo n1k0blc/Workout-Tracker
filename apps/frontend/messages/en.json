@@ -898,7 +898,6 @@
   "CyclesPage": {
     "title": "Training Cycles",
     "subtitle": "Manage your training cycles and blueprints",
-    "checking": "Checking...",
     "newCycle": "New Cycle",
     "loading": "Loading cycles...",
     "activeCycles": "Active Cycles",
@@ -929,12 +928,12 @@
       "confirm": "Complete"
     },
     "alerts": {
-      "activeCycleExists": "An active cycle already exists. Please complete it first.",
-      "checkFailed": "Failed to check active cycles",
       "completeFailed": "Failed to complete cycle"
     }
   },
   "CycleWizard": {
+    "checking": "Checking...",
+    "activeCycleExists": "An active cycle already exists. Please complete it first.",
     "title": "New Training Cycle",
     "cancel": "Cancel",
     "stepProgress": "Step {current} of {total}",
