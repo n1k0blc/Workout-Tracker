@@ -3,6 +3,10 @@ name: CI
 on:
   push:
   pull_request:
+  # Advisories land without any change here: the 21 Oct Node release, for one, turned an
+  # up-to-date repo into a vulnerable one. A daily run on the default branch notices.
+  schedule:
+    - cron: '17 5 * * *'
 
 jobs:
   audit:
@@ -28,3 +32,46 @@ jobs:
       # with no reviewed entry ever required (issue #170).
       - name: pnpm audit (high/critical)
         run: pnpm audit --audit-level=high
+
+  # pnpm audit only sees npm packages in the lockfile. What the containers run on top of
+  # them -- the Node binary, Alpine's packages, the Postgres image -- comes from the
+  # Dockerfiles' base images and is invisible to it. Grype is used rather than Trivy because
+  # Trivy's database has no entries for the Node binary itself: scanning the node:22.23.3
+  # image from before the 21 Oct security release, Trivy reported none of its CVEs and Grype
+  # reported all of them.
+  image-scan:
+    name: Container image scan (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            dockerfile: apps/backend/Dockerfile
+            image: workout-tracker-backend:ci
+          - name: frontend
+            dockerfile: apps/frontend/Dockerfile
+            image: workout-tracker-frontend:ci
+          - name: postgres
+            image: postgres:16-alpine
+    steps:
+      - uses: actions/checkout@v4
+
+      # Same build context as docker-compose.prod.yml. The runner is amd64 and the Pi is
+      # arm64; the Node version and Alpine package versions are the same on both.
+      - name: Build image
+        if: matrix.dockerfile
+        run: docker build -f ${{ matrix.dockerfile }} -t ${{ matrix.image }} .
+
+      # Pinned to a commit rather than the v7 tag: third-party action with access to the
+      # build. Reads .grype.yaml from the repo root. only-fixed keeps the job to findings
+      # an upgrade resolves, so it doesn't sit red on advisories nobody can act on.
+      - name: Grype scan (high/critical)
+        uses: anchore/scan-action@27805bf3b4e84b4a5c980df22ed233c00390a439 # v7.4.2
+        with:
+          image: ${{ matrix.image }}
+          fail-build: true
+          severity-cutoff: high
+          only-fixed: true
+          output-format: table
+          config: .grype.yaml

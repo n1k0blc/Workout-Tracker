@@ -1,0 +1,21 @@
+# Read by the "Container image scan" job in .github/workflows/ci.yml (and by a local
+# `grype <image>` run from the repo root).
+#
+# Our own npm dependencies are already gated by `pnpm audit` and the exceptions in
+# pnpm-workspace.yaml; this scan is for what that can't see: the Node binary, Alpine's
+# packages and the Postgres image. The excludes and ignores below keep it from re-reporting
+# the same npm findings under a second set of rules.
+exclude:
+  # npm and corepack themselves, shipped inside the official node image. We can't bump them
+  # from here, and they follow the next Node image. Without this every Node release,
+  # patched or not, is reported for its bundled brace-expansion, pacote and sigstore.
+  - "/usr/local/lib/node_modules/**"
+  # pnpm's own download, cached by `corepack enable` during the image build. Its bundled
+  # undici is the tool's, not the app's, and /root is not readable by the nodejs user the
+  # containers run as. The version is pinned by `packageManager` in package.json.
+  - "/root/.cache/**"
+
+ignore:
+  # Same exception as pnpm-workspace.yaml's auditConfig.ignoreGhsas: deepmerge-ts is pinned
+  # to 7.1.5 by @prisma/config, and only Prisma 8 (#174) picks up the patched 8.x.
+  - vulnerability: GHSA-ggr8-5vv4-36mx
