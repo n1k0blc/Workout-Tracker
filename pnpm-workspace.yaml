@@ -66,5 +66,6 @@ auditConfig:
     # zod <4.6.6 (GHSA-mrhx-c7xc-m3w5, memory exhaustion validating oversized collections): the
     # only copy left is zod 3.25.x under shadcn, which declares zod ^3.24.1, so an override to
     # the patched 4.x would break its CLI. shadcn is a scaffolding CLI run by hand on a dev
-    # machine and the app never imports it. Remove once shadcn moves to zod 4.
+    # machine; the app only pulls in its CSS (globals.css) at build time and nothing imports
+    # it at runtime. Remove once shadcn moves to zod 4.
     - GHSA-mrhx-c7xc-m3w5

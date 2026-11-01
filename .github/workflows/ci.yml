@@ -39,8 +39,12 @@ jobs:
   # Trivy's database has no entries for the Node binary itself: scanning the node:22.23.3
   # image from before the 21 Oct security release, Trivy reported none of its CVEs and Grype
   # reported all of them.
+  #
+  # Skipped on plain pushes: it builds both images, which would slow every push. It still
+  # runs on pull requests and on the daily schedule.
   image-scan:
     name: Container image scan (${{ matrix.name }})
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
