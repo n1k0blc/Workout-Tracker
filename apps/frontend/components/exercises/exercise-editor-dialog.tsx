@@ -213,7 +213,7 @@ export function ExerciseEditorDialog({
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} noValidate className="space-y-6">
           {/* Basic Info */}
           <div className="space-y-4">
             <div>

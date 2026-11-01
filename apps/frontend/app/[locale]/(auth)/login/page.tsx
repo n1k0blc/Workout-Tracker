@@ -5,23 +5,27 @@ import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
-import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { useFormErrors } from '@/hooks/useFormErrors';
+import { checkEmail } from '@/lib/field-rules';
 
 export default function LoginPage() {
   const t = useTranslations('LoginPage');
-  const apiError = useApiErrorMessage();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [form, formRef] = useFormErrors({ fields: ['email', 'password'] });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    // The password is only checked for presence: the login form never states the password policy.
+    const valid = form.setConstraints({
+      email: checkEmail(email),
+      password: password === '' ? 'isNotEmpty' : null,
+    });
+    if (!valid) return;
     setLoading(true);
 
     try {
@@ -32,10 +36,10 @@ export default function LoginPage() {
       // of every ThemeProvider render) triggers a "script tag while rendering on the
       // client" warning on that remount. A full page load re-renders it server-side, where
       // the script is part of the initial HTML and hydration matches it without complaint.
-      const user = await login({ email, password });
+      const user = await login({ email: email.trim(), password });
       window.location.href = `/${user.locale}/dashboard`;
     } catch (err) {
-      setError(apiError(err));
+      form.showApiError(err);
     } finally {
       setLoading(false);
     }
@@ -58,7 +62,7 @@ export default function LoginPage() {
             </Link>
           </p>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form ref={formRef} noValidate className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <FieldGroup>
             <Field>
               <FieldLabel htmlFor="email">{t('email')}</FieldLabel>
@@ -66,11 +70,12 @@ export default function LoginPage() {
                 id="email"
                 type="email"
                 autoComplete="email"
-                required
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => { setEmail(e.target.value); form.clear('email'); }}
                 placeholder={t('email')}
+                {...form.fieldProps('email')}
               />
+              <FieldError id={form.errorId('email')}>{form.errors.email}</FieldError>
             </Field>
 
             <Field>
@@ -79,19 +84,14 @@ export default function LoginPage() {
                 id="password"
                 type="password"
                 autoComplete="current-password"
-                required
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { setPassword(e.target.value); form.clear('password'); }}
                 placeholder={t('password')}
+                {...form.fieldProps('password')}
               />
+              <FieldError id={form.errorId('password')}>{form.errors.password}</FieldError>
             </Field>
           </FieldGroup>
-
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
 
           <Button type="submit" className="w-full" disabled={loading} size="lg">
             {loading ? t('submitting') : t('submit')}

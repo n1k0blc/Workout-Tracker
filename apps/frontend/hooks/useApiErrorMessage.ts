@@ -6,6 +6,28 @@ import { ApiError } from '@/lib/api/errors';
 import { weekdayReferenceDate } from '@/lib/weekday';
 
 /**
+ * The catalogue text for one broken rule on one field, or undefined when there is none (#222).
+ * `property` may be a path (`homeGyms.0.name`); the last segment names the field. Tries the
+ * field-specific entry (`validation.password.minLength`) before the generic one
+ * (`validation.minLength`). Client checks and server `fieldErrors` both go through this, so the
+ * same constraint reads the same on either side.
+ */
+export function useValidationMessage() {
+  const t = useTranslations('ApiErrors');
+
+  return useCallback(
+    (property: string, constraint: string): string | undefined => {
+      const field = property.split('.').pop() ?? property;
+      const key = [`validation.${field}.${constraint}`, `validation.${constraint}`].find((k) =>
+        t.has(k),
+      );
+      return key ? t(key, { property: field }) : undefined;
+    },
+    [t],
+  );
+}
+
+/**
  * The user-facing text for a failed API call (#190). The API's own `message` is German/English
  * developer text and is never displayed. A validation failure maps each `property` + constraint
  * name to `ApiErrors.validation`, trying the property-specific entry
@@ -18,6 +40,7 @@ import { weekdayReferenceDate } from '@/lib/weekday';
 export function useApiErrorMessage() {
   const t = useTranslations('ApiErrors');
   const format = useFormatter();
+  const validationMessage = useValidationMessage();
 
   return useCallback(
     (error: unknown, fallback?: string): string => {
@@ -27,12 +50,9 @@ export function useApiErrorMessage() {
       if (error.fieldErrors.length > 0) {
         const messages = new Set<string>();
         for (const { property, constraints } of error.fieldErrors) {
-          const field = property.split('.').pop() ?? property;
           for (const constraint of constraints) {
-            const key = [`validation.${field}.${constraint}`, `validation.${constraint}`].find(
-              (k) => t.has(k),
-            );
-            if (key) messages.add(t(key, { property: field }));
+            const message = validationMessage(property, constraint);
+            if (message) messages.add(message);
             else console.warn(`[i18n] no ApiErrors message for ${property} / ${constraint}`);
           }
         }
@@ -62,6 +82,6 @@ export function useApiErrorMessage() {
       );
       return generic;
     },
-    [t, format],
+    [t, format, validationMessage],
   );
 }

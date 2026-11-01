@@ -27,7 +27,7 @@ export default function BasicInfoStep({
   const isValid = formData.name.trim().length > 0 && formData.duration > 0;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} noValidate className="space-y-6">
       <div className="space-y-2">
         <Label htmlFor="name">{t('nameLabel')}</Label>
         <Input

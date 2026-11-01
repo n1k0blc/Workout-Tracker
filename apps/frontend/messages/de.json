@@ -108,13 +108,54 @@
       "isLocalDate": "Bitte gib ein gültiges Datum ein.",
       "matches": "Das Format ist ungültig.",
       "password": {
-        "minLength": "Das Passwort muss mindestens 8 Zeichen lang sein."
+        "minLength": "Das Passwort muss mindestens 8 Zeichen lang sein.",
+        "isNotEmpty": "Bitte gib ein Passwort ein.",
+        "maxLength": "Das Passwort darf höchstens 100 Zeichen lang sein."
       },
       "newPassword": {
         "minLength": "Das neue Passwort muss mindestens 8 Zeichen lang sein."
       },
       "email": {
-        "isEmail": "Bitte gib eine gültige E-Mail-Adresse ein."
+        "isEmail": "Bitte gib eine gültige E-Mail-Adresse ein.",
+        "isNotEmpty": "Bitte gib deine E-Mail-Adresse ein.",
+        "maxLength": "Die E-Mail-Adresse darf höchstens 254 Zeichen lang sein."
+      },
+      "noControlCharacters": "Bitte entferne Steuer- oder unsichtbare Zeichen.",
+      "isPersonName": "Erlaubt sind nur Buchstaben, Leerzeichen, Apostrophe, Punkte und Bindestriche, beginnend mit einem Buchstaben.",
+      "maxDecimals": "Zu viele Nachkommastellen.",
+      "confirmPassword": {
+        "isNotEmpty": "Bitte wiederhole dein Passwort.",
+        "passwordsDiffer": "Die Passwörter stimmen nicht überein."
+      },
+      "firstName": {
+        "isNotEmpty": "Bitte gib deinen Vornamen ein.",
+        "maxLength": "Der Vorname darf höchstens 50 Zeichen lang sein."
+      },
+      "lastName": {
+        "isNotEmpty": "Bitte gib deinen Nachnamen ein.",
+        "maxLength": "Der Nachname darf höchstens 50 Zeichen lang sein."
+      },
+      "dateOfBirth": {
+        "isNotEmpty": "Bitte gib dein Geburtsdatum ein.",
+        "minAge": "Du musst mindestens 13 Jahre alt sein.",
+        "maxAge": "Bitte gib ein gültiges Geburtsdatum ein."
+      },
+      "height": {
+        "isNotEmpty": "Bitte gib deine Größe ein.",
+        "isInt": "Bitte gib deine Größe in ganzen Zentimetern ein.",
+        "min": "Die Größe muss mindestens 100 cm betragen.",
+        "max": "Die Größe darf höchstens 250 cm betragen."
+      },
+      "weight": {
+        "isNotEmpty": "Bitte gib dein Gewicht ein.",
+        "isNumber": "Bitte gib dein Gewicht als Zahl ein.",
+        "min": "Das Gewicht muss mindestens 30 kg betragen.",
+        "max": "Das Gewicht darf höchstens 400 kg betragen.",
+        "maxDecimals": "Verwende höchstens eine Nachkommastelle."
+      },
+      "homeGyms": {
+        "arrayMinSize": "Bitte füge mindestens ein Home Gym hinzu.",
+        "arrayMaxSize": "Du kannst höchstens 10 Studios hinzufügen."
       }
     }
   },
@@ -1378,17 +1419,7 @@
     "removeGym": "Home Gym entfernen",
     "back": "Zurück",
     "creating": "Wird erstellt …",
-    "create": "Account erstellen",
-    "errors": {
-      "missingFields": "Bitte fülle alle Felder aus",
-      "passwordMismatch": "Passwörter stimmen nicht überein",
-      "passwordTooShort": "Das Passwort muss mindestens 8 Zeichen lang sein",
-      "heightRange": "Die Größe muss zwischen 50 und 300 cm liegen",
-      "weightRange": "Das Gewicht muss zwischen 20 und 500 kg liegen",
-      "tooYoung": "Du musst mindestens 13 Jahre alt sein",
-      "invalidBirthDate": "Bitte gib ein gültiges Geburtsdatum ein",
-      "noGym": "Bitte füge mindestens ein Home Gym hinzu"
-    }
+    "create": "Account erstellen"
   },
   "HistoryPage": {
     "title": "Trainingsverlauf",

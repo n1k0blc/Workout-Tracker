@@ -108,13 +108,54 @@
       "isLocalDate": "Please enter a valid date.",
       "matches": "The format is invalid.",
       "password": {
-        "minLength": "The password must be at least 8 characters long."
+        "minLength": "The password must be at least 8 characters long.",
+        "isNotEmpty": "Please enter a password.",
+        "maxLength": "The password can be at most 100 characters long."
       },
       "newPassword": {
         "minLength": "The new password must be at least 8 characters long."
       },
       "email": {
-        "isEmail": "Please enter a valid email address."
+        "isEmail": "Please enter a valid email address.",
+        "isNotEmpty": "Please enter your email address.",
+        "maxLength": "The email address can be at most 254 characters long."
+      },
+      "noControlCharacters": "Please remove control or invisible characters.",
+      "isPersonName": "Use only letters, spaces, apostrophes, periods and hyphens, starting with a letter.",
+      "maxDecimals": "Too many decimal places.",
+      "confirmPassword": {
+        "isNotEmpty": "Please repeat your password.",
+        "passwordsDiffer": "The passwords do not match."
+      },
+      "firstName": {
+        "isNotEmpty": "Please enter your first name.",
+        "maxLength": "The first name can be at most 50 characters long."
+      },
+      "lastName": {
+        "isNotEmpty": "Please enter your last name.",
+        "maxLength": "The last name can be at most 50 characters long."
+      },
+      "dateOfBirth": {
+        "isNotEmpty": "Please enter your date of birth.",
+        "minAge": "You must be at least 13 years old.",
+        "maxAge": "Please enter a valid date of birth."
+      },
+      "height": {
+        "isNotEmpty": "Please enter your height.",
+        "isInt": "Please enter your height in whole centimetres.",
+        "min": "The height must be at least 100 cm.",
+        "max": "The height must be at most 250 cm."
+      },
+      "weight": {
+        "isNotEmpty": "Please enter your weight.",
+        "isNumber": "Please enter your weight as a number.",
+        "min": "The weight must be at least 30 kg.",
+        "max": "The weight must be at most 400 kg.",
+        "maxDecimals": "Use at most one decimal place."
+      },
+      "homeGyms": {
+        "arrayMinSize": "Please add at least one home gym.",
+        "arrayMaxSize": "You can add at most 10 gyms."
       }
     }
   },
@@ -1378,17 +1419,7 @@
     "removeGym": "Remove home gym",
     "back": "Back",
     "creating": "Creating …",
-    "create": "Create account",
-    "errors": {
-      "missingFields": "Please fill in all fields",
-      "passwordMismatch": "Passwords do not match",
-      "passwordTooShort": "The password must be at least 8 characters long",
-      "heightRange": "Height must be between 50 and 300 cm",
-      "weightRange": "Weight must be between 20 and 500 kg",
-      "tooYoung": "You must be at least 13 years old",
-      "invalidBirthDate": "Please enter a valid date of birth",
-      "noGym": "Please add at least one home gym"
-    }
+    "create": "Create account"
   },
   "HistoryPage": {
     "title": "Workout history",

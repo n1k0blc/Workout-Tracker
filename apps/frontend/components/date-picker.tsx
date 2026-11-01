@@ -8,6 +8,10 @@ interface DatePickerProps {
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  id?: string;
+  /** Set by `useFormErrors().fieldProps`; the field turns red and is found by focus-first-invalid. */
+  'aria-invalid'?: boolean;
+  'aria-describedby'?: string;
 }
 
 export function DatePicker({
@@ -16,6 +20,9 @@ export function DatePicker({
   placeholder = 'TT.MM.JJJJ',
   disabled = false,
   className,
+  id,
+  'aria-invalid': ariaInvalid,
+  'aria-describedby': ariaDescribedBy,
 }: DatePickerProps) {
   // Convert Date to YYYY-MM-DD for native input
   const inputValue = date ? date.toISOString().split('T')[0] : '';
@@ -31,11 +38,14 @@ export function DatePicker({
 
   return (
     <input
+      id={id}
       type="date"
+      aria-invalid={ariaInvalid}
+      aria-describedby={ariaDescribedBy}
       value={inputValue}
       onChange={handleChange}
       disabled={disabled}
-      className={`flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${className || ''}`}
+      className={`flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive ${className || ''}`}
       placeholder={placeholder}
       max={new Date().toISOString().split('T')[0]}
     />
