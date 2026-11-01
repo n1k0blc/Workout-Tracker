@@ -16,7 +16,7 @@ import { formatKcal, groupDiaryEntries } from '@/lib/nutrition';
 import { DiaryEntryRow } from '@/components/nutrition/diary-entry-row';
 import { QuickEntrySheet } from '@/components/nutrition/quick-entry-sheet';
 import { QuantityEditorSheet } from '@/components/nutrition/quantity-editor-sheet';
-import { FoodPickerSheet } from '@/components/nutrition/food-picker-sheet';
+import { FoodPickerSheet, useFoodBasket } from '@/components/nutrition/food-picker-sheet';
 import { ScanToLog } from '@/components/nutrition/scan-to-log';
 import { CopyFromDaySheet } from '@/components/nutrition/copy-from-day-sheet';
 
@@ -128,6 +128,7 @@ export default function AbschnittPage() {
   const [quickOpen, setQuickOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
+  const basket = useFoodBasket();
   const [copyOpen, setCopyOpen] = useState(false);
   const [editEntry, setEditEntry] = useState<DiaryEntry | null>(null);
   const [editOpen, setEditOpen] = useState(false);
@@ -251,7 +252,10 @@ export default function AbschnittPage() {
                 <p className="text-center text-xs text-muted-foreground">{t('archivedHint')}</p>
               ) : (
                 <div className="flex gap-2">
-                  <Button className="flex-1" onClick={() => setPickerOpen(true)}>
+                  <Button className="flex-1" onClick={() => {
+                    basket.clear();
+                    setPickerOpen(true);
+                  }}>
                     <IconPlus data-icon="inline-start" />
                     {t('add')}
                   </Button>
@@ -288,6 +292,7 @@ export default function AbschnittPage() {
           slotId={slot.id}
           slotName={displayName ?? ''}
           date={date}
+          basket={basket}
           onCommitted={load}
         />
       )}
@@ -295,12 +300,10 @@ export default function AbschnittPage() {
         <ScanToLog
           open={scanOpen}
           onOpenChange={setScanOpen}
-          slotId={slot.id}
           slotName={displayName ?? ''}
-          date={date}
-          onLogged={load}
-          // Dismissing the scanner returns to the picker it was opened from, so the user can
-          // keep picking foods by search or from Favoriten/Zuletzt.
+          onScanned={(food, grams, label) => basket.addFood(food, grams, label)}
+          // Dismissing the scanner returns to the picker it was opened from, basket intact, so
+          // the user can keep picking foods by search or from Favoriten/Zuletzt.
           onCancel={() => setPickerOpen(true)}
         />
       )}

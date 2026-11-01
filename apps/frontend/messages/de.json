@@ -1320,9 +1320,6 @@
   "FavoriteToggle": {
     "saveError": "Favorit konnte nicht gespeichert werden"
   },
-  "ScanToLog": {
-    "added": "{food} zu {slot} hinzugefügt"
-  },
   "ExerciseSelectionModal": {
     "title": "Übung hinzufügen",
     "close": "Schließen",

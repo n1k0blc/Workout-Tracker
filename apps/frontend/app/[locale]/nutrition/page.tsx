@@ -14,7 +14,7 @@ import { addDays } from '@/lib/nutrition';
 import { NutritionDayBar } from '@/components/nutrition/nutrition-day-bar';
 import { NutritionTotalsCard } from '@/components/nutrition/nutrition-totals-card';
 import { MealSlotRow } from '@/components/nutrition/meal-slot-row';
-import { FoodPickerSheet } from '@/components/nutrition/food-picker-sheet';
+import { FoodPickerSheet, useFoodBasket } from '@/components/nutrition/food-picker-sheet';
 import { ScanToLog } from '@/components/nutrition/scan-to-log';
 import { ManageSlotsSheet } from '@/components/nutrition/manage-slots-sheet';
 import { useSlotName } from '@/hooks/useSlotName';
@@ -39,6 +39,7 @@ export default function NutritionPage() {
   const [pickerSlot, setPickerSlot] = useState<{ id: string; name: string } | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
+  const basket = useFoodBasket();
   const [manageOpen, setManageOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -102,6 +103,7 @@ export default function NutritionPage() {
                       date={date}
                       onQuickAdd={() => {
                         setPickerSlot({ id: slot.id, name: slotName(slot) });
+                        basket.clear();
                         setPickerOpen(true);
                       }}
                     />
@@ -129,6 +131,7 @@ export default function NutritionPage() {
           slotId={pickerSlot.id}
           slotName={pickerSlot.name}
           date={date}
+          basket={basket}
           onCommitted={load}
         />
       )}
@@ -136,12 +139,10 @@ export default function NutritionPage() {
         <ScanToLog
           open={scanOpen}
           onOpenChange={setScanOpen}
-          slotId={pickerSlot.id}
           slotName={pickerSlot.name}
-          date={date}
-          onLogged={load}
-          // Dismissing the scanner returns to the picker it was opened from, so the user can
-          // keep picking foods by search or from Favoriten/Zuletzt.
+          onScanned={(food, grams, label) => basket.addFood(food, grams, label)}
+          // Dismissing the scanner returns to the picker it was opened from, basket intact, so
+          // the user can keep picking foods by search or from Favoriten/Zuletzt.
           onCancel={() => setPickerOpen(true)}
         />
       )}
