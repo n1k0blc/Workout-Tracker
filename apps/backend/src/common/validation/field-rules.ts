@@ -88,7 +88,7 @@ export function PersonName() {
 }
 
 /** Whole years between a `YYYY-MM-DD` birth date and `today` (negative before birth). */
-function ageOn(birthDate: string, today: string): number {
+export function ageOn(birthDate: string, today: string): number {
   const [by, bm, bd] = birthDate.slice(0, 10).split('-').map(Number);
   const [ty, tm, td] = today.split('-').map(Number);
   return ty - by - (tm < bm || (tm === bm && td < bd) ? 1 : 0);
