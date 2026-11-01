@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
+import * as pageStaticInfo from "next/dist/build/analysis/get-page-static-info";
+import { getMiddlewareRouteMatcher } from "next/dist/shared/lib/router/utils/middleware-route-matcher";
 import { buildCsp, config, middleware } from "../middleware";
 
 function run(
@@ -166,16 +168,43 @@ describe("locale negotiation (issue #179): composed ahead of the CSP logic", () 
   });
 });
 
+// config.matcher is Next's own routing config, compiled to a real matcher at build time.
+// Running it through Next's own compiler answers the question the middleware really faces
+// -- "does this pathname reach me?" -- where a hand-rolled `new RegExp(config.matcher[0])`
+// does not reproduce that compilation (no anchoring, among other differences). Next's
+// internal build helpers are only loosely typed, hence the local signatures.
+const { getMiddlewareMatchers } = pageStaticInfo as unknown as {
+  getMiddlewareMatchers: (matcher: string[], nextConfig: object) => { regexp: string }[];
+};
+const runsFor = getMiddlewareRouteMatcher(getMiddlewareMatchers(config.matcher, {}) as never) as (
+  pathname: string,
+) => boolean;
+
 describe("matcher excludes /api (#179)", () => {
-  // config.matcher is Next's own routing config, compiled to a real matcher at build
-  // time by Next itself (see next/dist/shared/lib/router/utils/middleware-route-matcher.js)
-  // -- a hand-rolled `new RegExp(config.matcher[0]).test(path)` does NOT reproduce that
-  // compilation (no anchoring, among other differences) and gives false results, so this
-  // only asserts the source pattern names the exclusion; the actual routing behavior is
-  // verified by running the dev server and confirming a proxied /api/* request (used by
-  // the dev:https/dev:mobile flows, via next.config.ts's /api/:path* rewrite) is not
-  // 307-redirected to /en/api/* by next-intl's localePrefix:"always".
-  it("names /api in its exclusion lookahead", () => {
-    expect(config.matcher[0]).toContain("(?!api|");
+  // Without this, the dev:https/dev:mobile proxy modes (next.config.ts's /api/:path*
+  // rewrite) would have every /api/* call 307-redirected to /en/api/* by next-intl's
+  // localePrefix:"always".
+  it("does not intercept /api", () => {
+    expect(runsFor("/api/workouts")).toBe(false);
+  });
+});
+
+describe("matcher lets static files through untouched (#220)", () => {
+  // The zxing decoder is fetched from the app's own origin. If the locale middleware sees
+  // it, localePrefix:"always" 307s it to /<locale>/zxing_reader.wasm (no such file), every
+  // detect() rejects, and Safari/iOS shows a viewfinder that never reads a code.
+  it("does not intercept the zxing wasm", () => {
+    expect(runsFor("/zxing_reader.wasm")).toBe(false);
+  });
+
+  it("still intercepts HTML routes, so locale negotiation and the CSP nonce are unchanged", () => {
+    expect(runsFor("/")).toBe(true);
+    expect(runsFor("/de/dashboard")).toBe(true);
+    expect(runsFor("/dashboard")).toBe(true);
+  });
+
+  it("still excludes the existing static extensions", () => {
+    expect(runsFor("/logo.svg")).toBe(false);
+    expect(runsFor("/fonts/inter.woff2")).toBe(false);
   });
 });
