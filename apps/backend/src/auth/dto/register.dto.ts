@@ -1,8 +1,4 @@
 import {
-  IsEmail,
-  IsString,
-  MinLength,
-  MaxLength,
   IsDateString,
   IsInt,
   IsNumber,
@@ -20,15 +16,14 @@ import {
   BaseText,
   BODY_WEIGHT_KG_MAX,
   BODY_WEIGHT_KG_MIN,
-  EMAIL_MAX,
+  Email,
   HEIGHT_CM_MAX,
   HEIGHT_CM_MIN,
   HOME_GYMS_MAX,
   MaxAge,
   MinAge,
   NAME_MAX,
-  PASSWORD_MAX,
-  PASSWORD_MIN,
+  Password,
   PersonName,
 } from '../../common/validation/field-rules';
 
@@ -38,13 +33,10 @@ export class HomeGymInput {
 }
 
 export class RegisterDto {
-  @IsEmail()
-  @MaxLength(EMAIL_MAX)
+  @Email()
   email: string;
 
-  @IsString()
-  @MinLength(PASSWORD_MIN)
-  @MaxLength(PASSWORD_MAX)
+  @Password()
   password: string;
 
   @PersonName()

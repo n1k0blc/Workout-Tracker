@@ -1,5 +1,4 @@
 import {
-  IsEmail,
   IsOptional,
   IsString,
   MaxLength,
@@ -10,11 +9,12 @@ import {
   Min,
   Max,
 } from 'class-validator';
+import { Email } from '../../common/validation/field-rules';
 import { ApiLocale, SUPPORTED_LOCALES } from '../../common/utils/locale.util';
 
 export class UpdateUserDto {
   @IsOptional()
-  @IsEmail()
+  @Email()
   email?: string;
 
   @IsOptional()

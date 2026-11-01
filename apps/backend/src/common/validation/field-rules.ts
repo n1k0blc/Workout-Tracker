@@ -1,6 +1,13 @@
 import { applyDecorators } from '@nestjs/common';
 import { Transform } from 'class-transformer';
-import { IsNotEmpty, IsString, MaxLength, registerDecorator } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  MaxLength,
+  MinLength,
+  registerDecorator,
+} from 'class-validator';
 import { resolveToday } from '../utils/today.util';
 
 /**
@@ -46,6 +53,10 @@ function trimmed({ value }: { value: unknown }) {
   return typeof value === 'string' ? value.trim() : value;
 }
 
+function trimmedLowercase({ value }: { value: unknown }) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : value;
+}
+
 function constraint(name: string, validate: (value: unknown) => boolean): PropertyDecorator {
   return (object, propertyKey) => {
     registerDecorator({
@@ -74,6 +85,24 @@ export function BaseText(max: number) {
       (value) => typeof value !== 'string' || !FORBIDDEN_TEXT_PATTERN.test(value),
     ),
   );
+}
+
+/**
+ * An e-mail address, trimmed and lowercased (#225) so `Niko@x.com` and `niko@x.com` are one
+ * account. The transform runs before validation, so every invalid address, padded or not, fails
+ * with the one constraint `isEmail` (or `maxLength` past `EMAIL_MAX`).
+ */
+export function Email() {
+  return applyDecorators(Transform(trimmedLowercase), IsEmail(), MaxLength(EMAIL_MAX));
+}
+
+/**
+ * A password, `PASSWORD_MIN`-`PASSWORD_MAX` characters. Never trimmed: spaces are legitimate
+ * password characters. Checked before any hashing, so an oversized one costs nothing.
+ * Constraints: `isString`, `minLength`, `maxLength`.
+ */
+export function Password() {
+  return applyDecorators(IsString(), MinLength(PASSWORD_MIN), MaxLength(PASSWORD_MAX));
 }
 
 /** Base text, 1-`PERSON_NAME_MAX`, shaped like a person's name. Adds the constraint `isPersonName`. */

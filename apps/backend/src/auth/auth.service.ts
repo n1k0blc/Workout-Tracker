@@ -9,7 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto, LoginDto, ChangePasswordDto } from './dto';
 import { UserDto } from '../users/dto';
-import { PasswordService } from './password.service';
+import { DUMMY_PASSWORD_HASH, PasswordService } from './password.service';
 import { BreachedPasswordService } from './breached-password.service';
 import { RefreshTokenService, IssuedRefreshToken } from './refresh-token.service';
 import { defaultMealSlotCreateData } from '../nutrition/meal-slots.service';
@@ -130,6 +130,9 @@ export class AuthService {
     });
 
     if (!userWithPassword) {
+      // Spend the same time a real verification would, so an unknown address can't be told apart
+      // from a wrong password by response time.
+      await this.passwordService.verify(password, DUMMY_PASSWORD_HASH);
       throw new AppUnauthorizedException('INVALID_CREDENTIALS');
     }
 
