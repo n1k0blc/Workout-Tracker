@@ -1272,8 +1272,6 @@
     "profile": "Profil"
   },
   "ExerciseEditorDialog": {
-    "nameRequired": "Bitte gib einen Namen ein",
-    "percentagesInvalid": "Muskelgruppen-Prozente müssen 100 % ergeben (aktuell: {sum} %)",
     "titleView": "Übung anzeigen",
     "titleEdit": "Übung bearbeiten",
     "titleCreate": "Benutzerdefinierte Übung erstellen",

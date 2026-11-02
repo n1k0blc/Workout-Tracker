@@ -9,6 +9,7 @@ import { foodSourceLabel, withFavoriteOverrides } from '@/lib/nutrition';
 import { useFavoriteToggle } from '@/hooks/useFavoriteToggle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SEARCH_MAX } from '@/lib/field-rules';
 import { FavoriteStar } from '@/components/nutrition/favorite-star';
 import { FoodEditorDialog } from './food-editor-dialog';
 import { BarcodeScannerSheet } from '@/components/nutrition/barcode-scanner-sheet';
@@ -92,6 +93,7 @@ export default function FoodsTab() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={t('searchPlaceholder')}
+          maxLength={SEARCH_MAX}
           className="border-b-0"
         />
         <Button

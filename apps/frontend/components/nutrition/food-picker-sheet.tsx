@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SEARCH_MAX } from '@/lib/field-rules';
 import { apiClient } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Food, MealListItem, PickerItem } from '@/types';
@@ -359,6 +360,7 @@ export function FoodPickerSheet({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('searchPlaceholder')}
+              maxLength={SEARCH_MAX}
               className="border-b-0"
             />
             <Button

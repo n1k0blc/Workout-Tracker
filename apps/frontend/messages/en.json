@@ -1272,8 +1272,6 @@
     "profile": "Profile"
   },
   "ExerciseEditorDialog": {
-    "nameRequired": "Please enter a name",
-    "percentagesInvalid": "Muscle group percentages must add up to 100% (currently {sum}%)",
     "titleView": "View exercise",
     "titleEdit": "Edit exercise",
     "titleCreate": "Create custom exercise",

@@ -43,6 +43,7 @@ import {
 import { ProtectedRoute } from '@/components/protected-route';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SEARCH_MAX } from '@/lib/field-rules';
 import { apiClient } from '@/lib/api';
 import { Food, FoodPortion, MealItem, PickerItem } from '@/types';
 import {
@@ -646,6 +647,7 @@ function FoodSearchView({
             value={search}
             onChange={(e) => onSearch(e.target.value)}
             placeholder={t('searchPlaceholder')}
+            maxLength={SEARCH_MAX}
             className="border-b-0"
             autoFocus
           />
