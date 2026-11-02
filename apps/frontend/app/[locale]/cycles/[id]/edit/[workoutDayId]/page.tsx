@@ -56,7 +56,7 @@ import { addPlannedSet, planRir } from '@/lib/planned-sets';
 import type { PlannedSet } from '@/types';
 import { weekdayReferenceDate } from '@/lib/weekday';
 import { notify } from '@/lib/toast';
-import { findFirstSetNeedingRir } from '@/lib/log-set-guards';
+import { findFirstSetNeedingRir, findFirstSetOverLimit } from '@/lib/log-set-guards';
 import { useFormErrors } from '@/hooks/useFormErrors';
 import { FieldError } from '@/components/ui/field';
 import { NAME_MAX, TRAINING_DAY_NAME_MAX, checkBaseText } from '@/lib/field-rules';
@@ -237,12 +237,17 @@ export default function EditBlueprintPage() {
   };
 
   // A planned working set needs an RIR (#227): the card marks the empty field, this names it.
+  // A value past its upper bound is named the same way.
   // True when something is missing and the save must stop.
   const reportMissingRir = () => {
-    const hit = findFirstSetNeedingRir(exercises);
+    const missingRir = findFirstSetNeedingRir(exercises);
+    const hit = missingRir ?? findFirstSetOverLimit(exercises);
     if (!hit) return false;
     notify.warning(
-      tCard('planRirMissing', { exercise: exercises[hit.exerciseIndex].exerciseName, number: hit.setIndex + 1 }),
+      tCard(missingRir ? 'planRirMissing' : 'planSetTooHigh', {
+        exercise: exercises[hit.exerciseIndex].exerciseName,
+        number: hit.setIndex + 1,
+      }),
     );
     return true;
   };

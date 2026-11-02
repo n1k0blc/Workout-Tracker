@@ -206,6 +206,15 @@ export function bodyLimits(system: UnitSystem) {
   };
 }
 
+/**
+ * The heaviest a set may be, in the user's own unit, for the `<input max>` and the limit message.
+ * Pounds round down to one decimal, so the edge a message names is one the kg check
+ * (`WEIGHT_KG_MAX`) accepts. Display only: the card's form state stays canonical kg (ADR-0005).
+ */
+export function setWeightLimit(system: UnitSystem): number {
+  return system === 'METRIC' ? WEIGHT_KG_MAX : Math.floor((WEIGHT_KG_MAX / KG_PER_LB) * 10) / 10;
+}
+
 /** A Zyklus starts today (the user's day) or later, at most a year ahead. Days are `YYYY-MM-DD`. */
 export function checkStartDate(day: string, today: string): Constraint {
   if (day === '') return 'isNotEmpty';

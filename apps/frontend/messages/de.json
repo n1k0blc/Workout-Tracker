@@ -176,6 +176,12 @@
         "min": "Das Gewicht muss mindestens {min} {unit} betragen.",
         "max": "Das Gewicht darf höchstens {max} {unit} betragen."
       },
+      "reps": {
+        "max": "Es sind höchstens {max} Wiederholungen möglich."
+      },
+      "rir": {
+        "max": "Der RIR darf höchstens {max} betragen."
+      },
       "homeGyms": {
         "arrayMinSize": "Bitte füge mindestens ein Home Gym hinzu.",
         "arrayMaxSize": "Du kannst höchstens 10 Studios hinzufügen."
@@ -604,7 +610,9 @@
     "logOutOfOrder": "Logge zuerst Satz {number} oder wische ihn weg.",
     "logExerciseAbove": "Schließe zuerst „{name}“ ab – oder ziehe diese Übung nach oben, wenn das Gerät belegt ist.",
     "planRirMissing": "{exercise}, Satz {number}: Gib einen RIR an.",
+    "planSetTooHigh": "{exercise}, Satz {number}: Ein Wert liegt über dem erlaubten Maximum – prüfe die markierten Felder.",
     "rirHint": "Ziel: höchstens RIR 2.",
+    "setLimitReached": "Eine Übung kann höchstens {max} Sätze enthalten.",
     "errors": {
       "weightMissing": "Bitte gib das Gewicht ein.",
       "weightInvalid": "Das Gewicht darf nicht negativ sein.",

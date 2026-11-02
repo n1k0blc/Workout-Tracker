@@ -4,16 +4,17 @@ import { render, screen, fireEvent, cleanup, within, waitFor } from '@testing-li
 import { NextIntlClientProvider } from 'next-intl';
 import messages from '@/messages/de.json';
 
-const { notify, logSet, updateSet, workoutState } = vi.hoisted(() => ({
+const { notify, logSet, updateSet, workoutState, units } = vi.hoisted(() => ({
   notify: { error: vi.fn(), warning: vi.fn(), info: vi.fn(), success: vi.fn() },
   logSet: vi.fn(),
   updateSet: vi.fn(),
   workoutState: { isPastWorkout: false },
+  units: { system: 'METRIC' as 'METRIC' | 'IMPERIAL' },
 }));
 
 vi.mock('@/lib/toast', () => ({ notify }));
 vi.mock('@/lib/api', () => ({ apiClient: { getExercises: vi.fn().mockResolvedValue([]) } }));
-vi.mock('@/lib/auth-context', () => ({ useAuth: () => ({ user: { unitSystem: 'METRIC' } }) }));
+vi.mock('@/lib/auth-context', () => ({ useAuth: () => ({ user: { unitSystem: units.system } }) }));
 vi.mock('@/lib/workout-context', async () => {
   const { useFakeSetRowState } = await import('@/lib/test-set-row-state');
   return {
@@ -105,6 +106,7 @@ beforeEach(() => {
   updateSet.mockReset();
   Object.values(notify).forEach((fn) => fn.mockReset());
   workoutState.isPastWorkout = false;
+  units.system = 'METRIC';
 });
 afterEach(cleanup);
 
@@ -545,5 +547,110 @@ describe('field errors sit under their row', () => {
     await flush();
 
     expect(within(rowOf(inputs()[2])).getByText('Bitte gib den RIR ein.')).not.toBeNull();
+  });
+});
+
+describe('upper bounds on the set inputs', () => {
+  const heavy = (kg: number, over: Partial<PlannedSet> = {}) => exerciseOf({ plannedSets: [planned(1, { weight: kg, ...over })] });
+
+  it('tells the input what it may hold: reps 1-100 and RIR 0-10 in whole steps, weight up to 1000 kg', () => {
+    renderCard(exerciseOf());
+
+    const [weight, reps, rir] = inputs();
+    expect([weight.min, weight.max]).toEqual(['0', '1000']);
+    expect([reps.min, reps.max, reps.step]).toEqual(['1', '100', '1']);
+    expect([rir.min, rir.max, rir.step]).toEqual(['0', '10', '1']);
+  });
+
+  it('states the weight limit in pounds for a pound user, and judges the typed pounds', () => {
+    units.system = 'IMPERIAL';
+    renderCard(exerciseOf());
+
+    expect(inputs()[0].max).toBe('2204.6');
+  });
+
+  it.each([
+    ['tick', () => tick()],
+    ['swipe', () => swipeRight(rowOf(inputs()[0]))],
+  ])('refuses 1000.5 kg by %s with a field error, and logs 1000 kg', async (_name, logIt) => {
+    renderCard(heavy(1000.5));
+
+    logIt();
+    await flush();
+
+    expect(logSet).not.toHaveBeenCalled();
+    expect(inputs()[0].getAttribute('aria-invalid')).toBe('true');
+    expect(screen.getByText('Das Gewicht darf höchstens 1.000 kg betragen.')).not.toBeNull();
+    expect(notify.warning).toHaveBeenCalledTimes(1);
+
+    fireEvent.change(inputs()[0], { target: { value: '1000' } });
+    logIt();
+    await flush();
+    expect(logSet).toHaveBeenCalledWith('ex1', expect.objectContaining({ weight: 1000 }));
+  });
+
+  it('names the limit in pounds for a pound user', async () => {
+    units.system = 'IMPERIAL';
+    renderCard(heavy(1000.5));
+
+    tick();
+    await flush();
+
+    expect(screen.getByText('Das Gewicht darf höchstens 2.204,6 lb betragen.')).not.toBeNull();
+  });
+
+  it('refuses 101 reps and RIR 11, accepts 100 and 10', async () => {
+    renderCard(exerciseOf({ plannedSets: [planned(1, { reps: 101, rir: 11 })] }));
+
+    tick();
+    await flush();
+
+    expect(logSet).not.toHaveBeenCalled();
+    expect(inputs()[1].getAttribute('aria-invalid')).toBe('true');
+    expect(inputs()[2].getAttribute('aria-invalid')).toBe('true');
+    expect(screen.getByText('Es sind höchstens 100 Wiederholungen möglich.')).not.toBeNull();
+    expect(screen.getByText('Der RIR darf höchstens 10 betragen.')).not.toBeNull();
+
+    fireEvent.change(inputs()[1], { target: { value: '100' } });
+    fireEvent.change(inputs()[2], { target: { value: '10' } });
+    tick();
+    await flush();
+    expect(logSet).toHaveBeenCalledWith('ex1', expect.objectContaining({ reps: 100, rir: 10 }));
+  });
+
+  it('flags a logged set edited past the bound', () => {
+    renderCard(exerciseOf({ plannedSets: undefined, sets: [logged(1)] }));
+
+    fireEvent.change(inputs()[1], { target: { value: '101' } });
+
+    expect(inputs()[1].getAttribute('aria-invalid')).toBe('true');
+  });
+});
+
+describe('at most 20 sets per Uebung', () => {
+  const addSetButton = () => screen.getByRole('button', { name: /Satz hinzufügen/ });
+  const withSets = (count: number) =>
+    exerciseOf({ plannedSets: Array.from({ length: count }, (_, i) => planned(i + 1)) });
+
+  it('adds the 20th set, and answers the 21st with a toast', () => {
+    const onAddSet = vi.fn();
+    renderCard(withSets(19), { allowSetManagement: true, onAddSet });
+    fireEvent.click(addSetButton());
+    expect(onAddSet).toHaveBeenCalledTimes(1);
+    cleanup();
+
+    const refused = vi.fn();
+    renderCard(withSets(20), { allowSetManagement: true, onAddSet: refused });
+    fireEvent.click(addSetButton());
+    expect(refused).not.toHaveBeenCalled();
+    expect(notify.warning).toHaveBeenCalledWith('Eine Übung kann höchstens 20 Sätze enthalten.');
+  });
+
+  it('counts added rows in the live workout too', () => {
+    renderCard(withSets(20));
+    fireEvent.click(addSetButton());
+
+    expect(notify.warning).toHaveBeenCalledWith('Eine Übung kann höchstens 20 Sätze enthalten.');
+    expect(inputs()).toHaveLength(60);
   });
 });

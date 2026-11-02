@@ -19,7 +19,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { FieldError } from '@/components/ui/field';
 import { notify } from '@/lib/toast';
-import { findFirstSetNeedingRir } from '@/lib/log-set-guards';
+import { findFirstSetNeedingRir, findFirstSetOverLimit } from '@/lib/log-set-guards';
 import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
 import { useFormErrors } from '@/hooks/useFormErrors';
 import { NAME_MAX, checkBaseText } from '@/lib/field-rules';
@@ -187,12 +187,14 @@ export default function BlueprintEditorStep({
   // one, so the card showing the field error is the one on screen.
   const handleNext = () => {
     for (const [dayIndex, day] of formData.workoutDays.entries()) {
-      const hit = findFirstSetNeedingRir(day.blueprint.exercises);
+      const missingRir = findFirstSetNeedingRir(day.blueprint.exercises);
+      const overLimit = findFirstSetOverLimit(day.blueprint.exercises);
+      const hit = missingRir ?? overLimit;
       if (!hit) continue;
       const ex = day.blueprint.exercises[hit.exerciseIndex];
       setCurrentDayIndex(dayIndex);
       notify.warning(
-        tCard('planRirMissing', {
+        tCard(missingRir ? 'planRirMissing' : 'planSetTooHigh', {
           exercise: ex.exerciseName || exercises.find((e) => e.id === ex.exerciseId)?.name || '',
           number: hit.setIndex + 1,
         }),

@@ -140,6 +140,36 @@ describe('TemplateEditorScreen saving', () => {
     expect(updateWorkoutTemplate).not.toHaveBeenCalled();
   });
 
+  it('will not save a planned set past an upper bound, and names where it is', async () => {
+    getWorkoutTemplate.mockResolvedValue(
+      template({
+        name: 'Push',
+        exercises: [
+          {
+            id: 'ex1',
+            exerciseId: 'e1',
+            exerciseName: 'Kniebeuge',
+            order: 1,
+            sets: [
+              { id: 's1', order: 1, setType: 'WORKING', reps: 100, weight: 1000, rir: 10, rest: 90 },
+              { id: 's2', order: 2, setType: 'WORKING', reps: 101, weight: 100, rir: 2, rest: 90 },
+            ],
+          },
+        ],
+      }),
+    );
+    await renderEditor();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() =>
+      expect(notify.warning).toHaveBeenCalledWith(
+        'Kniebeuge, Satz 2: Ein Wert liegt über dem erlaubten Maximum – prüfe die markierten Felder.',
+      ),
+    );
+    expect(updateWorkoutTemplate).not.toHaveBeenCalled();
+  });
+
   it('saves a warm-up without RIR and keeps a stored RIR 0 on a working set', async () => {
     getWorkoutTemplate.mockResolvedValue(
       template({

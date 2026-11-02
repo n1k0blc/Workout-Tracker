@@ -28,6 +28,15 @@ import { Input } from '@/components/ui/input';
 import { FieldError, FieldWarning } from '@/components/ui/field';
 import { WeightInput } from './weight-input';
 import { useUnits } from '@/lib/use-units';
+import { useValidationMessage } from '@/hooks/useApiErrorMessage';
+import {
+  REPS_MAX,
+  REPS_MIN,
+  RIR_MAX,
+  RIR_MIN,
+  SETS_PER_EXERCISE_MAX,
+  setWeightLimit,
+} from '@/lib/field-rules';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -159,6 +168,10 @@ interface ExerciseCardProps {
 
 const NO_NUMBERS: readonly number[] = [];
 
+// Reps and RIR are whole numbers; the browser's min/max/step come from the field rules (#221).
+const REPS_INPUT = { min: REPS_MIN, max: REPS_MAX, step: 1 } as const;
+const RIR_INPUT = { min: RIR_MIN, max: RIR_MAX, step: 1 } as const;
+
 export default function ExerciseCard({
   exercise,
   exerciseNumber,
@@ -181,6 +194,7 @@ export default function ExerciseCard({
 }: ExerciseCardProps) {
   const t = useTranslations('ExerciseCard');
   const units = useUnits();
+  const validationMessage = useValidationMessage();
 
   // Derive effective flags. For 'active' everything is on.
   // For 'edit' the caller decides (History: all structural/logging off; Blueprint: structural on, logging off).
@@ -541,7 +555,7 @@ export default function ExerciseCard({
   const unloggedFeedback = (setNumber: number, setType: SetType): RowFeedback =>
     buildFeedback(setType, unloggedValues(setNumber), (p) =>
       ownsPlan
-        ? p.field.endsWith('rir')
+        ? p.field.endsWith('rir') || p.kind === 'tooHigh'
         : !!showUnloggedErrors || (markedFields[setNumber] ?? []).includes(p.field),
     );
 
@@ -552,7 +566,7 @@ export default function ExerciseCard({
    */
   const loggedFeedback = (set: SetLog): RowFeedback =>
     buildFeedback(set.setType ?? SetType.WORKING, loggedValues(set), (p) =>
-      editsLoggedSets ? touchedLoggedIds.has(set.id) : p.field.endsWith('rir'),
+      editsLoggedSets ? touchedLoggedIds.has(set.id) : p.field.endsWith('rir') || p.kind === 'tooHigh',
     );
 
   /** Spread on an input: the red error state, or the amber warning. */
@@ -578,7 +592,15 @@ export default function ExerciseCard({
   const problemText = (p: SetProblem) => {
     const base = p.field.split('.').pop() as 'weight' | 'reps' | 'rir';
     const key = p.kind === 'zeroWeight' ? 'weightZero' : `${base}${p.kind === 'missing' ? 'Missing' : 'Invalid'}`;
-    const text = t(`errors.${key}` as 'errors.weightZero', { unit: units.unit });
+    // An upper bound reads from the shared validation catalogue; the weight limit is named in the
+    // user's own unit (ADR-0005), the card's form state stays kg.
+    const text =
+      p.kind === 'tooHigh'
+        ? (validationMessage(base, 'max', {
+            max: base === 'weight' ? setWeightLimit(units.system) : base === 'reps' ? REPS_MAX : RIR_MAX,
+            unit: units.unit,
+          }) ?? t('logInvalid'))
+        : t(`errors.${key}` as 'errors.weightZero', { unit: units.unit });
     return p.field.startsWith('left.')
       ? `${t('sideLeft')}: ${text}`
       : p.field.startsWith('right.')
@@ -1157,7 +1179,7 @@ export default function ExerciseCard({
           />
           <Input
             type="number"
-            inputMode="numeric"
+            inputMode="numeric" {...REPS_INPUT}
             value={draft[side].reps}
             onChange={(e) => onChange(side, 'reps', e.target.value)}
             placeholder="0"
@@ -1168,7 +1190,7 @@ export default function ExerciseCard({
           {opts.showRir ? (
             <Input
               type="number"
-              inputMode="numeric"
+              inputMode="numeric" {...RIR_INPUT}
               value={draft[side].rir}
               onChange={(e) => onChange(side, 'rir', e.target.value)}
               placeholder=""
@@ -1291,11 +1313,11 @@ export default function ExerciseCard({
           ) : (
             <>
               <WeightInput inputMode="decimal" valueKg={getEditValue(setNumber, 'weight')} onChangeKg={(kg) => handleRowValueChange(setNumber, null, 'weight', kg)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-base md:text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} {...feedbackProps(fb, rowKey, 'weight')} />
-              <Input type="number" inputMode="numeric" value={getEditValue(setNumber, 'reps')} onChange={(e) => handleRowValueChange(setNumber, null, 'reps', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-base md:text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} {...feedbackProps(fb, rowKey, 'reps')} />
+              <Input type="number" inputMode="numeric" {...REPS_INPUT} value={getEditValue(setNumber, 'reps')} onChange={(e) => handleRowValueChange(setNumber, null, 'reps', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-base md:text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} {...feedbackProps(fb, rowKey, 'reps')} />
               {isWarmup ? (
                 <span />
               ) : (
-                <Input type="number" inputMode="numeric" value={getEditValue(setNumber, 'rir')} onChange={(e) => handleRowValueChange(setNumber, null, 'rir', e.target.value)} onBlur={commitIfNeeded} placeholder="" className="h-7 text-base md:text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} {...feedbackProps(fb, rowKey, 'rir')} />
+                <Input type="number" inputMode="numeric" {...RIR_INPUT} value={getEditValue(setNumber, 'rir')} onChange={(e) => handleRowValueChange(setNumber, null, 'rir', e.target.value)} onBlur={commitIfNeeded} placeholder="" className="h-7 text-base md:text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} {...feedbackProps(fb, rowKey, 'rir')} />
               )}
             </>
           )}
@@ -1375,7 +1397,7 @@ export default function ExerciseCard({
               />
               <Input
                 type="number"
-                inputMode="numeric"
+                inputMode="numeric" {...REPS_INPUT}
                 value={isEditingThis ? editingValues.reps : set.reps.toString()}
                 onChange={(e) => handleRowValueChange(set.setNumber, set, 'reps', e.target.value)}
                 placeholder="0"
@@ -1389,7 +1411,7 @@ export default function ExerciseCard({
               ) : (
                 <Input
                   type="number"
-                  inputMode="numeric"
+                  inputMode="numeric" {...RIR_INPUT}
                   value={isEditingThis ? editingValues.rir : (set.rir != null ? set.rir.toString() : '')}
                   onChange={(e) => handleRowValueChange(set.setNumber, set, 'rir', e.target.value)}
                   placeholder=""
@@ -1613,7 +1635,7 @@ export default function ExerciseCard({
                         {/* Reps cell - always input style; for logged: live editable via updateSet */}
                         <Input
                           type="number"
-                          inputMode="numeric"
+                          inputMode="numeric" {...REPS_INPUT}
                           value={isEditingThis ? editingValues.reps : (loggedSet ? loggedSet.reps.toString() : getEditValue(setNumber, 'reps'))}
                           onChange={(e) => handleRowValueChange(setNumber, loggedSet ?? null, 'reps', e.target.value)}
                           onBlur={commitIfNeeded}
@@ -1631,7 +1653,7 @@ export default function ExerciseCard({
                         ) : (
                           <Input
                             type="number"
-                            inputMode="numeric"
+                            inputMode="numeric" {...RIR_INPUT}
                             value={isEditingThis ? editingValues.rir : (loggedSet ? (loggedSet.rir != null ? loggedSet.rir.toString() : '') : getEditValue(setNumber, 'rir'))}
                             onChange={(e) => handleRowValueChange(setNumber, loggedSet ?? null, 'rir', e.target.value)}
                             onBlur={commitIfNeeded}
@@ -1695,6 +1717,10 @@ export default function ExerciseCard({
             {/* Add set button (table-like) - only if set management allowed and not readonly */}
             {!isReadonly && effectiveAllowSetManagement && (
               <Button variant="outline" onClick={() => {
+                if (setIndicatorSlots.length >= SETS_PER_EXERCISE_MAX) {
+                  notify.warning(t('setLimitReached', { max: SETS_PER_EXERCISE_MAX }));
+                  return;
+                }
                 if (onAddSet) {
                   onAddSet(exercise.id);
                 } else {

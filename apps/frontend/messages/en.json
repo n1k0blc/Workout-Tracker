@@ -176,6 +176,12 @@
         "min": "The weight must be at least {min} {unit}.",
         "max": "The weight must be at most {max} {unit}."
       },
+      "reps": {
+        "max": "Reps can be at most {max}."
+      },
+      "rir": {
+        "max": "RIR can be at most {max}."
+      },
       "homeGyms": {
         "arrayMinSize": "Please add at least one home gym.",
         "arrayMaxSize": "You can add at most 10 gyms."
@@ -604,7 +610,9 @@
     "logOutOfOrder": "Log set {number} first, or swipe it away.",
     "logExerciseAbove": "Finish “{name}” first, or drag this exercise up if the machine is taken.",
     "planRirMissing": "{exercise}, set {number}: Enter an RIR.",
+    "planSetTooHigh": "{exercise}, set {number}: A value is above the allowed maximum – check the marked fields.",
     "rirHint": "Aim for RIR 2 at most.",
+    "setLimitReached": "An exercise can have at most {max} sets.",
     "errors": {
       "weightMissing": "Enter the weight.",
       "weightInvalid": "The weight cannot be negative.",

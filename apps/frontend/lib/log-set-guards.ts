@@ -1,4 +1,5 @@
 import { Equipment, SetType } from '@/types';
+import { REPS_MAX, RIR_MAX, WEIGHT_KG_MAX } from './field-rules';
 
 /**
  * The rules for logging one set (#227, parent #221), as pure functions over the raw strings the
@@ -31,7 +32,9 @@ export type SetProblemKind =
   /** A number the field cannot hold: negative, fractional reps or RIR, reps below 1. */
   | 'invalid'
   /** 0 kg on an exercise that is not Bodyweight. */
-  | 'zeroWeight';
+  | 'zeroWeight'
+  /** Above the field's upper bound (`WEIGHT_KG_MAX`, `REPS_MAX`, `RIR_MAX`). */
+  | 'tooHigh';
 
 export interface SetProblem {
   field: SetFieldKey;
@@ -61,15 +64,18 @@ function checkField(
     case 'weight':
       if (empty || Number.isNaN(n)) return 'missing';
       if (n < 0) return 'invalid';
+      if (n > WEIGHT_KG_MAX) return 'tooHigh';
       if (n === 0 && ctx.equipment !== Equipment.BODYWEIGHT) return 'zeroWeight';
       return null;
     case 'reps':
       if (empty || Number.isNaN(n)) return 'missing';
-      return Number.isInteger(n) && n >= 1 ? null : 'invalid';
+      if (!Number.isInteger(n) || n < 1) return 'invalid';
+      return n > REPS_MAX ? 'tooHigh' : null;
     case 'rir':
       if (ctx.setType === SetType.WARMUP) return null;
       if (empty || Number.isNaN(n)) return 'missing';
-      return Number.isInteger(n) && n >= 0 ? null : 'invalid';
+      if (!Number.isInteger(n) || n < 0) return 'invalid';
+      return n > RIR_MAX ? 'tooHigh' : null;
   }
 }
 
@@ -168,6 +174,38 @@ export function findFirstSetNeedingRir(
 ): { exerciseIndex: number; setIndex: number } | null {
   for (const [exerciseIndex, exercise] of exercises.entries()) {
     const setIndex = exercise.sets.findIndex(setNeedsRir);
+    if (setIndex !== -1) return { exerciseIndex, setIndex };
+  }
+  return null;
+}
+
+/** A planned or stored set's numbers, aggregate and per side; absent values are not judged. */
+interface BoundedSet {
+  weight?: number | null;
+  weightLeft?: number | null;
+  weightRight?: number | null;
+  reps?: number | null;
+  repsLeft?: number | null;
+  repsRight?: number | null;
+  rir?: number | null;
+  rirLeft?: number | null;
+  rirRight?: number | null;
+}
+
+/**
+ * The first set across a plan holding a weight, reps or RIR past its upper bound, or null. The
+ * plan editors check it before saving, so the user is told on the client instead of by a 400.
+ */
+export function findFirstSetOverLimit(
+  exercises: readonly { sets: readonly BoundedSet[] }[],
+): { exerciseIndex: number; setIndex: number } | null {
+  const over = (value: number | null | undefined, max: number) => value != null && value > max;
+  const isOver = (s: BoundedSet) =>
+    [s.weight, s.weightLeft, s.weightRight].some((v) => over(v, WEIGHT_KG_MAX)) ||
+    [s.reps, s.repsLeft, s.repsRight].some((v) => over(v, REPS_MAX)) ||
+    [s.rir, s.rirLeft, s.rirRight].some((v) => over(v, RIR_MAX));
+  for (const [exerciseIndex, exercise] of exercises.entries()) {
+    const setIndex = exercise.sets.findIndex(isOver);
     if (setIndex !== -1) return { exerciseIndex, setIndex };
   }
   return null;

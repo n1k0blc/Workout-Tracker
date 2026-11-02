@@ -6,6 +6,7 @@ import {
   firstEarlierUnresolvedSet,
   setNeedsRir,
   findFirstSetNeedingRir,
+  findFirstSetOverLimit,
   type SetFieldValues,
 } from './log-set-guards';
 import { Equipment, SetType } from '@/types';
@@ -82,6 +83,40 @@ describe('checkSetForLogging: 0 kg is a load only on Bodyweight exercises', () =
 
   it('accepts a weighted bodyweight set (weighted pull-up)', () => {
     expect(check(values({ weight: '20' }), { equipment: Equipment.BODYWEIGHT })).toEqual([]);
+  });
+});
+
+describe('checkSetForLogging: upper bounds (weight 1000 kg, 100 reps, RIR 10)', () => {
+  it('accepts the last valid value and refuses the first invalid one', () => {
+    expect(check(values({ weight: '1000' }))).toEqual([]);
+    expect(check(values({ weight: '1000.001' }))).toEqual([{ field: 'weight', kind: 'tooHigh' }]);
+    expect(check(values({ reps: '100' }))).toEqual([]);
+    expect(check(values({ reps: '101' }))).toEqual([{ field: 'reps', kind: 'tooHigh' }]);
+    expect(check(values({ rir: '10' }))).toEqual([]);
+    expect(check(values({ rir: '11' }))).toEqual([{ field: 'rir', kind: 'tooHigh' }]);
+  });
+
+  it('judges the weight in kg, so a pound value just under the limit passes', () => {
+    // 2204.6 lb is 999.99 kg, 2204.7 lb is 1000.04 kg (ADR-0005: the card holds canonical kg).
+    expect(check(values({ weight: String(2204.6 * 0.45359237) }))).toEqual([]);
+    expect(check(values({ weight: String(2204.7 * 0.45359237) }))).toEqual([{ field: 'weight', kind: 'tooHigh' }]);
+  });
+
+  it('applies to every side of a unilateral set and to a warm-up', () => {
+    expect(check({ left: values(), right: values({ reps: '101' }) })).toEqual([
+      { field: 'right.reps', kind: 'tooHigh' },
+    ]);
+    expect(check(values({ weight: '1001' }), { setType: SetType.WARMUP })).toEqual([
+      { field: 'weight', kind: 'tooHigh' },
+    ]);
+  });
+
+  it('keeps a fractional value "invalid" rather than too high', () => {
+    expect(check(values({ reps: '100.5' }))).toEqual([{ field: 'reps', kind: 'invalid' }]);
+  });
+
+  it('does not ask for a RIR bound on a warm-up', () => {
+    expect(check(values({ rir: '99' }), { setType: SetType.WARMUP })).toEqual([]);
   });
 });
 
@@ -218,5 +253,22 @@ describe('findFirstSetNeedingRir', () => {
 
   it('is null when every working set has RIR', () => {
     expect(findFirstSetNeedingRir([{ sets: [{ setType: SetType.WORKING, rir: 0 }] }])).toBeNull();
+  });
+});
+
+describe('findFirstSetOverLimit: a plan cannot be saved with a value past a bound', () => {
+  it('finds the first planned set above 1000 kg, 100 reps or RIR 10, on either side', () => {
+    expect(findFirstSetOverLimit([{ sets: [{ weight: 1000, reps: 100, rir: 10 }] }])).toBeNull();
+    expect(
+      findFirstSetOverLimit([{ sets: [{ weight: 60 }] }, { sets: [{ weight: 60 }, { weight: 1000.5 }] }]),
+    ).toEqual({ exerciseIndex: 1, setIndex: 1 });
+    expect(findFirstSetOverLimit([{ sets: [{ reps: 101 }] }])).toEqual({ exerciseIndex: 0, setIndex: 0 });
+    expect(findFirstSetOverLimit([{ sets: [{ rir: 11 }] }])).toEqual({ exerciseIndex: 0, setIndex: 0 });
+    expect(findFirstSetOverLimit([{ sets: [{ rirRight: 11 }] }])).toEqual({ exerciseIndex: 0, setIndex: 0 });
+    expect(findFirstSetOverLimit([{ sets: [{ weightLeft: 1001 }] }])).toEqual({ exerciseIndex: 0, setIndex: 0 });
+  });
+
+  it('ignores an absent value', () => {
+    expect(findFirstSetOverLimit([{ sets: [{ rir: null, repsLeft: null }, {}] }])).toBeNull();
   });
 });

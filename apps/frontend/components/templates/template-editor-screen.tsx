@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { notify } from '@/lib/toast';
-import { findFirstSetNeedingRir } from '@/lib/log-set-guards';
+import { findFirstSetNeedingRir, findFirstSetOverLimit } from '@/lib/log-set-guards';
 import { useFormErrors } from '@/hooks/useFormErrors';
 import { NAME_MAX, checkBaseText } from '@/lib/field-rules';
 import ExerciseCard from '@/components/workout/exercise-card';
@@ -229,12 +229,16 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
     }
 
     // A planned working set needs an RIR (#227); the card marks the empty field, this names it.
-    const missingRir = findFirstSetNeedingRir(exercises.map((ex) => ({ sets: ex.plannedSets ?? [] })));
-    if (missingRir) {
+    // A value past its upper bound is named the same way.
+    const plan = exercises.map((ex) => ({ sets: ex.plannedSets ?? [] }));
+    const missingRir = findFirstSetNeedingRir(plan);
+    const overLimit = findFirstSetOverLimit(plan);
+    const blocking = missingRir ?? overLimit;
+    if (blocking) {
       notify.warning(
-        tCard('planRirMissing', {
-          exercise: exercises[missingRir.exerciseIndex].exerciseName,
-          number: missingRir.setIndex + 1,
+        tCard(missingRir ? 'planRirMissing' : 'planSetTooHigh', {
+          exercise: exercises[blocking.exerciseIndex].exerciseName,
+          number: blocking.setIndex + 1,
         }),
       );
       return;

@@ -3,6 +3,7 @@
 import { useState, type ComponentProps } from 'react';
 import { Input } from '@/components/ui/input';
 import { useUnitSystem } from '@/lib/use-units';
+import { setWeightLimit } from '@/lib/field-rules';
 import { weightInputString, weightToKg } from '@/lib/units';
 
 /** Decimals a weight may be typed with, in the user's own unit (#227). Client only. */
@@ -44,6 +45,7 @@ export function WeightInput({ valueKg, onChangeKg, ...props }: WeightInputProps)
       {...props}
       type="number"
       min={0}
+      max={setWeightLimit(system)}
       step="any"
       value={shown}
       onChange={(e) => {
