@@ -9,6 +9,9 @@ import { WorkoutListItem } from '@/types';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Badge } from '@/components/ui/badge';
 import { GymTag } from '@/components/GymTag';
+import { FieldError } from '@/components/ui/field';
+import { useValidationMessage } from '@/hooks/useApiErrorMessage';
+import { checkDateRange } from '@/lib/field-rules';
 import {
   IconCalendar,
   IconClock,
@@ -25,6 +28,10 @@ export default function HistoryPage() {
   const [filterType, setFilterType] = useState<FilterType>('30days');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
+  const validationMessage = useValidationMessage();
+  // A range that ends before it starts is an error to read, not an empty list to puzzle over.
+  const rangeProblem = filterType === 'custom' ? checkDateRange(customStartDate, customEndDate) : null;
+  const rangeMessage = rangeProblem ? validationMessage('endDate', rangeProblem) : undefined;
 
   const getDateRange = (): { startDate: string; endDate: string } => {
     const now = new Date();
@@ -70,7 +77,7 @@ export default function HistoryPage() {
   };
 
   const loadWorkouts = useCallback(async () => {
-    if (filterType === 'custom' && (!customStartDate || !customEndDate)) {
+    if (filterType === 'custom' && (!customStartDate || !customEndDate || rangeProblem)) {
       return;
     }
 
@@ -88,7 +95,7 @@ export default function HistoryPage() {
       setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterType, customStartDate, customEndDate]);
+  }, [filterType, customStartDate, customEndDate, rangeProblem]);
 
   useEffect(() => {
     loadWorkouts();
@@ -165,10 +172,11 @@ export default function HistoryPage() {
                 {filterType === 'custom' && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
                     <div>
-                      <div className="text-sm font-medium text-muted-foreground mb-2">
+                      <label htmlFor="customStartDate" className="block text-sm font-medium text-muted-foreground mb-2">
                         {t('from')}
-                      </div>
+                      </label>
                       <input
+                        id="customStartDate"
                         type="date"
                         value={customStartDate}
                         onChange={(e) => setCustomStartDate(e.target.value)}
@@ -176,22 +184,26 @@ export default function HistoryPage() {
                       />
                     </div>
                     <div>
-                      <div className="text-sm font-medium text-muted-foreground mb-2">
+                      <label htmlFor="customEndDate" className="block text-sm font-medium text-muted-foreground mb-2">
                         {t('to')}
-                      </div>
+                      </label>
                       <input
+                        id="customEndDate"
                         type="date"
                         value={customEndDate}
                         onChange={(e) => setCustomEndDate(e.target.value)}
-                        className="w-full"
+                        className="w-full aria-invalid:border-destructive"
+                        aria-invalid={rangeMessage ? true : undefined}
+                        aria-describedby={rangeMessage ? 'endDate-error' : undefined}
                       />
+                      <FieldError id="endDate-error" className="mt-1">{rangeMessage}</FieldError>
                     </div>
                   </div>
                 )}
               </div>
 
               {/* Workouts List */}
-              {loading ? (
+              {rangeMessage ? null : loading ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="text-lg text-muted-foreground">{t('loading')}</div>
                 </div>

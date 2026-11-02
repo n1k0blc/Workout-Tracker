@@ -94,6 +94,58 @@ describe.each(['America/New_York', 'America/Los_Angeles', 'Pacific/Honolulu', 'E
   },
 );
 
+/**
+ * The date of a past workout runs from 2000-01-01 through the user's today (#230). The native
+ * input lets a typed value past its min/max, so the page judges it on save.
+ */
+describe('the date of a past workout', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 10, 2, 12, 0));
+    getWorkout.mockResolvedValue({
+      id: 'w1',
+      date: '2026-08-15T10:00:00.000Z',
+      localDate: '2026-08-15',
+      totalDuration: 3600,
+      isFreeWorkout: true,
+      exercises: [],
+    });
+    updateWorkout.mockResolvedValue({});
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    cleanup();
+    getWorkout.mockReset();
+    updateWorkout.mockReset();
+    push.mockClear();
+  });
+
+  async function saveWith(day: string) {
+    const { container } = renderEditPage();
+    await screen.findByText('Workout bearbeiten');
+    const input = container.querySelector('input[type="date"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: day } });
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    return input;
+  }
+
+  it.each(['2000-01-01', '2026-11-02'])('saves %s, the last valid day at either end', async (day) => {
+    await saveWith(day);
+    await waitFor(() => expect(updateWorkout).toHaveBeenCalledTimes(1));
+  });
+
+  it.each([
+    ['1999-12-31', 'Das Datum liegt zu weit in der Vergangenheit.'],
+    ['2026-11-03', 'Das Datum darf nicht in der Zukunft liegen.'],
+  ])('refuses %s with the reason under the field', async (day, message) => {
+    const input = await saveWith(day);
+    expect(await screen.findByText(message)).toBeTruthy();
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    expect(updateWorkout).not.toHaveBeenCalled();
+  });
+});
+
 /** Failures are a toast (#231), never a native alert(): the page stays put or leaves, unblocked. */
 describe('editing a past workout, when the server fails', () => {
   const workout = {

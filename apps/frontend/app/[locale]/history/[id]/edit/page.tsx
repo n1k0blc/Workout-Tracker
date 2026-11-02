@@ -12,10 +12,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
 import { Badge } from '@/components/ui/badge';
-import { Field, FieldLabel } from '@/components/ui/field';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { DatePicker } from '@/components/date-picker';
 import ExerciseCard from '@/components/workout/exercise-card';
 import { notify } from '@/lib/toast';
+import { useFormErrors } from '@/hooks/useFormErrors';
+import { WORKOUT_DATE_MIN_YEAR, checkWorkoutDate } from '@/lib/field-rules';
+import { toLocalDateString } from '@/lib/local-date';
 import {
   IconChevronLeft,
 } from '@tabler/icons-react';
@@ -57,6 +60,7 @@ export default function EditWorkoutPage() {
   const [workoutDate, setWorkoutDate] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [dateForm, dateFormRef] = useFormErrors({ fields: ['workoutDate'] });
 
   const navigateBack = () => {
     if (fromCycle && cycleId) {
@@ -105,6 +109,9 @@ export default function EditWorkoutPage() {
 
   const handleSave = async () => {
     if (!workout) return;
+    if (!dateForm.setConstraints({ workoutDate: checkWorkoutDate(workoutDate, toLocalDateString(new Date())) })) {
+      return;
+    }
 
     setSaving(true);
     try {
@@ -186,12 +193,16 @@ export default function EditWorkoutPage() {
 
             {/* Workout Date */}
             <Card>
-              <CardContent className="p-6">
+              <CardContent className="p-6" ref={dateFormRef}>
                 <Field>
-                  <FieldLabel>{t('date')}</FieldLabel>
+                  <FieldLabel htmlFor="workoutDate">{t('date')}</FieldLabel>
                   <DatePicker
+                    id="workoutDate"
                     date={workoutDate ? new Date(workoutDate) : null}
+                    min={`${WORKOUT_DATE_MIN_YEAR}-01-01`}
+                    {...dateForm.fieldProps('workoutDate')}
                     onSelect={(date) => {
+                      dateForm.clear('workoutDate');
                       if (date) {
                         // DatePicker hands back the picked day as UTC midnight, so the day is
                         // read in UTC; the local clock would be the previous day west of Greenwich.
@@ -202,6 +213,7 @@ export default function EditWorkoutPage() {
                     }}
                     className="w-full md:w-auto"
                   />
+                  <FieldError id={dateForm.errorId('workoutDate')}>{dateForm.errors.workoutDate}</FieldError>
                 </Field>
                 <p className="mt-2 text-sm text-muted-foreground">
                   {t('originally', { date: formatDate(workout.date) })}
