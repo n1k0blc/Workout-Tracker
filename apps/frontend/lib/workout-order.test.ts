@@ -157,6 +157,28 @@ describe('toExercisePayload', () => {
     expect(set).not.toHaveProperty('rirLeft');
   });
 
+  it('sends no RIR for a warm-up, whatever the draft still holds (#227)', () => {
+    const uni = log('a', 1, [1, 2]);
+    Object.assign(uni.sets[0], {
+      setType: SetType.WARMUP,
+      repsLeft: 10,
+      repsRight: 10,
+      weightLeft: 50,
+      weightRight: 50,
+      rirLeft: 2,
+      rirRight: 2,
+    });
+
+    const [warmup, working] = toExercisePayload([uni])[0].sets;
+
+    expect(warmup).not.toHaveProperty('rir', 2);
+    expect(warmup.rir).toBeUndefined();
+    expect(warmup).not.toHaveProperty('rirLeft');
+    expect(warmup).not.toHaveProperty('rirRight');
+    expect(warmup).toMatchObject({ repsLeft: 10, weightRight: 50 });
+    expect(working.rir).toBe(2);
+  });
+
   it('emits reps/weight sides without RIR when neither side was graded', () => {
     const uni = log('a', 1, [1]);
     Object.assign(uni.sets[0], {

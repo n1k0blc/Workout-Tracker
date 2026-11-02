@@ -31,7 +31,15 @@ function setContext(overrides: Record<string, unknown> = {}) {
       id: 'w1',
       isFreeWorkout: true,
       originTemplateName: 'Push',
-      exercises: [{ id: 'e1', sets: [{ id: 's1' }] }],
+      // One fully logged working set, so "Beenden" (the completeness rule, #228) opens the dialog.
+      exercises: [
+        {
+          id: 'e1',
+          exerciseName: 'Bankdrücken',
+          plannedSets: [],
+          sets: [{ id: 's1', setNumber: 1, setType: 'WORKING', reps: 8, weight: 80, rir: 2 }],
+        },
+      ],
     },
     completeWorkout,
     discardWorkout: vi.fn(),
@@ -45,6 +53,7 @@ function setContext(overrides: Record<string, unknown> = {}) {
     pastWorkoutDuration: 3600,
     setPastWorkoutDuration,
     isMinimized: false,
+    setRowState: { skipped: {}, added: {} },
     ...overrides,
   };
 }

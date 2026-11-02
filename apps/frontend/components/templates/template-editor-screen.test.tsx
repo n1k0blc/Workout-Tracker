@@ -114,6 +114,60 @@ describe('TemplateEditorScreen saving', () => {
     expect(push).not.toHaveBeenCalled();
   });
 
+  it('will not save a planned working set without RIR, and names where it is (#227)', async () => {
+    getWorkoutTemplate.mockResolvedValue(
+      template({
+        name: 'Push',
+        exercises: [
+          {
+            id: 'ex1',
+            exerciseId: 'e1',
+            exerciseName: 'Kniebeuge',
+            order: 1,
+            sets: [
+              { id: 's1', order: 1, setType: 'WARMUP', reps: 5, weight: 20, rir: null, rest: 90 },
+              { id: 's2', order: 2, setType: 'WORKING', reps: 5, weight: 100, rir: null, rest: 90 },
+            ],
+          },
+        ],
+      }),
+    );
+    await renderEditor();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(notify.warning).toHaveBeenCalledWith('Kniebeuge, Satz 2: Gib einen RIR an.'));
+    expect(updateWorkoutTemplate).not.toHaveBeenCalled();
+  });
+
+  it('saves a warm-up without RIR and keeps a stored RIR 0 on a working set', async () => {
+    getWorkoutTemplate.mockResolvedValue(
+      template({
+        name: 'Push',
+        exercises: [
+          {
+            id: 'ex1',
+            exerciseId: 'e1',
+            exerciseName: 'Kniebeuge',
+            order: 1,
+            sets: [
+              { id: 's1', order: 1, setType: 'WARMUP', reps: 5, weight: 20, rir: 3, rest: 90 },
+              { id: 's2', order: 2, setType: 'WORKING', reps: 5, weight: 100, rir: 0, rest: 90 },
+            ],
+          },
+        ],
+      }),
+    );
+    await renderEditor();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+
+    await waitFor(() => expect(updateWorkoutTemplate).toHaveBeenCalled());
+    const [warmup, working] = updateWorkoutTemplate.mock.calls[0][1].exercises[0].sets;
+    expect(warmup.rir).toBeUndefined();
+    expect(working.rir).toBe(0);
+  });
+
   it('toasts a failure that belongs to no field and stays on the page', async () => {
     getWorkoutTemplate.mockResolvedValue(template({ name: 'Push' }));
     updateWorkoutTemplate.mockRejectedValue(new Error('network down'));

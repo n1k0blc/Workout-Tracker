@@ -19,6 +19,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { FieldError } from '@/components/ui/field';
 import { notify } from '@/lib/toast';
+import { findFirstSetNeedingRir } from '@/lib/log-set-guards';
 import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
 import { useFormErrors } from '@/hooks/useFormErrors';
 import { NAME_MAX, checkBaseText } from '@/lib/field-rules';
@@ -27,7 +28,7 @@ import { replacePlanExerciseInList } from '@/lib/exercise-replace';
 import { usePlanExercisePrefill } from '@/lib/plan-exercise-prefill';
 import { reorderExerciseLogs, withArrayPositionOrder } from '@/lib/workout-order';
 import { plannedSideFields } from '@/lib/set-sides';
-import { addPlannedSet } from '@/lib/planned-sets';
+import { addPlannedSet, planRir } from '@/lib/planned-sets';
 import type { PlannedSet } from '@/types';
 import { sortByCycleWeekday, weekdayReferenceDate } from '@/lib/weekday';
 import {
@@ -64,6 +65,7 @@ export default function BlueprintEditorStep({
   onBack,
 }: BlueprintEditorStepProps) {
   const t = useTranslations('BlueprintEditorStep');
+  const tCard = useTranslations('ExerciseCard');
   const apiError = useApiErrorMessage();
   // The template name in the save-as-template dialog; a taken name belongs under that field.
   const [templateForm, templateFormRef] = useFormErrors({
@@ -128,7 +130,7 @@ export default function BlueprintEditorStep({
           setType: s.setType || SetType.WORKING,
           reps: s.reps ?? 0,
           weight: s.weight ?? 0,
-          rir: s.rir ?? 0,
+          rir: planRir(s),
           repsLeft: s.repsLeft ?? undefined,
           repsRight: s.repsRight ?? undefined,
           weightLeft: s.weightLeft ?? undefined,
@@ -173,13 +175,32 @@ export default function BlueprintEditorStep({
         setType: s.setType,
         reps: s.reps ?? 0,
         weight: s.weight ?? 0,
-        rir: s.rir ?? 0,
+        rir: planRir(s),
         // Per-side targets for unilateral exercises (issue #103); dropped for bilateral sets.
         ...plannedSideFields(s, ex.isUnilateral),
         rest: s.rest ?? 90,
       })),
     })));
   }, []);
+
+  // Every planned working set of every day needs an RIR (#227). Go to the first day that lacks
+  // one, so the card showing the field error is the one on screen.
+  const handleNext = () => {
+    for (const [dayIndex, day] of formData.workoutDays.entries()) {
+      const hit = findFirstSetNeedingRir(day.blueprint.exercises);
+      if (!hit) continue;
+      const ex = day.blueprint.exercises[hit.exerciseIndex];
+      setCurrentDayIndex(dayIndex);
+      notify.warning(
+        tCard('planRirMissing', {
+          exercise: ex.exerciseName || exercises.find((e) => e.id === ex.exerciseId)?.name || '',
+          number: hit.setIndex + 1,
+        }),
+      );
+      return;
+    }
+    onNext();
+  };
 
   // Sync helper: after local changes to currentExercises, push back to formData
   const syncCurrentExercisesToFormData = (exLogs: ExerciseLog[]) => {
@@ -257,7 +278,7 @@ export default function BlueprintEditorStep({
             setType: set.setType,
             reps: set.reps,
             weight: set.weight,
-            rir: set.rir,
+            rir: planRir(set),
             // Carry per-side targets when saving a unilateral blueprint as a template (issue #103).
             ...plannedSideFields(set, ex.isUnilateral),
             rest: set.rest,
@@ -301,7 +322,7 @@ export default function BlueprintEditorStep({
           setType: set.setType,
           reps: set.reps,
           weight: set.weight,
-          rir: set.rir ?? 0,
+          rir: planRir(set),
           // Carry a unilateral template's per-side targets into the blueprint (issue #103).
           ...plannedSideFields(set, ex.isUnilateral),
           rest: set.rest ?? 90,
@@ -600,7 +621,7 @@ export default function BlueprintEditorStep({
           </Button>
           <Button
             type="button"
-            onClick={onNext}
+            onClick={handleNext}
             disabled={!allDaysHaveExercises}
             className="flex-1"
           >

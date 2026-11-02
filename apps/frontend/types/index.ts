@@ -180,7 +180,8 @@ export interface PlannedSet {
   setType: SetType;
   reps: number;
   weight: number;
-  rir: number;
+  /** Absent on a warm-up (it has no RIR) and on a working set whose RIR is not filled in yet. */
+  rir?: number | null;
   // Per-side targets for a unilateral exercise's planned set (issue #103). Present once a
   // plan has been overwritten from a performed workout (or edited per side); absent on
   // legacy plans backfilled symmetrically, where reps/weight/rir carry both sides. The

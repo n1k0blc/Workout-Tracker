@@ -140,6 +140,25 @@ Before, the server rejected a second active Zyklus only after the user had fille
 
 Before running the migration against any populated database, run `npm run check:input-rules` (in `apps/backend`, `DATABASE_URL` pointed at the target). It is read-only and reports every user with more than one active Zyklus as `multiple-active-cycles`; those need a manual decision (complete or delete all but one), since the migration fails on them.
 
+### Warm-up sets carry no RIR
+
+**A `WARMUP` set has no RIR, on any `WorkoutKind`. A `WORKING` set needs one when it is logged or planned, but the server never requires it.**
+
+The server only knows the first half: `deriveSetAggregates` (`apps/backend/src/workout-tree/workout-tree.service.ts`) answers `WORKOUT_SET_WARMUP_RIR` (400) for a warm-up with `rir`, `rirLeft` or `rirRight`. It cannot require RIR on working sets because history holds working sets without one and editing resends the whole tree through `replaceTree`. The data migration of `check:input-rules` nulled the existing warm-up RIR.
+
+The client enforces the rest, through one guard (`apps/frontend/lib/log-set-guards.ts`): `checkSetForLogging` is the single check behind the tick, the swipe and the past-tracking auto-commit; `setNeedsRir` / `findFirstSetNeedingRir` answer "does a working set still lack its RIR" for the plan editors' save and the workout-completeness check. Save payloads never trust the draft to have cleared a warm-up's RIR: `toExercisePayload`, `plannedSideFields` and `planRir` drop it. In Verlauf the rules apply only to sets the user changed.
+
+### A workout is finished only when it is complete
+
+**Every planned set and added set row is logged or swiped away, every logged working set has RIR, and at least one set is logged. One pure function answers it for everyone.**
+
+`checkWorkoutCompleteness` (`apps/frontend/lib/workout-completeness.ts`) takes the workout and the session's set rows (`SetRowState`) and answers `{ complete: true }` or `{ complete: false, problem }` with the first problem in workout order (Übungen top to bottom, sets by number): `unloggedSet`, `missingRir`, `emptyExercise` or `nothingLogged`. `checkExerciseCompleteness` is the same rule for one Übung. Every caller goes through it — the live "Beenden", past-workout tracking, the Übung-order lock, and the 5-hour outcome. Do not write a second completeness rule next to it.
+
+- **Swiped-away planned sets and added set rows live in `workout-context`** (`setRowState`, `skipPlannedSet`, `addSetRow`, `removeSetRow`), not in the exercise card, because the check needs them. Swiped-away sets are persisted with the draft (`DraftMeta.skippedSets`, read back with `readSkippedSets`), so a reload cannot bring a swiped-away row back and block finishing. Added rows are session state and are not persisted. Logging a set, removing its Übung, discarding or saving the workout clears them.
+- **An Übung with every set swiped away is complete and is left out of the payload** — `toExercisePayload` already drops an Übung with no logged set. **An Übung with no planned sets and nothing logged is not complete**: it is a forgotten empty card, not a skipped one. A workout where nothing at all is logged is not complete either.
+- **"Beenden" always looks enabled.** An incomplete workout answers with a toast naming the first problem and scrolls to it (the card opens on the way); the confirm dialog opens only for a complete workout. In past-workout tracking a refused "Beenden" also marks every row that could not be logged with its field errors.
+- **The Übung-order lock applies in the live workout only**: no set is logged until the Übung directly above, in the current order, is complete, and the toast suggests dragging the Übung up. Past-workout tracking has no such order — its rows commit on their own — and the server enforces none of this.
+
 ### Tracked values have no user-facing limit
 
 **`Set.rest` and a tracked `totalDuration` accept any non-negative whole number up to the column maximum, and never produce a user-facing error.**

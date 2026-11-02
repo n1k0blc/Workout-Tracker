@@ -5,12 +5,14 @@ import { Workout, ExerciseLog, SetLog, PlannedSet, SetType, SaveAsTemplateMode, 
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { reorderExerciseLogs, toExercisePayload } from '@/lib/workout-order';
+import { planRir } from '@/lib/planned-sets';
 import { aggregateSetSides } from '@/lib/set-sides';
 import { replaceExerciseInList } from '@/lib/exercise-replace';
 import { toLocalDateString } from '@/lib/local-date';
 import { blankPlanValues, buildPrefillToast, mapLastPerformanceOntoPlan } from '@/lib/last-performance';
 import { usePrefillToast } from '@/hooks/usePrefillToast';
-import { draftStorageKeys, claimDraftForUser, DraftMeta } from '@/lib/workout-draft-storage';
+import { draftStorageKeys, claimDraftForUser, readSkippedSets, DraftMeta } from '@/lib/workout-draft-storage';
+import { EMPTY_SET_ROW_STATE, type SetRowState } from '@/lib/workout-completeness';
 
 /** One entry per set actually logged during a *live* session, in completion order. Drives
  *  rest-attribution (§3.5): when a new set completes, the previous entry's set gets its `rest`
@@ -112,6 +114,18 @@ interface WorkoutContextType {
     }
   ) => Promise<void>;
   setActiveWorkoutDirectly: (workout: Workout | null, isPastWorkout?: boolean, pastWorkoutDuration?: number) => void;
+  /**
+   * The set rows that exist only in this session (#228): planned sets the user swiped away and
+   * added rows not logged yet. The workout-completeness check reads them together with the
+   * workout. Swiped-away sets are persisted with the draft; added rows are not.
+   */
+  setRowState: SetRowState;
+  /** Swipe a planned set away: it counts as done and is never logged. */
+  skipPlannedSet: (exerciseLogId: string, setNumber: number) => void;
+  /** Open an added set row (not logged yet) on an Uebung. */
+  addSetRow: (exerciseLogId: string, setNumber: number) => void;
+  /** Discard an added set row without logging it. */
+  removeSetRow: (exerciseLogId: string, setNumber: number) => void;
   workoutDuration: number;
   restTimer: number;
   restTimerTarget: number;
@@ -121,6 +135,28 @@ const WorkoutContext = createContext<WorkoutContextType | undefined>(undefined);
 
 function generateLocalId(prefix: string): string {
   return `local-${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+type RowMap = SetRowState['skipped'];
+
+/** `map` with `setNumber` taken out of `exerciseLogId`'s list; the key goes when the list empties. */
+function withoutNumber(map: RowMap, exerciseLogId: string, setNumber: number): RowMap {
+  const list = map[exerciseLogId];
+  if (!list?.includes(setNumber)) return map;
+  const rest = withoutExercise(map, exerciseLogId);
+  const remaining = list.filter((n) => n !== setNumber);
+  return remaining.length > 0 ? { ...rest, [exerciseLogId]: remaining } : rest;
+}
+
+function withNumber(map: RowMap, exerciseLogId: string, setNumber: number): RowMap {
+  const list = map[exerciseLogId] ?? [];
+  if (list.includes(setNumber)) return map;
+  return { ...map, [exerciseLogId]: [...list, setNumber].sort((a, b) => a - b) };
+}
+
+function withoutExercise(map: RowMap, exerciseLogId: string): RowMap {
+  if (!(exerciseLogId in map)) return map;
+  return Object.fromEntries(Object.entries(map).filter(([id]) => id !== exerciseLogId));
 }
 
 
@@ -169,6 +205,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   // Read by setActiveWorkoutDirectly so every draft write carries the current
   // minimized flag rather than dropping it (issue #129).
   const isMinimizedRef = useRef(false);
+  // Session-only set rows (#228): swiped-away planned sets and added rows. The ref is written
+  // together with the state so a draft write in the same tick already carries the new value.
+  const [setRowState, setSetRowState] = useState<SetRowState>(EMPTY_SET_ROW_STATE);
+  const setRowStateRef = useRef<SetRowState>(EMPTY_SET_ROW_STATE);
 
   useEffect(() => {
     workoutStartTimeRef.current = workoutStartTime;
@@ -181,6 +221,23 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     activeWorkoutRef.current = activeWorkout;
   }, [activeWorkout]);
+
+  const writeSetRowState = useCallback((next: SetRowState) => {
+    setRowStateRef.current = next;
+    setSetRowState(next);
+  }, []);
+
+  /** The draft's meta: what the session is, plus the swiped-away sets (omitted while there are none). */
+  const draftMeta = useCallback((isPast: boolean, pastDuration: number, minimized?: boolean): DraftMeta => {
+    const skipped = setRowStateRef.current.skipped;
+    const hasSkips = Object.keys(skipped).length > 0;
+    return {
+      isPastWorkout: isPast,
+      pastWorkoutDuration: pastDuration,
+      isMinimized: minimized,
+      ...(hasSkips ? { skippedSets: skipped as Record<string, number[]> } : {}),
+    };
+  }, []);
 
   const persistDraft = useCallback((workout: Workout | null, meta: DraftMeta | null) => {
     if (typeof window === 'undefined') return;
@@ -380,6 +437,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       setIsPastWorkout(false);
       setPastWorkoutDuration(0);
       completionLogRef.current = [];
+      writeSetRowState(EMPTY_SET_ROW_STATE);
       clearAllTimerState();
       persistDraft(null, null);
       return;
@@ -433,14 +491,13 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    persistDraft(workout, {
-      isPastWorkout: isPast ?? false,
-      pastWorkoutDuration: pastDuration ?? 0,
+    persistDraft(
+      workout,
       // A live session carries its collapsed state into the draft so a reload
       // restores it as it was (issue #129); past tracking never minimizes.
-      isMinimized: isPast ? undefined : isMinimizedRef.current,
-    });
-  }, [persistDraft, keys, clearAllTimerState]);
+      draftMeta(isPast ?? false, pastDuration ?? 0, isPast ? undefined : isMinimizedRef.current),
+    );
+  }, [persistDraft, draftMeta, keys, clearAllTimerState, writeSetRowState]);
 
   // Both minimize paths route through here (ADR-0001): flip the flag and rewrite the
   // draft meta in the same call, so the persisted state can never lag the UI.
@@ -449,9 +506,36 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setIsMinimized(next);
     const workout = activeWorkoutRef.current;
     if (workout && !isPastWorkout) {
-      persistDraft(workout, { isPastWorkout: false, pastWorkoutDuration, isMinimized: next });
+      persistDraft(workout, draftMeta(false, pastWorkoutDuration, next));
     }
-  }, [persistDraft, isPastWorkout, pastWorkoutDuration]);
+  }, [persistDraft, draftMeta, isPastWorkout, pastWorkoutDuration]);
+
+  /** A change to the session's set rows; the swiped-away ones are written to the draft at once. */
+  const applySetRowState = useCallback((next: SetRowState) => {
+    writeSetRowState(next);
+    const workout = activeWorkoutRef.current;
+    if (workout) {
+      persistDraft(workout, draftMeta(isPastWorkout, pastWorkoutDuration, isPastWorkout ? undefined : isMinimizedRef.current));
+    }
+  }, [writeSetRowState, persistDraft, draftMeta, isPastWorkout, pastWorkoutDuration]);
+
+  const skipPlannedSet = useCallback((exerciseLogId: string, setNumber: number) => {
+    const cur = setRowStateRef.current;
+    applySetRowState({
+      skipped: withNumber(cur.skipped, exerciseLogId, setNumber),
+      added: withoutNumber(cur.added, exerciseLogId, setNumber),
+    });
+  }, [applySetRowState]);
+
+  const addSetRow = useCallback((exerciseLogId: string, setNumber: number) => {
+    const cur = setRowStateRef.current;
+    applySetRowState({ ...cur, added: withNumber(cur.added, exerciseLogId, setNumber) });
+  }, [applySetRowState]);
+
+  const removeSetRow = useCallback((exerciseLogId: string, setNumber: number) => {
+    const cur = setRowStateRef.current;
+    applySetRowState({ ...cur, added: withoutNumber(cur.added, exerciseLogId, setNumber) });
+  }, [applySetRowState]);
 
   const minimizeWorkout = useCallback(() => setMinimized(true), [setMinimized]);
   const expandWorkout = useCallback(() => setMinimized(false), [setMinimized]);
@@ -496,7 +580,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         setType: s.setType,
         reps: s.reps,
         weight: s.weight,
-        rir: s.rir ?? 0,
+        rir: planRir(s),
         // Per-side targets so a workout started from an asymmetric plan prefills both sides,
         // and a left-to-right swipe logs both (issue #103).
         repsLeft: s.repsLeft ?? undefined,
@@ -648,6 +732,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       const saved = await apiClient.createWorkout(payload);
 
       completionLogRef.current = [];
+      writeSetRowState(EMPTY_SET_ROW_STATE);
       setActiveWorkout(null);
       isMinimizedRef.current = false;
       setIsMinimized(false);
@@ -665,6 +750,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
   const discardWorkout = () => {
     completionLogRef.current = [];
+    writeSetRowState(EMPTY_SET_ROW_STATE);
     setActiveWorkout(null);
     isMinimizedRef.current = false;
     setIsMinimized(false);
@@ -780,6 +866,11 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
   const removeExercise = async (exerciseLogId: string) => {
     if (!activeWorkout) return;
+    const rows = setRowStateRef.current;
+    writeSetRowState({
+      skipped: withoutExercise(rows.skipped, exerciseLogId),
+      added: withoutExercise(rows.added, exerciseLogId),
+    });
     setActiveWorkoutDirectly(
       { ...activeWorkout, exercises: activeWorkout.exercises.filter((ex) => ex.id !== exerciseLogId) },
       isPastWorkout,
@@ -892,6 +983,13 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       completionLogRef.current = [...completionLogRef.current, { exerciseLogId, setLogId: newSetId, at: now }];
     }
 
+    // A logged set is neither swiped away nor an open added row any more. Written before the
+    // draft below so that write already carries it.
+    const rows = setRowStateRef.current;
+    writeSetRowState({
+      skipped: withoutNumber(rows.skipped, exerciseLogId, data.setNumber),
+      added: withoutNumber(rows.added, exerciseLogId, data.setNumber),
+    });
     setActiveWorkoutDirectly({ ...activeWorkout, exercises }, isPastWorkout, pastWorkoutDuration);
 
     // Rest-timer display (UX feedback only -- the actual persisted `rest` value is the real
@@ -965,6 +1063,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     isMinimizedRef.current = false;
     setIsMinimized(false);
     completionLogRef.current = [];
+    writeSetRowState(EMPTY_SET_ROW_STATE);
     resetTimerState();
 
     if (!uid) return;
@@ -992,6 +1091,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
           setActiveWorkout(workout);
           setIsPastWorkout(meta.isPastWorkout);
           setPastWorkoutDuration(meta.pastWorkoutDuration);
+          writeSetRowState({ skipped: readSkippedSets(meta), added: {} });
           // Absent on a draft written before this feature -- resume expanded (issue #129).
           const restoredMinimized = !meta.isPastWorkout && meta.isMinimized === true;
           isMinimizedRef.current = restoredMinimized;
@@ -1052,6 +1152,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         deleteSet,
         updateSet,
         setActiveWorkoutDirectly,
+        setRowState,
+        skipPlannedSet,
+        addSetRow,
+        removeSetRow,
         workoutDuration,
         restTimer,
         restTimerTarget,

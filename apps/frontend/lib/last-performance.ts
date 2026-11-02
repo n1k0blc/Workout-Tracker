@@ -42,7 +42,7 @@ export function mapLastPerformanceOntoPlan(
         id: makeId(),
         order: i + 1,
         setType: h.setType,
-        ...valuesFrom(h, 0),
+        ...valuesFrom(h, 0, h.setType),
         rest: 90,
       })),
       setCountMismatch: false,
@@ -66,7 +66,7 @@ export function mapLastPerformanceOntoPlan(
     cursor.set(slot.setType, idx + 1);
     const h = pool[Math.min(idx, pool.length - 1)];
     changed = true;
-    return { ...slot, ...valuesFrom(h, slot.rir) };
+    return { ...slot, ...valuesFrom(h, slot.rir, slot.setType) };
   });
 
   return { sets, setCountMismatch: history.length !== target.length, changed };
@@ -92,12 +92,14 @@ export function blankPlanValues(target: readonly PlannedSet[]): PlannedSet[] {
  *  history carries no RIR -- the plan slot's own target in the structured case, 0 otherwise. */
 function valuesFrom(
   h: LastPerformanceSet,
-  rirFallback: number,
+  rirFallback: number | null | undefined,
+  setType: SetType,
 ): Omit<PlannedSet, 'id' | 'order' | 'setType' | 'rest'> {
   return {
     reps: h.reps,
     weight: h.weight,
-    rir: h.rir ?? rirFallback,
+    // A warm-up has no RIR, whatever old history carries (#227).
+    rir: setType === SetType.WARMUP ? undefined : (h.rir ?? rirFallback),
     repsLeft: h.repsLeft,
     repsRight: h.repsRight,
     weightLeft: h.weightLeft,

@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useWorkout } from '@/lib/workout-context';
 import { apiClient } from '@/lib/api';
+import { checkWorkoutCompleteness } from '@/lib/workout-completeness';
+import { notify } from '@/lib/toast';
 import { Workout, PersonalRecord, SaveAsTemplateMode } from '@/types';
 import ExerciseCard from '@/components/workout/exercise-card';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
@@ -43,7 +45,6 @@ import {
 } from '@tabler/icons-react';
 import { cn } from '@/lib/utils';
 import { FieldError } from '@/components/ui/field';
-import { notify } from '@/lib/toast';
 import { useFormErrors } from '@/hooks/useFormErrors';
 import { useValidationMessage } from '@/hooks/useApiErrorMessage';
 import { NAME_MAX, checkBaseText } from '@/lib/field-rules';
@@ -81,6 +82,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
     pastWorkoutDuration,
     setPastWorkoutDuration,
     isMinimized,
+    setRowState,
   } = useWorkout();
 
   const [showExerciseModal, setShowExerciseModal] = useState(false);
@@ -88,6 +90,10 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
   // isn't left guessing they need to add sets.
   const [newlyAddedIds, setNewlyAddedIds] = useState<Set<string>>(new Set());
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
+  // Where a refused "Beenden" sent the user, and whether it was refused at all: the card of the
+  // first problem opens and scrolls to it, and a past workout marks every row that is not done.
+  const [reveal, setReveal] = useState<{ exerciseId: string; setNumber: number | null; nonce: number } | null>(null);
+  const [finishRefused, setFinishRefused] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [updateBlueprint, setUpdateBlueprint] = useState(false);
   const [templateAction, setTemplateAction] = useState<TemplateAction>('none');
@@ -133,24 +139,47 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
   // templates are locked); auto-detected from where this workout was started, no selector.
   const canOverwriteTemplate = !!activeWorkout.originTemplateId && activeWorkout.originTemplateIsCustom === true;
 
-  // Simplified: An exercise is considered "handled" if it has at least one logged set.
-  // We no longer distinguish between planned/unplanned sets during execution.
-  const areAllSetsLogged = (): boolean => {
-    if (activeWorkout.exercises.length === 0) return false;
+  // The typed duration of a workout tracked afterwards: shown live under its field, and it
+  // keeps "Beenden" from opening the confirmation until it is a real number of minutes.
+  const typedMinutes = Math.floor(pastWorkoutDuration / 60);
+  const durationProblem = isPastWorkout ? checkTypedDuration(String(typedMinutes)) : null;
+  const durationMessage = durationProblem
+    ? validationMessage('durationMinutes', durationProblem, {
+        min: TYPED_DURATION_MIN_MINUTES,
+        max: TYPED_DURATION_MAX_MINUTES,
+      })
+    : undefined;
 
-    return activeWorkout.exercises.every((exercise) => {
-      return exercise.sets.length > 0;
-    });
-  };
-
-  const canFinishWorkout = (): boolean => {
-    if (mode === 'edit' || isPastWorkout) {
-      // In edit mode (e.g. past workout tracking), allow finishing as long as there are exercises.
-      // The values in the input fields (edit state or planned) will be used on save.
-      // No requirement for explicit "logged" sets via log UI (which is hidden in edit).
-      return activeWorkout.exercises.length > 0;
+  // "Beenden" always looks enabled. A complete workout opens the confirm dialog; an incomplete one
+  // answers with a toast naming the first problem and takes the user there (#228). Live
+  // workouts and past-workout tracking share the one rule.
+  const handleFinish = () => {
+    if (durationMessage) {
+      notify.error(durationMessage);
+      return;
     }
-    return areAllSetsLogged();
+    const result = checkWorkoutCompleteness(activeWorkout, setRowState);
+    if (result.complete) {
+      setShowCompleteConfirm(true);
+      return;
+    }
+    const { problem } = result;
+    setFinishRefused(true);
+    if (problem.kind === 'nothingLogged') {
+      notify.warning(t('incomplete.nothingLogged'));
+      return;
+    }
+    notify.warning(
+      t(`incomplete.${problem.kind}`, {
+        exercise: problem.exerciseName,
+        number: problem.kind === 'emptyExercise' ? 0 : problem.setNumber,
+      }),
+    );
+    setReveal((prev) => ({
+      exerciseId: problem.exerciseId,
+      setNumber: problem.kind === 'emptyExercise' ? null : problem.setNumber,
+      nonce: (prev?.nonce ?? 0) + 1,
+    }));
   };
 
   const handleAddExercise = async (exerciseId: string) => {
@@ -200,17 +229,6 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
       console.error('Failed to reorder exercises:', error);
     }
   };
-
-  // The typed duration of a workout tracked afterwards: shown live under its field, and it
-  // keeps "Beenden" from opening the confirmation until it is a real number of minutes.
-  const typedMinutes = Math.floor(pastWorkoutDuration / 60);
-  const durationProblem = isPastWorkout ? checkTypedDuration(String(typedMinutes)) : null;
-  const durationMessage = durationProblem
-    ? validationMessage('durationMinutes', durationProblem, {
-        min: TYPED_DURATION_MIN_MINUTES,
-        max: TYPED_DURATION_MAX_MINUTES,
-      })
-    : undefined;
 
   const handleComplete = async () => {
     if (
@@ -374,6 +392,8 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
                     allowSetManagement={true}
                     allowLogging={!isPastWorkout}
                     defaultOpen={newlyAddedIds.has(exercise.id)}
+                    reveal={reveal?.exerciseId === exercise.id ? reveal : undefined}
+                    showUnloggedErrors={isPastWorkout && finishRefused}
                   />
                 ))}
               </SortableContext>
@@ -426,14 +446,8 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
               {t('discard')}
             </Button>
             <Button
-              onClick={() => {
-                if (durationMessage) {
-                  notify.error(durationMessage);
-                  return;
-                }
-                setShowCompleteConfirm(true);
-              }}
-              disabled={loading || !canFinishWorkout()}
+              onClick={handleFinish}
+              disabled={loading}
               className="flex-1"
             >
               {t('finish')}

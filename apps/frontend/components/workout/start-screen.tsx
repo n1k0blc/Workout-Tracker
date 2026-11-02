@@ -9,6 +9,7 @@ import { SuggestedWorkout } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import ExerciseCard from '@/components/workout/exercise-card';
+import { planRir } from '@/lib/planned-sets';
 import {
   IconCalendar,
   IconDumbbell,
@@ -307,7 +308,7 @@ export default function WorkoutStartScreen() {
                                 setType: s.setType,
                                 reps: s.reps,
                                 weight: s.weight,
-                                rir: s.rir ?? 0,
+                                rir: planRir(s),
                                 // Per-side targets render as an L/R breakdown in this preview (issue #103).
                                 repsLeft: s.repsLeft ?? undefined,
                                 repsRight: s.repsRight ?? undefined,

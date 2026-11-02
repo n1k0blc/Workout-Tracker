@@ -9,6 +9,8 @@
  * guard mirrors `setWorkingVolume` -- weight `0` counts as present, `null`/`undefined`
  * does not.
  */
+import { SetType } from '@/types';
+
 export interface PerSideSet {
   repsLeft?: number | null;
   repsRight?: number | null;
@@ -162,6 +164,7 @@ export function deriveSidesFromDrafts(
 }
 
 interface PlannedSetLikeSides {
+  setType?: SetType;
   reps: number;
   weight: number;
   rir?: number | null;
@@ -202,7 +205,8 @@ export function plannedSideFields(
     weightRight: s.weightRight ?? s.weight,
   };
   const rir = s.rirLeft ?? s.rirRight ?? s.rir;
-  if (rir != null) {
+  // A warm-up has no RIR and the server rejects one (#227).
+  if (rir != null && s.setType !== SetType.WARMUP) {
     out.rirLeft = s.rirLeft ?? rir;
     out.rirRight = s.rirRight ?? rir;
   }
