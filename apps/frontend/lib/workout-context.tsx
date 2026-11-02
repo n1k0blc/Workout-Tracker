@@ -458,6 +458,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
   const setActiveWorkoutDirectly = useCallback((workout: Workout | null, isPast?: boolean, pastDuration?: number) => {
     if (!workout) {
+      activeWorkoutRef.current = null;
       setActiveWorkout(null);
       setIsPastWorkout(false);
       setPastWorkoutDuration(0);
@@ -477,6 +478,9 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     // tick (a visible flutter), and silently resumed a paused workout.
     const isPatchOfSameSession = activeWorkoutRef.current?.id === workout.id;
 
+    // The ref moves with the state, not a render later: a mutator running in the same tick (the
+    // past-workout auto-commit logs several sets at once) must build on this workout.
+    activeWorkoutRef.current = workout;
     setActiveWorkout(workout);
     setIsPastWorkout(isPast ?? false);
     setPastWorkoutDuration(pastDuration ?? 0);
@@ -963,6 +967,9 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     exerciseLogId: string,
     data: LogSetData
   ) => {
+    // Read the ref, not the render's `activeWorkout`: a card's mount-time auto-commit calls the
+    // `logSet` of the render it mounted in, and two of them in one tick must not overwrite each other.
+    const activeWorkout = activeWorkoutRef.current;
     if (!activeWorkout) return;
 
     const isLive = !isPastWorkout;
@@ -1057,6 +1064,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteSet = async (setLogId: string) => {
+    const activeWorkout = activeWorkoutRef.current;
     if (!activeWorkout) return;
 
     completionLogRef.current = completionLogRef.current.filter((e) => e.setLogId !== setLogId);
@@ -1083,6 +1091,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       rirRight?: number;
     }
   ) => {
+    const activeWorkout = activeWorkoutRef.current;
     if (!activeWorkout) return;
 
     const updatedExercises = activeWorkout.exercises.map((ex) => ({

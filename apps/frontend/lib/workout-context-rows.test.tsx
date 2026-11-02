@@ -217,3 +217,66 @@ describe('saving a workout with a swiped-away Übung', () => {
     expect(payload.exercises[0]).toMatchObject({ exerciseId: 'e2', order: 1 });
   });
 });
+
+/**
+ * Past-workout tracking auto-commits every filled row from a `setTimeout(…, 0)` on mount, so
+ * several cards -- or several sets of one -- log in the same tick, all through the `logSet` of
+ * the render they mounted in. Each must build on the workout the previous one left, not on the
+ * workout that render saw.
+ */
+describe('mutations in the same tick', () => {
+  const setsOf = (exerciseId: string) =>
+    api.activeWorkout!.exercises.find((ex) => ex.id === exerciseId)!.sets.map((s) => s.setNumber);
+  const working = (setNumber: number) => ({ setNumber, reps: 10, weight: 60, rir: 2 });
+
+  it('keep the set of every Übung that logs in that tick', async () => {
+    mount();
+    act(() => api.setActiveWorkoutDirectly(workout(), true, 1800));
+
+    await act(async () => {
+      await Promise.all([api.logSet('ex1', working(1)), api.logSet('ex2', working(1))]);
+    });
+
+    expect(setsOf('ex1')).toEqual([1]);
+    expect(setsOf('ex2')).toEqual([1]);
+  });
+
+  it('keep every set of one Übung that logs in that tick', async () => {
+    mount();
+    act(() => api.setActiveWorkoutDirectly(workout(), true, 1800));
+
+    await act(async () => {
+      await Promise.all([1, 2, 3].map((n) => api.logSet('ex1', working(n))));
+    });
+
+    expect(setsOf('ex1')).toEqual([1, 2, 3]);
+  });
+
+  it('keep an edit made in the same tick as a log', async () => {
+    mount();
+    act(() => api.setActiveWorkoutDirectly(workout(), true, 1800));
+    await logWorking('ex1', 1);
+    const loggedId = api.activeWorkout!.exercises[0].sets[0].id;
+
+    await act(async () => {
+      await Promise.all([api.updateSet(loggedId, { weight: 70 }), api.logSet('ex2', working(1))]);
+    });
+
+    expect(api.activeWorkout!.exercises[0].sets[0].weight).toBe(70);
+    expect(setsOf('ex2')).toEqual([1]);
+  });
+
+  it('keep a deletion made in the same tick as a log', async () => {
+    mount();
+    act(() => api.setActiveWorkoutDirectly(workout(), true, 1800));
+    await logWorking('ex1', 1);
+    const loggedId = api.activeWorkout!.exercises[0].sets[0].id;
+
+    await act(async () => {
+      await Promise.all([api.deleteSet(loggedId), api.logSet('ex2', working(1))]);
+    });
+
+    expect(setsOf('ex1')).toEqual([]);
+    expect(setsOf('ex2')).toEqual([1]);
+  });
+});
