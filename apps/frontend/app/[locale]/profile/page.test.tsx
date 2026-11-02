@@ -35,12 +35,13 @@ const baseUser = {
   unitSystem: 'METRIC' as 'METRIC' | 'IMPERIAL',
 };
 
-const { push, logout, updateProfile, getHomeGyms, deleteHomeGym } = vi.hoisted(() => ({
+const { push, logout, updateProfile, getHomeGyms, deleteHomeGym, changePassword } = vi.hoisted(() => ({
   push: vi.fn(),
   logout: vi.fn(),
   updateProfile: vi.fn(),
   getHomeGyms: vi.fn(),
   deleteHomeGym: vi.fn(),
+  changePassword: vi.fn(),
 }));
 
 vi.mock('@/i18n/navigation', () => ({
@@ -64,7 +65,7 @@ vi.mock('@/lib/api/client', () => ({
     createHomeGym: vi.fn(),
     updateHomeGym: vi.fn(),
     deleteHomeGym,
-    changePassword: vi.fn(),
+    changePassword,
   },
 }));
 
@@ -249,5 +250,72 @@ describe('ProfilePage gym deletion', () => {
     await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
     expect(deleteHomeGym).not.toHaveBeenCalled();
     expect(screen.getByText('Downtown Gym')).toBeTruthy();
+  });
+});
+
+/**
+ * Sign-in hardening (#225): the change-password dialog and the e-mail field mirror the server's
+ * rules, so a limit breach is caught before the request and read the same either way.
+ */
+describe('ProfilePage password and e-mail rules', () => {
+  afterEach(() => {
+    cleanup();
+    changePassword.mockReset();
+    updateProfile.mockClear();
+    logout.mockReset();
+    currentUser = baseUser;
+  });
+
+  async function fillPasswordDialog(current: string, next: string, confirm = next) {
+    renderProfilePage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Passwort ändern' }));
+    fireEvent.change(await screen.findByLabelText('Aktuelles Passwort'), { target: { value: current } });
+    fireEvent.change(screen.getByLabelText('Neues Passwort'), { target: { value: next } });
+    fireEvent.change(screen.getByLabelText('Neues Passwort bestätigen'), { target: { value: confirm } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Passwort ändern' }).at(-1)!);
+  }
+
+  it('sends both passwords when each is 8 to 100 characters', async () => {
+    changePassword.mockResolvedValue(undefined);
+    await fillPasswordDialog('a'.repeat(100), 'b'.repeat(100));
+
+    await waitFor(() =>
+      expect(changePassword).toHaveBeenCalledWith({
+        currentPassword: 'a'.repeat(100),
+        newPassword: 'b'.repeat(100),
+      }),
+    );
+  });
+
+  it.each([
+    ['a'.repeat(7), 'valid-new-password', 'Aktuelles Passwort', 'Das aktuelle Passwort muss mindestens 8 Zeichen lang sein.'],
+    ['a'.repeat(101), 'valid-new-password', 'Aktuelles Passwort', 'Das aktuelle Passwort darf höchstens 100 Zeichen lang sein.'],
+    ['valid-old-password', 'b'.repeat(7), 'Neues Passwort', 'Das neue Passwort muss mindestens 8 Zeichen lang sein.'],
+    ['valid-old-password', 'b'.repeat(101), 'Neues Passwort', 'Das neue Passwort darf höchstens 100 Zeichen lang sein.'],
+  ])('refuses case %#: nothing is sent and the field says why', async (current, next, label, message) => {
+    await fillPasswordDialog(current, next);
+
+    expect(await screen.findByText(message)).toBeTruthy();
+    expect(screen.getByLabelText(label).getAttribute('aria-invalid')).toBe('true');
+    expect(changePassword).not.toHaveBeenCalled();
+  });
+
+  it('refuses an e-mail address that is not valid', async () => {
+    currentUser = {
+      ...baseUser,
+      weight: 100,
+      height: 180,
+      dateOfBirth: '1990-01-01T00:00:00.000Z',
+    } as typeof baseUser;
+    renderProfilePage();
+
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Bearbeiten' }))[1]);
+    fireEvent.change(await screen.findByDisplayValue('sam@example.com'), {
+      target: { value: 'not-an-address' },
+    });
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Speichern' }))[0]);
+
+    expect(await screen.findByText('Bitte gib eine gültige E-Mail-Adresse ein.')).toBeTruthy();
+    expect(updateProfile).not.toHaveBeenCalled();
   });
 });

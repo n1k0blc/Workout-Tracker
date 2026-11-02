@@ -1,0 +1,19 @@
+-- At most one ACTIVE WorkoutCycle per user.
+--
+-- Why: the service rejects a second active Zyklus with ACTIVE_CYCLE_ALREADY_EXISTS, but it
+-- reads before it writes, so two simultaneous create requests could both pass the check and
+-- both insert. This makes it a real constraint; the service keeps its check (a readable 400
+-- instead of a driver error) and maps a lost race on this index back to the same code.
+--
+-- A Zyklus scheduled for the future also has status ACTIVE and counts as active -- unchanged.
+-- COMPLETED cycles are not constrained, so a user keeps any number of past ones.
+--
+-- Partial indexes cannot be expressed in schema.prisma, so this lives in raw SQL only and
+-- the schema carries a comment pointing here. Check that `prisma migrate dev` does not
+-- propose to drop it again whenever Prisma is upgraded.
+--
+-- This migration FAILS if any user already has more than one ACTIVE cycle. Run
+-- `npm run check:input-rules` (apps/backend) against the target database first: it reports
+-- every such user under "multiple-active-cycles" and is read-only. Complete or delete all
+-- but one of that user's cycles by hand before deploying.
+CREATE UNIQUE INDEX "WorkoutCycle_userId_active_key" ON "WorkoutCycle"("userId") WHERE "status" = 'ACTIVE';

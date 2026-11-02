@@ -113,8 +113,19 @@
         "isNotEmpty": "Please enter a password.",
         "maxLength": "The password can be at most 100 characters long."
       },
+      "currentPassword": {
+        "isNotEmpty": "Please enter your current password.",
+        "minLength": "The current password must be at least 8 characters long.",
+        "maxLength": "The current password can be at most 100 characters long."
+      },
       "newPassword": {
-        "minLength": "The new password must be at least 8 characters long."
+        "isNotEmpty": "Please enter a new password.",
+        "minLength": "The new password must be at least 8 characters long.",
+        "maxLength": "The new password can be at most 100 characters long."
+      },
+      "confirmNewPassword": {
+        "isNotEmpty": "Please repeat your new password.",
+        "passwordsDiffer": "The passwords do not match."
       },
       "email": {
         "isEmail": "Please enter a valid email address.",
@@ -211,7 +222,6 @@
       "weightValue": "{weight} {unit}",
       "empty": "-",
       "validationAllFields": "Please fill in all fields",
-      "validationInvalidEmail": "Please provide a valid email address",
       "validationHeightRange": "Height must be between {min} and {max} {unit}",
       "validationWeightRange": "Weight must be between {min} and {max} {unit}",
       "validationAgeRange": "Age must be between 13 and 120 years",
@@ -255,11 +265,7 @@
       "currentPassword": "Current password",
       "newPassword": "New password",
       "confirmNewPassword": "Confirm new password",
-      "warning": "After changing your password you'll be signed out everywhere and need to sign in again.",
-      "validationAllFields": "Please fill in all fields",
-      "validationMinLength": "New password must be at least 8 characters long",
-      "validationMismatch": "Passwords don't match",
-      "changeError": "Failed to change password"
+      "warning": "After changing your password you'll be signed out everywhere and need to sign in again."
     },
     "logout": "Log out"
   },
@@ -911,7 +917,6 @@
   "CyclesPage": {
     "title": "Training Cycles",
     "subtitle": "Manage your training cycles and blueprints",
-    "checking": "Checking...",
     "newCycle": "New Cycle",
     "loading": "Loading cycles...",
     "activeCycles": "Active Cycles",
@@ -942,12 +947,12 @@
       "confirm": "Complete"
     },
     "alerts": {
-      "activeCycleExists": "An active cycle already exists. Please complete it first.",
-      "checkFailed": "Failed to check active cycles",
       "completeFailed": "Failed to complete cycle"
     }
   },
   "CycleWizard": {
+    "checking": "Checking...",
+    "activeCycleExists": "An active cycle already exists. Please complete it first.",
     "title": "New Training Cycle",
     "cancel": "Cancel",
     "stepProgress": "Step {current} of {total}",

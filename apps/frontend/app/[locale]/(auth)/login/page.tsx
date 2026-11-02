@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { useFormErrors } from '@/hooks/useFormErrors';
-import { checkEmail } from '@/lib/field-rules';
+import { checkEmail, checkPassword } from '@/lib/field-rules';
 
 export default function LoginPage() {
   const t = useTranslations('LoginPage');
@@ -20,10 +20,9 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // The password is only checked for presence: the login form never states the password policy.
     const valid = form.setConstraints({
       email: checkEmail(email),
-      password: password === '' ? 'isNotEmpty' : null,
+      password: checkPassword(password),
     });
     if (!valid) return;
     setLoading(true);

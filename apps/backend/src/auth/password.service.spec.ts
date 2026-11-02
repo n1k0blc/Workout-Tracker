@@ -1,5 +1,5 @@
 import * as bcrypt from 'bcrypt';
-import { PasswordService } from './password.service';
+import { DUMMY_PASSWORD_HASH, PasswordService } from './password.service';
 
 describe('PasswordService', () => {
   const service = new PasswordService();
@@ -30,6 +30,19 @@ describe('PasswordService', () => {
     it('rejects the wrong password against a legacy bcrypt hash', async () => {
       const hash = await bcrypt.hash('legacy password', 10);
       await expect(service.verify('wrong password', hash)).resolves.toBe(false);
+    });
+  });
+
+  describe('DUMMY_PASSWORD_HASH', () => {
+    // Login verifies against it for an unknown address; it only hides timing if it costs what a
+    // real hash costs, so it has to carry the parameters hash() uses today.
+    it('has the same algorithm and cost parameters as a fresh hash', async () => {
+      const parameters = (hash: string) => hash.split('$').slice(0, 4).join('$');
+      expect(parameters(DUMMY_PASSWORD_HASH)).toBe(parameters(await service.hash('anything')));
+    });
+
+    it('matches no password anyone could send', async () => {
+      await expect(service.verify('anything', DUMMY_PASSWORD_HASH)).resolves.toBe(false);
     });
   });
 

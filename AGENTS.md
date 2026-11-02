@@ -115,6 +115,18 @@ Rotation through `WorkoutDay.order` is gone: it advanced from the last performed
 - **The API** rejects the change in `ExercisesService.update` (`apps/backend/src/exercises/exercises.service.ts`) with a 409 and a German message, but only when the value actually differs from the stored one — a no-op save that restates the current flag still passes. "In use" counts a `WorkoutSet` of **any** `WorkoutKind` (performed, template, blueprint — one table), reached via `workoutExercise.exerciseId`; there is no `completedAt` predicate.
 - **The DTO** carries `inUse` (`ExerciseDto`), computed on every read. The editor dialog (`apps/frontend/components/exercises/exercise-editor-dialog.tsx`) uses it to render the Unilateral checkbox disabled with the reason inline, so the rule is visible before save rather than only on the 409.
 
+### One active Zyklus per user
+
+**A user has at most one `WorkoutCycle` with `status = 'ACTIVE'`. A Zyklus scheduled for the future is `ACTIVE` too and counts. Any number of `COMPLETED` ones may exist.**
+
+Before, the server rejected a second active Zyklus only after the user had filled in the whole wizard, and its check read before it wrote, so two simultaneous requests could both pass it.
+
+- **The database** enforces it: partial unique index `WorkoutCycle_userId_active_key` on `WorkoutCycle(userId) WHERE status = 'ACTIVE'`, migration `20261102120000_workout_cycle_unique_active_per_user`. It is raw SQL — Prisma cannot express a partial index, so it is absent from `schema.prisma` (only a comment points to it). Prisma 7's `migrate dev` leaves it alone (verified; its only stray proposal is the known `Workout.updatedAt` `DROP DEFAULT`), but re-check after a Prisma upgrade.
+- **The API** keeps its check in `create` (`apps/backend/src/workout-cycles/workout-cycles.service.ts`) and answers `ACTIVE_CYCLE_ALREADY_EXISTS` (400). A request that loses the race hits the index instead and has its `P2002` mapped to the same code, so the answer is a 400, never a 500. With the Prisma 7 `pg` driver adapter the violated index name is at `meta.driverAdapterError.cause.constraint.index` and `meta.target` is absent; `isUniqueIndexConflict` reads both shapes, and the weekday index depends on that too.
+- **The wizard route** (`apps/frontend/app/[locale]/cycles/new/page.tsx`, via `NewCycleGuard`) is the single client-side gate: whoever opens it — the Zyklen page, the dashboard card, a past Zyklus, a typed URL — is redirected to the Zyklen page with a toast when an active Zyklus exists. Do not re-add a check at the individual buttons; the "new Zyklus" button stays visible everywhere and relies on the guard. The server still has the last word if the guard's lookup fails or a Zyklus becomes active mid-wizard.
+
+Before running the migration against any populated database, run `npm run check:input-rules` (in `apps/backend`, `DATABASE_URL` pointed at the target). It is read-only and reports every user with more than one active Zyklus as `multiple-active-cycles`; those need a manual decision (complete or delete all but one), since the migration fails on them.
+
 ## Agent skills
 
 ### Issue tracker
