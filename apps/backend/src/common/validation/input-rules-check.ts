@@ -4,16 +4,43 @@ import { resolveToday } from '../utils/today.util';
 import {
   AGE_MAX,
   AGE_MIN,
+  AMOUNT_MAX,
+  AMOUNT_MIN,
   BODY_WEIGHT_KG_MAX,
   BODY_WEIGHT_KG_MIN,
+  CYCLE_DURATION_MAX,
+  CYCLE_DURATION_MIN,
   EMAIL_MAX,
+  EXERCISES_PER_WORKOUT_MAX,
+  FOOD_NAME_MAX,
   FORBIDDEN_TEXT_PATTERN,
   HEIGHT_CM_MAX,
   HEIGHT_CM_MIN,
   HOME_GYMS_MAX,
+  KCAL_PER_100_MAX,
+  MACRO_PER_100_MAX,
   NAME_MAX,
   PERSON_NAME_MAX,
   PERSON_NAME_PATTERN,
+  PORTION_LABEL_MAX,
+  PORTIONS_PER_FOOD_MAX,
+  QUICK_ENTRY_KCAL_MAX,
+  QUICK_ENTRY_MACRO_MAX,
+  REPS_MAX,
+  REPS_MIN,
+  RIR_MAX,
+  RIR_MIN,
+  SECTION_NAME_MAX,
+  SECTIONS_PER_USER_MAX,
+  SETS_PER_EXERCISE_MAX,
+  TARGET_KCAL_MAX,
+  TARGET_KCAL_MIN,
+  TARGET_MACRO_MAX,
+  TARGET_MACRO_MIN,
+  TRAINING_DAY_NAME_MAX,
+  WEIGHT_KG_MAX,
+  WORKOUT_DATE_FUTURE_GRACE_HOURS,
+  WORKOUT_DATE_MIN_YEAR,
   ageOn,
 } from './field-rules';
 
@@ -59,39 +86,10 @@ async function* rowsOf<T extends { id: string }>(
 
 type Report = (violation: InputRuleViolation) => void;
 
-/** Tagesziele limits (kcal / macros in grams). Not yet in field-rules.ts: the Profil ticket adds them there. */
-const TARGET_KCAL_MIN = 500;
-const TARGET_KCAL_MAX = 10000;
-const TARGET_MACRO_MIN = 1;
-const TARGET_MACRO_MAX = 1000;
-
-// Limits of #221 that no DTO has declared yet; the ticket that adds each rule moves its number
-// into field-rules.ts (which the frontend mirrors) and this file imports it from there.
-const TRAINING_DAY_NAME_MAX = 50;
-const FOOD_NAME_MAX = 120;
-const SECTION_NAME_MAX = 60;
-const PORTION_LABEL_MAX = 60;
-const CYCLE_DURATION_MIN = 1;
-const CYCLE_DURATION_MAX = 52;
-const EXERCISES_PER_WORKOUT_MAX = 30;
-const SETS_PER_EXERCISE_MAX = 20;
-const PORTIONS_PER_FOOD_MAX = 10;
-const SECTIONS_PER_USER_MAX = 10;
-const WEIGHT_KG_MAX = 1000;
-const REPS_MIN = 1;
-const REPS_MAX = 100;
-const RIR_MIN = 0;
-const RIR_MAX = 10;
-const KCAL_PER_100_MAX = 900;
-const MACRO_PER_100_MAX = 100;
-const QUICK_ENTRY_KCAL_MAX = 10000;
-const QUICK_ENTRY_MACRO_MAX = 1000;
-const AMOUNT_MIN = 0.1;
-const AMOUNT_MAX = 5000;
 /** Performed workouts may not predate this day. */
-const WORKOUT_DATE_MIN = new Date('2000-01-01T00:00:00.000Z');
+const WORKOUT_DATE_MIN = new Date(Date.UTC(WORKOUT_DATE_MIN_YEAR, 0, 1));
 /** `Workout.date` is an instant; a day of slack keeps a zone ahead of the server from reading as "future". */
-const WORKOUT_DATE_FUTURE_GRACE_MS = 24 * 60 * 60 * 1000;
+const WORKOUT_DATE_FUTURE_GRACE_MS = WORKOUT_DATE_FUTURE_GRACE_HOURS * 60 * 60 * 1000;
 
 interface TextRule {
   max: number;

@@ -13,6 +13,7 @@ import {
   RepsAnalyticsDto,
   SetsAnalyticsDto,
   IntensityAnalyticsDto,
+  PersonalRecordsQueryDto,
 } from './dto';
 import { AnalyticsFilterDto } from '../common/dto/analytics-filter.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -39,9 +40,7 @@ export class AnalyticsController {
   @Get('prs')
   async getPersonalRecords(
     @CurrentUser() user: { id: string },
-    @Query('muscleGroup') muscleGroup: string | string[] | undefined,
-    @Query('equipment') equipment: string | string[] | undefined,
-    @Query('gymId') gymId: string | undefined,
+    @Query() { muscleGroup, equipment, gymId }: PersonalRecordsQueryDto,
     @ClientLocale() locale: ApiLocale,
   ): Promise<PersonalRecordsDto> {
     return this.analyticsService.getPersonalRecords(user.id, muscleGroup, equipment, gymId, locale);

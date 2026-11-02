@@ -1,10 +1,11 @@
-import { IsOptional, IsEnum, IsString } from 'class-validator';
+import { IsOptional, IsEnum, IsIn } from 'class-validator';
 import { MuscleGroup } from '../../common/muscle.util';
 import { Equipment } from './create-exercise.dto';
+import { SearchTerm } from '../../common/validation/field-rules';
 
 export class FilterExerciseDto {
   @IsOptional()
-  @IsString()
+  @SearchTerm()
   search?: string;
 
   // Filters on the derived primary muscle (max-percent column).
@@ -17,6 +18,6 @@ export class FilterExerciseDto {
   equipment?: Equipment;
 
   @IsOptional()
-  @IsString()
-  includeCustom?: string; // 'true' or 'false'
+  @IsIn(['true', 'false'])
+  includeCustom?: string;
 }

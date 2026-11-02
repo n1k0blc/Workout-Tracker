@@ -1,7 +1,6 @@
 import {
   IsString,
   IsNotEmpty,
-  MaxLength,
   IsOptional,
   IsBoolean,
   IsArray,
@@ -11,6 +10,7 @@ import {
   Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { BaseText, SECTION_NAME_MAX } from '../../common/validation/field-rules';
 
 /** One Abschnitt, as returned to the client. */
 export class MealSlotDto {
@@ -29,18 +29,14 @@ export class MealSlotListDto {
 }
 
 export class CreateMealSlotDto {
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(60)
+  @BaseText(SECTION_NAME_MAX)
   name: string;
 }
 
 /** Rename and/or (un)archive an Abschnitt. At least one field is meaningful. */
 export class UpdateMealSlotDto {
   @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(60)
+  @BaseText(SECTION_NAME_MAX)
   name?: string;
 
   @IsOptional()

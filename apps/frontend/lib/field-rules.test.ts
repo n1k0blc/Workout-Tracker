@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import * as rules from './field-rules';
+import deMessages from '@/messages/de.json';
+import enMessages from '@/messages/en.json';
 import {
   checkBaseText,
   checkBirthDate,
@@ -127,10 +129,15 @@ describe('drift against the backend field rules', () => {
     resolve(process.cwd(), '../backend/src/common/validation/field-rules.ts'),
     'utf-8',
   );
-  const limits = [...backend.matchAll(/^export const ([A-Z_]+) = (\d+);$/gm)].map(
-    (m) => [m[1], Number(m[2])] as const,
-  );
-  const patterns = [...backend.matchAll(/^export const ([A-Z_]+_PATTERN) = (\/.+\/[a-z]*);$/gm)].map(
+  // A limit may carry a decimal (`AMOUNT_MIN = 0.1`) and digits in its name (`KCAL_PER_100_MAX`).
+  // A trailing `// server-only` exempts a limit the client has no use for: the column maximum of
+  // Rest and tracked durations, which are never shown to the user as an error.
+  const limitLines = [
+    ...backend.matchAll(/^export const ([A-Z0-9_]+) = (\d+(?:\.\d+)?);( \/\/ server-only)?$/gm),
+  ];
+  const limits = limitLines.filter((m) => !m[3]).map((m) => [m[1], Number(m[2])] as const);
+  const serverOnly = limitLines.filter((m) => m[3]).map((m) => m[1]);
+  const patterns = [...backend.matchAll(/^export const ([A-Z0-9_]+_PATTERN) = (\/.+\/[a-z]*);$/gm)].map(
     (m) => [m[1], m[2]] as const,
   );
   const frontend = rules as unknown as Record<string, unknown>;
@@ -148,11 +155,38 @@ describe('drift against the backend field rules', () => {
     expect(String(frontend[name])).toBe(literal);
   });
 
+  it('does not define a limit the backend marks server-only', () => {
+    expect(serverOnly).toContain('INT_COLUMN_MAX');
+    for (const name of serverOnly) expect(name in rules).toBe(false);
+  });
+
   it('has no numeric limit the backend does not know', () => {
     const known = new Set(limits.map(([name]) => name));
     const extra = Object.entries(frontend)
-      .filter(([name, v]) => typeof v === 'number' && /^[A-Z_]+$/.test(name) && !known.has(name))
+      .filter(([name, v]) => typeof v === 'number' && /^[A-Z0-9_]+$/.test(name) && !known.has(name))
       .map(([name]) => name);
     expect(extra).toEqual([]);
+  });
+
+  it('has a de and en catalogue entry for every constraint the backend rules can report', () => {
+    const names = new Set(
+      [
+        ...backend.matchAll(/(?:constraint|ageRule)\(\s*'([A-Za-z]+)'/g),
+        ...backend.matchAll(/name: '([A-Za-z]+)',\s*target/g),
+      ].map((m) => m[1]),
+    );
+    expect(names.size).toBeGreaterThan(8);
+    for (const [locale, messages] of [['de', deMessages], ['en', enMessages]] as const) {
+      const validation = messages.ApiErrors.validation as Record<string, unknown>;
+      for (const name of names) {
+        // A generic entry, or one under the field it belongs to (`dateOfBirth.minAge`).
+        const found =
+          typeof validation[name] === 'string' ||
+          Object.values(validation).some(
+            (v) => typeof v === 'object' && v !== null && name in (v as object),
+          );
+        expect(found, `${name} (${locale})`).toBe(true);
+      }
+    }
   });
 });

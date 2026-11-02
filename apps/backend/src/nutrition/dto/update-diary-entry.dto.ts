@@ -1,4 +1,10 @@
-import { IsNumber, IsPositive, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsNumber, Min, Max, IsOptional } from 'class-validator';
+import {
+  AMOUNT_MAX,
+  AMOUNT_MIN,
+  BaseText,
+  PORTION_LABEL_MAX,
+} from '../../common/validation/field-rules';
 
 /**
  * Changes an Eintrag's quantity. The service rescales the stored kcal/macro snapshot by
@@ -8,11 +14,11 @@ import { IsNumber, IsPositive, IsOptional, IsString, MaxLength } from 'class-val
  */
 export class UpdateDiaryEntryDto {
   @IsNumber()
-  @IsPositive()
+  @Min(AMOUNT_MIN)
+  @Max(AMOUNT_MAX)
   quantity: number;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(60)
+  @BaseText(PORTION_LABEL_MAX, { allowEmpty: true })
   quantityLabel?: string;
 }

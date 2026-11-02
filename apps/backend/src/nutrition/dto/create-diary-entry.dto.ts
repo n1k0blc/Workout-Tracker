@@ -1,14 +1,14 @@
-import {
-  IsString,
-  IsNotEmpty,
-  MaxLength,
-  IsNumber,
-  Min,
-  IsOptional,
-  IsPositive,
-  IsBoolean,
-} from 'class-validator';
+import { IsString, IsNotEmpty, IsNumber, Min, Max, IsOptional, IsBoolean } from 'class-validator';
 import { IsLocalDate } from '../../common/utils/local-date.util';
+import {
+  AMOUNT_MAX,
+  AMOUNT_MIN,
+  BaseText,
+  FOOD_NAME_MAX,
+  PORTION_LABEL_MAX,
+  QUICK_ENTRY_KCAL_MAX,
+  QUICK_ENTRY_MACRO_MAX,
+} from '../../common/validation/field-rules';
 
 /**
  * Logs one Eintrag into an Abschnitt. In this ticket every entry is a Schnelleintrag: the
@@ -26,37 +26,40 @@ export class CreateDiaryEntryDto {
   @IsLocalDate()
   localDate: string;
 
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(200)
+  // Same rule as a Lebensmittel name, so "Als Lebensmittel speichern" cannot fail on it.
+  @BaseText(FOOD_NAME_MAX)
   name: string;
 
   @IsNumber()
   @Min(0)
+  @Max(QUICK_ENTRY_KCAL_MAX)
   kcal: number;
 
   @IsNumber()
   @Min(0)
+  @Max(QUICK_ENTRY_MACRO_MAX)
   carbs: number;
 
   @IsNumber()
   @Min(0)
+  @Max(QUICK_ENTRY_MACRO_MAX)
   protein: number;
 
   @IsNumber()
   @Min(0)
+  @Max(QUICK_ENTRY_MACRO_MAX)
   fat: number;
 
   // How much was eaten, in the entry's own unit. Absent for a bare Schnelleintrag, where it
   // defaults to 1; the quantity editor later rescales the snapshot by newQuantity / this.
   @IsOptional()
   @IsNumber()
-  @IsPositive()
+  @Min(AMOUNT_MIN)
+  @Max(AMOUNT_MAX)
   quantity?: number;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(60)
+  @BaseText(PORTION_LABEL_MAX, { allowEmpty: true })
   quantityLabel?: string;
 
   // When true, the entered name and kcal/macros are also saved as a new USER Lebensmittel

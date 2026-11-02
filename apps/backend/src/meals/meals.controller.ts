@@ -16,7 +16,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ClientLocale } from '../common/decorators/client-locale.decorator';
 import { ApiLocale } from '../common/utils/locale.util';
 import { MealsService } from './meals.service';
-import { CreateMealDto, UpdateMealDto, MealDto, MealListDto } from './dto';
+import { CreateMealDto, UpdateMealDto, MealDto, MealListDto, MealsQueryDto } from './dto';
 
 @Controller('meals')
 @UseGuards(JwtAuthGuard)
@@ -28,7 +28,7 @@ export class MealsController {
   async findAll(
     @CurrentUser() user: { id: string },
     @ClientLocale() locale: ApiLocale,
-    @Query('mine') mine?: string,
+    @Query() { mine }: MealsQueryDto,
   ): Promise<MealListDto> {
     return this.meals.findAll(user.id, mine === '1' || mine === 'true', locale);
   }

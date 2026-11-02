@@ -5,6 +5,7 @@ import {
   AppConflictException,
 } from '../common/errors/app-exceptions';
 import { PrismaService } from '../prisma/prisma.service';
+import { SECTIONS_PER_USER_MAX } from '../common/validation/field-rules';
 import { MealSlotDto, MealSlotListDto } from './dto';
 
 /**
@@ -113,6 +114,9 @@ export class MealSlotsService {
   async create(userId: string, name: string): Promise<MealSlotDto> {
     const rows = await this.loadRows(userId);
     const activeIds = rows.filter((r) => !r.archivedAt).map((r) => r.id);
+    if (activeIds.length >= SECTIONS_PER_USER_MAX) {
+      throw new AppBadRequestException('MEAL_SLOT_LIMIT_REACHED', { max: SECTIONS_PER_USER_MAX });
+    }
     const archivedIds = rows.filter((r) => r.archivedAt).map((r) => r.id);
     const parkedOrder = rows.reduce((max, r) => Math.max(max, r.order), 0) + 1;
 
@@ -171,6 +175,13 @@ export class MealSlotsService {
       });
       if (activeCount <= 1) {
         throw new AppConflictException('MEAL_SLOT_LAST_ACTIVE');
+      }
+    } else {
+      const activeCount = await this.prisma.mealSlot.count({
+        where: { userId, archivedAt: null },
+      });
+      if (activeCount >= SECTIONS_PER_USER_MAX) {
+        throw new AppBadRequestException('MEAL_SLOT_LIMIT_REACHED', { max: SECTIONS_PER_USER_MAX });
       }
     }
 

@@ -135,6 +135,15 @@ The server only knows the first half: `deriveSetAggregates` (`apps/backend/src/w
 
 The client enforces the rest, through one guard (`apps/frontend/lib/log-set-guards.ts`): `checkSetForLogging` is the single check behind the tick, the swipe and the past-tracking auto-commit; `setNeedsRir` / `findFirstSetNeedingRir` answer "does a working set still lack its RIR" for the plan editors' save, the live workout's "Beenden" and the workout-completeness check. Save payloads never trust the draft to have cleared a warm-up's RIR: `toExercisePayload`, `plannedSideFields` and `planRir` drop it. In Verlauf the rules apply only to sets the user changed.
 
+### Tracked values have no user-facing limit
+
+**`Set.rest` and a tracked `totalDuration` accept any non-negative whole number up to the column maximum, and never produce a user-facing error.**
+
+Both are measured, not chosen: a forgotten workout, a long break or a paused timer simply yields a big number, and refusing to save it would lose the training session over a value the user never typed. A cap would also make the 5-hour auto-save fail on exactly the workouts it exists for. Typed values (weight, reps, RIR, a hand-entered duration) are the user's input and do have limits; tracked ones do not.
+
+- **The API** bounds them by the `Int` column and nothing else: `@Min(0)` and `@Max(INT_COLUMN_MAX)` in `workout-tree.dto.ts` (`rest`) and the workout DTOs (`totalDuration`). `INT_COLUMN_MAX` is tagged `// server-only` in `apps/backend/src/common/validation/field-rules.ts`, which exempts it from the frontend drift test; the client has no mirror constant and no message for it.
+- **The client** must not clamp, reject or warn on a measured rest or duration. The one typed duration (1-480 minutes, past-workout tracking) is a separate, client-only field.
+
 ## Agent skills
 
 ### Issue tracker
