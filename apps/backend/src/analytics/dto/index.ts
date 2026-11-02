@@ -8,3 +8,4 @@ export * from './rest-time-analytics.dto';
 export * from './reps-analytics.dto';
 export * from './sets-analytics.dto';
 export * from './intensity-analytics.dto';
+export * from './personal-records-query.dto';

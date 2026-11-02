@@ -18,7 +18,6 @@ import { ClientToday } from '../common/decorators/client-today.decorator';
 import { ClientLocale } from '../common/decorators/client-locale.decorator';
 import { ApiLocale } from '../common/utils/locale.util';
 import { Today } from '../common/utils/today.util';
-import { isLocalDate } from '../common/utils/local-date.util';
 import { DiaryEntriesService } from './diary-entries.service';
 import { NutritionAnalyticsService } from './nutrition-analytics.service';
 import { MealSlotsService } from './meal-slots.service';
@@ -39,7 +38,11 @@ import {
   MealSlotDto,
   MealSlotListDto,
   PickerListDto,
+  PickerScopeQueryDto,
   NutritionTrendDto,
+  NutritionDayQueryDto,
+  NutritionAnalyticsQueryDto,
+  CopySourceDatesQueryDto,
 } from './dto';
 
 @Controller('nutrition')
@@ -60,13 +63,9 @@ export class NutritionController {
   async getDay(
     @CurrentUser() user: { id: string },
     @ClientToday() today: Today,
-    @Query('date') date?: string,
+    @Query() { date }: NutritionDayQueryDto,
   ): Promise<NutritionDayDto> {
-    const localDate = date ?? today.localDate;
-    if (!isLocalDate(localDate)) {
-      throw new AppBadRequestException('NUTRITION_DAY_DATE_INVALID');
-    }
-    return this.diaryEntries.getDay(user.id, localDate);
+    return this.diaryEntries.getDay(user.id, date ?? today.localDate);
   }
 
   /**
@@ -77,17 +76,8 @@ export class NutritionController {
   @Get('analytics')
   async getAnalytics(
     @CurrentUser() user: { id: string },
-    @Query('start') start?: string,
-    @Query('end') end?: string,
+    @Query() { start, end }: NutritionAnalyticsQueryDto,
   ): Promise<NutritionTrendDto> {
-    if (
-      typeof start !== 'string' ||
-      typeof end !== 'string' ||
-      !isLocalDate(start) ||
-      !isLocalDate(end)
-    ) {
-      throw new AppBadRequestException('NUTRITION_ANALYTICS_RANGE_INVALID');
-    }
     return this.nutritionAnalytics.getTrend(user.id, start, end);
   }
 
@@ -100,7 +90,7 @@ export class NutritionController {
   async pickerFavorites(
     @CurrentUser() user: { id: string },
     @ClientLocale() locale: ApiLocale,
-    @Query('scope') scope?: string,
+    @Query() { scope }: PickerScopeQueryDto,
   ): Promise<PickerListDto> {
     return this.picker.getFavorites(user.id, toPickerScope(scope), locale);
   }
@@ -109,7 +99,7 @@ export class NutritionController {
   async pickerRecent(
     @CurrentUser() user: { id: string },
     @ClientLocale() locale: ApiLocale,
-    @Query('scope') scope?: string,
+    @Query() { scope }: PickerScopeQueryDto,
   ): Promise<PickerListDto> {
     return this.picker.getRecent(user.id, toPickerScope(scope), locale);
   }
@@ -192,10 +182,9 @@ export class NutritionController {
   @Get('copy/source-dates')
   async copySourceDates(
     @CurrentUser() user: { id: string },
-    @Query('exclude') exclude?: string,
+    @Query() { exclude }: CopySourceDatesQueryDto,
   ): Promise<CopySourceDatesDto> {
-    const cleanExclude = exclude && isLocalDate(exclude) ? exclude : undefined;
-    return { dates: await this.diaryEntries.listCopySourceDates(user.id, cleanExclude) };
+    return { dates: await this.diaryEntries.listCopySourceDates(user.id, exclude) };
   }
 
   // Copies one Abschnitt's entries from another day into the same Abschnitt on the target day.

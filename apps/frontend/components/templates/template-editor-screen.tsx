@@ -10,7 +10,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Field, FieldLabel } from '@/components/ui/field';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
+import { notify } from '@/lib/toast';
+import { findFirstSetNeedingRir, findFirstSetOverLimit } from '@/lib/log-set-guards';
+import { useFormErrors } from '@/hooks/useFormErrors';
+import { EXERCISES_PER_WORKOUT_MAX, NAME_MAX, checkBaseText } from '@/lib/field-rules';
 import ExerciseCard from '@/components/workout/exercise-card';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import { IconChevronLeft, IconPlus } from '@tabler/icons-react';
@@ -18,7 +22,7 @@ import { replacePlanExerciseInList } from '@/lib/exercise-replace';
 import { usePlanExercisePrefill } from '@/lib/plan-exercise-prefill';
 import { withArrayPositionOrder } from '@/lib/workout-order';
 import { plannedSideFields } from '@/lib/set-sides';
-import { addPlannedSet, removePlannedSet, updatePlannedSet } from '@/lib/planned-sets';
+import { addPlannedSet, planRir, removePlannedSet, updatePlannedSet } from '@/lib/planned-sets';
 import {
   DndContext,
   closestCenter,
@@ -41,6 +45,13 @@ interface TemplateEditorScreenProps {
 export default function TemplateEditorScreen({ templateId }: TemplateEditorScreenProps) {
   const router = useRouter();
   const t = useTranslations('TemplateEditorScreen');
+  const tCard = useTranslations('ExerciseCard');
+  const tActive = useTranslations('ActiveWorkout');
+  const [form, formRef] = useFormErrors({
+    fields: ['name'],
+    codeFields: { TEMPLATE_NAME_TAKEN: 'name' },
+    messageValues: { name: { max: NAME_MAX } },
+  });
 
   const [name, setName] = useState('');
   const [recommendedGymId, setRecommendedGymId] = useState<string>('');
@@ -104,6 +115,10 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
   };
 
   const handleAddExercise = (exerciseId: string) => {
+    if (exercises.length >= EXERCISES_PER_WORKOUT_MAX) {
+      notify.warning(tActive('exerciseLimitReached', { max: EXERCISES_PER_WORKOUT_MAX }));
+      return; // Keep the modal open, like the active workout
+    }
     const exDetails = availableExercises.find((e) => e.id === exerciseId);
     if (!exDetails) return;
 
@@ -166,7 +181,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
             setType: s.setType ?? SetType.WORKING,
             reps: s.reps ?? 0,
             weight: s.weight ?? 0,
-            rir: s.rir ?? 0,
+            rir: planRir(s),
             // Per-side targets survive from an overwrite-from-workout (issue #103); absent on
             // legacy symmetric plans, where the editor seeds both sides from the aggregate.
             repsLeft: s.repsLeft ?? undefined,
@@ -186,7 +201,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
       }
     } catch (error) {
       console.error('Failed to load data for template editor:', error);
-      alert(t('alerts.loadFailed'));
+      notify.error(t('alerts.loadFailed'));
       router.push('/templates');
     } finally {
       setLoading(false);
@@ -202,20 +217,35 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
   // add/remove/replace/reorder/add-set/edit-set surface.
 
   const handleSave = async () => {
-    if (!name.trim()) {
-      alert(t('alerts.nameRequired'));
+    if (!form.setConstraints({ name: checkBaseText(name, NAME_MAX) })) {
       return;
     }
 
     if (exercises.length === 0) {
-      alert(t('alerts.atLeastOneExercise'));
+      notify.warning(t('alerts.atLeastOneExercise'));
       return;
     }
 
     // Validate every exercise has at least one set (template requirement).
     const hasEmpty = exercises.some((ex) => (ex.plannedSets?.length || 0) === 0);
     if (hasEmpty) {
-      alert(t('alerts.everyExerciseNeedsSet'));
+      notify.warning(t('alerts.everyExerciseNeedsSet'));
+      return;
+    }
+
+    // A planned working set needs an RIR (#227); the card marks the empty field, this names it.
+    // A value past its upper bound is named the same way.
+    const plan = exercises.map((ex) => ({ sets: ex.plannedSets ?? [] }));
+    const missingRir = findFirstSetNeedingRir(plan);
+    const overLimit = findFirstSetOverLimit(plan);
+    const blocking = missingRir ?? overLimit;
+    if (blocking) {
+      notify.warning(
+        tCard(missingRir ? 'planRirMissing' : 'planSetTooHigh', {
+          exercise: exercises[blocking.exerciseIndex].exerciseName,
+          number: blocking.setIndex + 1,
+        }),
+      );
       return;
     }
 
@@ -231,7 +261,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
           setType: s.setType ?? SetType.WORKING,
           reps: s.reps ?? 0,
           weight: s.weight ?? 0,
-          rir: s.rir ?? 0,
+          rir: planRir(s),
           // Per-side targets for unilateral exercises (issue #103); dropped for bilateral
           // sets, which the write path requires.
           ...plannedSideFields(s, ex.isUnilateral),
@@ -254,7 +284,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
       router.push('/templates');
     } catch (error) {
       console.error('Failed to save template:', error);
-      alert(t('alerts.saveFailed'));
+      form.showApiError(error);
     } finally {
       setSaving(false);
     }
@@ -305,7 +335,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
             {/* Template Metadata (Name + Recommended Gym) */}
             <Card>
               <CardContent className="p-6 space-y-4">
-                <Field>
+                <Field ref={formRef}>
                   <FieldLabel>{t('nameLabel')}</FieldLabel>
                   {isReadonlyView ? (
                     <div className="px-3 py-2 text-sm font-medium border border-input bg-muted/30 rounded-md">
@@ -314,11 +344,16 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
                   ) : (
                     <Input
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        form.clear('name');
+                      }}
                       placeholder={t('namePlaceholder')}
                       className="w-full"
+                      {...form.fieldProps('name')}
                     />
                   )}
+                  <FieldError id={form.errorId('name')}>{form.errors.name}</FieldError>
                 </Field>
 
                 {!isReadonlyView && (

@@ -5,5 +5,6 @@ export * from './copy-diary.dto';
 export * from './update-diary-entry.dto';
 export * from './nutrition-day.dto';
 export * from './nutrition-analytics.dto';
+export * from './nutrition-query.dto';
 export * from './meal-slot.dto';
 export * from './picker.dto';

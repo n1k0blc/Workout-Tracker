@@ -22,7 +22,10 @@ import { LOCALE_HEADER } from '../common/utils/locale.util';
 import { IssuedRefreshToken } from './refresh-token.service';
 
 // Brute-force protection: 5 attempts per minute per client, well below the global default.
+// Login, register and change-password (which verifies the current password) share it.
 const AUTH_THROTTLE = { default: { limit: 5, ttl: 60_000 } };
+// Refresh is called by the client itself whenever an access token lapses, so it gets headroom.
+const REFRESH_THROTTLE = { default: { limit: 30, ttl: 60_000 } };
 
 const ACCESS_TOKEN_COOKIE = 'access_token';
 const REFRESH_TOKEN_COOKIE = 'refresh_token';
@@ -66,6 +69,7 @@ export class AuthController {
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
+  @Throttle(REFRESH_THROTTLE)
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
@@ -91,6 +95,7 @@ export class AuthController {
   }
 
   @Post('change-password')
+  @Throttle(AUTH_THROTTLE)
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
   async changePassword(

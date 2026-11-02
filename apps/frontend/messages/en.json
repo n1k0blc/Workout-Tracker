@@ -19,6 +19,7 @@
       "USER_NOT_FOUND": "User not found.",
       "EMAIL_ALREADY_IN_USE": "This email address is already in use.",
       "HOME_GYM_NOT_FOUND": "Gym not found.",
+      "HOME_GYM_LIMIT_REACHED": "You can have at most {max} gyms.",
       "HOME_GYM_IN_USE_BY_ACTIVE_CYCLE": "This gym is planned for a day of an active cycle. Update those cycle days first.",
       "FOOD_NOT_FOUND": "Food not found.",
       "BARCODE_INVALID": "That is not a valid EAN or UPC barcode.",
@@ -35,7 +36,9 @@
       "MEAL_SLOT_NOT_FOUND": "Section not found.",
       "MEAL_SLOT_ARCHIVED": "This section is archived.",
       "MEAL_SLOT_ORDER_INVALID": "The order of the sections is invalid.",
+      "MEAL_SLOT_LIMIT_REACHED": "You can have at most {max} active sections.",
       "MEAL_SLOT_LAST_ACTIVE": "At least one section must stay active.",
+      "QUICK_ENTRY_NOT_A_FOOD": "This can only be saved as a food if the values fit 100 g: at most 900 kcal, at most 100 g per macro and 100 g together.",
       "MEAL_SLOT_REORDER_SET_MISMATCH": "The sections have changed. Please reload the page.",
       "MEAL_SLOT_UPDATE_EMPTY": "There is nothing to change.",
       "NUTRITION_TREND_RANGE_INVERTED": "The end date cannot be before the start date.",
@@ -56,6 +59,8 @@
       "CYCLE_ALREADY_COMPLETED": "This cycle has already ended.",
       "CYCLE_CONCURRENT_MODIFICATION": "Another change to this cycle got in the way. Please try again.",
       "ACTIVE_CYCLE_ALREADY_EXISTS": "An active cycle already exists. Please end it first.",
+      "CYCLE_START_DATE_PAST": "A cycle cannot start in the past.",
+      "CYCLE_START_DATE_TOO_FAR": "A cycle can start at most one year ahead.",
       "DUPLICATE_WEEKDAY_IN_CYCLE": "Two training days fall on {weekday}. Each weekday can be used only once per cycle.",
       "WORKOUT_DAY_NOT_FOUND": "Workout day not found.",
       "WORKOUT_DAY_CYCLE_MISMATCH": "This workout day does not belong to this cycle.",
@@ -68,6 +73,7 @@
       "WORKOUT_SET_UNEXPECTED_SIDE_DATA": "{exerciseName} is a bilateral exercise – its sets cannot carry per-side values.",
       "WORKOUT_SET_MISSING_SIDE_DATA": "{exerciseName}, set {setNumber}: every set of a unilateral exercise needs reps and weight for both sides.",
       "WORKOUT_SET_RIR_SIDE_MISMATCH": "{exerciseName}, set {setNumber}: RIR is set for only one side. Provide it for both sides or for neither.",
+      "WORKOUT_SET_WARMUP_RIR": "{exerciseName}, set {setNumber}: A warm-up set has no RIR.",
       "WORKOUT_TREE_ORDER_INVALID": "The order of the items is invalid. Please reload the page.",
       "WORKOUT_NOT_FOUND": "Workout not found.",
       "WORKOUT_CYCLE_CONTEXT_REQUIRED": "This workout needs a cycle and a workout day.",
@@ -107,14 +113,184 @@
       "isDateString": "Please enter a valid date.",
       "isLocalDate": "Please enter a valid date.",
       "matches": "The format is invalid.",
+      "isId": "Invalid identifier.",
+      "isBarcode": "Please enter a valid EAN or UPC code (8, 12 or 13 digits with a correct check digit).",
+      "macroSum": "Carbs, protein and fat together can be at most 100 g per 100 g.",
+      "minDate": "The date is too far in the past.",
+      "maxDate": "The date cannot be in the future.",
+      "endBeforeStart": "The end cannot be before the start.",
       "password": {
-        "minLength": "The password must be at least 8 characters long."
+        "minLength": "The password must be at least 8 characters long.",
+        "isNotEmpty": "Please enter a password.",
+        "maxLength": "The password can be at most 100 characters long."
+      },
+      "currentPassword": {
+        "isNotEmpty": "Please enter your current password.",
+        "minLength": "The current password must be at least 8 characters long.",
+        "maxLength": "The current password can be at most 100 characters long."
       },
       "newPassword": {
-        "minLength": "The new password must be at least 8 characters long."
+        "isNotEmpty": "Please enter a new password.",
+        "minLength": "The new password must be at least 8 characters long.",
+        "maxLength": "The new password can be at most 100 characters long."
+      },
+      "confirmNewPassword": {
+        "isNotEmpty": "Please repeat your new password.",
+        "passwordsDiffer": "The passwords do not match."
       },
       "email": {
-        "isEmail": "Please enter a valid email address."
+        "isEmail": "Please enter a valid email address.",
+        "isNotEmpty": "Please enter your email address.",
+        "maxLength": "The email address can be at most 254 characters long."
+      },
+      "noControlCharacters": "Please remove control or invisible characters.",
+      "isPersonName": "Use only letters, spaces, apostrophes, periods and hyphens, starting with a letter.",
+      "maxDecimals": "Too many decimal places.",
+      "confirmPassword": {
+        "isNotEmpty": "Please repeat your password.",
+        "passwordsDiffer": "The passwords do not match."
+      },
+      "firstName": {
+        "isNotEmpty": "Please enter your first name.",
+        "maxLength": "The first name can be at most 50 characters long."
+      },
+      "lastName": {
+        "isNotEmpty": "Please enter your last name.",
+        "maxLength": "The last name can be at most 50 characters long."
+      },
+      "dateOfBirth": {
+        "isNotEmpty": "Please enter your date of birth.",
+        "minAge": "You must be at least 13 years old.",
+        "maxAge": "Please enter a valid date of birth."
+      },
+      "height": {
+        "isNotEmpty": "Please enter your height.",
+        "isInt": "Please enter your height as a whole number.",
+        "min": "The height must be at least {min} {unit}.",
+        "max": "The height must be at most {max} {unit}."
+      },
+      "weight": {
+        "isNotEmpty": "Please enter your weight.",
+        "isNumber": "Please enter your weight as a number.",
+        "maxDecimals": "Use at most one decimal place.",
+        "min": "The weight must be at least {min} {unit}.",
+        "max": "The weight must be at most {max} {unit}."
+      },
+      "reps": {
+        "max": "Reps can be at most {max}."
+      },
+      "rir": {
+        "max": "RIR can be at most {max}."
+      },
+      "homeGyms": {
+        "arrayMinSize": "Please add at least one home gym.",
+        "arrayMaxSize": "You can add at most 10 gyms."
+      },
+      "name": {
+        "isNotEmpty": "Please enter a name.",
+        "maxLength": "The name can be at most {max} characters."
+      },
+      "templateName": {
+        "isNotEmpty": "Please enter a template name.",
+        "maxLength": "The template name can be at most {max} characters."
+      },
+      "targetKcal": {
+        "isInt": "The calorie target must be a whole number.",
+        "min": "The calorie target must be at least {min} kcal.",
+        "max": "The calorie target must be at most {max} kcal."
+      },
+      "targetCarbs": {
+        "isInt": "The carbs target must be a whole number.",
+        "min": "The carbs target must be at least {min} g.",
+        "max": "The carbs target must be at most {max} g."
+      },
+      "targetProtein": {
+        "isInt": "The protein target must be a whole number.",
+        "min": "The protein target must be at least {min} g.",
+        "max": "The protein target must be at most {max} g."
+      },
+      "targetFat": {
+        "isInt": "The fat target must be a whole number.",
+        "min": "The fat target must be at least {min} g.",
+        "max": "The fat target must be at most {max} g."
+      },
+      "startDate": {
+        "isNotEmpty": "Please choose a start date.",
+        "minDate": "A cycle cannot start in the past.",
+        "maxDate": "A cycle can start at most one year ahead."
+      },
+      "durationMinutes": {
+        "isNotEmpty": "Please enter the duration in minutes.",
+        "isInt": "Please enter the duration in whole minutes.",
+        "min": "The duration must be at least {min} minute.",
+        "max": "The duration can be at most {max} minutes."
+      },
+      "workoutDate": {
+        "isNotEmpty": "Please choose a date."
+      },
+      "kcal": {
+        "isNotEmpty": "Please enter the calories.",
+        "isNumber": "Please enter a number.",
+        "min": "The calories cannot be negative.",
+        "max": "The calories can be at most {max} kcal.",
+        "maxDecimals": "Use at most one decimal place."
+      },
+      "carbs": {
+        "isNotEmpty": "Please enter the carbs.",
+        "isNumber": "Please enter a number.",
+        "min": "The carbs cannot be negative.",
+        "max": "The carbs can be at most {max} g."
+      },
+      "protein": {
+        "isNotEmpty": "Please enter the protein.",
+        "isNumber": "Please enter a number.",
+        "min": "The protein cannot be negative.",
+        "max": "The protein can be at most {max} g."
+      },
+      "fat": {
+        "isNotEmpty": "Please enter the fat.",
+        "isNumber": "Please enter a number.",
+        "min": "The fat cannot be negative.",
+        "max": "The fat can be at most {max} g.",
+        "macroSum": "Carbs, protein and fat together can be at most 100 g per 100 g."
+      },
+      "portions": {
+        "arrayMaxSize": "You can add at most {max} portion sizes.",
+        "portionDefault": "Mark exactly one portion size as the default."
+      },
+      "label": {
+        "isNotEmpty": "Please give the portion size a name.",
+        "maxLength": "The name can be at most {max} characters."
+      },
+      "grams": {
+        "isNotEmpty": "Please enter an amount.",
+        "isNumber": "Please enter a number.",
+        "min": "The amount must be at least {min} {unit}.",
+        "max": "The amount can be at most {max} {unit}."
+      },
+      "quantity": {
+        "isNotEmpty": "Please enter an amount.",
+        "isNumber": "Please enter a number.",
+        "min": "The amount must be at least {min}.",
+        "max": "The amount can be at most {max}."
+      },
+      "factor": {
+        "isNotEmpty": "Please enter a factor.",
+        "isNumber": "Please enter a number.",
+        "min": "The factor must be at least {min}.",
+        "max": "The factor can be at most {max}."
+      },
+      "saveAsFood": {
+        "notAFood": "This can only be saved as a food if the values fit 100 g: at most 900 kcal, at most 100 g per macro and 100 g together."
+      },
+      "newName": {
+        "isNotEmpty": "Please enter a name.",
+        "maxLength": "The name can be at most {max} characters.",
+        "arrayMaxSize": "You can have at most {count} active sections."
+      },
+      "editName": {
+        "isNotEmpty": "Please enter a name.",
+        "maxLength": "The name can be at most {max} characters."
       }
     }
   },
@@ -138,10 +314,6 @@
       "gramsUnit": "g",
       "macrosResult": "Macros add up to",
       "kcalUnit": "kcal",
-      "kcalRangeError": "Calorie target must be a whole number between 1 and {max}",
-      "carbsRangeError": "Carbs target must be a whole number between 1 and {max}",
-      "proteinRangeError": "Protein target must be a whole number between 1 and {max}",
-      "fatRangeError": "Fat target must be a whole number between 1 and {max}",
       "saved": "Daily targets saved",
       "saveError": "Failed to save daily targets",
       "hintMatch": "Macros and calorie target match.",
@@ -162,11 +334,6 @@
       "heightValue": "{height} {unit}",
       "weightValue": "{weight} {unit}",
       "empty": "-",
-      "validationAllFields": "Please fill in all fields",
-      "validationInvalidEmail": "Please provide a valid email address",
-      "validationHeightRange": "Height must be between {min} and {max} {unit}",
-      "validationWeightRange": "Weight must be between {min} and {max} {unit}",
-      "validationAgeRange": "Age must be between 13 and 120 years",
       "updated": "Profile updated successfully",
       "updateError": "Failed to update profile"
     },
@@ -192,6 +359,8 @@
       "empty": "No gyms added yet",
       "editDialogTitle": "Edit gym",
       "deleteConfirm": "Really delete this gym? This isn't possible if the gym is used in workouts.",
+      "deleteDialogTitle": "Delete gym?",
+      "deleteSubmit": "Delete",
       "added": "Gym added successfully",
       "addError": "Failed to add gym",
       "updated": "Gym updated successfully",
@@ -205,11 +374,7 @@
       "currentPassword": "Current password",
       "newPassword": "New password",
       "confirmNewPassword": "Confirm new password",
-      "warning": "After changing your password you'll be signed out everywhere and need to sign in again.",
-      "validationAllFields": "Please fill in all fields",
-      "validationMinLength": "New password must be at least 8 characters long",
-      "validationMismatch": "Passwords don't match",
-      "changeError": "Failed to change password"
+      "warning": "After changing your password you'll be signed out everywhere and need to sign in again."
     },
     "logout": "Log out"
   },
@@ -346,8 +511,15 @@
     "addFirstExerciseAria": "Add first exercise",
     "addExerciseAria": "Add exercise",
     "duplicateExerciseError": "This exercise is already in the workout. Add sets to the existing exercise instead.",
+    "exerciseLimitReached": "A workout can have at most {max} exercises.",
     "addExerciseError": "Failed to add exercise",
     "saveError": "Failed to save workout",
+    "incomplete": {
+      "unloggedSet": "{exercise}: set {number} is not logged yet. Log it or swipe it away.",
+      "missingRir": "{exercise}: set {number} still needs an RIR.",
+      "emptyExercise": "{exercise} has no sets yet. Add a set or remove the exercise.",
+      "nothingLogged": "Log at least one set before you finish the workout."
+    },
     "discard": "Discard",
     "discarding": "Discarding...",
     "finish": "Finish workout",
@@ -433,8 +605,23 @@
     "setTypeWarmup": "Warmup",
     "setTypeWorking": "Work",
     "logSet": "Log set (or swipe LTR)",
-    "logSetWaitingForSides": "Fill in both sides to log the set",
-    "sidesIncompleteHint": "Fill in weight and reps for both sides to log the set",
+    "logMissing": "Set not logged – missing: {fields}.",
+    "logInvalid": "Set not logged – please check the marked fields.",
+    "logOutOfOrder": "Log set {number} first, or swipe it away.",
+    "logExerciseAbove": "Finish “{name}” first, or drag this exercise up if the machine is taken.",
+    "planRirMissing": "{exercise}, set {number}: Enter an RIR.",
+    "planSetTooHigh": "{exercise}, set {number}: A value is above the allowed maximum – check the marked fields.",
+    "rirHint": "Aim for RIR 2 at most.",
+    "setLimitReached": "An exercise can have at most {max} sets.",
+    "errors": {
+      "weightMissing": "Enter the weight.",
+      "weightInvalid": "The weight cannot be negative.",
+      "weightZero": "0 {unit} is only possible on bodyweight exercises.",
+      "repsMissing": "Enter the reps.",
+      "repsInvalid": "At least 1 whole rep.",
+      "rirMissing": "Enter the RIR.",
+      "rirInvalid": "RIR must be a whole number from 0."
+    },
     "loggedTitle": "Logged (cannot be unlogged; swipe RTL to delete)",
     "rirLabel": "RIR {rir}",
     "addSet": "Add set",
@@ -587,8 +774,8 @@
   "MealEditorScreen": {
     "loadError": "Meal could not be loaded.",
     "addedFood": "{name} added",
-    "nameRequired": "Please enter a name.",
     "ingredientRequired": "A meal needs at least one ingredient.",
+    "ingredientAmountInvalid": "Check the amount of an ingredient: the value you typed is not applied.",
     "saved": "Meal saved",
     "created": "Meal created",
     "saveError": "Save failed.",
@@ -849,7 +1036,6 @@
   "CyclesPage": {
     "title": "Training Cycles",
     "subtitle": "Manage your training cycles and blueprints",
-    "checking": "Checking...",
     "newCycle": "New Cycle",
     "loading": "Loading cycles...",
     "activeCycles": "Active Cycles",
@@ -880,12 +1066,12 @@
       "confirm": "Complete"
     },
     "alerts": {
-      "activeCycleExists": "An active cycle already exists. Please complete it first.",
-      "checkFailed": "Failed to check active cycles",
       "completeFailed": "Failed to complete cycle"
     }
   },
   "CycleWizard": {
+    "checking": "Checking...",
+    "activeCycleExists": "An active cycle already exists. Please complete it first.",
     "title": "New Training Cycle",
     "cancel": "Cancel",
     "stepProgress": "Step {current} of {total}",
@@ -951,11 +1137,8 @@
     "back": "Back",
     "nextToReview": "Next to Review",
     "alerts": {
-      "templateNameRequired": "Please enter a template name",
       "atLeastOneExercise": "Add at least one exercise",
       "templateCreated": "Template created successfully!",
-      "templateNameExists": "A template with this name already exists",
-      "templateSaveFailed": "Failed to save template",
       "templateEmpty": "This template contains no exercises",
       "templateLoadFailed": "Failed to load template"
     },
@@ -1003,13 +1186,8 @@
     },
     "alerts": {
       "loadFailed": "Failed to load data",
-      "nameRequired": "Please enter a workout name",
-      "saveFailed": "Failed to save blueprint",
-      "templateNameRequired": "Please enter a template name",
       "atLeastOneExercise": "Add at least one exercise",
-      "templateCreated": "Template created successfully!",
-      "templateNameExists": "A template with this name already exists",
-      "templateSaveFailed": "Failed to save template"
+      "templateCreated": "Template created successfully!"
     },
     "saveTemplateDialog": {
       "title": "Save blueprint as template",
@@ -1101,10 +1279,8 @@
     "save": "Save",
     "alerts": {
       "loadFailed": "Failed to load data.",
-      "nameRequired": "Please enter a name for the template.",
       "atLeastOneExercise": "Please add at least one exercise.",
-      "everyExerciseNeedsSet": "Every exercise must have at least one set.",
-      "saveFailed": "Failed to save template."
+      "everyExerciseNeedsSet": "Every exercise must have at least one set."
     }
   },
   "CycleDetailPage": {
@@ -1189,8 +1365,6 @@
     "profile": "Profile"
   },
   "ExerciseEditorDialog": {
-    "nameRequired": "Please enter a name",
-    "percentagesInvalid": "Muscle group percentages must add up to 100% (currently {sum}%)",
     "titleView": "View exercise",
     "titleEdit": "Edit exercise",
     "titleCreate": "Create custom exercise",
@@ -1212,11 +1386,6 @@
     "cancel": "Cancel"
   },
   "FoodEditorDialog": {
-    "nameRequired": "Please enter a name.",
-    "nutrientsInvalid": "Calories and macros must be numbers ≥ 0.",
-    "barcodeInvalid": "Barcode must have 8 to 14 digits.",
-    "portionInvalid": "Every portion needs a label and an amount greater than 0.",
-    "portionDefault": "Mark exactly one portion as the default.",
     "titleReadOnly": "Food",
     "titleEdit": "Edit food",
     "titleCreate": "New food",
@@ -1339,6 +1508,18 @@
     "fallbackAnyGym": "No gym entry – used the last workout.",
     "setCountMismatch": "Different number of sets than planned – adjust the sets if needed."
   },
+  "ForgottenWorkout": {
+    "title": "Still training?",
+    "description": "Your workout has been running for over 5 hours.",
+    "willSave": "If you don't answer, it will be saved automatically in {time}, ending at your last logged set.",
+    "willDiscard": "If you don't answer, it will be discarded in {time} because it is incomplete. This can't be undone.",
+    "keepTraining": "Keep training",
+    "finish": "Finish workout",
+    "discard": "Discard",
+    "saved": "Your forgotten workout was saved automatically.",
+    "discarded": "Your forgotten workout was incomplete and has been discarded.",
+    "saveFailed": "The workout could not be saved automatically. It has been kept."
+  },
   "LoginPage": {
     "title": "Sign in",
     "or": "Or",
@@ -1378,17 +1559,7 @@
     "removeGym": "Remove home gym",
     "back": "Back",
     "creating": "Creating …",
-    "create": "Create account",
-    "errors": {
-      "missingFields": "Please fill in all fields",
-      "passwordMismatch": "Passwords do not match",
-      "passwordTooShort": "The password must be at least 8 characters long",
-      "heightRange": "Height must be between 50 and 300 cm",
-      "weightRange": "Weight must be between 20 and 500 kg",
-      "tooYoung": "You must be at least 13 years old",
-      "invalidBirthDate": "Please enter a valid date of birth",
-      "noGym": "Please add at least one home gym"
-    }
+    "create": "Create account"
   },
   "HistoryPage": {
     "title": "Workout history",
@@ -1430,6 +1601,7 @@
   "HistoryEditPage": {
     "loadError": "Could not load the workout",
     "saveError": "Could not save the workout",
+    "setsIncomplete": "Please fill in the marked fields before saving.",
     "loading": "Loading workout …",
     "backToCycle": "Back to cycle details",
     "backToHistory": "Back to history",
@@ -1455,5 +1627,8 @@
     "tagline": "Your personal workout tracking app for maximum training success",
     "signIn": "Sign in",
     "register": "Register"
+  },
+  "DatePicker": {
+    "placeholder": "MM/DD/YYYY"
   }
 }

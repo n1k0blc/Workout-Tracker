@@ -23,6 +23,8 @@ import {
   FoodListDto,
   SimilarFoodDto,
   BarcodeLookupDto,
+  FoodsQueryDto,
+  SimilarFoodsQueryDto,
 } from './dto';
 
 @Controller('foods')
@@ -34,7 +36,7 @@ export class FoodsController {
   async findAll(
     @CurrentUser() user: { id: string },
     @ClientLocale() locale: ApiLocale,
-    @Query('search') search?: string,
+    @Query() { search }: FoodsQueryDto,
   ): Promise<FoodListDto> {
     return this.foods.findAll(user.id, search, locale);
   }
@@ -43,7 +45,7 @@ export class FoodsController {
   @Get('similar')
   async findSimilar(
     @CurrentUser() user: { id: string },
-    @Query('name') name?: string,
+    @Query() { name }: SimilarFoodsQueryDto,
   ): Promise<SimilarFoodDto[]> {
     return this.foods.findSimilar(user.id, name ?? '');
   }

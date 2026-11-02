@@ -15,6 +15,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
+import { FieldError } from '@/components/ui/field';
+import { useFormErrors } from '@/hooks/useFormErrors';
+import { TRAINING_DAY_NAME_MAX, checkBaseText } from '@/lib/field-rules';
 
 interface WorkoutDaysStepProps {
   formData: CycleFormData;
@@ -53,6 +56,10 @@ export default function WorkoutDaysStep({
   const [modalWeekday, setModalWeekday] = useState<number>(1);
   const [modalName, setModalName] = useState('');
   const [modalGymId, setModalGymId] = useState('');
+  const [form, formRef] = useFormErrors({
+    fields: ['name'],
+    messageValues: { name: { max: TRAINING_DAY_NAME_MAX } },
+  });
 
   const sortedDaysList = sortByCycleWeekday(selectedDaysList, formData.startDate);
 
@@ -108,6 +115,7 @@ export default function WorkoutDaysStep({
     setModalName('');
     setModalGymId(homeGyms.length > 0 ? homeGyms[0].id : '');
     setEditingWeekday(null);
+    form.clear('name');
     setIsModalOpen(true);
   };
 
@@ -118,6 +126,7 @@ export default function WorkoutDaysStep({
     setModalName(day.name);
     setModalGymId(day.plannedHomeGymId || (homeGyms[0]?.id || ''));
     setEditingWeekday(weekday);
+    form.clear('name');
     setIsModalOpen(true);
   };
 
@@ -127,8 +136,9 @@ export default function WorkoutDaysStep({
 
   const handleModalSave = () => {
     if (modalWeekday == null) return;
+    if (!form.setConstraints({ name: checkBaseText(modalName, TRAINING_DAY_NAME_MAX) })) return;
 
-    const name = modalName.trim() || getWeekdayLabel(modalWeekday);
+    const name = modalName.trim();
     const gymId = modalGymId || undefined;
 
     const newEntry: SelectedDay = {
@@ -260,7 +270,7 @@ export default function WorkoutDaysStep({
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 py-2">
+          <div ref={formRef} className="space-y-4 py-2">
             {/* Weekday chips */}
             <div>
               <Label className="mb-2 block">{t('editDialog.weekdayLabel')}</Label>
@@ -291,10 +301,15 @@ export default function WorkoutDaysStep({
               <Input
                 id="day-name"
                 value={modalName}
-                onChange={(e) => setModalName(e.target.value)}
+                onChange={(e) => {
+                  setModalName(e.target.value);
+                  form.clear('name');
+                }}
                 placeholder={t('editDialog.namePlaceholder')}
                 className="mt-1"
+                {...form.fieldProps('name')}
               />
+              <FieldError id={form.errorId('name')} className="mt-1">{form.errors.name}</FieldError>
               <div className="mt-2">
                 <div className="text-xs text-muted-foreground mb-1">{t('editDialog.suggestionsLabel')}</div>
                 <div className="flex flex-wrap gap-1">
@@ -305,7 +320,10 @@ export default function WorkoutDaysStep({
                       variant="outline"
                       size="sm"
                       className="text-xs h-7"
-                      onClick={() => setModalName(s)}
+                      onClick={() => {
+                        setModalName(s);
+                        form.clear('name');
+                      }}
                     >
                       {s}
                     </Button>
@@ -342,7 +360,7 @@ export default function WorkoutDaysStep({
             >
               {t('editDialog.cancel')}
             </Button>
-            <Button onClick={handleModalSave} disabled={modalWeekday == null || !modalName.trim()}>
+            <Button onClick={handleModalSave} disabled={modalWeekday == null}>
               {editingWeekday !== null ? t('editDialog.save') : t('editDialog.add')}
             </Button>
           </DialogFooter>

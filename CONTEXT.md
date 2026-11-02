@@ -204,6 +204,36 @@ say.
   per property and constraint name. An unmapped code logs a warning and falls back to the
   caller's context message or `ApiErrors.generic`. Code: `ApiExceptionFilter`, `App*Exception`.
 
+### Live-Workout (forgotten workouts)
+
+- **Entwurf** (draft) — a live workout exists only in `localStorage` until it is finished: the
+  workout, its timers and a `DraftMeta` (collapsed state, swiped-away sets, `startedAt`,
+  `askAgainAt`), namespaced by account. Nothing runs while the app is closed, so every rule about
+  a forgotten workout is a comparison of timestamps made when the app is open or comes back.
+  Code: `workout-draft-storage.ts`, `WorkoutProvider`.
+
+- **Vollständiges Workout** (complete workout) — every planned set and added row is logged or
+  swiped away, every logged working set has RIR, at least one set is logged. Only a complete
+  workout is saved ([ADR-0010](docs/adr/0010-only-complete-workouts-are-saved.md)). Code:
+  `checkWorkoutCompleteness`.
+
+- **Startzeitpunkt** (`startedAt`) — when the live session began, stored with the Entwurf. Pausing
+  never moves it (it moves the timer's start instead), so paused time counts towards the 5
+  hours. A draft without one falls back to the workout's creation time.
+
+- **Trainierst du noch?** (the 5-hour prompt) — once a live workout is 5 hours old, the app asks
+  whether the user is still training: **Weiter trainieren** (ask again after 1 hour,
+  `askAgainAt`), **Workout beenden** (the usual "Beenden") or **Verwerfen**. Never shown for
+  past-workout tracking. The 5-minute countdown runs only while the app is on screen and starts
+  over at a full 5 minutes whenever it comes back. Code: `useForgottenWorkout`,
+  `ForgottenWorkoutPrompt`.
+
+- **Automatisches Speichern** — what an unanswered prompt does: a complete workout is saved,
+  ending at its last logged set (`totalDuration` measured to that set, `localDate` that set's
+  day, so it does not mark today as done), an incomplete one is discarded. A toast reports it the
+  next time the user sees the app. A failed save keeps the Entwurf and asks again after an
+  hour; two tabs sharing the Entwurf run the outcome once (`runExclusively`).
+
 ### Übungen (exercise catalogue)
 
 - **Übung-Übersetzung** — the 115 catalogue Übungen (`isCustom = false`) show their name in the

@@ -7,10 +7,20 @@ import {
   Min,
   Max,
   ArrayMinSize,
+  ArrayMaxSize,
   IsOptional,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { WorkoutExerciseInputDto } from '../../common/dto/workout-tree.dto';
+import {
+  BaseText,
+  CYCLE_DURATION_MAX,
+  CYCLE_DURATION_MIN,
+  EXERCISES_PER_WORKOUT_MAX,
+  NAME_MAX,
+  TRAINING_DAY_NAME_MAX,
+  TRAINING_DAYS_PER_CYCLE_MAX,
+} from '../../common/validation/field-rules';
 
 export class WorkoutDayDto {
   @IsInt()
@@ -18,7 +28,7 @@ export class WorkoutDayDto {
   @Max(6)
   weekday: number; // 0 = Sunday, 6 = Saturday; distance from the cycle's startDate weekday decides WorkoutDay.order (#74)
 
-  @IsString()
+  @BaseText(TRAINING_DAY_NAME_MAX)
   name: string; // e.g., "Upper Body", "Leg Day"
 
   @IsOptional()
@@ -29,16 +39,17 @@ export class WorkoutDayDto {
   @ValidateNested({ each: true })
   @Type(() => WorkoutExerciseInputDto)
   @ArrayMinSize(1)
+  @ArrayMaxSize(EXERCISES_PER_WORKOUT_MAX)
   exercises: WorkoutExerciseInputDto[];
 }
 
 export class CreateCycleDto {
-  @IsString()
+  @BaseText(NAME_MAX)
   name: string;
 
   @IsInt()
-  @Min(1)
-  @Max(52)
+  @Min(CYCLE_DURATION_MIN)
+  @Max(CYCLE_DURATION_MAX)
   duration: number; // weeks
 
   @IsDateString()
@@ -50,5 +61,6 @@ export class CreateCycleDto {
   @ValidateNested({ each: true })
   @Type(() => WorkoutDayDto)
   @ArrayMinSize(1)
+  @ArrayMaxSize(TRAINING_DAYS_PER_CYCLE_MAX)
   workoutDays: WorkoutDayDto[];
 }

@@ -1,3 +1,4 @@
+import { IsIn, IsOptional } from 'class-validator';
 import { FoodDto } from '../../foods/dto';
 import { MealListItemDto } from '../../meals/dto';
 
@@ -12,4 +13,14 @@ export type PickerItemDto =
 
 export class PickerListDto {
   items: PickerItemDto[];
+}
+
+/**
+ * `scope=food` narrows the picker lists to Lebensmittel only (the Zutat search inside the
+ * Mahlzeit editor, where a meal cannot be an ingredient); absent or `all` means foods and meals.
+ */
+export class PickerScopeQueryDto {
+  @IsOptional()
+  @IsIn(['food', 'all'])
+  scope?: string;
 }

@@ -13,13 +13,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { withArrayPositionOrder } from '@/lib/workout-order';
 import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
+import { ApiError } from '@/lib/api/errors';
+import { toLocalDateString } from '@/lib/local-date';
+import { notify } from '@/lib/toast';
 
 export interface BlueprintSetData {
   order: number;
   setType: SetType;
   reps: number;
   weight: number;
-  rir: number;
+  rir?: number;
   // Per-side targets for a unilateral exercise's planned set (issue #103). Carried straight
   // through to the create-cycle payload; absent for bilateral exercises.
   repsLeft?: number;
@@ -65,12 +68,13 @@ export default function CycleWizard() {
   const apiError = useApiErrorMessage();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
   const [formData, setFormData] = useState<CycleFormData>({
     name: '',
     duration: 4,
-    startDate: new Date().toISOString().split('T')[0],
+    // The user's own today: the UTC day is yesterday for a while after local midnight, and the
+    // start-date rule would reject it.
+    startDate: toLocalDateString(new Date()),
     workoutDays: [],
   });
 
@@ -83,18 +87,15 @@ export default function CycleWizard() {
   };
 
   const handleNext = () => {
-    setError('');
     setCurrentStep((prev) => Math.min(prev + 1, totalSteps));
   };
 
   const handleBack = () => {
-    setError('');
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
   const handleSubmit = async () => {
     setLoading(true);
-    setError('');
 
     try {
       // Transform data structure for backend API
@@ -116,7 +117,9 @@ export default function CycleWizard() {
       await apiClient.createCycle(payload);
       router.push('/cycles');
     } catch (err) {
-      setError(apiError(err, t('createError')));
+      // A start date the server refuses sends the user back to the field it belongs to.
+      if (err instanceof ApiError && err.code?.startsWith('CYCLE_START_DATE_')) setCurrentStep(1);
+      notify.error(apiError(err, t('createError')));
     } finally {
       setLoading(false);
     }
@@ -178,14 +181,6 @@ export default function CycleWizard() {
 
       {/* Content */}
       <div className="max-w-4xl mx-auto px-4 py-6">
-        {error && (
-          <Card className="mb-6 border-destructive bg-destructive/5">
-            <CardContent className="p-4">
-              <p className="text-sm text-destructive">{error}</p>
-            </CardContent>
-          </Card>
-        )}
-
         <Card>
           <CardContent className="p-6">
             {currentStep === 1 && (

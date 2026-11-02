@@ -24,6 +24,8 @@ import {
   WorkoutResponseDto,
   WorkoutListItemDto,
   LastPerformanceDto,
+  LastPerformanceQueryDto,
+  WorkoutsQueryDto,
 } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -64,9 +66,7 @@ export class WorkoutsController {
   @Get('exercise-last-performance')
   async getExerciseLastPerformance(
     @CurrentUser() user: { id: string },
-    @Query('exerciseId') exerciseId: string,
-    @Query('gymId') gymId?: string,
-    @Query('excludeWorkoutId') excludeWorkoutId?: string,
+    @Query() { exerciseId, gymId, excludeWorkoutId }: LastPerformanceQueryDto,
   ): Promise<LastPerformanceDto | null> {
     if (!exerciseId) {
       throw new AppBadRequestException('EXERCISE_ID_REQUIRED');
@@ -82,9 +82,7 @@ export class WorkoutsController {
   @Get()
   async findAll(
     @CurrentUser() user: { id: string },
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-    @Query('cycleId') cycleId?: string,
+    @Query() { startDate, endDate, cycleId }: WorkoutsQueryDto,
   ): Promise<WorkoutListItemDto[]> {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;

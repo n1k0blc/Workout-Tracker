@@ -24,6 +24,16 @@ export interface DraftMeta {
   /** Whether the live session is collapsed into the bottom bar (issue #129).
    *  Absent on drafts that predate the feature -- treated as expanded. */
   isMinimized?: boolean;
+  /** Planned set numbers the user swiped away, per exercise log id (#228). Without it a reload
+   *  would bring every swiped-away row back, and the workout could not be finished. Absent on
+   *  drafts that predate the feature -- read with `readSkippedSets`. */
+  skippedSets?: Record<string, number[]>;
+  /** When the live session started, epoch ms (#229). Unlike the timer's start it is never moved by
+   *  pausing, so the 5-hour prompt counts paused time. Absent on drafts that predate the feature --
+   *  `resolveStartedAt` falls back to the workout's creation time. */
+  startedAt?: number;
+  /** After "Weiter trainieren": the earliest the 5-hour prompt may ask again, epoch ms (#229). */
+  askAgainAt?: number;
 }
 
 export interface DraftStorageKeys {
@@ -91,4 +101,39 @@ export function claimDraftForUser(
   for (const [legacyKey] of TIMER_KEYS) storage.removeItem(legacyKey);
 
   return { draft, meta };
+}
+
+/** The "ask again" time saved with a draft; anything that is not a finite number reads as none. */
+export function readAskAgainAt(meta: Pick<DraftMeta, 'askAgainAt'>): number | null {
+  const value: unknown = meta.askAgainAt;
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * What the 5-hour outcome tells the user once they see the app (#229). The outcome can fire in a
+ * tab nobody is looking at, so it is parked here until a visible tab shows it and clears it.
+ */
+export function forgottenOutcomeKey(userId: string): string {
+  return `forgottenWorkoutOutcome::${userId}`;
+}
+
+/** The localStorage claim that lets only one tab run the 5-hour outcome (see `runExclusively`). */
+export function forgottenClaimKey(userId: string): string {
+  return `forgottenWorkoutClaim::${userId}`;
+}
+
+/**
+ * The swiped-away set numbers saved with a draft. Storage can hold anything (an old draft, a
+ * hand-edited value), so only well-formed entries -- a list of positive whole numbers per
+ * exercise -- are kept; the rest is dropped rather than failing the whole restore.
+ */
+export function readSkippedSets(meta: Pick<DraftMeta, 'skippedSets'>): Record<string, number[]> {
+  const raw: unknown = meta.skippedSets;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out: Record<string, number[]> = {};
+  for (const [exerciseLogId, numbers] of Object.entries(raw)) {
+    if (!Array.isArray(numbers)) continue;
+    out[exerciseLogId] = numbers.filter((n): n is number => Number.isInteger(n) && n > 0);
+  }
+  return out;
 }

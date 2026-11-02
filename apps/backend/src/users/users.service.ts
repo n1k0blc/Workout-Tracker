@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { AppNotFoundException, AppConflictException } from '../common/errors/app-exceptions';
+import {
+  AppBadRequestException,
+  AppNotFoundException,
+  AppConflictException,
+} from '../common/errors/app-exceptions';
+import { HOME_GYMS_MAX } from '../common/validation/field-rules';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto, UserDto, CreateHomeGymDto, UpdateHomeGymDto, HomeGymDto } from './dto';
 import { toPrismaLocale, withApiLocale } from '../common/utils/locale.util';
@@ -101,6 +106,10 @@ export class UsersService {
   }
 
   async createHomeGym(userId: string, createHomeGymDto: CreateHomeGymDto): Promise<HomeGymDto> {
+    const gyms = await this.prisma.homeGym.count({ where: { userId, deletedAt: null } });
+    if (gyms >= HOME_GYMS_MAX) {
+      throw new AppBadRequestException('HOME_GYM_LIMIT_REACHED', { max: HOME_GYMS_MAX });
+    }
     return this.prisma.homeGym.create({
       data: { userId, name: createHomeGymDto.name },
       select: { id: true, name: true, createdAt: true },

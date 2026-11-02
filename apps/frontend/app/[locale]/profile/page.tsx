@@ -13,6 +13,8 @@ import {
   heightToCm,
   heightUnitLabel,
 } from '@/lib/units';
+import { toLocalDateString } from '@/lib/local-date';
+import { notify } from '@/lib/toast';
 import { apiClient } from '@/lib/api/client';
 import { HomeGym } from '@/types';
 import {
@@ -36,8 +38,7 @@ import { LogoutButton } from '@/components/logout-button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DatePicker } from '@/components/date-picker';
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
@@ -47,7 +48,40 @@ import {
   DialogTrigger,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
+import { useFormErrors } from '@/hooks/useFormErrors';
+import {
+  HOME_GYMS_MAX,
+  NAME_MAX,
+  TARGET_KCAL_MAX,
+  TARGET_KCAL_MIN,
+  TARGET_MACRO_MAX,
+  TARGET_MACRO_MIN,
+  bodyLimits,
+  checkBaseText,
+  checkBirthDate,
+  checkBodyWeight,
+  checkEmail,
+  checkHeight,
+  checkInteger,
+  checkPassword,
+  checkPersonName,
+  type Constraint,
+} from '@/lib/field-rules';
+
+/** A Tagesziel may be left blank (it clears the target); otherwise a whole number in range. */
+const checkTarget = (raw: string, min: number, max: number): Constraint =>
+  raw.trim() === '' ? null : checkInteger(raw.trim(), min, max);
 
 export default function ProfilePage() {
   const t = useTranslations('Profile');
@@ -56,8 +90,6 @@ export default function ProfilePage() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
 
   // Profile Data
   const [email, setEmail] = useState('');
@@ -81,7 +113,10 @@ export default function ProfilePage() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
-  const [passwordError, setPasswordError] = useState('');
+  const [passwordForm, passwordFormRef] = useFormErrors({
+    fields: ['currentPassword', 'newPassword', 'confirmNewPassword'],
+    codeFields: { CURRENT_PASSWORD_INCORRECT: 'currentPassword', PASSWORD_BREACHED: 'newPassword' },
+  });
   const [passwordLoading, setPasswordLoading] = useState(false);
 
   // HomeGyms
@@ -89,6 +124,7 @@ export default function ProfilePage() {
   const [newGymName, setNewGymName] = useState('');
   const [editingGymId, setEditingGymId] = useState<string | null>(null);
   const [editingGymName, setEditingGymName] = useState('');
+  const [deleteGymId, setDeleteGymId] = useState<string | null>(null);
 
   // Language (#179). foodMarket also exists on User but gets no UI until a second market does.
   const [localeValue, setLocaleValue] = useState<'de' | 'en'>('de');
@@ -98,6 +134,34 @@ export default function ProfilePage() {
   // values are only rewritten when the user actually edits the field (see lib/units.ts).
   const unitSystem = useUnitSystem();
   const [unitSaving, setUnitSaving] = useState(false);
+
+  // Field errors per card; whatever the server rejects that has no field here becomes a toast.
+  // Height and weight limits are named in the user's own unit (#230).
+  const [profileForm, profileFormRef] = useFormErrors({
+    fields: ['email', 'firstName', 'lastName', 'dateOfBirth', 'height', 'weight'],
+    codeFields: { EMAIL_ALREADY_IN_USE: 'email' },
+    messageValues: bodyLimits(unitSystem),
+  });
+  const [targetsForm, targetsFormRef] = useFormErrors({
+    fields: ['targetKcal', 'targetCarbs', 'targetProtein', 'targetFat'],
+    messageValues: {
+      targetKcal: { min: TARGET_KCAL_MIN, max: TARGET_KCAL_MAX },
+      targetCarbs: { min: TARGET_MACRO_MIN, max: TARGET_MACRO_MAX },
+      targetProtein: { min: TARGET_MACRO_MIN, max: TARGET_MACRO_MAX },
+      targetFat: { min: TARGET_MACRO_MIN, max: TARGET_MACRO_MAX },
+    },
+  });
+  const gymMessageValues = { name: { max: NAME_MAX }, homeGyms: { max: HOME_GYMS_MAX } };
+  const [addGymForm, addGymFormRef] = useFormErrors({
+    fields: ['name', 'homeGyms'],
+    codeFields: { HOME_GYM_LIMIT_REACHED: 'homeGyms' },
+    messageValues: gymMessageValues,
+  });
+  const [editGymForm, editGymFormRef] = useFormErrors({
+    fields: ['name'],
+    messageValues: gymMessageValues,
+  });
+  const [isAddGymOpen, setIsAddGymOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -142,136 +206,100 @@ export default function ProfilePage() {
   };
 
   const handleUpdateProfile = async () => {
-    setError('');
-    setSuccess('');
+    const valid = profileForm.setConstraints({
+      email: checkEmail(email),
+      firstName: checkPersonName(firstName),
+      lastName: checkPersonName(lastName),
+      dateOfBirth: checkBirthDate(
+        dateOfBirth ? dateOfBirth.toISOString().slice(0, 10) : null,
+        toLocalDateString(new Date()),
+      ),
+      height: checkHeight(height, unitSystem, user?.height),
+      weight: checkBodyWeight(weight, unitSystem, user?.weight),
+    });
+    if (!valid) return;
+
     setLoading(true);
 
     try {
-      // Validate
-      if (!email || !firstName || !lastName || !dateOfBirth || !height || !weight) {
-        throw new Error(t('profileData.validationAllFields'));
-      }
-
-      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailPattern.test(email)) {
-        throw new Error(t('profileData.validationInvalidEmail'));
-      }
-
       // Typed values are exact in the user's own unit and converted once; untouched
       // fields keep their stored cm/kg (never write back a value the user did not type).
-      const heightNum = heightToCm(height, unitSystem, user?.height);
-      const weightNum = weightToKg(weight, unitSystem, user?.weight);
-
-      if (heightNum == null || heightNum < 50 || heightNum > 300) {
-        throw new Error(
-          t('profileData.validationHeightRange', {
-            min: unitSystem === 'IMPERIAL' ? 20 : 50,
-            max: unitSystem === 'IMPERIAL' ? 118 : 300,
-            unit: heightUnitLabel(unitSystem),
-          }),
-        );
-      }
-
-      if (weightNum == null || weightNum < 20 || weightNum > 500) {
-        throw new Error(
-          t('profileData.validationWeightRange', {
-            min: unitSystem === 'IMPERIAL' ? 44 : 20,
-            max: unitSystem === 'IMPERIAL' ? 1102 : 500,
-            unit: weightUnitLabel(unitSystem),
-          }),
-        );
-      }
-
-      const age = calculateAge(dateOfBirth);
-      if (age < 13 || age > 120) {
-        throw new Error(t('profileData.validationAgeRange'));
-      }
-
       await apiClient.updateProfile({
-        email,
-        firstName,
-        lastName,
-        dateOfBirth: dateOfBirth.toISOString().split('T')[0],
-        height: heightNum,
-        weight: weightNum,
+        email: email.trim(),
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        dateOfBirth: dateOfBirth!.toISOString().split('T')[0],
+        height: heightToCm(height, unitSystem, user?.height)!,
+        weight: weightToKg(weight, unitSystem, user?.weight)!,
       });
 
-      setSuccess(t('profileData.updated'));
+      notify.success(t('profileData.updated'));
       setIsEditingProfile(false);
 
       // Reload user data
       window.location.reload();
-    } catch (err: any) {
-      setError(apiError(err, t('profileData.updateError')));
+    } catch (err) {
+      profileForm.showApiError(err);
     } finally {
       setLoading(false);
     }
   };
 
-  /** A blank Tagesziel field clears the target (null); otherwise it must be a whole number in range. */
-  const parseTargetField = (raw: string, errorMessage: string, max: number): number | null => {
-    const trimmed = raw.trim();
-    if (trimmed === '') return null;
-    const value = Number(trimmed);
-    if (!Number.isInteger(value) || value < 1 || value > max) {
-      throw new Error(errorMessage);
-    }
-    return value;
-  };
-
   const handleUpdateTargets = async () => {
-    setError('');
-    setSuccess('');
+    const valid = targetsForm.setConstraints({
+      targetKcal: checkTarget(targetKcal, TARGET_KCAL_MIN, TARGET_KCAL_MAX),
+      targetCarbs: checkTarget(targetCarbs, TARGET_MACRO_MIN, TARGET_MACRO_MAX),
+      targetProtein: checkTarget(targetProtein, TARGET_MACRO_MIN, TARGET_MACRO_MAX),
+      targetFat: checkTarget(targetFat, TARGET_MACRO_MIN, TARGET_MACRO_MAX),
+    });
+    if (!valid) return;
+
     setTargetsLoading(true);
 
     try {
-      const payload = {
-        targetKcal: parseTargetField(targetKcal, t('targets.kcalRangeError', { max: 20000 }), 20000),
-        targetCarbs: parseTargetField(targetCarbs, t('targets.carbsRangeError', { max: 2000 }), 2000),
-        targetProtein: parseTargetField(
-          targetProtein,
-          t('targets.proteinRangeError', { max: 2000 }),
-          2000,
-        ),
-        targetFat: parseTargetField(targetFat, t('targets.fatRangeError', { max: 2000 }), 2000),
-      };
+      // A blank field clears its target (null).
+      const orNull = (raw: string) => (raw.trim() === '' ? null : Number(raw.trim()));
+      await apiClient.updateProfile({
+        targetKcal: orNull(targetKcal),
+        targetCarbs: orNull(targetCarbs),
+        targetProtein: orNull(targetProtein),
+        targetFat: orNull(targetFat),
+      });
 
-      await apiClient.updateProfile(payload);
-
-      setSuccess(t('targets.saved'));
+      notify.success(t('targets.saved'));
       setIsEditingTargets(false);
       window.location.reload();
-    } catch (err: any) {
-      setError(apiError(err, t('targets.saveError')));
+    } catch (err) {
+      targetsForm.showApiError(err);
     } finally {
       setTargetsLoading(false);
     }
   };
 
   const handleAddGym = async () => {
-    if (!newGymName.trim()) return;
+    const valid = addGymForm.setConstraints({
+      name: checkBaseText(newGymName, NAME_MAX),
+      homeGyms: homeGyms.length >= HOME_GYMS_MAX ? 'arrayMaxSize' : null,
+    });
+    if (!valid) return;
 
-    setError('');
-    setSuccess('');
     setLoading(true);
 
     try {
       const gym = await apiClient.createHomeGym({ name: newGymName.trim() });
       setHomeGyms([...homeGyms, gym]);
       setNewGymName('');
-      setSuccess(t('gyms.added'));
-    } catch (err: any) {
-      setError(apiError(err, t('gyms.addError')));
+      notify.success(t('gyms.added'));
+    } catch (err) {
+      addGymForm.showApiError(err);
     } finally {
       setLoading(false);
     }
   };
 
   const handleUpdateGym = async (id: string) => {
-    if (!editingGymName.trim()) return;
+    if (!editGymForm.setConstraints({ name: checkBaseText(editingGymName, NAME_MAX) })) return;
 
-    setError('');
-    setSuccess('');
     setLoading(true);
 
     try {
@@ -279,51 +307,41 @@ export default function ProfilePage() {
       setHomeGyms(homeGyms.map((g) => (g.id === id ? updatedGym : g)));
       setEditingGymId(null);
       setEditingGymName('');
-      setSuccess(t('gyms.updated'));
-    } catch (err: any) {
-      setError(apiError(err, t('gyms.updateError')));
+      notify.success(t('gyms.updated'));
+    } catch (err) {
+      editGymForm.showApiError(err);
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeleteGym = async (id: string) => {
-    if (!confirm(t('gyms.deleteConfirm'))) {
-      return;
-    }
-
-    setError('');
-    setSuccess('');
+    setDeleteGymId(null);
     setLoading(true);
 
     try {
       await apiClient.deleteHomeGym(id);
       setHomeGyms(homeGyms.filter((g) => g.id !== id));
-      setSuccess(t('gyms.deleted'));
-    } catch (err: any) {
-      setError(apiError(err, t('gyms.deleteError')));
+      notify.success(t('gyms.deleted'));
+    } catch (err) {
+      notify.error(apiError(err, t('gyms.deleteError')));
     } finally {
       setLoading(false);
     }
   };
 
   const handleChangePassword = async () => {
-    setPasswordError('');
-
-    if (!currentPassword || !newPassword || !confirmNewPassword) {
-      setPasswordError(t('security.validationAllFields'));
-      return;
-    }
-
-    if (newPassword.length < 8) {
-      setPasswordError(t('security.validationMinLength'));
-      return;
-    }
-
-    if (newPassword !== confirmNewPassword) {
-      setPasswordError(t('security.validationMismatch'));
-      return;
-    }
+    const valid = passwordForm.setConstraints({
+      currentPassword: checkPassword(currentPassword),
+      newPassword: checkPassword(newPassword),
+      confirmNewPassword:
+        confirmNewPassword === ''
+          ? 'isNotEmpty'
+          : confirmNewPassword !== newPassword
+            ? 'passwordsDiffer'
+            : null,
+    });
+    if (!valid) return;
 
     setPasswordLoading(true);
 
@@ -338,7 +356,7 @@ export default function ProfilePage() {
       await logout();
       router.push('/login');
     } catch (err: any) {
-      setPasswordError(apiError(err, t('security.changeError')));
+      passwordForm.showApiError(err);
     } finally {
       setPasswordLoading(false);
     }
@@ -357,14 +375,13 @@ export default function ProfilePage() {
   const handleLocaleChange = async (next: string) => {
     if (next !== 'de' && next !== 'en') return;
 
-    setError('');
     setLocaleSaving(true);
 
     try {
       await apiClient.updateProfile({ locale: next });
       window.location.href = `/${next}/profile`;
-    } catch (err: any) {
-      setError(apiError(err, t('language.updateError')));
+    } catch (err) {
+      notify.error(apiError(err, t('language.updateError')));
       setLocaleSaving(false);
     }
   };
@@ -374,14 +391,13 @@ export default function ProfilePage() {
   const handleUnitSystemChange = async (next: string) => {
     if (next !== 'METRIC' && next !== 'IMPERIAL') return;
 
-    setError('');
     setUnitSaving(true);
 
     try {
       await apiClient.updateProfile({ unitSystem: next });
       window.location.reload();
-    } catch (err: any) {
-      setError(apiError(err, t('units.updateError')));
+    } catch (err) {
+      notify.error(apiError(err, t('units.updateError')));
       setUnitSaving(false);
     }
   };
@@ -415,18 +431,6 @@ export default function ProfilePage() {
           </h1>
         </div>
 
-        {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {success && (
-          <Alert className="mb-4">
-            <AlertDescription>{success}</AlertDescription>
-          </Alert>
-        )}
-
         {/* Tagesziele Section (#152) */}
         <Card className="mb-6">
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-y-2">
@@ -443,6 +447,9 @@ export default function ProfilePage() {
                   size="sm"
                   onClick={() => {
                     setIsEditingTargets(false);
+                    for (const key of ['targetKcal', 'targetCarbs', 'targetProtein', 'targetFat']) {
+                      targetsForm.clear(key);
+                    }
                     setTargetKcal(user?.targetKcal?.toString() || '');
                     setTargetCarbs(user?.targetCarbs?.toString() || '');
                     setTargetProtein(user?.targetProtein?.toString() || '');
@@ -459,23 +466,34 @@ export default function ProfilePage() {
             )}
           </CardHeader>
 
-          <CardContent>
+          <CardContent ref={targetsFormRef}>
             {!isEditingTargets && !anyTargetSet ? (
               <p className="text-sm text-muted-foreground">{t('targets.empty')}</p>
             ) : (
               <div className="space-y-5">
                 <Field>
-                  <FieldLabel>{t('targets.kcalLabel')}</FieldLabel>
+                  <FieldLabel htmlFor="targetKcal">{t('targets.kcalLabel')}</FieldLabel>
                   {isEditingTargets ? (
-                    <Input
-                      type="number"
-                      inputMode="numeric"
-                      value={targetKcal}
-                      onChange={(e) => setTargetKcal(e.target.value)}
-                      min="1"
-                      max="20000"
-                      placeholder={t('targets.kcalPlaceholder')}
-                    />
+                    <>
+                      <Input
+                        id="targetKcal"
+                        type="number"
+                        inputMode="numeric"
+                        value={targetKcal}
+                        onChange={(e) => {
+                          setTargetKcal(e.target.value);
+                          targetsForm.clear('targetKcal');
+                        }}
+                        min={TARGET_KCAL_MIN}
+                        max={TARGET_KCAL_MAX}
+                        step={1}
+                        placeholder={t('targets.kcalPlaceholder')}
+                        {...targetsForm.fieldProps('targetKcal')}
+                      />
+                      <FieldError id={targetsForm.errorId('targetKcal')}>
+                        {targetsForm.errors.targetKcal}
+                      </FieldError>
+                    </>
                   ) : (
                     <p className="flex items-baseline gap-1.5 py-2">
                       <span className="text-2xl font-bold">
@@ -488,22 +506,31 @@ export default function ProfilePage() {
 
                 <div className="grid grid-cols-3 gap-3">
                   {[
-                    { label: t('targets.carbsLabel'), value: targetCarbs, set: setTargetCarbs },
-                    { label: t('targets.proteinLabel'), value: targetProtein, set: setTargetProtein },
-                    { label: t('targets.fatLabel'), value: targetFat, set: setTargetFat },
+                    { key: 'targetCarbs', label: t('targets.carbsLabel'), value: targetCarbs, set: setTargetCarbs },
+                    { key: 'targetProtein', label: t('targets.proteinLabel'), value: targetProtein, set: setTargetProtein },
+                    { key: 'targetFat', label: t('targets.fatLabel'), value: targetFat, set: setTargetFat },
                   ].map((f) => (
-                    <Field key={f.label}>
-                      <FieldLabel>{f.label}</FieldLabel>
+                    <Field key={f.key}>
+                      <FieldLabel htmlFor={f.key}>{f.label}</FieldLabel>
                       {isEditingTargets ? (
-                        <Input
-                          type="number"
-                          inputMode="numeric"
-                          value={f.value}
-                          onChange={(e) => f.set(e.target.value)}
-                          min="1"
-                          max="2000"
-                          placeholder={t('targets.gramsPlaceholder')}
-                        />
+                        <>
+                          <Input
+                            id={f.key}
+                            type="number"
+                            inputMode="numeric"
+                            value={f.value}
+                            onChange={(e) => {
+                              f.set(e.target.value);
+                              targetsForm.clear(f.key);
+                            }}
+                            min={TARGET_MACRO_MIN}
+                            max={TARGET_MACRO_MAX}
+                            step={1}
+                            placeholder={t('targets.gramsPlaceholder')}
+                            {...targetsForm.fieldProps(f.key)}
+                          />
+                          <FieldError id={targetsForm.errorId(f.key)}>{targetsForm.errors[f.key]}</FieldError>
+                        </>
                       ) : (
                         <p className="py-2">
                           <span className="text-base font-semibold">
@@ -559,7 +586,12 @@ export default function ProfilePage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setIsEditingProfile(false)}
+                  onClick={() => {
+                    setIsEditingProfile(false);
+                    for (const key of ['email', 'firstName', 'lastName', 'dateOfBirth', 'height', 'weight']) {
+                      profileForm.clear(key);
+                    }
+                  }}
                 >
                   {t('common.cancel')}
                 </Button>
@@ -575,28 +607,44 @@ export default function ProfilePage() {
             )}
           </CardHeader>
 
-          <CardContent>
+          <CardContent ref={profileFormRef}>
             <FieldGroup>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Field>
-                  <FieldLabel>{t('profileData.firstName')}</FieldLabel>
+                  <FieldLabel htmlFor="firstName">{t('profileData.firstName')}</FieldLabel>
                   {isEditingProfile ? (
-                    <Input
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                    />
+                    <>
+                      <Input
+                        id="firstName"
+                        value={firstName}
+                        onChange={(e) => {
+                          setFirstName(e.target.value);
+                          profileForm.clear('firstName');
+                        }}
+                        {...profileForm.fieldProps('firstName')}
+                      />
+                      <FieldError id={profileForm.errorId('firstName')}>{profileForm.errors.firstName}</FieldError>
+                    </>
                   ) : (
                     <p className="text-foreground py-2">{firstName || t('profileData.empty')}</p>
                   )}
                 </Field>
 
                 <Field>
-                  <FieldLabel>{t('profileData.lastName')}</FieldLabel>
+                  <FieldLabel htmlFor="lastName">{t('profileData.lastName')}</FieldLabel>
                   {isEditingProfile ? (
-                    <Input
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                    />
+                    <>
+                      <Input
+                        id="lastName"
+                        value={lastName}
+                        onChange={(e) => {
+                          setLastName(e.target.value);
+                          profileForm.clear('lastName');
+                        }}
+                        {...profileForm.fieldProps('lastName')}
+                      />
+                      <FieldError id={profileForm.errorId('lastName')}>{profileForm.errors.lastName}</FieldError>
+                    </>
                   ) : (
                     <p className="text-foreground py-2">{lastName || t('profileData.empty')}</p>
                   )}
@@ -604,30 +652,46 @@ export default function ProfilePage() {
               </div>
 
               <Field>
-                <FieldLabel>{t('profileData.email')}</FieldLabel>
+                <FieldLabel htmlFor="email">{t('profileData.email')}</FieldLabel>
                 {isEditingProfile ? (
-                  <Input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
+                  <>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        profileForm.clear('email');
+                      }}
+                      {...profileForm.fieldProps('email')}
+                    />
+                    <FieldError id={profileForm.errorId('email')}>{profileForm.errors.email}</FieldError>
+                  </>
                 ) : (
                   <p className="text-foreground py-2">{user?.email}</p>
                 )}
               </Field>
 
               <Field>
-                <FieldLabel>
+                <FieldLabel htmlFor="dateOfBirth">
                   {dateOfBirth
                     ? t('profileData.dateOfBirthWithAge', { age: calculateAge(dateOfBirth) })
                     : t('profileData.dateOfBirth')}
                 </FieldLabel>
                 {isEditingProfile ? (
-                  <DatePicker
-                    date={dateOfBirth}
-                    onSelect={setDateOfBirth}
-                    placeholder={t('profileData.datePlaceholder')}
-                  />
+                  <>
+                    <DatePicker
+                      id="dateOfBirth"
+                      date={dateOfBirth}
+                      onSelect={(date) => {
+                        setDateOfBirth(date);
+                        profileForm.clear('dateOfBirth');
+                      }}
+                      placeholder={t('profileData.datePlaceholder')}
+                      {...profileForm.fieldProps('dateOfBirth')}
+                    />
+                    <FieldError id={profileForm.errorId('dateOfBirth')}>{profileForm.errors.dateOfBirth}</FieldError>
+                  </>
                 ) : (
                   <p className="text-foreground py-2">
                     {dateOfBirth ? format.dateTime(dateOfBirth) : t('profileData.empty')}
@@ -637,15 +701,24 @@ export default function ProfilePage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Field>
-                  <FieldLabel>{t('profileData.heightLabel', { unit: heightUnitLabel(unitSystem) })}</FieldLabel>
+                  <FieldLabel htmlFor="height">{t('profileData.heightLabel', { unit: heightUnitLabel(unitSystem) })}</FieldLabel>
                   {isEditingProfile ? (
-                    <Input
-                      type="number"
-                      value={height}
-                      onChange={(e) => setHeight(e.target.value)}
-                      min={unitSystem === 'IMPERIAL' ? 20 : 50}
-                      max={unitSystem === 'IMPERIAL' ? 118 : 300}
-                    />
+                    <>
+                      <Input
+                        id="height"
+                        type="number"
+                        value={height}
+                        onChange={(e) => {
+                          setHeight(e.target.value);
+                          profileForm.clear('height');
+                        }}
+                        min={bodyLimits(unitSystem).height.min}
+                        max={bodyLimits(unitSystem).height.max}
+                        step={1}
+                        {...profileForm.fieldProps('height')}
+                      />
+                      <FieldError id={profileForm.errorId('height')}>{profileForm.errors.height}</FieldError>
+                    </>
                   ) : (
                     <p className="text-foreground py-2">
                       {height ? t('profileData.heightValue', { height, unit: heightUnitLabel(unitSystem) }) : t('profileData.empty')}
@@ -654,16 +727,24 @@ export default function ProfilePage() {
                 </Field>
 
                 <Field>
-                  <FieldLabel>{t('profileData.weightLabel', { unit: weightUnitLabel(unitSystem) })}</FieldLabel>
+                  <FieldLabel htmlFor="weight">{t('profileData.weightLabel', { unit: weightUnitLabel(unitSystem) })}</FieldLabel>
                   {isEditingProfile ? (
-                    <Input
-                      type="number"
-                      value={weight}
-                      onChange={(e) => setWeight(e.target.value)}
-                      min={unitSystem === 'IMPERIAL' ? 44 : 20}
-                      max={unitSystem === 'IMPERIAL' ? 1102 : 500}
-                      step="0.1"
-                    />
+                    <>
+                      <Input
+                        id="weight"
+                        type="number"
+                        value={weight}
+                        onChange={(e) => {
+                          setWeight(e.target.value);
+                          profileForm.clear('weight');
+                        }}
+                        min={bodyLimits(unitSystem).weight.min}
+                        max={bodyLimits(unitSystem).weight.max}
+                        step={0.1}
+                        {...profileForm.fieldProps('weight')}
+                      />
+                      <FieldError id={profileForm.errorId('weight')}>{profileForm.errors.weight}</FieldError>
+                    </>
                   ) : (
                     <p className="text-foreground py-2">
                       {weight ? t('profileData.weightValue', { weight, unit: weightUnitLabel(unitSystem) }) : t('profileData.empty')}
@@ -716,7 +797,17 @@ export default function ProfilePage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>{t('gyms.title')}</CardTitle>
-              <Dialog>
+              <Dialog
+                open={isAddGymOpen}
+                onOpenChange={(open) => {
+                  setIsAddGymOpen(open);
+                  if (!open) {
+                    setNewGymName('');
+                    addGymForm.clear('name');
+                    addGymForm.clear('homeGyms');
+                  }
+                }}
+              >
                 <DialogTrigger asChild>
                   <Button>
                     <IconPlus className="mr-2 size-4" />
@@ -727,23 +818,31 @@ export default function ProfilePage() {
                   <DialogHeader>
                     <DialogTitle>{t('gyms.addDialogTitle')}</DialogTitle>
                   </DialogHeader>
-                  <div className="space-y-4 py-4">
+                  <div ref={addGymFormRef} className="space-y-4 py-4">
                     <Field>
-                      <FieldLabel>{t('gyms.nameLabel')}</FieldLabel>
+                      <FieldLabel htmlFor="newGymName">{t('gyms.nameLabel')}</FieldLabel>
                       <Input
+                        id="newGymName"
                         value={newGymName}
-                        onChange={(e) => setNewGymName(e.target.value)}
+                        onChange={(e) => {
+                          setNewGymName(e.target.value);
+                          addGymForm.clear('name');
+                          addGymForm.clear('homeGyms');
+                        }}
                         placeholder={t('gyms.namePlaceholder')}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') handleAddGym();
                         }}
+                        {...addGymForm.fieldProps('name')}
                       />
+                      <FieldError id={addGymForm.errorId('name')}>{addGymForm.errors.name}</FieldError>
+                      <FieldError id={addGymForm.errorId('homeGyms')}>{addGymForm.errors.homeGyms}</FieldError>
                     </Field>
                   </div>
                   <DialogFooter>
                     <Button
                       onClick={handleAddGym}
-                      disabled={loading || !newGymName.trim()}
+                      disabled={loading}
                     >
                       {t('gyms.addSubmit')}
                     </Button>
@@ -778,7 +877,7 @@ export default function ProfilePage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleDeleteGym(gym.id)}
+                        onClick={() => setDeleteGymId(gym.id)}
                         disabled={loading}
                         className="text-destructive hover:text-destructive"
                       >
@@ -793,23 +892,37 @@ export default function ProfilePage() {
         </Card>
 
         {/* Edit Gym Dialog */}
-        <Dialog open={!!editingGymId} onOpenChange={(open) => !open && setEditingGymId(null)}>
+        <Dialog
+          open={!!editingGymId}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditingGymId(null);
+              editGymForm.clear('name');
+            }
+          }}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{t('gyms.editDialogTitle')}</DialogTitle>
             </DialogHeader>
-            <div className="py-4">
+            <div ref={editGymFormRef} className="py-4">
               <Field>
-                <FieldLabel>{t('gyms.nameLabel')}</FieldLabel>
+                <FieldLabel htmlFor="editingGymName">{t('gyms.nameLabel')}</FieldLabel>
                 <Input
+                  id="editingGymName"
                   value={editingGymName}
-                  onChange={(e) => setEditingGymName(e.target.value)}
+                  onChange={(e) => {
+                    setEditingGymName(e.target.value);
+                    editGymForm.clear('name');
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && editingGymId) {
                       handleUpdateGym(editingGymId);
                     }
                   }}
+                  {...editGymForm.fieldProps('name')}
                 />
+                <FieldError id={editGymForm.errorId('name')}>{editGymForm.errors.name}</FieldError>
               </Field>
             </div>
             <DialogFooter>
@@ -818,13 +931,32 @@ export default function ProfilePage() {
               </Button>
               <Button
                 onClick={() => editingGymId && handleUpdateGym(editingGymId)}
-                disabled={loading || !editingGymName.trim()}
+                disabled={loading}
               >
                 {t('common.save')}
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Delete Gym Confirmation */}
+        <AlertDialog open={!!deleteGymId} onOpenChange={(open) => !open && setDeleteGymId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t('gyms.deleteDialogTitle')}</AlertDialogTitle>
+              <AlertDialogDescription>{t('gyms.deleteConfirm')}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteGymId && handleDeleteGym(deleteGymId)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {t('gyms.deleteSubmit')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Security Section */}
         <Card className="mb-6">
@@ -836,7 +968,11 @@ export default function ProfilePage() {
                 onOpenChange={(open) => {
                   setIsPasswordDialogOpen(open);
                   if (!open) {
-                    setPasswordError('');
+                    passwordForm.setConstraints({
+                      currentPassword: null,
+                      newPassword: null,
+                      confirmNewPassword: null,
+                    });
                     setCurrentPassword('');
                     setNewPassword('');
                     setConfirmNewPassword('');
@@ -854,42 +990,60 @@ export default function ProfilePage() {
                     <DialogTitle>{t('security.changePassword')}</DialogTitle>
                   </DialogHeader>
 
-                  {passwordError && (
-                    <Alert variant="destructive">
-                      <AlertDescription>{passwordError}</AlertDescription>
-                    </Alert>
-                  )}
-
-                  <div className="space-y-4 py-4">
+                  <div ref={passwordFormRef} className="space-y-4 py-4">
                     <Field>
-                      <FieldLabel>{t('security.currentPassword')}</FieldLabel>
+                      <FieldLabel htmlFor="current-password">{t('security.currentPassword')}</FieldLabel>
                       <Input
+                        id="current-password"
                         type="password"
                         value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        onChange={(e) => {
+                          setCurrentPassword(e.target.value);
+                          passwordForm.clear('currentPassword');
+                        }}
                         autoComplete="current-password"
+                        {...passwordForm.fieldProps('currentPassword')}
                       />
+                      <FieldError id={passwordForm.errorId('currentPassword')}>
+                        {passwordForm.errors.currentPassword}
+                      </FieldError>
                     </Field>
                     <Field>
-                      <FieldLabel>{t('security.newPassword')}</FieldLabel>
+                      <FieldLabel htmlFor="new-password">{t('security.newPassword')}</FieldLabel>
                       <Input
+                        id="new-password"
                         type="password"
                         value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
+                        onChange={(e) => {
+                          setNewPassword(e.target.value);
+                          passwordForm.clear('newPassword');
+                        }}
                         autoComplete="new-password"
+                        {...passwordForm.fieldProps('newPassword')}
                       />
+                      <FieldError id={passwordForm.errorId('newPassword')}>
+                        {passwordForm.errors.newPassword}
+                      </FieldError>
                     </Field>
                     <Field>
-                      <FieldLabel>{t('security.confirmNewPassword')}</FieldLabel>
+                      <FieldLabel htmlFor="confirm-new-password">{t('security.confirmNewPassword')}</FieldLabel>
                       <Input
+                        id="confirm-new-password"
                         type="password"
                         value={confirmNewPassword}
-                        onChange={(e) => setConfirmNewPassword(e.target.value)}
+                        onChange={(e) => {
+                          setConfirmNewPassword(e.target.value);
+                          passwordForm.clear('confirmNewPassword');
+                        }}
                         autoComplete="new-password"
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') handleChangePassword();
                         }}
+                        {...passwordForm.fieldProps('confirmNewPassword')}
                       />
+                      <FieldError id={passwordForm.errorId('confirmNewPassword')}>
+                        {passwordForm.errors.confirmNewPassword}
+                      </FieldError>
                     </Field>
                   </div>
 

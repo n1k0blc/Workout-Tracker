@@ -2,9 +2,9 @@ import {
   IsString,
   IsNotEmpty,
   IsNumber,
-  IsPositive,
+  Min,
+  Max,
   IsOptional,
-  MaxLength,
   IsArray,
   ValidateNested,
   ArrayMinSize,
@@ -12,6 +12,12 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { IsLocalDate } from '../../common/utils/local-date.util';
+import {
+  AMOUNT_MAX,
+  AMOUNT_MIN,
+  BaseText,
+  PORTION_LABEL_MAX,
+} from '../../common/validation/field-rules';
 
 /** One food picked in the drawer, with how much of it (normalised to grams or ml). */
 export class DiaryEntryFromFoodItemDto {
@@ -22,13 +28,13 @@ export class DiaryEntryFromFoodItemDto {
   // Always grams or millilitres -- the client resolves a chosen portion into this before
   // sending. The server scales the food's per-100 values by `grams / 100`.
   @IsNumber()
-  @IsPositive()
+  @Min(AMOUNT_MIN)
+  @Max(AMOUNT_MAX)
   grams: number;
 
   // How the amount was entered, kept verbatim for display ("1 Portion (40 g)", "150 g").
   @IsOptional()
-  @IsString()
-  @MaxLength(60)
+  @BaseText(PORTION_LABEL_MAX, { allowEmpty: true })
   quantityLabel?: string;
 }
 

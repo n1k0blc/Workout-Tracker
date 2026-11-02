@@ -14,19 +14,23 @@ vi.mock('@/lib/auth-context', () => ({
 
 const updateSet = vi.fn();
 
-vi.mock('@/lib/workout-context', () => ({
-  useWorkout: () => ({
-    removeExercise: vi.fn(),
-    replaceExercise: vi.fn(),
-    logSet: vi.fn(),
-    updateSet,
-    loading: false,
-    activeWorkout: { id: 'w1', exercises: [] },
-    setActiveWorkoutDirectly: vi.fn(),
-    isPastWorkout: false,
-    pastWorkoutDuration: 0,
-  }),
-}));
+vi.mock('@/lib/workout-context', async () => {
+  const { useFakeSetRowState } = await import('@/test-utils/set-row-state');
+  return {
+    useWorkout: () => ({
+      ...useFakeSetRowState(),
+      removeExercise: vi.fn(),
+      replaceExercise: vi.fn(),
+      logSet: vi.fn(),
+      updateSet,
+      loading: false,
+      activeWorkout: { id: 'w1', exercises: [] },
+      setActiveWorkoutDirectly: vi.fn(),
+      isPastWorkout: false,
+      pastWorkoutDuration: 0,
+    }),
+  };
+});
 
 import ExerciseCard from '@/components/workout/exercise-card';
 import { SetType, type ExerciseLog } from '@/types';

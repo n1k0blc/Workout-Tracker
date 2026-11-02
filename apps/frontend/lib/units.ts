@@ -7,7 +7,7 @@
 export type UnitSystem = 'METRIC' | 'IMPERIAL';
 
 export const KG_PER_LB = 0.45359237;
-const CM_PER_INCH = 2.54;
+export const CM_PER_INCH = 2.54;
 
 export function weightUnitLabel(system: UnitSystem): 'kg' | 'lb' {
   return system === 'IMPERIAL' ? 'lb' : 'kg';

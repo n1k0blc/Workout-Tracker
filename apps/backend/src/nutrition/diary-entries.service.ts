@@ -6,6 +6,7 @@ import {
 } from '../common/errors/app-exceptions';
 import { PrismaService } from '../prisma/prisma.service';
 import { scalePer100 } from '../common/utils/nutrition.util';
+import { fitsFoodLimits } from '../common/validation/field-rules';
 import { MealsService } from '../meals/meals.service';
 import { MealSlotsService } from './meal-slots.service';
 import { toMacroTargetsDto, UserTargetsRow, USER_TARGETS_SELECT } from './nutrition-targets.util';
@@ -187,6 +188,12 @@ export class DiaryEntriesService {
    */
   async createEntry(userId: string, dto: CreateDiaryEntryDto): Promise<DiaryEntryDto> {
     await this.assertWritableSlot(userId, dto.mealSlotId);
+
+    // The entered numbers become a Lebensmittel's per-100 values, which have tighter limits than
+    // a Schnelleintrag: refuse here rather than create a food the editor would not accept.
+    if (dto.saveAsFood && !fitsFoodLimits(dto)) {
+      throw new AppBadRequestException('QUICK_ENTRY_NOT_A_FOOD');
+    }
 
     const entryData = {
       userId,

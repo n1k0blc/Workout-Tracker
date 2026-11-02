@@ -19,6 +19,15 @@ import { aggregateSetSides } from './set-sides';
 
 const DEFAULT_REST_SECONDS = 90;
 
+/**
+ * The RIR a plan row carries between storage, the editor and the save payload (#227): none on a
+ * warm-up, which has no RIR and which the server rejects one on, and a working set's missing RIR
+ * stays missing instead of becoming 0 ("to failure"). The editors then ask for it.
+ */
+export function planRir(s: { setType?: SetType; rir?: number | null }): number | undefined {
+  return (s.setType ?? SetType.WORKING) === SetType.WARMUP ? undefined : (s.rir ?? undefined);
+}
+
 const renumber = (sets: PlannedSet[]): PlannedSet[] =>
   sets.map((set, index) => ({ ...set, order: index + 1 }));
 
@@ -42,7 +51,11 @@ export function addPlannedSet(
   // placeholders to type an estimate into, not a fabricated 10x0@2.
   const reps = previous?.reps ?? 0;
   const weight = previous?.weight ?? 0;
-  const rir = previous?.rir ?? 0;
+  // RIR is the exception (#227): a previous warm-up has none to copy, and a previous working
+  // set that has none yet must not become RIR 0 ("to failure") unasked. The new set then shows
+  // an empty RIR as an error until the user enters one.
+  const inheritsRir = previous !== undefined && previous.setType !== SetType.WARMUP;
+  const rir = previous === undefined ? 0 : inheritsRir ? (previous.rir ?? undefined) : undefined;
 
   const next: PlannedSet = {
     id: `planned-${Date.now()}-${sets.length}`,
@@ -63,8 +76,8 @@ export function addPlannedSet(
     const repsRight = previous?.repsRight ?? reps;
     const weightLeft = previous?.weightLeft ?? weight;
     const weightRight = previous?.weightRight ?? weight;
-    const rirLeft = previous?.rirLeft ?? rir;
-    const rirRight = previous?.rirRight ?? rir;
+    const rirLeft = inheritsRir ? (previous.rirLeft ?? rir) : rir;
+    const rirRight = inheritsRir ? (previous.rirRight ?? rir) : rir;
     const agg = aggregateSetSides(
       { reps: repsLeft, weight: weightLeft, rir: rirLeft },
       { reps: repsRight, weight: weightRight, rir: rirRight },

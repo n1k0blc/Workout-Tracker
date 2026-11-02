@@ -1,7 +1,6 @@
-import { IsString, MaxLength } from 'class-validator';
+import { BaseText, NAME_MAX } from '../../common/validation/field-rules';
 
 export class UpdateHomeGymDto {
-  @IsString()
-  @MaxLength(100)
+  @BaseText(NAME_MAX)
   name: string;
 }
