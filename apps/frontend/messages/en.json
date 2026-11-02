@@ -411,6 +411,12 @@
     "duplicateExerciseError": "This exercise is already in the workout. Add sets to the existing exercise instead.",
     "addExerciseError": "Failed to add exercise",
     "saveError": "Failed to save workout",
+    "incomplete": {
+      "unloggedSet": "{exercise}: set {number} is not logged yet. Log it or swipe it away.",
+      "missingRir": "{exercise}: set {number} still needs an RIR.",
+      "emptyExercise": "{exercise} has no sets yet. Add a set or remove the exercise.",
+      "nothingLogged": "Log at least one set before you finish the workout."
+    },
     "discard": "Discard",
     "discarding": "Discarding...",
     "finish": "Finish workout",
@@ -499,6 +505,7 @@
     "logMissing": "Set not logged – missing: {fields}.",
     "logInvalid": "Set not logged – please check the marked fields.",
     "logOutOfOrder": "Log set {number} first, or swipe it away.",
+    "logExerciseAbove": "Finish “{name}” first, or drag this exercise up if the machine is taken.",
     "planRirMissing": "{exercise}, set {number}: Enter an RIR.",
     "rirHint": "Aim for RIR 2 at most.",
     "errors": {

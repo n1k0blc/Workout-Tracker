@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { ExerciseLog, SetLog, SetType, Exercise } from '@/types';
 import { useWorkout } from '@/lib/workout-context';
@@ -14,6 +14,7 @@ import {
   type SetFieldValues,
   type SetProblem,
 } from '@/lib/log-set-guards';
+import { checkExerciseCompleteness } from '@/lib/workout-completeness';
 import { notify } from '@/lib/toast';
 import { seedAddedSetValues } from '@/lib/add-set-seed';
 import type { LogSetData } from '@/lib/workout-context';
@@ -140,8 +141,23 @@ interface ExerciseCardProps {
 
   /** Start expanded instead of collapsed -- for exercises just added this session, so the user isn't left guessing they need to add sets. */
   defaultOpen?: boolean;
+
+  /**
+   * Ask the card to open and scroll to a set row (#228): the screen's "Beenden" names the first
+   * problem and sends the user there. Every new `nonce` is a new request, so asking for the same
+   * row twice scrolls twice. A null `setNumber` scrolls to the card itself.
+   */
+  reveal?: { setNumber: number | null; nonce: number };
+
+  /**
+   * Past-workout tracking after a refused "Beenden": every row that could not be logged shows
+   * what is wrong with it, not only the rows the user already tried to log (#228).
+   */
+  showUnloggedErrors?: boolean;
 }
 
+
+const NO_NUMBERS: readonly number[] = [];
 
 export default function ExerciseCard({
   exercise,
@@ -160,6 +176,8 @@ export default function ExerciseCard({
   onUpdatePlannedSet,
   readonly,
   defaultOpen,
+  reveal,
+  showUnloggedErrors,
 }: ExerciseCardProps) {
   const t = useTranslations('ExerciseCard');
   const units = useUnits();
@@ -182,6 +200,10 @@ export default function ExerciseCard({
     setActiveWorkoutDirectly,
     isPastWorkout,
     pastWorkoutDuration,
+    setRowState,
+    skipPlannedSet,
+    addSetRow,
+    removeSetRow,
   } = useWorkout();
 
   // Prefer injected handlers (for decoupled template usage, no context hijack) over context
@@ -192,6 +214,27 @@ export default function ExerciseCard({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showReplaceModal, setShowReplaceModal] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(!defaultOpen);
+
+  // "Beenden" names the first problem and sends the user there (#228): the card opens in the same
+  // render the request arrives in, and the scroll follows once the rows are in the DOM. A request
+  // that was already there when the card mounted is not ours to act on.
+  const setRowId = (setNumber: number) => `set-row-${exercise.id}-${setNumber}`;
+  const [openedForReveal, setOpenedForReveal] = useState(reveal?.nonce);
+  if (reveal && reveal.nonce !== openedForReveal) {
+    setOpenedForReveal(reveal.nonce);
+    setIsCollapsed(false);
+  }
+  const scrolledForReveal = useRef(reveal?.nonce);
+  useEffect(() => {
+    if (!reveal || reveal.nonce === scrolledForReveal.current) return;
+    scrolledForReveal.current = reveal.nonce;
+    const row = reveal.setNumber === null ? null : document.getElementById(setRowId(reveal.setNumber));
+    (row ?? document.getElementById(`exercise-card-${exercise.id}`))?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reveal]);
   const [editingSetId, setEditingSetId] = useState<string | null>(null);
   const [editingValues, setEditingValues] = useState<{
     reps: string;
@@ -233,13 +276,13 @@ export default function ExerciseCard({
     !!exercise.isUnilateral &&
     ((exercise.sets || []).length > 0 || (exercise.plannedSets || []).length > 0);
 
-  // Local drafts for additional/extra sets (free workouts or sets beyond planned).
-  // These are UI-only (not persisted in context) – backend only cares about final logs.
-  const [additionalSetNumbers, setAdditionalSetNumbers] = useState<number[]>([]);
-
-  // Locally skipped planned set numbers (for this workout execution only).
-  // Allows "deleting" (hiding the row for) unlogged planned sets via RTL swipe.
-  const [skippedPlannedSetNumbers, setSkippedPlannedSetNumbers] = useState<Set<number>>(new Set());
+  // Added rows (free workouts or sets beyond planned) and swiped-away planned sets live in
+  // workout-context (#228), because the workout-completeness check needs them too. Added rows
+  // are session state; swiped-away sets (an RTL swipe on an unlogged planned row) are also
+  // persisted with the draft. Backend only cares about the final logs.
+  const additionalSetNumbers = setRowState.added[exercise.id] ?? NO_NUMBERS;
+  const skippedList = setRowState.skipped[exercise.id] ?? NO_NUMBERS;
+  const skippedPlannedSetNumbers = useMemo(() => new Set(skippedList), [skippedList]);
 
   // Swipe state for set rows (LTR = log if unlogged, RTL = discard unlogged draft).
   const [activeSwipe, setActiveSwipe] = useState<null | { key: string | number; startX: number; startY: number; offset: number }>(null);
@@ -492,11 +535,14 @@ export default function ExerciseCard({
   /**
    * Which problems an unlogged row shows. The plan editors show a missing RIR at all times, since
    * a planned working set needs one and nothing else makes the editor's save fail visibly; a
-   * logging row shows the fields the user was already told about.
+   * logging row shows the fields the user was already told about -- or, once a past workout's
+   * "Beenden" was refused, everything wrong with it.
    */
   const unloggedFeedback = (setNumber: number, setType: SetType): RowFeedback =>
     buildFeedback(setType, unloggedValues(setNumber), (p) =>
-      ownsPlan ? p.field.endsWith('rir') : (markedFields[setNumber] ?? []).includes(p.field),
+      ownsPlan
+        ? p.field.endsWith('rir')
+        : !!showUnloggedErrors || (markedFields[setNumber] ?? []).includes(p.field),
     );
 
   /**
@@ -628,7 +674,7 @@ export default function ExerciseCard({
     const seed = seedAddedSetValues(exercise.sets, exercise.plannedSets);
     const toStr = (n: number | null | undefined) => (n == null ? '' : n.toString());
 
-    setAdditionalSetNumbers((prev) => [...prev, next]);
+    addSetRow(exercise.id, next);
     setEditValues((prev) => ({
       ...prev,
       [next]: seed
@@ -686,6 +732,17 @@ export default function ExerciseCard({
     const plannedSet = exercise.plannedSets?.find((ps) => ps.order === setNumber);
     // Additional / free set: must come from seeded editValues (from addAdditionalSet)
     if (!plannedSet && !editValues[setNumber]) return;
+
+    // In the live workout an Uebung is worked through top to bottom: nothing is logged until the
+    // Uebung directly above, in the current order, is complete. Dragging this Uebung up is the way
+    // out when the machine is taken. Past tracking has no such order.
+    if (enforceSetOrder && activeWorkout) {
+      const above = activeWorkout.exercises[activeWorkout.exercises.findIndex((ex) => ex.id === exercise.id) - 1];
+      if (above && checkExerciseCompleteness(above, setRowState)) {
+        if (!opts.silent) notify.warning(t('logExerciseAbove', { name: above.exerciseName }));
+        return;
+      }
+    }
 
     // In the live workout the sets of an Uebung are logged in order. A swiped-away set is no
     // longer among the slots, so it never blocks. Past tracking has no such order.
@@ -757,12 +814,10 @@ export default function ExerciseCard({
     }
 
     try {
+      // The context also takes the set out of the added rows and the swiped-away ones.
       await logSet(exercise.id, payload);
 
-      // Remove from additional drafts (if it was one)
-      setAdditionalSetNumbers((prev) => prev.filter((n) => n !== setNumber));
-
-      // Clear edit state + any skip marker for this setNumber (now logged)
+      // Clear edit state for this setNumber (now logged)
       setEditValues((prev) => {
         const newVals = { ...prev };
         delete newVals[setNumber];
@@ -773,11 +828,6 @@ export default function ExerciseCard({
         if (!(setNumber in prev)) return prev;
         const next = { ...prev };
         delete next[setNumber];
-        return next;
-      });
-      setSkippedPlannedSetNumbers((prev) => {
-        const next = new Set(prev);
-        next.delete(setNumber);
         return next;
       });
     } catch (error) {
@@ -972,12 +1022,7 @@ export default function ExerciseCard({
           setEditValues({});
           setSideEdits({});
         }
-        setAdditionalSetNumbers(prev => prev.filter(n => n !== setNumber));
-        setSkippedPlannedSetNumbers(prev => {
-          const next = new Set(prev);
-          next.delete(setNumber);
-          return next;
-        });
+        removeSetRow(exercise.id, setNumber);
         return;
       }
 
@@ -988,13 +1033,9 @@ export default function ExerciseCard({
       // - For already-logged sets or additional drafts: remove them from the workout -- through
       //   the injected `onDeleteSet` when present, otherwise the context's direct-set path.
       if (isPlannedSlot && !getLoggedSet(setNumber)) {
-        // Session-level skip of a planned suggestion. Survives server re-sync because we filter on render.
-        setSkippedPlannedSetNumbers(prev => {
-          const next = new Set(prev);
-          next.add(setNumber);
-          return next;
-        });
-        setAdditionalSetNumbers(prev => prev.filter(n => n !== setNumber));
+        // Session-level skip of a planned suggestion, kept by the context and persisted with the
+        // draft. Survives server re-sync because we filter on render.
+        skipPlannedSet(exercise.id, setNumber);
         return;
       }
 
@@ -1003,12 +1044,7 @@ export default function ExerciseCard({
       if (onDeleteSet) {
         // Injected owner (history editor): never reach into the shared workout context.
         onDeleteSet(exercise.id, setNumber);
-        setAdditionalSetNumbers(prev => prev.filter(n => n !== setNumber));
-        setSkippedPlannedSetNumbers(prev => {
-          const next = new Set(prev);
-          next.delete(setNumber);
-          return next;
-        });
+        removeSetRow(exercise.id, setNumber);
         return;
       }
 
@@ -1031,25 +1067,16 @@ export default function ExerciseCard({
         );
       }
 
-      setAdditionalSetNumbers(prev => prev.filter(n => n !== setNumber));
-      setSkippedPlannedSetNumbers(prev => {
-        const next = new Set(prev);
-        next.delete(setNumber);
-        return next;
-      });
+      removeSetRow(exercise.id, setNumber);
       return;
     }
 
     if (isPlannedSlot) {
       // For unlogged planned (pure active without setManagement flag): hide via skip.
-      setSkippedPlannedSetNumbers(prev => {
-        const next = new Set(prev);
-        next.add(setNumber);
-        return next;
-      });
+      skipPlannedSet(exercise.id, setNumber);
     } else {
       // Additional / extra / free: remove the prepare row entirely
-      setAdditionalSetNumbers(prev => prev.filter(n => n !== setNumber));
+      removeSetRow(exercise.id, setNumber);
     }
   };
 
@@ -1236,6 +1263,7 @@ export default function ExerciseCard({
     return (
       <div
         key={`add-${setNumber}`}
+        id={setRowId(setNumber)}
         onPointerDown={(e) => startSwipe(swipeKey, e.clientX, e.clientY)}
         onPointerMove={(e) => updateSwipe(e.clientX, e.clientY)}
         onPointerUp={() => endSwipe(swipeKey, setNumber, false)}
@@ -1302,6 +1330,7 @@ export default function ExerciseCard({
     return (
       <div
         key={set.id}
+        id={setRowId(set.setNumber)}
         onPointerDown={(e) => startSwipe(swipeKey, e.clientX, e.clientY)}
         onPointerMove={(e) => updateSwipe(e.clientX, e.clientY)}
         onPointerUp={() => endSwipe(swipeKey, set.setNumber, true)}
@@ -1391,6 +1420,7 @@ export default function ExerciseCard({
     <>
       <Card
         ref={setNodeRef}
+        id={`exercise-card-${exercise.id}`}
         style={style}
         className="py-0 gap-0 overflow-hidden rounded-lg border-border"
       >
@@ -1533,6 +1563,7 @@ export default function ExerciseCard({
               return (
                 <div
                   key={plannedSet.id}
+                  id={setRowId(setNumber)}
                   onPointerDown={(e) => startSwipe(swipeKey, e.clientX, e.clientY)}
                   onPointerMove={(e) => updateSwipe(e.clientX, e.clientY)}
                   onPointerUp={() => endSwipe(swipeKey, setNumber, !!loggedSet)}

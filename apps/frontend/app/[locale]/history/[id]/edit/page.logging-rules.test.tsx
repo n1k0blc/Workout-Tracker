@@ -7,11 +7,11 @@ import messages from '@/messages/de.json';
 const { push, router, getWorkout, updateWorkout, notify } = vi.hoisted(() => {
   const push = vi.fn();
   return {
-    push,
-    router: { push },
-    getWorkout: vi.fn(),
-    updateWorkout: vi.fn(),
-    notify: { error: vi.fn(), warning: vi.fn(), info: vi.fn(), success: vi.fn() },
+      push,
+      router: { push },
+      getWorkout: vi.fn(),
+      updateWorkout: vi.fn(),
+      notify: { error: vi.fn(), warning: vi.fn(), info: vi.fn(), success: vi.fn() },
   };
 });
 
@@ -27,19 +27,23 @@ vi.mock('@/components/protected-route', () => ({
   ProtectedRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 // The history editor never touches the live session; the card still reads the context.
-vi.mock('@/lib/workout-context', () => ({
-  useWorkout: () => ({
-    removeExercise: vi.fn(),
-    replaceExercise: vi.fn(),
-    logSet: vi.fn(),
-    updateSet: vi.fn(),
-    loading: false,
-    activeWorkout: null,
-    setActiveWorkoutDirectly: vi.fn(),
-    isPastWorkout: false,
-    pastWorkoutDuration: 0,
-  }),
-}));
+vi.mock('@/lib/workout-context', async () => {
+  const { useFakeSetRowState } = await import('@/lib/test-set-row-state');
+  return {
+    useWorkout: () => ({
+      ...useFakeSetRowState(),
+      removeExercise: vi.fn(),
+      replaceExercise: vi.fn(),
+      logSet: vi.fn(),
+      updateSet: vi.fn(),
+      loading: false,
+      activeWorkout: null,
+      setActiveWorkoutDirectly: vi.fn(),
+      isPastWorkout: false,
+      pastWorkoutDuration: 0,
+    }),
+  };
+});
 
 import EditWorkoutPage from './page';
 

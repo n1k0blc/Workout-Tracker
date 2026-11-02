@@ -14,19 +14,23 @@ const { notify, logSet, updateSet, workoutState } = vi.hoisted(() => ({
 vi.mock('@/lib/toast', () => ({ notify }));
 vi.mock('@/lib/api', () => ({ apiClient: { getExercises: vi.fn().mockResolvedValue([]) } }));
 vi.mock('@/lib/auth-context', () => ({ useAuth: () => ({ user: { unitSystem: 'METRIC' } }) }));
-vi.mock('@/lib/workout-context', () => ({
-  useWorkout: () => ({
-    removeExercise: vi.fn(),
-    replaceExercise: vi.fn(),
-    logSet,
-    updateSet,
-    loading: false,
-    activeWorkout: { id: 'w1', exercises: [] },
-    setActiveWorkoutDirectly: vi.fn(),
-    isPastWorkout: workoutState.isPastWorkout,
-    pastWorkoutDuration: 0,
-  }),
-}));
+vi.mock('@/lib/workout-context', async () => {
+  const { useFakeSetRowState } = await import('@/lib/test-set-row-state');
+  return {
+    useWorkout: () => ({
+      ...useFakeSetRowState(),
+      removeExercise: vi.fn(),
+      replaceExercise: vi.fn(),
+      logSet,
+      updateSet,
+      loading: false,
+      activeWorkout: { id: 'w1', exercises: [] },
+      setActiveWorkoutDirectly: vi.fn(),
+      isPastWorkout: workoutState.isPastWorkout,
+      pastWorkoutDuration: 0,
+    }),
+  };
+});
 
 import ExerciseCard from '@/components/workout/exercise-card';
 import { Equipment, SetType, type ExerciseLog, type PlannedSet, type SetLog } from '@/types';

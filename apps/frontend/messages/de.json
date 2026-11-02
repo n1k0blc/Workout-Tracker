@@ -411,6 +411,12 @@
     "duplicateExerciseError": "Diese Übung ist bereits im Workout. Füge stattdessen Sätze zur bestehenden Übung hinzu.",
     "addExerciseError": "Fehler beim Hinzufügen der Übung",
     "saveError": "Fehler beim Speichern des Workouts",
+    "incomplete": {
+      "unloggedSet": "{exercise}: Satz {number} ist noch nicht geloggt. Logge ihn oder wische ihn weg.",
+      "missingRir": "{exercise}: Satz {number} braucht noch einen RIR.",
+      "emptyExercise": "{exercise} hat noch keine Sätze. Füge einen Satz hinzu oder entferne die Übung.",
+      "nothingLogged": "Logge mindestens einen Satz, bevor du das Workout beendest."
+    },
     "discard": "Verwerfen",
     "discarding": "Wird verworfen...",
     "finish": "Workout beenden",
@@ -499,6 +505,7 @@
     "logMissing": "Satz nicht geloggt – es fehlt: {fields}.",
     "logInvalid": "Satz nicht geloggt – bitte prüfe die markierten Felder.",
     "logOutOfOrder": "Logge zuerst Satz {number} oder wische ihn weg.",
+    "logExerciseAbove": "Schließe zuerst „{name}“ ab – oder ziehe diese Übung nach oben, wenn das Gerät belegt ist.",
     "planRirMissing": "{exercise}, Satz {number}: Gib einen RIR an.",
     "rirHint": "Ziel: höchstens RIR 2.",
     "errors": {
