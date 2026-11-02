@@ -4,10 +4,10 @@ import { useState, type ComponentProps } from 'react';
 import { Input } from '@/components/ui/input';
 import { useUnitSystem } from '@/lib/use-units';
 import { setWeightLimit } from '@/lib/field-rules';
-import { weightInputString, weightToKg } from '@/lib/units';
+import { WEIGHT_DECIMALS, weightInputString, weightToKg } from '@/lib/units';
 
 /** Decimals a weight may be typed with, in the user's own unit (#227). Client only. */
-const WEIGHT_MAX_DECIMALS = 3;
+const WEIGHT_MAX_DECIMALS = WEIGHT_DECIMALS;
 
 /** True when the number-input value has more decimals than a weight may carry. */
 function hasTooManyDecimals(typed: string): boolean {
@@ -23,7 +23,7 @@ type WeightInputProps = Omit<ComponentProps<typeof Input>, 'value' | 'onChange' 
 
 /**
  * A weight field that shows the user's unit system over kg form state (#186, ADR-0005).
- * Untouched fields display `valueKg` converted and rounded but never write anything back;
+ * Untouched fields display `valueKg` converted (to the three decimals a weight is typed with, so a typed 27,25 stays 27.25) but never write anything back;
  * on an edit the typed number is exact in the user's own unit and converted once. `type` stays
  * "number" so `.value` is period-normalised regardless of locale. Up to three decimals can be
  * typed (micro-plates, pound fractions); a fourth is refused like `e` and `-` are, so the field

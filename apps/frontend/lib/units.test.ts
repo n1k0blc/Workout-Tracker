@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  BODY_WEIGHT_DECIMALS,
   KG_PER_LB,
   displayWeight,
   weightInputString,
@@ -18,15 +19,39 @@ describe('weight units (#186)', () => {
     expect(weightUnitLabel('IMPERIAL')).toBe('lb');
   });
 
-  it('displays metric weights rounded to 0.5 kg', () => {
+  it('displays metric weights as stored, up to three decimals', () => {
     expect(displayWeight(100, 'METRIC')).toBe(100);
-    expect(displayWeight(22.3, 'METRIC')).toBe(22.5);
-    expect(displayWeight(22.2, 'METRIC')).toBe(22);
+    expect(displayWeight(22.3, 'METRIC')).toBe(22.3);
+    expect(displayWeight(27.25, 'METRIC')).toBe(27.25);
+    expect(displayWeight(21.125, 'METRIC')).toBe(21.125);
+    // floating-point noise from arithmetic never shows
+    expect(displayWeight(0.1 + 0.2, 'METRIC')).toBe(0.3);
   });
 
-  it('displays imperial weights rounded to 1 lb', () => {
-    expect(displayWeight(100, 'IMPERIAL')).toBe(220);
+  it('displays imperial weights in lb, up to three decimals', () => {
+    expect(displayWeight(100, 'IMPERIAL')).toBe(220.462);
     expect(displayWeight(102.05828325, 'IMPERIAL')).toBe(225);
+  });
+
+  it('can show fewer decimals, as body weight does (one decimal)', () => {
+    expect(displayWeight(100, 'IMPERIAL', BODY_WEIGHT_DECIMALS)).toBe(220.5);
+    expect(weightInputString(100, 'IMPERIAL', BODY_WEIGHT_DECIMALS)).toBe('220.5');
+    expect(weightInputString(82.25, 'METRIC', BODY_WEIGHT_DECIMALS)).toBe('82.3');
+  });
+
+  it('never writes back an untouched body weight shown with one decimal', () => {
+    const shown = weightInputString(100, 'IMPERIAL', BODY_WEIGHT_DECIMALS);
+    expect(weightToKg(shown, 'IMPERIAL', 100, BODY_WEIGHT_DECIMALS)).toBe(100);
+  });
+
+  it.each(['27.25', '27.1', '0.001', '21.125', '1000'])('shows a typed %s kg exactly as typed', (typed) => {
+    const kg = weightToKg(typed, 'METRIC')!;
+    expect(weightInputString(kg, 'METRIC')).toBe(typed);
+  });
+
+  it.each(['60.5', '60.25', '0.001', '21.125', '2204.6'])('shows a typed %s lb exactly as typed', (typed) => {
+    const kg = weightToKg(typed, 'IMPERIAL')!;
+    expect(weightInputString(kg, 'IMPERIAL')).toBe(typed);
   });
 
   it('logging 225 lb and re-reading it in lb returns exactly 225', () => {
@@ -64,9 +89,10 @@ describe('weight units (#186)', () => {
     expect(weightToKg('abc', 'IMPERIAL')).toBeNull();
   });
 
-  it('renders an integer without a trailing .0 and a half kilo with one decimal', () => {
+  it('renders an integer without a trailing .0 and keeps the decimals that were stored', () => {
     expect(weightInputString(80, 'METRIC')).toBe('80');
     expect(weightInputString(82.5, 'METRIC')).toBe('82.5');
+    expect(weightInputString(82.25, 'METRIC')).toBe('82.25');
   });
 
   it('displays volume in whole units of the chosen system', () => {

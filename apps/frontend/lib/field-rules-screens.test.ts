@@ -54,7 +54,7 @@ describe('height and body weight in the unit the user types', () => {
   });
 
   it('lets an untouched stored weight through unjudged on its decimals', () => {
-    expect(checkBodyWeight('66', 'IMPERIAL', 30)).toBeNull(); // 30 kg shown as 66 lb
+    expect(checkBodyWeight('66.1', 'IMPERIAL', 30)).toBeNull(); // 30 kg shown as 66.1 lb
   });
 
   it('states the limits in the typed unit', () => {

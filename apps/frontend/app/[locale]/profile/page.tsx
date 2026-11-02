@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useUnitSystem } from '@/lib/use-units';
 import {
   weightInputString,
+  BODY_WEIGHT_DECIMALS,
   weightToKg,
   weightUnitLabel,
   heightInputString,
@@ -170,7 +171,7 @@ export default function ProfilePage() {
       setLastName(user.lastName || '');
       setDateOfBirth(user.dateOfBirth ? new Date(user.dateOfBirth) : null);
       setHeight(user.height != null ? heightInputString(user.height, unitSystem) : '');
-      setWeight(user.weight != null ? weightInputString(user.weight, unitSystem) : '');
+      setWeight(user.weight != null ? weightInputString(user.weight, unitSystem, BODY_WEIGHT_DECIMALS) : '');
       setTargetKcal(user.targetKcal?.toString() || '');
       setTargetCarbs(user.targetCarbs?.toString() || '');
       setTargetProtein(user.targetProtein?.toString() || '');
@@ -230,7 +231,7 @@ export default function ProfilePage() {
         lastName: lastName.trim(),
         dateOfBirth: dateOfBirth!.toISOString().split('T')[0],
         height: heightToCm(height, unitSystem, user?.height)!,
-        weight: weightToKg(weight, unitSystem, user?.weight)!,
+        weight: weightToKg(weight, unitSystem, user?.weight, BODY_WEIGHT_DECIMALS)!,
       });
 
       notify.success(t('profileData.updated'));
