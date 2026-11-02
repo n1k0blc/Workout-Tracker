@@ -1,5 +1,4 @@
 import {
-  IsEmail,
   IsOptional,
   IsDateString,
   IsInt,
@@ -14,6 +13,7 @@ import {
   AGE_MIN,
   BODY_WEIGHT_KG_MAX,
   BODY_WEIGHT_KG_MIN,
+  Email,
   HEIGHT_CM_MAX,
   HEIGHT_CM_MIN,
   MaxAge,
@@ -27,7 +27,7 @@ import {
 
 export class UpdateUserDto {
   @IsOptional()
-  @IsEmail()
+  @Email()
   email?: string;
 
   @IsOptional()
