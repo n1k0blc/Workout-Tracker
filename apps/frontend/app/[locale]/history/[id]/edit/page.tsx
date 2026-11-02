@@ -12,9 +12,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
 import { Badge } from '@/components/ui/badge';
-import { Field, FieldLabel } from '@/components/ui/field';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { DatePicker } from '@/components/date-picker';
 import ExerciseCard from '@/components/workout/exercise-card';
+import { notify } from '@/lib/toast';
+import { useFormErrors } from '@/hooks/useFormErrors';
+import { WORKOUT_DATE_MIN_YEAR, checkWorkoutDate } from '@/lib/field-rules';
+import { toLocalDateString } from '@/lib/local-date';
+import { checkLoggedSet } from '@/lib/log-set-guards';
 import {
   IconChevronLeft,
 } from '@tabler/icons-react';
@@ -56,6 +61,10 @@ export default function EditWorkoutPage() {
   const [workoutDate, setWorkoutDate] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [dateForm, dateFormRef] = useFormErrors({ fields: ['workoutDate'] });
+  // Sets the user changed. Only these are held to the logging rules: an older workout may hold
+  // working sets without RIR, and an untouched one must not block saving (#227).
+  const [touchedSetIds, setTouchedSetIds] = useState<Set<string>>(new Set());
 
   const navigateBack = () => {
     if (fromCycle && cycleId) {
@@ -76,7 +85,7 @@ export default function EditWorkoutPage() {
       setWorkoutDate(data.localDate);
     } catch (error) {
       console.error('Failed to load workout:', error);
-      alert(t('loadError'));
+      notify.error(t('loadError'));
       if (fromCycle && cycleId) {
         router.push(`/cycles/${cycleId}`);
       } else {
@@ -93,6 +102,7 @@ export default function EditWorkoutPage() {
   }, [loadWorkout]);
 
   const handleUpdateSet = (exerciseId: string, setId: string, data: SetEditData) => {
+    setTouchedSetIds((prev) => new Set(prev).add(setId));
     setExercises((prev) =>
       prev.map((ex) =>
         ex.id === exerciseId
@@ -104,6 +114,21 @@ export default function EditWorkoutPage() {
 
   const handleSave = async () => {
     if (!workout) return;
+    if (!dateForm.setConstraints({ workoutDate: checkWorkoutDate(workoutDate, toLocalDateString(new Date())) })) {
+      return;
+    }
+
+    const hasInvalidChangedSet = exercises.some((ex) =>
+      ex.sets.some(
+        (s) =>
+          touchedSetIds.has(s.id) &&
+          checkLoggedSet(s, { equipment: ex.equipment, isUnilateral: ex.isUnilateral }).length > 0,
+      ),
+    );
+    if (hasInvalidChangedSet) {
+      notify.warning(t('setsIncomplete'));
+      return;
+    }
 
     setSaving(true);
     try {
@@ -123,7 +148,7 @@ export default function EditWorkoutPage() {
       navigateBack();
     } catch (error) {
       console.error('Failed to save workout:', error);
-      alert(t('saveError'));
+      notify.error(t('saveError'));
     } finally {
       setSaving(false);
     }
@@ -185,23 +210,27 @@ export default function EditWorkoutPage() {
 
             {/* Workout Date */}
             <Card>
-              <CardContent className="p-6">
+              <CardContent className="p-6" ref={dateFormRef}>
                 <Field>
-                  <FieldLabel>{t('date')}</FieldLabel>
+                  <FieldLabel htmlFor="workoutDate">{t('date')}</FieldLabel>
                   <DatePicker
+                    id="workoutDate"
                     date={workoutDate ? new Date(workoutDate) : null}
+                    min={`${WORKOUT_DATE_MIN_YEAR}-01-01`}
+                    {...dateForm.fieldProps('workoutDate')}
                     onSelect={(date) => {
+                      dateForm.clear('workoutDate');
                       if (date) {
-                        const y = date.getFullYear();
-                        const m = String(date.getMonth() + 1).padStart(2, '0');
-                        const d = String(date.getDate()).padStart(2, '0');
-                        setWorkoutDate(`${y}-${m}-${d}`);
+                        // DatePicker hands back the picked day as UTC midnight, so the day is
+                        // read in UTC; the local clock would be the previous day west of Greenwich.
+                        setWorkoutDate(date.toISOString().slice(0, 10));
                       } else {
                         setWorkoutDate('');
                       }
                     }}
                     className="w-full md:w-auto"
                   />
+                  <FieldError id={dateForm.errorId('workoutDate')}>{dateForm.errors.workoutDate}</FieldError>
                 </Field>
                 <p className="mt-2 text-sm text-muted-foreground">
                   {t('originally', { date: formatDate(workout.date) })}

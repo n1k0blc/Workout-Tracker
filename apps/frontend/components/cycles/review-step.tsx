@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import ExerciseCard from '@/components/workout/exercise-card';
+import { planRir } from '@/lib/planned-sets';
 
 interface ReviewStepProps {
   formData: CycleFormData;
@@ -52,7 +53,7 @@ export default function ReviewStep({
         setType: s.setType,
         reps: s.reps ?? 0,
         weight: s.weight ?? 0,
-        rir: s.rir ?? 0,
+        rir: planRir(s),
         repsLeft: s.repsLeft ?? undefined,
         repsRight: s.repsRight ?? undefined,
         weightLeft: s.weightLeft ?? undefined,

@@ -8,7 +8,7 @@ const planned = (
     setType: SetType;
     reps: number;
     weight: number;
-    rir: number;
+    rir: number | undefined;
     rest: number;
     repsLeft: number;
     repsRight: number;
@@ -46,6 +46,15 @@ describe('addPlannedSet', () => {
 
     expect(next).toHaveLength(1);
     expect(next[0]).toMatchObject({ order: 1, setType: SetType.WORKING, reps: 0, weight: 0, rir: 0, rest: 90 });
+  });
+
+  it('does not turn a warm-up before it, or a missing RIR, into RIR 0 (#227)', () => {
+    const afterWarmup = addPlannedSet([planned(1, { setType: SetType.WARMUP, rir: undefined })]);
+    expect(afterWarmup[1].setType).toBe(SetType.WORKING);
+    expect(afterWarmup[1].rir).toBeUndefined();
+
+    const afterEmpty = addPlannedSet([planned(1, { rir: undefined })]);
+    expect(afterEmpty[1].rir).toBeUndefined();
   });
 
   it('gives the new set its own id', () => {

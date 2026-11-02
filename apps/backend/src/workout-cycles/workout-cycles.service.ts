@@ -11,7 +11,13 @@ import {
 } from '../workout-tree/workout-tree.service';
 import { setWorkingVolume } from '../common/utils/volume.util';
 import { calculateCycleWeek, getCurrentDate } from '../common/utils/date.util';
-import { Today, localDateToInstant } from '../common/utils/today.util';
+import {
+  Today,
+  addLocalYears,
+  instantToLocalDate,
+  localDateToInstant,
+  resolveToday,
+} from '../common/utils/today.util';
 import { cycleStartWeekday, getWeekdayDistanceFromCycleStart } from '../common/utils/weekday.util';
 import { ExercisesService } from '../exercises/exercises.service';
 import {
@@ -27,15 +33,26 @@ import { ApiLocale, DEFAULT_LOCALE } from '../common/utils/locale.util';
 
 const WEEKDAY_UNIQUE_INDEX = 'WorkoutDay_cycleId_weekday_key';
 const ORDER_UNIQUE_INDEX = 'WorkoutDay_cycleId_order_key';
+// Partial unique index on WorkoutCycle(userId) WHERE status = 'ACTIVE' -- raw SQL in a
+// migration, so it has no counterpart in schema.prisma.
+const ACTIVE_CYCLE_UNIQUE_INDEX = 'WorkoutCycle_userId_active_key';
 
-/** Whether `error` is a P2002 raised by the given WorkoutDay unique index, and nothing else. */
+/** Whether `error` is a P2002 raised by the given unique index, and nothing else. */
 function isUniqueIndexConflict(error: unknown, indexName: string, fields: string[]): boolean {
   if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
     return false;
   }
-  // `meta.target` is the index name on Postgres, but has been a field-name array on other
-  // connectors and older client versions -- match either shape.
-  const target = error.meta?.target;
+  // With the Prisma 7 `pg` driver adapter (what the app runs on) the index name is only at
+  // `meta.driverAdapterError.cause.constraint.index` -- `meta.target` is absent. Older
+  // connectors put the index name, or a field-name array, in `meta.target`. Match all three.
+  const meta = error.meta as
+    | {
+        target?: unknown;
+        driverAdapterError?: { cause?: { constraint?: { index?: unknown } } };
+      }
+    | undefined;
+  if (meta?.driverAdapterError?.cause?.constraint?.index === indexName) return true;
+  const target = meta?.target;
   return Array.isArray(target)
     ? fields.every((field) => target.includes(field))
     : target === indexName;
@@ -43,6 +60,11 @@ function isUniqueIndexConflict(error: unknown, indexName: string, fields: string
 
 function isWeekdayConflict(error: unknown): boolean {
   return isUniqueIndexConflict(error, WEEKDAY_UNIQUE_INDEX, ['cycleId', 'weekday']);
+}
+
+/** A P2002 on the one-active-Zyklus-per-user partial index. */
+function isActiveCycleConflict(error: unknown): boolean {
+  return isUniqueIndexConflict(error, ACTIVE_CYCLE_UNIQUE_INDEX, ['userId']);
 }
 
 /**
@@ -133,6 +155,7 @@ export class WorkoutCyclesService {
     createCycleDto: CreateCycleDto,
     userId: string,
     locale: ApiLocale = DEFAULT_LOCALE,
+    today: Today = resolveToday(),
   ): Promise<CycleResponseDto> {
     const existingActiveCycle = await this.prisma.workoutCycle.findFirst({
       where: { userId, status: 'ACTIVE' },
@@ -143,6 +166,7 @@ export class WorkoutCyclesService {
     }
 
     const { name, duration, startDate, workoutDays } = createCycleDto;
+    this.assertStartDate(startDate, today);
 
     const weekdays = workoutDays.map((day) => day.weekday);
     const duplicateWeekday = weekdays.find((weekday, i) => weekdays.indexOf(weekday) !== i);
@@ -157,37 +181,56 @@ export class WorkoutCyclesService {
 
     const startWeekday = cycleStartWeekday(startDate);
 
-    const cycleId = await this.prisma.$transaction(async (tx) => {
-      const cycle = await tx.workoutCycle.create({
-        data: { name, duration, startDate: new Date(startDate), userId },
+    const cycleId = await this.prisma
+      .$transaction(async (tx) => {
+        const cycle = await tx.workoutCycle.create({
+          data: { name, duration, startDate: new Date(startDate), userId },
+        });
+
+        for (const day of workoutDays) {
+          const workoutDay = await tx.workoutDay.create({
+            data: {
+              cycleId: cycle.id,
+              weekday: day.weekday,
+              order: getWeekdayDistanceFromCycleStart(day.weekday, startWeekday),
+              name: day.name,
+              plannedHomeGymId: day.plannedHomeGymId || null,
+            },
+          });
+
+          const blueprint = await tx.workout.create({
+            data: { kind: 'BLUEPRINT', userId, workoutDayId: workoutDay.id },
+          });
+
+          await this.workoutTreeService.replaceTree(
+            tx,
+            blueprint.id,
+            toExerciseInputs(day.exercises, exercisesById),
+          );
+        }
+
+        return cycle.id;
+      })
+      .catch((error: unknown) => {
+        // The check above reads before it writes, so two simultaneous requests can both pass it.
+        // The partial unique index on (userId) WHERE status = 'ACTIVE' is the actual authority;
+        // the request that loses it answers the same 400 the check does, not a driver-level 500.
+        if (isActiveCycleConflict(error)) {
+          throw new AppBadRequestException('ACTIVE_CYCLE_ALREADY_EXISTS');
+        }
+        throw error;
       });
 
-      for (const day of workoutDays) {
-        const workoutDay = await tx.workoutDay.create({
-          data: {
-            cycleId: cycle.id,
-            weekday: day.weekday,
-            order: getWeekdayDistanceFromCycleStart(day.weekday, startWeekday),
-            name: day.name,
-            plannedHomeGymId: day.plannedHomeGymId || null,
-          },
-        });
-
-        const blueprint = await tx.workout.create({
-          data: { kind: 'BLUEPRINT', userId, workoutDayId: workoutDay.id },
-        });
-
-        await this.workoutTreeService.replaceTree(
-          tx,
-          blueprint.id,
-          toExerciseInputs(day.exercises, exercisesById),
-        );
-      }
-
-      return cycle.id;
-    });
-
     return this.findById(cycleId, userId, locale);
+  }
+
+  /** Today in the user's zone through one year ahead, compared as calendar days. */
+  private assertStartDate(startDate: string, today: Today): void {
+    const day = startDate.slice(0, 10);
+    if (day < today.localDate) throw new AppBadRequestException('CYCLE_START_DATE_PAST');
+    if (day > addLocalYears(today.localDate, 1)) {
+      throw new AppBadRequestException('CYCLE_START_DATE_TOO_FAR');
+    }
   }
 
   async update(
@@ -195,8 +238,17 @@ export class WorkoutCyclesService {
     updateCycleDto: UpdateCycleDto,
     userId: string,
     locale: ApiLocale = DEFAULT_LOCALE,
+    today: Today = resolveToday(),
   ): Promise<CycleResponseDto> {
     const cycle = await this.findById(id, userId);
+
+    // Only a start date the user is changing is judged; a running Zyklus restates its own past one.
+    if (
+      updateCycleDto.startDate &&
+      updateCycleDto.startDate.slice(0, 10) !== instantToLocalDate(cycle.startDate)
+    ) {
+      this.assertStartDate(updateCycleDto.startDate, today);
+    }
 
     // The re-anchor below writes WorkoutDay rows, so this shares the move and swap paths'
     // conflict handling: a concurrent write winning either unique index has to answer 400,

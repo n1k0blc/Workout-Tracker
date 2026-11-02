@@ -21,11 +21,12 @@ import {
   QUANTITY_FACTORS,
 } from '@/lib/nutrition';
 import { useFavoriteToggle } from '@/hooks/useFavoriteToggle';
+import { FACTOR_MAX } from '@/lib/field-rules';
 import { FavoriteStar } from './favorite-star';
 import { QuantityStepper } from './quantity-stepper';
 
 const STEP = 0.5;
-const MIN = 0.5;
+const MIN = 0.5; // FACTOR_MIN, which `Math.max(MIN, ...)` below keeps
 
 interface FoodInfo {
   portions: FoodPortion[];
@@ -69,6 +70,8 @@ export function QuantityEditorSheet({
   );
   const [food, setFood] = useState<FoodInfo | null>(null);
   const [saving, setSaving] = useState(false);
+  // The stepper's free field holds an amount it did not apply: saving would send the old one.
+  const [amountInvalid, setAmountInvalid] = useState(false);
   const { effectiveFavorite, toggleFavorite, reset: resetFavorite } = useFavoriteToggle();
 
   const [wasOpen, setWasOpen] = useState(false);
@@ -179,6 +182,7 @@ export function QuantityEditorSheet({
                 grams={amount.grams}
                 portionLabel={amount.portionLabel}
                 onChange={(grams, portionLabel) => setAmount({ grams, portionLabel })}
+                onValidityChange={(valid) => setAmountInvalid(!valid)}
               />
             )
           ) : (
@@ -206,7 +210,10 @@ export function QuantityEditorSheet({
                     variant="ghost"
                     size="icon"
                     aria-label={t('more')}
-                    onClick={() => setMultiplier((q) => Math.round((q + STEP) * 100) / 100)}
+                    disabled={multiplier + STEP > FACTOR_MAX}
+                    onClick={() =>
+                      setMultiplier((q) => Math.min(FACTOR_MAX, Math.round((q + STEP) * 100) / 100))
+                    }
                   >
                     <IconPlus />
                   </Button>
@@ -244,7 +251,7 @@ export function QuantityEditorSheet({
         </div>
 
         <div className="mt-auto flex gap-2 border-t p-4">
-          <Button className="flex-1" onClick={handleSave} disabled={!changed || saving}>
+          <Button className="flex-1" onClick={handleSave} disabled={!changed || saving || amountInvalid}>
             {t('apply')}
           </Button>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

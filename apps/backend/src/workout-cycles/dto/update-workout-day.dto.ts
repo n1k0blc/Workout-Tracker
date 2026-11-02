@@ -1,7 +1,8 @@
 import { IsString, IsInt, Min, Max, IsOptional } from 'class-validator';
+import { BaseText, TRAINING_DAY_NAME_MAX } from '../../common/validation/field-rules';
 
 export class UpdateWorkoutDayDto {
-  @IsString()
+  @BaseText(TRAINING_DAY_NAME_MAX)
   name: string;
 
   @IsInt()

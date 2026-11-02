@@ -52,16 +52,34 @@ import { replacePlanExerciseInList } from '@/lib/exercise-replace';
 import { usePlanExercisePrefill } from '@/lib/plan-exercise-prefill';
 import { withArrayPositionOrder } from '@/lib/workout-order';
 import { plannedSideFields } from '@/lib/set-sides';
-import { addPlannedSet } from '@/lib/planned-sets';
+import { addPlannedSet, planRir } from '@/lib/planned-sets';
 import type { PlannedSet } from '@/types';
 import { weekdayReferenceDate } from '@/lib/weekday';
+import { notify } from '@/lib/toast';
+import { findFirstSetNeedingRir, findFirstSetOverLimit } from '@/lib/log-set-guards';
+import { useFormErrors } from '@/hooks/useFormErrors';
+import { FieldError } from '@/components/ui/field';
+import { EXERCISES_PER_WORKOUT_MAX, NAME_MAX, TRAINING_DAY_NAME_MAX, checkBaseText } from '@/lib/field-rules';
 
 export default function EditBlueprintPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
   const t = useTranslations('EditBlueprintPage');
+  const tCard = useTranslations('ExerciseCard');
+  const tActive = useTranslations('ActiveWorkout');
   const format = useFormatter();
+  // Two small forms, each with its own errors: the day's name on the page, and the template
+  // name in the save-as-template dialog (a taken name belongs under that field).
+  const [dayForm, dayFormRef] = useFormErrors({
+    fields: ['name'],
+    messageValues: { name: { max: TRAINING_DAY_NAME_MAX } },
+  });
+  const [templateForm, templateFormRef] = useFormErrors({
+    fields: ['templateName'],
+    codeFields: { TEMPLATE_NAME_TAKEN: 'templateName' },
+    messageValues: { templateName: { max: NAME_MAX } },
+  });
   const cycleId = params.id as string;
   const workoutDayId = params.workoutDayId as string;
 
@@ -138,7 +156,7 @@ export default function EditBlueprintPage() {
       }
     } catch (error) {
       console.error('Failed to load data:', error);
-      alert(t('alerts.loadFailed'));
+      notify.error(t('alerts.loadFailed'));
       router.push('/cycles');
     } finally {
       setLoading(false);
@@ -147,9 +165,13 @@ export default function EditBlueprintPage() {
 
   const handleAddExercise = (exerciseId: string, exercise?: Exercise) => {
     if (!exercise) return;
+    if (exercises.length >= EXERCISES_PER_WORKOUT_MAX) {
+      notify.warning(tActive('exerciseLimitReached', { max: EXERCISES_PER_WORKOUT_MAX }));
+      return; // Keep the modal open, like the active workout
+    }
 
     const baseSets = [
-      { id: `set-new-${Date.now()}`, order: 1, setType: SetType.WARMUP, reps: 10, weight: 20, rir: 3, rest: 90 },
+      { id: `set-new-${Date.now()}`, order: 1, setType: SetType.WARMUP, reps: 10, weight: 20, rest: 90 },
       { id: `set-new-${Date.now()}-1`, order: 2, setType: SetType.WORKING, reps: 10, weight: 40, rir: 2, rest: 90 },
       { id: `set-new-${Date.now()}-2`, order: 3, setType: SetType.WORKING, reps: 10, weight: 40, rir: 2, rest: 90 },
     ];
@@ -219,11 +241,28 @@ export default function EditBlueprintPage() {
     }
   };
 
+  // A planned working set needs an RIR (#227): the card marks the empty field, this names it.
+  // A value past its upper bound is named the same way.
+  // True when something is missing and the save must stop.
+  const reportMissingRir = () => {
+    const missingRir = findFirstSetNeedingRir(exercises);
+    const hit = missingRir ?? findFirstSetOverLimit(exercises);
+    if (!hit) return false;
+    notify.warning(
+      tCard(missingRir ? 'planRirMissing' : 'planSetTooHigh', {
+        exercise: exercises[hit.exerciseIndex].exerciseName,
+        number: hit.setIndex + 1,
+      }),
+    );
+    return true;
+  };
+
   const handleSave = async () => {
-    if (!workoutDayName.trim()) {
-      alert(t('alerts.nameRequired'));
+    if (!dayForm.setConstraints({ name: checkBaseText(workoutDayName, TRAINING_DAY_NAME_MAX) })) {
       return;
     }
+
+    if (reportMissingRir()) return;
 
     // Every weekday in the cycle is unique to one day (#71), so a match here can only be
     // another day -- this one already owns `plannedWeekday` if it's unchanged. Ask before
@@ -258,7 +297,7 @@ export default function EditBlueprintPage() {
             setType: set.setType,
             reps: set.reps,
             weight: set.weight,
-            rir: set.rir,
+            rir: planRir(set),
             ...plannedSideFields(set, ex.isUnilateral),
             rest: set.rest,
           })),
@@ -269,7 +308,7 @@ export default function EditBlueprintPage() {
       router.push('/cycles');
     } catch (error) {
       console.error('Failed to save blueprint:', error);
-      alert(t('alerts.saveFailed'));
+      dayForm.showApiError(error);
     } finally {
       setSaving(false);
     }
@@ -288,13 +327,14 @@ export default function EditBlueprintPage() {
   };
 
   const handleSaveAsTemplate = async () => {
-    if (!templateName.trim()) {
-      alert(t('alerts.templateNameRequired'));
+    if (!templateForm.setConstraints({ templateName: checkBaseText(templateName, NAME_MAX) })) {
       return;
     }
 
+    if (reportMissingRir()) return;
+
     if (exercises.length === 0) {
-      alert(t('alerts.atLeastOneExercise'));
+      notify.warning(t('alerts.atLeastOneExercise'));
       return;
     }
 
@@ -310,7 +350,7 @@ export default function EditBlueprintPage() {
             setType: set.setType,
             reps: set.reps,
             weight: set.weight,
-            rir: set.rir,
+            rir: planRir(set),
             ...plannedSideFields(set, ex.isUnilateral),
             rest: set.rest,
           })),
@@ -318,17 +358,12 @@ export default function EditBlueprintPage() {
       };
 
       await apiClient.createWorkoutTemplate(templateData);
-      alert(t('alerts.templateCreated'));
+      notify.success(t('alerts.templateCreated'));
       setShowSaveTemplateModal(false);
       setTemplateName('');
     } catch (error: unknown) {
       console.error('Failed to save template:', error);
-      const err = error as { response?: { status?: number } };
-      if (err.response?.status === 409) {
-        alert(t('alerts.templateNameExists'));
-      } else {
-        alert(t('alerts.templateSaveFailed'));
-      }
+      templateForm.showApiError(error);
     } finally {
       setSavingTemplate(false);
     }
@@ -348,7 +383,7 @@ export default function EditBlueprintPage() {
       setType: s.setType,
       reps: s.reps,
       weight: s.weight,
-      rir: s.rir ?? 0,
+      rir: planRir(s),
       repsLeft: s.repsLeft ?? undefined,
       repsRight: s.repsRight ?? undefined,
       weightLeft: s.weightLeft ?? undefined,
@@ -401,17 +436,24 @@ export default function EditBlueprintPage() {
                   {t('settings.title')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
+                <div ref={dayFormRef}>
                   <Label className="block text-sm font-medium text-foreground mb-2">
                     {t('settings.nameLabel')}
                   </Label>
                   <Input
                     type="text"
                     value={workoutDayName}
-                    onChange={(e) => setWorkoutDayName(e.target.value)}
+                    onChange={(e) => {
+                      setWorkoutDayName(e.target.value);
+                      dayForm.clear('name');
+                    }}
                     className="w-full"
                     placeholder={t('settings.namePlaceholder')}
+                    {...dayForm.fieldProps('name')}
                   />
+                  <FieldError id={dayForm.errorId('name')} className="mt-1">
+                    {dayForm.errors.name}
+                  </FieldError>
                 </div>
                 <div>
                   <Label className="block text-sm font-medium text-foreground mb-2">
@@ -601,27 +643,39 @@ export default function EditBlueprintPage() {
       {/* Save Template Modal (shadcn) */}
       <Dialog open={showSaveTemplateModal} onOpenChange={(open) => {
         setShowSaveTemplateModal(open);
-        if (!open) setTemplateName('');
+        if (!open) {
+          setTemplateName('');
+          templateForm.clear('templateName');
+        }
       }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{t('saveTemplateDialog.title')}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <div ref={templateFormRef} className="space-y-4 py-2">
             <p className="text-sm text-muted-foreground">
               {t('saveTemplateDialog.description')}
             </p>
-            <Input
-              value={templateName}
-              onChange={(e) => setTemplateName(e.target.value)}
-              placeholder={t('saveTemplateDialog.namePlaceholder')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !savingTemplate) {
-                  handleSaveAsTemplate();
-                }
-              }}
-              autoFocus
-            />
+            <div>
+              <Input
+                value={templateName}
+                onChange={(e) => {
+                  setTemplateName(e.target.value);
+                  templateForm.clear('templateName');
+                }}
+                placeholder={t('saveTemplateDialog.namePlaceholder')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !savingTemplate) {
+                    handleSaveAsTemplate();
+                  }
+                }}
+                autoFocus
+                {...templateForm.fieldProps('templateName')}
+              />
+              <FieldError id={templateForm.errorId('templateName')} className="mt-1">
+                {templateForm.errors.templateName}
+              </FieldError>
+            </div>
           </div>
           <DialogFooter className="flex gap-3">
             <Button
@@ -629,6 +683,7 @@ export default function EditBlueprintPage() {
               onClick={() => {
                 setShowSaveTemplateModal(false);
                 setTemplateName('');
+                templateForm.clear('templateName');
               }}
               disabled={savingTemplate}
             >
@@ -636,7 +691,7 @@ export default function EditBlueprintPage() {
             </Button>
             <Button
               onClick={handleSaveAsTemplate}
-              disabled={savingTemplate || !templateName.trim()}
+              disabled={savingTemplate}
             >
               {savingTemplate ? t('saveTemplateDialog.saving') : t('saveTemplateDialog.save')}
             </Button>

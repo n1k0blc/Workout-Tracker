@@ -379,7 +379,7 @@ export class FoodsService {
         data: {
           name: dto.name.trim(),
           brand: dto.brand?.trim() || null,
-          barcode: dto.barcode?.trim() || null,
+          barcode: (dto.barcode && normalizeBarcode(dto.barcode)) || null,
           isLiquid: dto.isLiquid ?? false,
           kcal: dto.kcal,
           carbs: dto.carbs,
@@ -411,7 +411,7 @@ export class FoodsService {
         data: {
           name: dto.name.trim(),
           brand: dto.brand?.trim() || null,
-          barcode: dto.barcode?.trim() || null,
+          barcode: (dto.barcode && normalizeBarcode(dto.barcode)) || null,
           isLiquid: dto.isLiquid ?? false,
           kcal: dto.kcal,
           carbs: dto.carbs,

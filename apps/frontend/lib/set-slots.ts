@@ -45,7 +45,7 @@ interface LoggedSetLike {
 export function getSetIndicatorSlots(input: {
   plannedSets?: PlannedSetLike[];
   sets: LoggedSetLike[];
-  additionalSetNumbers?: number[];
+  additionalSetNumbers?: readonly number[];
   skippedSetNumbers?: Set<number>;
 }): number[] {
   const skipped = input.skippedSetNumbers ?? new Set<number>();

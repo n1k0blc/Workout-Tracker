@@ -1,9 +1,10 @@
-import { IsString, IsEnum, IsBoolean, IsOptional, IsInt, Min, Max } from 'class-validator';
+import { IsEnum, IsBoolean, IsOptional, IsInt, Min, Max } from 'class-validator';
 import { MuscleGroup } from '../../common/muscle.util';
 import { Equipment } from './create-exercise.dto';
+import { BaseText, NAME_MAX } from '../../common/validation/field-rules';
 
 export class UpdateExerciseDto {
-  @IsString()
+  @BaseText(NAME_MAX)
   name: string;
 
   @IsOptional()

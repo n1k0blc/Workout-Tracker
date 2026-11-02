@@ -1,5 +1,8 @@
-import { IsOptional, IsEnum, IsIn, IsDateString, IsString, IsArray, IsUUID } from 'class-validator';
+import { IsOptional, IsEnum, IsIn, IsDateString, IsArray, IsUUID } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { MuscleGroup } from '../muscle.util';
+import { Equipment } from '../types';
+import { Id } from '../validation/field-rules';
 
 export enum AnalyticsScope {
   ALL = 'all',
@@ -41,26 +44,26 @@ export class AnalyticsFilterDto {
 
   // 'alle' | 'andere' | a specific gym id | undefined (all three treated as "no filter" except 'andere')
   @IsOptional()
-  @IsString()
+  @Id()
   gymId?: string;
 
   @IsOptional()
   @Transform(({ value }) => toArray(value))
   @IsArray()
-  @IsString({ each: true })
+  @IsEnum(MuscleGroup, { each: true })
   muscleGroup?: string[];
 
   @IsOptional()
   @Transform(({ value }) => toArray(value))
   @IsArray()
-  @IsString({ each: true })
+  @IsEnum(Equipment, { each: true })
   equipment?: string[];
 
   // Overrides muscleGroup/equipment entirely when set. Not @IsUUID: global/seeded
   // exercises carry non-UUID ids (e.g. "seed-bayesian-curl"), same as the write path's
   // WorkoutExerciseInputDto.exerciseId.
   @IsOptional()
-  @IsString()
+  @Id()
   exerciseId?: string;
 
   @IsOptional()

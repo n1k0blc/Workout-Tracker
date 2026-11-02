@@ -1,15 +1,21 @@
 import {
   IsString,
   IsNotEmpty,
-  MaxLength,
   IsNumber,
-  IsPositive,
+  Min,
+  Max,
   IsArray,
   ValidateNested,
   ArrayMinSize,
   ArrayMaxSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import {
+  AMOUNT_MAX,
+  AMOUNT_MIN,
+  BaseText,
+  FOOD_NAME_MAX,
+} from '../../common/validation/field-rules';
 
 /** One ingredient line: a Food and how much of it, in grams or millilitres. */
 export class MealItemInputDto {
@@ -20,7 +26,8 @@ export class MealItemInputDto {
   // Always grams or millilitres -- the client resolves a chosen portion into this before
   // sending, exactly like the picker's basket items.
   @IsNumber()
-  @IsPositive()
+  @Min(AMOUNT_MIN)
+  @Max(AMOUNT_MAX)
   quantity: number;
 }
 
@@ -31,9 +38,7 @@ export class MealItemInputDto {
  * a meal cannot contain a meal (the payload only carries `foodId`s).
  */
 export class CreateMealDto {
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(120)
+  @BaseText(FOOD_NAME_MAX)
   name: string;
 
   @IsArray()

@@ -23,6 +23,7 @@ function makeService(overrides: { findUnique?: unknown } = {}) {
     homeGym: {
       findMany: jest.fn(),
       create: jest.fn(),
+      count: jest.fn(),
       findUnique: jest
         .fn()
         .mockResolvedValue(
@@ -38,6 +39,28 @@ function makeService(overrides: { findUnique?: unknown } = {}) {
   const service = new UsersService(prisma as never);
   return { service, prisma };
 }
+
+describe('UsersService.createHomeGym — at most 10 gyms', () => {
+  it('creates the tenth gym and refuses the eleventh', async () => {
+    const { service, prisma } = makeService();
+    prisma.homeGym.create.mockResolvedValue({ id: 'g', name: 'Neu', createdAt: new Date() });
+
+    prisma.homeGym.count.mockResolvedValue(9);
+    await expect(service.createHomeGym('user-1', { name: 'Neu' })).resolves.toBeDefined();
+    expect(prisma.homeGym.count).toHaveBeenCalledWith({
+      where: { userId: 'user-1', deletedAt: null },
+    });
+
+    prisma.homeGym.count.mockResolvedValue(10);
+    prisma.homeGym.create.mockClear();
+    const refused = service.createHomeGym('user-1', { name: 'Elftes' });
+    await expect(refused).rejects.toMatchObject({
+      code: 'HOME_GYM_LIMIT_REACHED',
+      details: { max: 10 },
+    });
+    expect(prisma.homeGym.create).not.toHaveBeenCalled();
+  });
+});
 
 describe('UsersService.updateHomeGym — cross-user access', () => {
   it('404s when the gym belongs to a different user', async () => {

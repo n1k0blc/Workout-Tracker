@@ -106,6 +106,19 @@ Rotation through `WorkoutDay.order` is gone: it advanced from the last performed
 
 `WorkoutDay.order` still orders the modal's list. It must never decide *which* workout is recommended again.
 
+### A Zyklus starts today or later, at most a year ahead
+
+**`WorkoutCycle.startDate` is a calendar day in the user's time zone: today through one year ahead. On update it is judged only when it changed.**
+
+- **The API** checks it in `create` and `update` (`apps/backend/src/workout-cycles/workout-cycles.service.ts`) against `@ClientToday()`, never against the server's clock, and answers `CYCLE_START_DATE_PAST` / `CYCLE_START_DATE_TOO_FAR` (400). A leap day counts to 28 February in a non-leap year (`addLocalYears`). The update skips the check when the day equals the stored one, so a running Zyklus can still be renamed.
+- **The client** mirrors it with `checkStartDate` (`apps/frontend/lib/field-rules.ts`), and the wizard's default start date is the user's local today (`toLocalDateString`): the UTC day is yesterday for a while after local midnight and would be refused.
+
+### A barcode is an EAN-8, UPC-A or EAN-13 with a valid check digit
+
+**The scanner, the manual EAN field, the Lebensmittel editor and the API ask the same question, and a UPC-A is stored as the EAN-13 a scan of it looks up.**
+
+`normalizeBarcode` (`apps/backend/src/foods/barcode.ts`, mirrored in `apps/frontend/lib/barcode.ts`) is the rule. The `Barcode()` decorator (`field-rules.ts`) puts it on `CreateFoodDto`, so a 14-digit GTIN or a wrong check digit is a 400 `isBarcode`; the service stores `normalizeBarcode(dto.barcode)`. The editor uses `checkEan` and sends the normalized value.
+
 ### An in-use exercise cannot change its `isUnilateral` flag
 
 **Once any `WorkoutSet` references an exercise, its `isUnilateral` flag is frozen. Every other field stays editable.**
@@ -114,6 +127,55 @@ Rotation through `WorkoutDay.order` is gone: it advanced from the last performed
 
 - **The API** rejects the change in `ExercisesService.update` (`apps/backend/src/exercises/exercises.service.ts`) with a 409 and a German message, but only when the value actually differs from the stored one — a no-op save that restates the current flag still passes. "In use" counts a `WorkoutSet` of **any** `WorkoutKind` (performed, template, blueprint — one table), reached via `workoutExercise.exerciseId`; there is no `completedAt` predicate.
 - **The DTO** carries `inUse` (`ExerciseDto`), computed on every read. The editor dialog (`apps/frontend/components/exercises/exercise-editor-dialog.tsx`) uses it to render the Unilateral checkbox disabled with the reason inline, so the rule is visible before save rather than only on the 409.
+
+### One active Zyklus per user
+
+**A user has at most one `WorkoutCycle` with `status = 'ACTIVE'`. A Zyklus scheduled for the future is `ACTIVE` too and counts. Any number of `COMPLETED` ones may exist.**
+
+Before, the server rejected a second active Zyklus only after the user had filled in the whole wizard, and its check read before it wrote, so two simultaneous requests could both pass it.
+
+- **The database** enforces it: partial unique index `WorkoutCycle_userId_active_key` on `WorkoutCycle(userId) WHERE status = 'ACTIVE'`, migration `20261102120000_workout_cycle_unique_active_per_user`. It is raw SQL — Prisma cannot express a partial index, so it is absent from `schema.prisma` (only a comment points to it). Prisma 7's `migrate dev` leaves it alone (verified; its only stray proposal is the known `Workout.updatedAt` `DROP DEFAULT`), but re-check after a Prisma upgrade.
+- **The API** keeps its check in `create` (`apps/backend/src/workout-cycles/workout-cycles.service.ts`) and answers `ACTIVE_CYCLE_ALREADY_EXISTS` (400). A request that loses the race hits the index instead and has its `P2002` mapped to the same code, so the answer is a 400, never a 500. With the Prisma 7 `pg` driver adapter the violated index name is at `meta.driverAdapterError.cause.constraint.index` and `meta.target` is absent; `isUniqueIndexConflict` reads both shapes, and the weekday index depends on that too.
+- **The wizard route** (`apps/frontend/app/[locale]/cycles/new/page.tsx`, via `NewCycleGuard`) is the single client-side gate: whoever opens it — the Zyklen page, the dashboard card, a past Zyklus, a typed URL — is redirected to the Zyklen page with a toast when an active Zyklus exists. Do not re-add a check at the individual buttons; the "new Zyklus" button stays visible everywhere and relies on the guard. The server still has the last word if the guard's lookup fails or a Zyklus becomes active mid-wizard.
+
+Before running the migration against any populated database, run `npm run check:input-rules` (in `apps/backend`, `DATABASE_URL` pointed at the target). It is read-only and reports every user with more than one active Zyklus as `multiple-active-cycles`; those need a manual decision (complete or delete all but one), since the migration fails on them.
+
+### Warm-up sets carry no RIR
+
+**A `WARMUP` set has no RIR, on any `WorkoutKind`. A `WORKING` set needs one when it is logged or planned, but the server never requires it.**
+
+The server only knows the first half: `deriveSetAggregates` (`apps/backend/src/workout-tree/workout-tree.service.ts`) answers `WORKOUT_SET_WARMUP_RIR` (400) for a warm-up with `rir`, `rirLeft` or `rirRight`. It cannot require RIR on working sets because history holds working sets without one and editing resends the whole tree through `replaceTree`. The data migration of `check:input-rules` nulled the existing warm-up RIR.
+
+The client enforces the rest, through one guard (`apps/frontend/lib/log-set-guards.ts`): `checkSetForLogging` is the single check behind the tick, the swipe and the past-tracking auto-commit; `setNeedsRir` / `findFirstSetNeedingRir` answer "does a working set still lack its RIR" for the plan editors' save and the workout-completeness check. Save payloads never trust the draft to have cleared a warm-up's RIR: `toExercisePayload`, `plannedSideFields` and `planRir` drop it. In Verlauf the rules apply only to sets the user changed.
+
+### A workout is finished only when it is complete
+
+**Every planned set and added set row is logged or swiped away, every logged working set has RIR, and at least one set is logged. One pure function answers it for everyone.**
+
+`checkWorkoutCompleteness` (`apps/frontend/lib/workout-completeness.ts`) takes the workout and the session's set rows (`SetRowState`) and answers `{ complete: true }` or `{ complete: false, problem }` with the first problem in workout order (Übungen top to bottom, sets by number): `unloggedSet`, `missingRir`, `emptyExercise` or `nothingLogged`. `checkExerciseCompleteness` is the same rule for one Übung. Every caller goes through it — the live "Beenden", past-workout tracking, the Übung-order lock, and the 5-hour outcome. Do not write a second completeness rule next to it.
+
+- **Swiped-away planned sets and added set rows live in `workout-context`** (`setRowState`, `skipPlannedSet`, `addSetRow`, `removeSetRow`), not in the exercise card, because the check needs them. Swiped-away sets are persisted with the draft (`DraftMeta.skippedSets`, read back with `readSkippedSets`), so a reload cannot bring a swiped-away row back and block finishing. Added rows are session state and are not persisted. Logging a set, removing its Übung, discarding or saving the workout clears them.
+- **An Übung with every set swiped away is complete and is left out of the payload** — `toExercisePayload` already drops an Übung with no logged set. **An Übung with no planned sets and nothing logged is not complete**: it is a forgotten empty card, not a skipped one. A workout where nothing at all is logged is not complete either.
+- **"Beenden" always looks enabled.** An incomplete workout answers with a toast naming the first problem and scrolls to it (the card opens on the way); the confirm dialog opens only for a complete workout. In past-workout tracking a refused "Beenden" also marks every row that could not be logged with its field errors.
+- **The Übung-order lock applies in the live workout only**: no set is logged until the Übung directly above, in the current order, is complete, and the toast suggests dragging the Übung up. Past-workout tracking has no such order — its rows commit on their own — and the server enforces none of this.
+
+### A forgotten live workout is settled by timestamps, once
+
+**After 5 hours the app asks whether the user is still training; with no answer a complete workout is saved at its last logged set and an incomplete one is discarded ([ADR-0010](docs/adr/0010-only-complete-workouts-are-saved.md)).**
+
+- **The 5 hours run from `DraftMeta.startedAt`, never from `workoutStartTime`** — pausing shifts the timer start forward, and paused time must count. A draft without `startedAt` resolves through `resolveStartedAt`. `askAgainAt` ("Weiter trainieren", +1 hour) is stored in the same meta. Live workouts only; past-workout tracking never asks.
+- **The countdown only runs while the app is on screen** and restarts at a full 5 minutes whenever it returns (`useForgottenWorkout`). Do not persist a deadline.
+- **An automatic save ends at the last logged set** (`autoSaveEnd`): `totalDuration` is measured to it and `localDate` is its day. Stamping it with the day it is saved on would mark today as done in the workout recommendation above. It passes no `overwriteBlueprint` or `saveAsTemplate*`. A failed save keeps the draft.
+- **Two tabs share the draft, so the outcome runs behind `runExclusively`** (Web Locks, `localStorage` claim as fallback) and re-checks that the draft still exists once inside; a tab that finds its draft gone drops its session.
+
+### Tracked values have no user-facing limit
+
+**`Set.rest` and a tracked `totalDuration` accept any non-negative whole number up to the column maximum, and never produce a user-facing error.**
+
+Both are measured, not chosen: a forgotten workout, a long break or a paused timer simply yields a big number, and refusing to save it would lose the training session over a value the user never typed. A cap would also make the 5-hour auto-save fail on exactly the workouts it exists for. Typed values (weight, reps, RIR, a hand-entered duration) are the user's input and do have limits; tracked ones do not.
+
+- **The API** bounds them by the `Int` column and nothing else: `@Min(0)` and `@Max(INT_COLUMN_MAX)` in `workout-tree.dto.ts` (`rest`) and the workout DTOs (`totalDuration`). `INT_COLUMN_MAX` is tagged `// server-only` in `apps/backend/src/common/validation/field-rules.ts`, which exempts it from the frontend drift test; the client has no mirror constant and no message for it.
+- **The client** must not clamp, reject or warn on a measured rest or duration. The one typed duration (1-480 minutes, past-workout tracking) is a separate, client-only field.
 
 ## Agent skills
 

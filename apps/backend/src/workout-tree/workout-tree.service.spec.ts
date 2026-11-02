@@ -234,6 +234,72 @@ describe('toExerciseInputs per-side shape (#100)', () => {
   });
 });
 
+describe('toExerciseInputs warm-up sets carry no RIR (#227)', () => {
+  const warmup = (over: Record<string, unknown> = {}) =>
+    ({
+      order: 1,
+      setType: SetType.WARMUP,
+      reps: 10,
+      weight: 20,
+      ...over,
+    }) as WorkoutExerciseInputDto['sets'][number];
+
+  const bilateral = (over: Record<string, unknown> = {}): WorkoutExerciseInputDto =>
+    ({ exerciseId: 'a', order: 1, sets: [warmup(over)] }) as WorkoutExerciseInputDto;
+
+  const unilateral = (over: Record<string, unknown> = {}): WorkoutExerciseInputDto =>
+    bilateral({ repsLeft: 10, repsRight: 10, weightLeft: 20, weightRight: 20, ...over });
+
+  it('rejects a warm-up set with an RIR, naming the exercise and set', () => {
+    expect(() => run([bilateral({ rir: 2 })], { a: { name: 'Bankdrücken' } })).toThrow(
+      expect.objectContaining({
+        code: 'WORKOUT_SET_WARMUP_RIR',
+        details: { exerciseName: 'Bankdrücken', exercisePosition: 0, setNumber: 1 },
+      }),
+    );
+  });
+
+  it('rejects a warm-up RIR of 0, which is a value and not an absence', () => {
+    expect(() => run([bilateral({ rir: 0 })])).toThrow(
+      expect.objectContaining({ code: 'WORKOUT_SET_WARMUP_RIR' }),
+    );
+  });
+
+  it.each(['rirLeft', 'rirRight'])('rejects a unilateral warm-up set with %s', (side) => {
+    expect(() => run([unilateral({ [side]: 3 })], { a: { isUnilateral: true } })).toThrow(
+      expect.objectContaining({ code: 'WORKOUT_SET_WARMUP_RIR' }),
+    );
+  });
+
+  it('is a 400', () => {
+    expect(() => run([bilateral({ rir: 2 })])).toThrow(BadRequestException);
+  });
+
+  it('accepts a warm-up set without RIR, bilateral and unilateral', () => {
+    const [bi] = run([bilateral()]);
+    expect(bi.sets[0].rir).toBeNull();
+
+    const [uni] = run([unilateral()], { a: { isUnilateral: true } });
+    expect(uni.sets[0]).toMatchObject({ rir: null, rirLeft: null, rirRight: null });
+  });
+
+  it('accepts an explicit null RIR on a warm-up set', () => {
+    expect(() => run([bilateral({ rir: null })])).not.toThrow();
+  });
+
+  it('still accepts a working set with no RIR: history holds such sets and editing resends them', () => {
+    const [ex] = run([exercise(1, [1])]);
+    expect(ex.sets[0].rir).toBeNull();
+  });
+
+  it('still accepts an RIR on a working set', () => {
+    const [ex] = run([
+      { exerciseId: 'a', order: 1, sets: [{ ...set(1), rir: 2 }] } as WorkoutExerciseInputDto,
+    ]);
+    expect(ex.sets[0].rir).toBe(2);
+  });
+});
+
 describe('mapExercisesToResponse', () => {
   const loadedSet = (over: Record<string, unknown> = {}) => ({
     id: 's1',

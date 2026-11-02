@@ -1,9 +1,9 @@
-import { IsEmail, IsString } from 'class-validator';
+import { Email, Password } from '../../common/validation/field-rules';
 
 export class LoginDto {
-  @IsEmail()
+  @Email()
   email: string;
 
-  @IsString()
+  @Password()
   password: string;
 }

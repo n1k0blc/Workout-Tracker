@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SEARCH_MAX } from '@/lib/field-rules';
 import { Badge } from '@/components/ui/badge';
 import { IconPlus, IconX } from '@tabler/icons-react';
 
@@ -153,6 +154,7 @@ export default function ExerciseSelectionModal({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t('searchPlaceholder')}
+            maxLength={SEARCH_MAX}
             className="w-full"
           />
         </div>

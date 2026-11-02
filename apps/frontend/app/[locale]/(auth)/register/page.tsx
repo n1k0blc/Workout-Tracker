@@ -8,20 +8,36 @@ import { IconChevronLeft, IconPlus, IconX } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DatePicker } from '@/components/date-picker';
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
+import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { useFormErrors } from '@/hooks/useFormErrors';
+import { toLocalDateString } from '@/lib/local-date';
+import {
+  BODY_WEIGHT_KG_MAX,
+  BODY_WEIGHT_KG_MIN,
+  HEIGHT_CM_MAX,
+  HEIGHT_CM_MIN,
+  HOME_GYMS_MAX,
+  NAME_MAX,
+  bodyLimits,
+  checkBaseText,
+  checkBirthDate,
+  checkDecimal,
+  checkEmail,
+  checkInteger,
+  checkPassword,
+  checkPersonName,
+} from '@/lib/field-rules';
 
 interface HomeGymInput {
   name: string;
 }
 
+const gymKey = (index: number) => `homeGyms.${index}.name`;
+
 export default function RegisterPage() {
   const t = useTranslations('RegisterPage');
-  const apiError = useApiErrorMessage();
   const { register } = useAuth();
   const [step, setStep] = useState<1 | 2>(1);
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   // Step 1: Account & Profile
@@ -37,57 +53,34 @@ export default function RegisterPage() {
   // Step 2: Home Gyms
   const [homeGyms, setHomeGyms] = useState<HomeGymInput[]>([]);
 
+  // Field errors, the server's `fieldErrors` and the toast fallback all go through this (#222).
+  // A gym's key is the path the server reports for it, `homeGyms.<row>.name`.
+  const [form, formRef] = useFormErrors({
+    fields: [
+      'email', 'password', 'confirmPassword', 'firstName', 'lastName', 'dateOfBirth', 'height', 'weight',
+      'homeGyms', ...homeGyms.map((_, i) => gymKey(i)),
+    ],
+    codeFields: { EMAIL_ALREADY_REGISTERED: 'email', PASSWORD_BREACHED: 'password' },
+    // Nobody is signed in yet, so the limits are named in metric.
+    messageValues: { ...bodyLimits('METRIC'), name: { max: NAME_MAX } },
+  });
+
   const handleStep1Next = () => {
-    setError('');
-
-    // Validation
-    if (!email || !password || !confirmPassword || !firstName || !lastName || !dateOfBirth || !height || !weight) {
-      setError(t('errors.missingFields'));
-      return;
-    }
-
-    if (password !== confirmPassword) {
-      setError(t('errors.passwordMismatch'));
-      return;
-    }
-
-    if (password.length < 8) {
-      setError(t('errors.passwordTooShort'));
-      return;
-    }
-
-    const heightNum = parseInt(height);
-    if (heightNum < 50 || heightNum > 300) {
-      setError(t('errors.heightRange'));
-      return;
-    }
-
-    const weightNum = parseFloat(weight);
-    if (weightNum < 20 || weightNum > 500) {
-      setError(t('errors.weightRange'));
-      return;
-    }
-
-    // Calculate age
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
-
-    if (age < 13) {
-      setError(t('errors.tooYoung'));
-      return;
-    }
-
-    if (age > 120) {
-      setError(t('errors.invalidBirthDate'));
-      return;
-    }
-
-    setStep(2);
+    const valid = form.setConstraints({
+      email: checkEmail(email),
+      password: checkPassword(password),
+      confirmPassword:
+        confirmPassword === '' ? 'isNotEmpty' : confirmPassword !== password ? 'passwordsDiffer' : null,
+      firstName: checkPersonName(firstName),
+      lastName: checkPersonName(lastName),
+      dateOfBirth: checkBirthDate(
+        dateOfBirth ? dateOfBirth.toISOString().slice(0, 10) : null,
+        toLocalDateString(new Date()),
+      ),
+      height: checkInteger(height, HEIGHT_CM_MIN, HEIGHT_CM_MAX),
+      weight: checkDecimal(weight, BODY_WEIGHT_KG_MIN, BODY_WEIGHT_KG_MAX, 1),
+    });
+    if (valid) setStep(2);
   };
 
   const handleAddGym = () => {
@@ -96,24 +89,29 @@ export default function RegisterPage() {
 
   const handleRemoveGym = (index: number) => {
     setHomeGyms(homeGyms.filter((_, i) => i !== index));
+    form.clear('homeGyms');
+    // Rows after the removed one shift up, so their errors would sit under the wrong gym.
+    homeGyms.forEach((_, i) => form.clear(gymKey(i)));
   };
 
   const handleGymNameChange = (index: number, name: string) => {
     const updated = [...homeGyms];
     updated[index] = { name };
     setHomeGyms(updated);
+    form.clear(gymKey(index));
+    form.clear('homeGyms');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
 
-    // Validate homeGyms
-    const validGyms = homeGyms.filter(gym => gym.name.trim() !== '');
-    if (validGyms.length === 0) {
-      setError(t('errors.noGym'));
-      return;
-    }
+    // Every row is a gym: a blank row is an error, not silently dropped, so the row numbers the
+    // server reports in `homeGyms.<row>.name` are the rows on screen.
+    const valid = form.setConstraints({
+      homeGyms: homeGyms.length === 0 ? 'arrayMinSize' : null,
+      ...Object.fromEntries(homeGyms.map((gym, i) => [gymKey(i), checkBaseText(gym.name, NAME_MAX)])),
+    });
+    if (!valid) return;
 
     setLoading(true);
 
@@ -121,20 +119,22 @@ export default function RegisterPage() {
       // The submitted locale is derived server-side from the X-Locale header (#179), not
       // sent as a form field -- the user's own locale comes back on the response.
       const user = await register({
-        email,
+        email: email.trim(),
         password,
-        firstName,
-        lastName,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         dateOfBirth: dateOfBirth!.toISOString().split('T')[0], // YYYY-MM-DD
         height: parseInt(height),
         weight: parseFloat(weight),
-        homeGyms: validGyms,
+        homeGyms: homeGyms.map((gym) => ({ name: gym.name.trim() })),
       });
       // Hard navigation, not the locale-aware router -- see the matching comment in
       // login/page.tsx for why crossing locales needs a full page load.
       window.location.href = `/${user.locale}/dashboard`;
     } catch (err) {
-      setError(apiError(err));
+      // A rejection of a step 1 field sends the user back to it.
+      const placed = form.showApiError(err);
+      if (placed.some((key) => !key.startsWith('homeGyms'))) setStep(1);
     } finally {
       setLoading(false);
     }
@@ -161,7 +161,7 @@ export default function RegisterPage() {
         </div>
 
         {step === 1 ? (
-          <form className="mt-8 space-y-6" onSubmit={(e) => { e.preventDefault(); handleStep1Next(); }}>
+          <form ref={formRef} noValidate className="mt-8 space-y-6" onSubmit={(e) => { e.preventDefault(); handleStep1Next(); }}>
             <FieldGroup>
               {/* Email & Password */}
               <Field>
@@ -170,11 +170,12 @@ export default function RegisterPage() {
                   id="email"
                   type="email"
                   autoComplete="email"
-                  required
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => { setEmail(e.target.value); form.clear('email'); }}
                   placeholder={t('emailPlaceholder')}
+                  {...form.fieldProps('email')}
                 />
+                <FieldError id={form.errorId('email')}>{form.errors.email}</FieldError>
               </Field>
 
               <Field>
@@ -183,11 +184,12 @@ export default function RegisterPage() {
                   id="password"
                   type="password"
                   autoComplete="new-password"
-                  required
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => { setPassword(e.target.value); form.clear('password'); }}
                   placeholder={t('passwordPlaceholder')}
+                  {...form.fieldProps('password')}
                 />
+                <FieldError id={form.errorId('password')}>{form.errors.password}</FieldError>
               </Field>
 
               <Field>
@@ -196,11 +198,12 @@ export default function RegisterPage() {
                   id="confirm-password"
                   type="password"
                   autoComplete="new-password"
-                  required
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(e) => { setConfirmPassword(e.target.value); form.clear('confirmPassword'); }}
                   placeholder={t('confirmPlaceholder')}
+                  {...form.fieldProps('confirmPassword')}
                 />
+                <FieldError id={form.errorId('confirmPassword')}>{form.errors.confirmPassword}</FieldError>
               </Field>
             </FieldGroup>
 
@@ -213,31 +216,36 @@ export default function RegisterPage() {
                     <FieldLabel htmlFor="firstName">{t('firstName')}</FieldLabel>
                     <Input
                       id="firstName"
-                      required
                       value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
+                      onChange={(e) => { setFirstName(e.target.value); form.clear('firstName'); }}
                       placeholder={t('firstNamePlaceholder')}
+                      {...form.fieldProps('firstName')}
                     />
+                    <FieldError id={form.errorId('firstName')}>{form.errors.firstName}</FieldError>
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="lastName">{t('lastName')}</FieldLabel>
                     <Input
                       id="lastName"
-                      required
                       value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
+                      onChange={(e) => { setLastName(e.target.value); form.clear('lastName'); }}
                       placeholder={t('lastNamePlaceholder')}
+                      {...form.fieldProps('lastName')}
                     />
+                    <FieldError id={form.errorId('lastName')}>{form.errors.lastName}</FieldError>
                   </Field>
                 </div>
 
                 <Field>
                   <FieldLabel htmlFor="dateOfBirth">{t('dateOfBirth')}</FieldLabel>
                   <DatePicker
+                    id="dateOfBirth"
                     date={dateOfBirth}
-                    onSelect={setDateOfBirth}
+                    onSelect={(date) => { setDateOfBirth(date); form.clear('dateOfBirth'); }}
                     placeholder={t('dateOfBirthPlaceholder')}
+                    {...form.fieldProps('dateOfBirth')}
                   />
+                  <FieldError id={form.errorId('dateOfBirth')}>{form.errors.dateOfBirth}</FieldError>
                 </Field>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -246,44 +254,41 @@ export default function RegisterPage() {
                     <Input
                       id="height"
                       type="number"
-                      min="50"
-                      max="300"
-                      required
+                      min={HEIGHT_CM_MIN}
+                      max={HEIGHT_CM_MAX}
+                      step={1}
                       value={height}
-                      onChange={(e) => setHeight(e.target.value)}
+                      onChange={(e) => { setHeight(e.target.value); form.clear('height'); }}
                       placeholder="180"
+                      {...form.fieldProps('height')}
                     />
+                    <FieldError id={form.errorId('height')}>{form.errors.height}</FieldError>
                   </Field>
                   <Field>
                     <FieldLabel htmlFor="weight">{t('weight')}</FieldLabel>
                     <Input
                       id="weight"
                       type="number"
-                      step="0.1"
-                      min="20"
-                      max="500"
-                      required
+                      step={0.1}
+                      min={BODY_WEIGHT_KG_MIN}
+                      max={BODY_WEIGHT_KG_MAX}
                       value={weight}
-                      onChange={(e) => setWeight(e.target.value)}
+                      onChange={(e) => { setWeight(e.target.value); form.clear('weight'); }}
                       placeholder="75.0"
+                      {...form.fieldProps('weight')}
                     />
+                    <FieldError id={form.errorId('weight')}>{form.errors.weight}</FieldError>
                   </Field>
                 </div>
               </FieldGroup>
             </div>
-
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
 
             <Button type="submit" className="w-full" size="lg">
               {t('next')}
             </Button>
           </form>
         ) : (
-          <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          <form ref={formRef} noValidate className="mt-8 space-y-6" onSubmit={handleSubmit}>
             <FieldGroup>
               <Field>
                 <FieldLabel>{t('homeGyms')}</FieldLabel>
@@ -295,12 +300,14 @@ export default function RegisterPage() {
               {homeGyms.length > 0 && (
                 <FieldGroup className="gap-3">
                   {homeGyms.map((gym, index) => (
-                    <div key={index} className="flex items-center gap-2">
+                    <div key={index} className="grid gap-1">
+                      <div className="flex items-center gap-2">
                       <Input
                         value={gym.name}
                         onChange={(e) => handleGymNameChange(index, e.target.value)}
                         placeholder={t('gymPlaceholder')}
                         className="flex-1"
+                        {...form.fieldProps(gymKey(index))}
                       />
                       <Button
                         type="button"
@@ -312,10 +319,14 @@ export default function RegisterPage() {
                       >
                         <IconX />
                       </Button>
+                      </div>
+                      <FieldError id={form.errorId(gymKey(index))}>{form.errors[gymKey(index)]}</FieldError>
                     </div>
                   ))}
                 </FieldGroup>
               )}
+
+              <FieldError id={form.errorId('homeGyms')}>{form.errors.homeGyms}</FieldError>
 
               {/* Add Home Gym button - centered, same style as add exercise in workouts */}
               <div className="flex justify-center py-3">
@@ -326,18 +337,13 @@ export default function RegisterPage() {
                   className={homeGyms.length === 0 
                     ? "h-16 w-16 rounded-lg p-0 flex items-center justify-center" 
                     : "h-14 w-14 rounded-lg p-0 flex items-center justify-center"}
+                  disabled={homeGyms.length >= HOME_GYMS_MAX}
                   aria-label={homeGyms.length === 0 ? t('addGym') : t('addAnotherGym')}
                 >
                   <IconPlus className={homeGyms.length === 0 ? "size-8" : "size-7"} />
                 </Button>
               </div>
             </FieldGroup>
-
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
 
             <div className="flex gap-3 pt-2">
               <Button

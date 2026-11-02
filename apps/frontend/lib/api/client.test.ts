@@ -231,3 +231,30 @@ describe('client error responses (#190, #191)', () => {
     expect(error).toMatchObject({ status: 401, code: 'INVALID_CREDENTIALS' });
   });
 });
+
+describe('path parameters', () => {
+  it('leaves a seeded or generated id as it is', async () => {
+    const fetchMock = mockFetch();
+
+    await apiClient.getExercise('seed-bayesian-curl');
+    await apiClient.getCycle('11111111-1111-4111-8111-111111111111');
+
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      expect.stringMatching(/\/exercises\/seed-bayesian-curl$/),
+      expect.stringMatching(/\/cycles\/11111111-1111-4111-8111-111111111111$/),
+    ]);
+  });
+
+  it('encodes every id, so a stray character cannot change which route is called', async () => {
+    const fetchMock = mockFetch();
+
+    await apiClient.getWorkout('../cycles');
+    await apiClient.updateWorkoutDay('a/b', 'c?d', { name: 'Push', weekday: 1 });
+    await apiClient.deleteMeal('x y');
+
+    const urls = fetchMock.mock.calls.map((call) => call[0] as string);
+    expect(urls[0]).toMatch(/\/workouts\/\.\.%2Fcycles$/);
+    expect(urls[1]).toMatch(/\/cycles\/a%2Fb\/workout-days\/c%3Fd$/);
+    expect(urls[2]).toMatch(/\/meals\/x%20y$/);
+  });
+});

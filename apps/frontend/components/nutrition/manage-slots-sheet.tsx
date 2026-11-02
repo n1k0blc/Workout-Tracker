@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { toast } from 'sonner';
 import {
   IconGripVertical,
   IconPencil,
@@ -40,6 +39,10 @@ import { Input } from '@/components/ui/input';
 import { apiClient } from '@/lib/api';
 import { MealSlot } from '@/types';
 import { useSlotName } from '@/hooks/useSlotName';
+import { FieldError } from '@/components/ui/field';
+import { useFormErrors } from '@/hooks/useFormErrors';
+import { notify } from '@/lib/toast';
+import { SECTIONS_PER_USER_MAX, SECTION_NAME_MAX, checkBaseText } from '@/lib/field-rules';
 
 /**
  * "Abschnitte verwalten" (design screen 02): rename, reorder (drag), add and archive the
@@ -64,6 +67,15 @@ export function ManageSlotsSheet({
   const [editValue, setEditValue] = useState('');
   const [newName, setNewName] = useState('');
   const [busy, setBusy] = useState(false);
+  // Field errors for the new-name field and the one rename in progress. The count is the message's
+  // `{count}`: how many active Abschnitte a user may have.
+  const [form, formRef] = useFormErrors({
+    fields: ['newName', 'editName'],
+    messageValues: {
+      newName: { max: SECTION_NAME_MAX, count: SECTIONS_PER_USER_MAX },
+      editName: { max: SECTION_NAME_MAX },
+    },
+  });
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -76,7 +88,7 @@ export function ManageSlotsSheet({
       setActive(list.active);
       setArchived(list.archived);
     } catch {
-      toast.error(t('loadError'));
+      notify.error(t('loadError'));
     }
   }, [t]);
 
@@ -117,7 +129,7 @@ export function ManageSlotsSheet({
         setActive(list.active);
         setArchived(list.archived);
       } catch {
-        toast.error(t('reorderError'));
+        notify.error(t('reorderError'));
         await refresh();
       }
     });
@@ -125,7 +137,8 @@ export function ManageSlotsSheet({
 
   function saveRename(slot: MealSlot) {
     const name = editValue.trim();
-    if (!name || name === slotName(slot)) {
+    if (!form.setConstraints({ editName: checkBaseText(editValue, SECTION_NAME_MAX) })) return;
+    if (name === slotName(slot)) {
       setEditingId(null);
       return;
     }
@@ -137,7 +150,7 @@ export function ManageSlotsSheet({
         );
         setEditingId(null);
       } catch {
-        toast.error(t('renameError'));
+        notify.error(t('renameError'));
       }
     });
   }
@@ -150,7 +163,7 @@ export function ManageSlotsSheet({
       } catch {
         // The only expected failure is the server's "keep one active" 409 (the button is
         // already disabled at one active slot, so this is the race guard).
-        toast.error(t('archiveError'));
+        notify.error(t('archiveError'));
       }
     });
   }
@@ -161,21 +174,26 @@ export function ManageSlotsSheet({
         await apiClient.setMealSlotArchived(slot.id, false);
         await refresh();
       } catch {
-        toast.error(t('unarchiveError'));
+        notify.error(t('unarchiveError'));
       }
     });
   }
 
   function addSlot() {
     const name = newName.trim();
-    if (!name) return;
+    const valid = form.setConstraints({
+      newName:
+        checkBaseText(newName, SECTION_NAME_MAX) ??
+        ((active?.length ?? 0) >= SECTIONS_PER_USER_MAX ? 'arrayMaxSize' : null),
+    });
+    if (!valid) return;
     void run(async () => {
       try {
         await apiClient.createMealSlot(name);
         setNewName('');
         await refresh();
       } catch {
-        toast.error(t('addError'));
+        notify.error(t('addError'));
       }
     });
   }
@@ -188,7 +206,7 @@ export function ManageSlotsSheet({
           <DrawerDescription>{t('description')}</DrawerDescription>
         </DrawerHeader>
 
-        <div className="flex flex-col gap-4 overflow-y-auto px-4 pb-2">
+        <div ref={formRef} className="flex flex-col gap-4 overflow-y-auto px-4 pb-2">
           {active === null ? (
             <p className="py-8 text-center text-sm text-muted-foreground">{t('loading')}</p>
           ) : (
@@ -209,15 +227,23 @@ export function ManageSlotsSheet({
                       isFirst={index === 0}
                       editing={editingId === slot.id}
                       editValue={editValue}
+                      editError={form.errors.editName}
                       canArchive={active.length > 1}
                       disabled={busy}
                       dragDisabled={busy || editingId !== null}
-                      onEditValueChange={setEditValue}
+                      onEditValueChange={(value) => {
+                        setEditValue(value);
+                        form.clear('editName');
+                      }}
                       onStartEdit={() => {
                         setEditingId(slot.id);
                         setEditValue(slotName(slot));
+                        form.clear('editName');
                       }}
-                      onCancelEdit={() => setEditingId(null)}
+                      onCancelEdit={() => {
+                        setEditingId(null);
+                        form.clear('editName');
+                      }}
                       onConfirmEdit={() => saveRename(slot)}
                       onArchive={() => archive(slot)}
                     />
@@ -227,19 +253,28 @@ export function ManageSlotsSheet({
             </div>
           )}
 
-          <div className="flex items-center gap-2">
-            <Input
-              placeholder={t('newSlotPlaceholder')}
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') addSlot();
-              }}
-            />
-            <Button variant="outline" onClick={addSlot} disabled={busy || !newName.trim()}>
-              <IconPlus data-icon="inline-start" />
-              {t('add')}
-            </Button>
+          <div>
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder={t('newSlotPlaceholder')}
+                value={newName}
+                onChange={(e) => {
+                  setNewName(e.target.value);
+                  form.clear('newName');
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') addSlot();
+                }}
+                {...form.fieldProps('newName')}
+              />
+              <Button variant="outline" onClick={addSlot} disabled={busy}>
+                <IconPlus data-icon="inline-start" />
+                {t('add')}
+              </Button>
+            </div>
+            <FieldError id={form.errorId('newName')} className="mt-1">
+              {form.errors.newName}
+            </FieldError>
           </div>
 
           {archived.length > 0 && (
@@ -284,6 +319,7 @@ function SortableSlotRow({
   isFirst,
   editing,
   editValue,
+  editError,
   canArchive,
   disabled,
   dragDisabled,
@@ -297,6 +333,7 @@ function SortableSlotRow({
   isFirst: boolean;
   editing: boolean;
   editValue: string;
+  editError?: string;
   canArchive: boolean;
   disabled: boolean;
   dragDisabled: boolean;
@@ -334,21 +371,26 @@ function SortableSlotRow({
 
       {editing ? (
         <>
-          <Input
-            autoFocus
-            value={editValue}
-            onChange={(e) => onEditValueChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') onConfirmEdit();
-              if (e.key === 'Escape') onCancelEdit();
-            }}
-            className="h-9 flex-1"
-          />
+          <div className="flex-1">
+            <Input
+              autoFocus
+              value={editValue}
+              onChange={(e) => onEditValueChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') onConfirmEdit();
+                if (e.key === 'Escape') onCancelEdit();
+              }}
+              className="h-9"
+              aria-invalid={editError ? true : undefined}
+              aria-describedby={editError ? 'editName-error' : undefined}
+            />
+            <FieldError id="editName-error">{editError}</FieldError>
+          </div>
           <Button
             variant="ghost"
             size="icon-sm"
             aria-label={t('save')}
-            disabled={disabled || !editValue.trim()}
+            disabled={disabled}
             onClick={onConfirmEdit}
           >
             <IconCheck />

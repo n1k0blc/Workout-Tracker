@@ -1,11 +1,9 @@
-import { IsString, MinLength, MaxLength } from 'class-validator';
+import { Password } from '../../common/validation/field-rules';
 
 export class ChangePasswordDto {
-  @IsString()
+  @Password()
   currentPassword: string;
 
-  @IsString()
-  @MinLength(8)
-  @MaxLength(100)
+  @Password()
   newPassword: string;
 }

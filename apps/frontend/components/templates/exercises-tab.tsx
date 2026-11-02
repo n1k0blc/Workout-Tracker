@@ -10,6 +10,7 @@ import { ExerciseEditorDialog } from '@/components/exercises/exercise-editor-dia
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SEARCH_MAX } from '@/lib/field-rules';
 import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
@@ -22,6 +23,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
+import { notify } from '@/lib/toast';
 
 export default function ExercisesTab() {
   const t = useTranslations('ExercisesTab');
@@ -77,7 +79,7 @@ export default function ExercisesTab() {
       setDeleteExerciseId(null);
     } catch (error) {
       console.error('Failed to delete exercise:', error);
-      alert(t('deleteFailed'));
+      notify.error(t('deleteFailed'));
     }
   };
 
@@ -109,6 +111,7 @@ export default function ExercisesTab() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={t('searchPlaceholder')}
+          maxLength={SEARCH_MAX}
         />
       </div>
 

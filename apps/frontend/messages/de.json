@@ -19,6 +19,7 @@
       "USER_NOT_FOUND": "Benutzer nicht gefunden.",
       "EMAIL_ALREADY_IN_USE": "Diese E-Mail-Adresse wird bereits verwendet.",
       "HOME_GYM_NOT_FOUND": "Fitnessstudio nicht gefunden.",
+      "HOME_GYM_LIMIT_REACHED": "Du kannst höchstens {max} Studios haben.",
       "HOME_GYM_IN_USE_BY_ACTIVE_CYCLE": "Dieses Fitnessstudio ist für einen Tag eines aktiven Zyklus geplant. Ändere zuerst diese Zyklustage.",
       "FOOD_NOT_FOUND": "Lebensmittel nicht gefunden.",
       "BARCODE_INVALID": "Das ist kein gültiger EAN- oder UPC-Code.",
@@ -35,7 +36,9 @@
       "MEAL_SLOT_NOT_FOUND": "Abschnitt nicht gefunden.",
       "MEAL_SLOT_ARCHIVED": "Dieser Abschnitt ist archiviert.",
       "MEAL_SLOT_ORDER_INVALID": "Die Reihenfolge der Abschnitte ist ungültig.",
+      "MEAL_SLOT_LIMIT_REACHED": "Du kannst höchstens {max} aktive Abschnitte haben.",
       "MEAL_SLOT_LAST_ACTIVE": "Mindestens ein Abschnitt muss aktiv bleiben.",
+      "QUICK_ENTRY_NOT_A_FOOD": "Als Lebensmittel lässt sich das nur speichern, wenn die Werte zu 100 g passen: höchstens 900 kcal, je Makro höchstens 100 g und zusammen höchstens 100 g.",
       "MEAL_SLOT_REORDER_SET_MISMATCH": "Die Abschnitte haben sich geändert. Bitte lade die Seite neu.",
       "MEAL_SLOT_UPDATE_EMPTY": "Es gibt nichts zu ändern.",
       "NUTRITION_TREND_RANGE_INVERTED": "Das Enddatum darf nicht vor dem Startdatum liegen.",
@@ -56,6 +59,8 @@
       "CYCLE_ALREADY_COMPLETED": "Dieser Zyklus wurde bereits beendet.",
       "CYCLE_CONCURRENT_MODIFICATION": "Eine andere Änderung an diesem Zyklus ist dazwischengekommen. Bitte versuche es erneut.",
       "ACTIVE_CYCLE_ALREADY_EXISTS": "Es existiert bereits ein aktiver Zyklus. Bitte beende diesen zuerst.",
+      "CYCLE_START_DATE_PAST": "Ein Zyklus kann nicht in der Vergangenheit starten.",
+      "CYCLE_START_DATE_TOO_FAR": "Ein Zyklus kann höchstens ein Jahr im Voraus starten.",
       "DUPLICATE_WEEKDAY_IN_CYCLE": "Zwei Trainingstage liegen auf {weekday}. Pro Zyklus ist jeder Wochentag nur einmal erlaubt.",
       "WORKOUT_DAY_NOT_FOUND": "Trainingstag nicht gefunden.",
       "WORKOUT_DAY_CYCLE_MISMATCH": "Dieser Trainingstag gehört nicht zu diesem Zyklus.",
@@ -68,6 +73,7 @@
       "WORKOUT_SET_UNEXPECTED_SIDE_DATA": "{exerciseName} ist eine beidseitige Übung – ihre Sätze dürfen keine Werte pro Seite enthalten.",
       "WORKOUT_SET_MISSING_SIDE_DATA": "{exerciseName}, Satz {setNumber}: Bei einer einseitigen Übung braucht jeder Satz Wiederholungen und Gewicht für beide Seiten.",
       "WORKOUT_SET_RIR_SIDE_MISMATCH": "{exerciseName}, Satz {setNumber}: Der RIR ist nur für eine Seite angegeben. Gib ihn für beide Seiten oder für keine an.",
+      "WORKOUT_SET_WARMUP_RIR": "{exerciseName}, Satz {setNumber}: Ein Aufwärmsatz hat keinen RIR.",
       "WORKOUT_TREE_ORDER_INVALID": "Die Reihenfolge der Einträge ist ungültig. Bitte lade die Seite neu.",
       "WORKOUT_NOT_FOUND": "Training nicht gefunden.",
       "WORKOUT_CYCLE_CONTEXT_REQUIRED": "Für dieses Training fehlen Zyklus und Trainingstag.",
@@ -107,14 +113,184 @@
       "isDateString": "Bitte gib ein gültiges Datum ein.",
       "isLocalDate": "Bitte gib ein gültiges Datum ein.",
       "matches": "Das Format ist ungültig.",
+      "isId": "Ungültige Kennung.",
+      "isBarcode": "Bitte gib einen gültigen EAN- oder UPC-Code ein (8, 12 oder 13 Ziffern mit korrekter Prüfziffer).",
+      "macroSum": "Kohlenhydrate, Protein und Fett zusammen dürfen höchstens 100 g pro 100 g ergeben.",
+      "minDate": "Das Datum liegt zu weit in der Vergangenheit.",
+      "maxDate": "Das Datum darf nicht in der Zukunft liegen.",
+      "endBeforeStart": "Das Ende darf nicht vor dem Start liegen.",
       "password": {
-        "minLength": "Das Passwort muss mindestens 8 Zeichen lang sein."
+        "minLength": "Das Passwort muss mindestens 8 Zeichen lang sein.",
+        "isNotEmpty": "Bitte gib ein Passwort ein.",
+        "maxLength": "Das Passwort darf höchstens 100 Zeichen lang sein."
+      },
+      "currentPassword": {
+        "isNotEmpty": "Bitte gib dein aktuelles Passwort ein.",
+        "minLength": "Das aktuelle Passwort muss mindestens 8 Zeichen lang sein.",
+        "maxLength": "Das aktuelle Passwort darf höchstens 100 Zeichen lang sein."
       },
       "newPassword": {
-        "minLength": "Das neue Passwort muss mindestens 8 Zeichen lang sein."
+        "isNotEmpty": "Bitte gib ein neues Passwort ein.",
+        "minLength": "Das neue Passwort muss mindestens 8 Zeichen lang sein.",
+        "maxLength": "Das neue Passwort darf höchstens 100 Zeichen lang sein."
+      },
+      "confirmNewPassword": {
+        "isNotEmpty": "Bitte wiederhole dein neues Passwort.",
+        "passwordsDiffer": "Die Passwörter stimmen nicht überein."
       },
       "email": {
-        "isEmail": "Bitte gib eine gültige E-Mail-Adresse ein."
+        "isEmail": "Bitte gib eine gültige E-Mail-Adresse ein.",
+        "isNotEmpty": "Bitte gib deine E-Mail-Adresse ein.",
+        "maxLength": "Die E-Mail-Adresse darf höchstens 254 Zeichen lang sein."
+      },
+      "noControlCharacters": "Bitte entferne Steuer- oder unsichtbare Zeichen.",
+      "isPersonName": "Erlaubt sind nur Buchstaben, Leerzeichen, Apostrophe, Punkte und Bindestriche, beginnend mit einem Buchstaben.",
+      "maxDecimals": "Zu viele Nachkommastellen.",
+      "confirmPassword": {
+        "isNotEmpty": "Bitte wiederhole dein Passwort.",
+        "passwordsDiffer": "Die Passwörter stimmen nicht überein."
+      },
+      "firstName": {
+        "isNotEmpty": "Bitte gib deinen Vornamen ein.",
+        "maxLength": "Der Vorname darf höchstens 50 Zeichen lang sein."
+      },
+      "lastName": {
+        "isNotEmpty": "Bitte gib deinen Nachnamen ein.",
+        "maxLength": "Der Nachname darf höchstens 50 Zeichen lang sein."
+      },
+      "dateOfBirth": {
+        "isNotEmpty": "Bitte gib dein Geburtsdatum ein.",
+        "minAge": "Du musst mindestens 13 Jahre alt sein.",
+        "maxAge": "Bitte gib ein gültiges Geburtsdatum ein."
+      },
+      "height": {
+        "isNotEmpty": "Bitte gib deine Größe ein.",
+        "isInt": "Bitte gib deine Größe als ganze Zahl ein.",
+        "min": "Die Größe muss mindestens {min} {unit} betragen.",
+        "max": "Die Größe darf höchstens {max} {unit} betragen."
+      },
+      "weight": {
+        "isNotEmpty": "Bitte gib dein Gewicht ein.",
+        "isNumber": "Bitte gib dein Gewicht als Zahl ein.",
+        "maxDecimals": "Verwende höchstens eine Nachkommastelle.",
+        "min": "Das Gewicht muss mindestens {min} {unit} betragen.",
+        "max": "Das Gewicht darf höchstens {max} {unit} betragen."
+      },
+      "reps": {
+        "max": "Es sind höchstens {max} Wiederholungen möglich."
+      },
+      "rir": {
+        "max": "Der RIR darf höchstens {max} betragen."
+      },
+      "homeGyms": {
+        "arrayMinSize": "Bitte füge mindestens ein Home Gym hinzu.",
+        "arrayMaxSize": "Du kannst höchstens 10 Studios hinzufügen."
+      },
+      "name": {
+        "isNotEmpty": "Bitte gib einen Namen ein.",
+        "maxLength": "Der Name darf höchstens {max} Zeichen lang sein."
+      },
+      "templateName": {
+        "isNotEmpty": "Bitte gib einen Namen für die Vorlage ein.",
+        "maxLength": "Der Name der Vorlage darf höchstens {max} Zeichen lang sein."
+      },
+      "targetKcal": {
+        "isInt": "Das Kalorienziel muss eine ganze Zahl sein.",
+        "min": "Das Kalorienziel muss mindestens {min} kcal betragen.",
+        "max": "Das Kalorienziel darf höchstens {max} kcal betragen."
+      },
+      "targetCarbs": {
+        "isInt": "Das Kohlenhydrate-Ziel muss eine ganze Zahl sein.",
+        "min": "Das Kohlenhydrate-Ziel muss mindestens {min} g betragen.",
+        "max": "Das Kohlenhydrate-Ziel darf höchstens {max} g betragen."
+      },
+      "targetProtein": {
+        "isInt": "Das Protein-Ziel muss eine ganze Zahl sein.",
+        "min": "Das Protein-Ziel muss mindestens {min} g betragen.",
+        "max": "Das Protein-Ziel darf höchstens {max} g betragen."
+      },
+      "targetFat": {
+        "isInt": "Das Fett-Ziel muss eine ganze Zahl sein.",
+        "min": "Das Fett-Ziel muss mindestens {min} g betragen.",
+        "max": "Das Fett-Ziel darf höchstens {max} g betragen."
+      },
+      "startDate": {
+        "isNotEmpty": "Bitte wähle ein Startdatum.",
+        "minDate": "Ein Zyklus kann nicht in der Vergangenheit starten.",
+        "maxDate": "Ein Zyklus kann höchstens ein Jahr im Voraus starten."
+      },
+      "durationMinutes": {
+        "isNotEmpty": "Bitte gib die Dauer in Minuten ein.",
+        "isInt": "Bitte gib die Dauer in ganzen Minuten ein.",
+        "min": "Die Dauer muss mindestens {min} Minute betragen.",
+        "max": "Die Dauer darf höchstens {max} Minuten betragen."
+      },
+      "workoutDate": {
+        "isNotEmpty": "Bitte wähle ein Datum."
+      },
+      "kcal": {
+        "isNotEmpty": "Bitte gib die Kalorien ein.",
+        "isNumber": "Bitte gib eine Zahl ein.",
+        "min": "Die Kalorien dürfen nicht negativ sein.",
+        "max": "Die Kalorien dürfen höchstens {max} kcal betragen.",
+        "maxDecimals": "Verwende höchstens eine Nachkommastelle."
+      },
+      "carbs": {
+        "isNotEmpty": "Bitte gib die Kohlenhydrate ein.",
+        "isNumber": "Bitte gib eine Zahl ein.",
+        "min": "Die Kohlenhydrate dürfen nicht negativ sein.",
+        "max": "Die Kohlenhydrate dürfen höchstens {max} g betragen."
+      },
+      "protein": {
+        "isNotEmpty": "Bitte gib das Protein ein.",
+        "isNumber": "Bitte gib eine Zahl ein.",
+        "min": "Das Protein darf nicht negativ sein.",
+        "max": "Das Protein darf höchstens {max} g betragen."
+      },
+      "fat": {
+        "isNotEmpty": "Bitte gib das Fett ein.",
+        "isNumber": "Bitte gib eine Zahl ein.",
+        "min": "Das Fett darf nicht negativ sein.",
+        "max": "Das Fett darf höchstens {max} g betragen.",
+        "macroSum": "Kohlenhydrate, Protein und Fett zusammen dürfen höchstens 100 g je 100 g betragen."
+      },
+      "portions": {
+        "arrayMaxSize": "Du kannst höchstens {max} Portionsgrößen anlegen.",
+        "portionDefault": "Markiere genau eine Portionsgröße als Standard."
+      },
+      "label": {
+        "isNotEmpty": "Bitte gib der Portionsgröße eine Bezeichnung.",
+        "maxLength": "Die Bezeichnung darf höchstens {max} Zeichen lang sein."
+      },
+      "grams": {
+        "isNotEmpty": "Bitte gib eine Menge an.",
+        "isNumber": "Bitte gib eine Zahl ein.",
+        "min": "Die Menge muss mindestens {min} {unit} betragen.",
+        "max": "Die Menge darf höchstens {max} {unit} betragen."
+      },
+      "quantity": {
+        "isNotEmpty": "Bitte gib eine Menge an.",
+        "isNumber": "Bitte gib eine Zahl ein.",
+        "min": "Die Menge muss mindestens {min} betragen.",
+        "max": "Die Menge darf höchstens {max} betragen."
+      },
+      "factor": {
+        "isNotEmpty": "Bitte gib einen Faktor an.",
+        "isNumber": "Bitte gib eine Zahl ein.",
+        "min": "Der Faktor muss mindestens {min} betragen.",
+        "max": "Der Faktor darf höchstens {max} betragen."
+      },
+      "saveAsFood": {
+        "notAFood": "Als Lebensmittel lässt sich das nur speichern, wenn die Werte zu 100 g passen: höchstens 900 kcal, je Makro höchstens 100 g und zusammen höchstens 100 g."
+      },
+      "newName": {
+        "isNotEmpty": "Bitte gib einen Namen ein.",
+        "maxLength": "Der Name darf höchstens {max} Zeichen lang sein.",
+        "arrayMaxSize": "Du kannst höchstens {count} aktive Abschnitte haben."
+      },
+      "editName": {
+        "isNotEmpty": "Bitte gib einen Namen ein.",
+        "maxLength": "Der Name darf höchstens {max} Zeichen lang sein."
       }
     }
   },
@@ -138,10 +314,6 @@
       "gramsUnit": "g",
       "macrosResult": "Makros ergeben",
       "kcalUnit": "kcal",
-      "kcalRangeError": "Kalorienziel muss eine ganze Zahl zwischen 1 und {max} sein",
-      "carbsRangeError": "Kohlenhydrate-Ziel muss eine ganze Zahl zwischen 1 und {max} sein",
-      "proteinRangeError": "Protein-Ziel muss eine ganze Zahl zwischen 1 und {max} sein",
-      "fatRangeError": "Fett-Ziel muss eine ganze Zahl zwischen 1 und {max} sein",
       "saved": "Tagesziele gespeichert",
       "saveError": "Fehler beim Speichern der Tagesziele",
       "hintMatch": "Makros und Kalorienziel stimmen überein.",
@@ -162,11 +334,6 @@
       "heightValue": "{height} {unit}",
       "weightValue": "{weight} {unit}",
       "empty": "-",
-      "validationAllFields": "Bitte alle Felder ausfüllen",
-      "validationInvalidEmail": "Bitte eine gültige Email-Adresse angeben",
-      "validationHeightRange": "Größe muss zwischen {min} und {max} {unit} liegen",
-      "validationWeightRange": "Gewicht muss zwischen {min} und {max} {unit} liegen",
-      "validationAgeRange": "Alter muss zwischen 13 und 120 Jahren liegen",
       "updated": "Profil erfolgreich aktualisiert",
       "updateError": "Fehler beim Aktualisieren des Profils"
     },
@@ -192,6 +359,8 @@
       "empty": "Noch keine Gyms hinzugefügt",
       "editDialogTitle": "Gym bearbeiten",
       "deleteConfirm": "Gym wirklich löschen? Dies ist nicht möglich, wenn das Gym in Workouts verwendet wird.",
+      "deleteDialogTitle": "Gym löschen?",
+      "deleteSubmit": "Löschen",
       "added": "Gym erfolgreich hinzugefügt",
       "addError": "Fehler beim Hinzufügen des Gyms",
       "updated": "Gym erfolgreich aktualisiert",
@@ -205,11 +374,7 @@
       "currentPassword": "Aktuelles Passwort",
       "newPassword": "Neues Passwort",
       "confirmNewPassword": "Neues Passwort bestätigen",
-      "warning": "Nach dem Ändern deines Passworts wirst du überall abgemeldet und musst dich erneut anmelden.",
-      "validationAllFields": "Bitte alle Felder ausfüllen",
-      "validationMinLength": "Neues Passwort muss mindestens 8 Zeichen lang sein",
-      "validationMismatch": "Die Passwörter stimmen nicht überein",
-      "changeError": "Fehler beim Ändern des Passworts"
+      "warning": "Nach dem Ändern deines Passworts wirst du überall abgemeldet und musst dich erneut anmelden."
     },
     "logout": "Abmelden"
   },
@@ -346,8 +511,15 @@
     "addFirstExerciseAria": "Erste Übung hinzufügen",
     "addExerciseAria": "Übung hinzufügen",
     "duplicateExerciseError": "Diese Übung ist bereits im Workout. Füge stattdessen Sätze zur bestehenden Übung hinzu.",
+    "exerciseLimitReached": "Ein Workout kann höchstens {max} Übungen enthalten.",
     "addExerciseError": "Fehler beim Hinzufügen der Übung",
     "saveError": "Fehler beim Speichern des Workouts",
+    "incomplete": {
+      "unloggedSet": "{exercise}: Satz {number} ist noch nicht geloggt. Logge ihn oder wische ihn weg.",
+      "missingRir": "{exercise}: Satz {number} braucht noch einen RIR.",
+      "emptyExercise": "{exercise} hat noch keine Sätze. Füge einen Satz hinzu oder entferne die Übung.",
+      "nothingLogged": "Logge mindestens einen Satz, bevor du das Workout beendest."
+    },
     "discard": "Verwerfen",
     "discarding": "Wird verworfen...",
     "finish": "Workout beenden",
@@ -433,8 +605,23 @@
     "setTypeWarmup": "Aufwärmen",
     "setTypeWorking": "Arbeit",
     "logSet": "Satz loggen (oder Swipe LTR)",
-    "logSetWaitingForSides": "Beide Seiten ausfüllen, um den Satz zu loggen",
-    "sidesIncompleteHint": "Beide Seiten mit Gewicht und Wdh ausfüllen, um den Satz zu loggen",
+    "logMissing": "Satz nicht geloggt – es fehlt: {fields}.",
+    "logInvalid": "Satz nicht geloggt – bitte prüfe die markierten Felder.",
+    "logOutOfOrder": "Logge zuerst Satz {number} oder wische ihn weg.",
+    "logExerciseAbove": "Schließe zuerst „{name}“ ab – oder ziehe diese Übung nach oben, wenn das Gerät belegt ist.",
+    "planRirMissing": "{exercise}, Satz {number}: Gib einen RIR an.",
+    "planSetTooHigh": "{exercise}, Satz {number}: Ein Wert liegt über dem erlaubten Maximum – prüfe die markierten Felder.",
+    "rirHint": "Ziel: höchstens RIR 2.",
+    "setLimitReached": "Eine Übung kann höchstens {max} Sätze enthalten.",
+    "errors": {
+      "weightMissing": "Bitte gib das Gewicht ein.",
+      "weightInvalid": "Das Gewicht darf nicht negativ sein.",
+      "weightZero": "0 {unit} ist nur bei Körpergewicht-Übungen möglich.",
+      "repsMissing": "Bitte gib die Wiederholungen ein.",
+      "repsInvalid": "Mindestens 1 ganze Wiederholung.",
+      "rirMissing": "Bitte gib den RIR ein.",
+      "rirInvalid": "Der RIR muss eine ganze Zahl ab 0 sein."
+    },
     "loggedTitle": "Geloggt (nicht entloggen möglich; Swipe RTL zum Löschen)",
     "rirLabel": "RIR {rir}",
     "addSet": "Satz hinzufügen",
@@ -587,8 +774,8 @@
   "MealEditorScreen": {
     "loadError": "Mahlzeit konnte nicht geladen werden.",
     "addedFood": "{name} hinzugefügt",
-    "nameRequired": "Bitte gib einen Namen ein.",
     "ingredientRequired": "Eine Mahlzeit braucht mindestens eine Zutat.",
+    "ingredientAmountInvalid": "Prüfe die Menge einer Zutat: Der eingegebene Wert wird nicht übernommen.",
     "saved": "Mahlzeit gespeichert",
     "created": "Mahlzeit angelegt",
     "saveError": "Speichern fehlgeschlagen.",
@@ -849,7 +1036,6 @@
   "CyclesPage": {
     "title": "Trainingszyklen",
     "subtitle": "Verwalte deine Trainingszyklen und Blueprints",
-    "checking": "Prüfe...",
     "newCycle": "Neuer Zyklus",
     "loading": "Lädt Zyklen...",
     "activeCycles": "Aktive Zyklen",
@@ -880,12 +1066,12 @@
       "confirm": "Beenden"
     },
     "alerts": {
-      "activeCycleExists": "Es existiert bereits ein aktiver Zyklus. Bitte beende diesen zuerst.",
-      "checkFailed": "Fehler beim Prüfen der aktiven Zyklen",
       "completeFailed": "Fehler beim Beenden des Zyklus"
     }
   },
   "CycleWizard": {
+    "checking": "Prüfe...",
+    "activeCycleExists": "Es existiert bereits ein aktiver Zyklus. Bitte beende diesen zuerst.",
     "title": "Neuer Trainingszyklus",
     "cancel": "Abbrechen",
     "stepProgress": "Schritt {current} von {total}",
@@ -951,11 +1137,8 @@
     "back": "Zurück",
     "nextToReview": "Weiter zur Überprüfung",
     "alerts": {
-      "templateNameRequired": "Bitte gib einen Vorlagen-Namen ein",
       "atLeastOneExercise": "Füge mindestens eine Übung hinzu",
       "templateCreated": "Vorlage erfolgreich erstellt!",
-      "templateNameExists": "Eine Vorlage mit diesem Namen existiert bereits",
-      "templateSaveFailed": "Fehler beim Speichern der Vorlage",
       "templateEmpty": "Diese Vorlage enthält keine Übungen",
       "templateLoadFailed": "Fehler beim Laden der Vorlage"
     },
@@ -1003,13 +1186,8 @@
     },
     "alerts": {
       "loadFailed": "Fehler beim Laden der Daten",
-      "nameRequired": "Bitte gib einen Workout-Namen ein",
-      "saveFailed": "Fehler beim Speichern des Blueprints",
-      "templateNameRequired": "Bitte gib einen Vorlagen-Namen ein",
       "atLeastOneExercise": "Füge mindestens eine Übung hinzu",
-      "templateCreated": "Vorlage erfolgreich erstellt!",
-      "templateNameExists": "Eine Vorlage mit diesem Namen existiert bereits",
-      "templateSaveFailed": "Fehler beim Speichern der Vorlage"
+      "templateCreated": "Vorlage erfolgreich erstellt!"
     },
     "saveTemplateDialog": {
       "title": "Blueprint als Vorlage speichern",
@@ -1101,10 +1279,8 @@
     "save": "Speichern",
     "alerts": {
       "loadFailed": "Fehler beim Laden der Daten.",
-      "nameRequired": "Bitte gib einen Namen für die Vorlage ein.",
       "atLeastOneExercise": "Bitte füge mindestens eine Übung hinzu.",
-      "everyExerciseNeedsSet": "Jede Übung muss mindestens einen Satz haben.",
-      "saveFailed": "Fehler beim Speichern der Vorlage."
+      "everyExerciseNeedsSet": "Jede Übung muss mindestens einen Satz haben."
     }
   },
   "CycleDetailPage": {
@@ -1189,8 +1365,6 @@
     "profile": "Profil"
   },
   "ExerciseEditorDialog": {
-    "nameRequired": "Bitte gib einen Namen ein",
-    "percentagesInvalid": "Muskelgruppen-Prozente müssen 100 % ergeben (aktuell: {sum} %)",
     "titleView": "Übung anzeigen",
     "titleEdit": "Übung bearbeiten",
     "titleCreate": "Benutzerdefinierte Übung erstellen",
@@ -1212,11 +1386,6 @@
     "cancel": "Abbrechen"
   },
   "FoodEditorDialog": {
-    "nameRequired": "Bitte gib einen Namen ein.",
-    "nutrientsInvalid": "Kalorien und Makros müssen Zahlen ≥ 0 sein.",
-    "barcodeInvalid": "Barcode muss 8 bis 14 Ziffern haben.",
-    "portionInvalid": "Jede Portionsgröße braucht eine Bezeichnung und eine Menge größer als 0.",
-    "portionDefault": "Markiere genau eine Portionsgröße als Standard.",
     "titleReadOnly": "Lebensmittel",
     "titleEdit": "Lebensmittel bearbeiten",
     "titleCreate": "Neues Lebensmittel",
@@ -1339,6 +1508,18 @@
     "fallbackAnyGym": "Kein Gym-Eintrag – letztes Training verwendet.",
     "setCountMismatch": "Andere Satzanzahl als geplant – Sätze ggf. anpassen."
   },
+  "ForgottenWorkout": {
+    "title": "Trainierst du noch?",
+    "description": "Dein Workout läuft seit über 5 Stunden.",
+    "willSave": "Ohne Antwort wird es in {time} automatisch gespeichert, bis zum letzten geloggten Satz.",
+    "willDiscard": "Ohne Antwort wird es in {time} verworfen, weil es unvollständig ist. Das lässt sich nicht rückgängig machen.",
+    "keepTraining": "Weiter trainieren",
+    "finish": "Workout beenden",
+    "discard": "Verwerfen",
+    "saved": "Dein vergessenes Workout wurde automatisch gespeichert.",
+    "discarded": "Dein vergessenes Workout war unvollständig und wurde verworfen.",
+    "saveFailed": "Das Workout konnte nicht automatisch gespeichert werden. Es bleibt erhalten."
+  },
   "LoginPage": {
     "title": "Anmelden",
     "or": "Oder",
@@ -1378,17 +1559,7 @@
     "removeGym": "Home Gym entfernen",
     "back": "Zurück",
     "creating": "Wird erstellt …",
-    "create": "Account erstellen",
-    "errors": {
-      "missingFields": "Bitte fülle alle Felder aus",
-      "passwordMismatch": "Passwörter stimmen nicht überein",
-      "passwordTooShort": "Das Passwort muss mindestens 8 Zeichen lang sein",
-      "heightRange": "Die Größe muss zwischen 50 und 300 cm liegen",
-      "weightRange": "Das Gewicht muss zwischen 20 und 500 kg liegen",
-      "tooYoung": "Du musst mindestens 13 Jahre alt sein",
-      "invalidBirthDate": "Bitte gib ein gültiges Geburtsdatum ein",
-      "noGym": "Bitte füge mindestens ein Home Gym hinzu"
-    }
+    "create": "Account erstellen"
   },
   "HistoryPage": {
     "title": "Trainingsverlauf",
@@ -1430,6 +1601,7 @@
   "HistoryEditPage": {
     "loadError": "Fehler beim Laden des Workouts",
     "saveError": "Fehler beim Speichern des Workouts",
+    "setsIncomplete": "Bitte ergänze die markierten Felder, bevor du speicherst.",
     "loading": "Lädt Workout …",
     "backToCycle": "Zurück zu Zyklusdetails",
     "backToHistory": "Zurück zum Verlauf",
@@ -1455,5 +1627,8 @@
     "tagline": "Deine persönliche Workout-Tracking-App für maximalen Trainingserfolg",
     "signIn": "Anmelden",
     "register": "Registrieren"
+  },
+  "DatePicker": {
+    "placeholder": "TT.MM.JJJJ"
   }
 }

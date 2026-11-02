@@ -17,12 +17,18 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { FieldError } from '@/components/ui/field';
+import { notify } from '@/lib/toast';
+import { findFirstSetNeedingRir, findFirstSetOverLimit } from '@/lib/log-set-guards';
+import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
+import { useFormErrors } from '@/hooks/useFormErrors';
+import { EXERCISES_PER_WORKOUT_MAX, NAME_MAX, checkBaseText } from '@/lib/field-rules';
 import type { ExerciseLog } from '@/types';
 import { replacePlanExerciseInList } from '@/lib/exercise-replace';
 import { usePlanExercisePrefill } from '@/lib/plan-exercise-prefill';
 import { reorderExerciseLogs, withArrayPositionOrder } from '@/lib/workout-order';
 import { plannedSideFields } from '@/lib/set-sides';
-import { addPlannedSet } from '@/lib/planned-sets';
+import { addPlannedSet, planRir } from '@/lib/planned-sets';
 import type { PlannedSet } from '@/types';
 import { sortByCycleWeekday, weekdayReferenceDate } from '@/lib/weekday';
 import {
@@ -59,6 +65,15 @@ export default function BlueprintEditorStep({
   onBack,
 }: BlueprintEditorStepProps) {
   const t = useTranslations('BlueprintEditorStep');
+  const tCard = useTranslations('ExerciseCard');
+  const tActive = useTranslations('ActiveWorkout');
+  const apiError = useApiErrorMessage();
+  // The template name in the save-as-template dialog; a taken name belongs under that field.
+  const [templateForm, templateFormRef] = useFormErrors({
+    fields: ['templateName'],
+    codeFields: { TEMPLATE_NAME_TAKEN: 'templateName' },
+    messageValues: { templateName: { max: NAME_MAX } },
+  });
   const format = useFormatter();
   const [showExerciseModal, setShowExerciseModal] = useState(false);
   const [exercises, setExercises] = useState<Exercise[]>([]);
@@ -116,7 +131,7 @@ export default function BlueprintEditorStep({
           setType: s.setType || SetType.WORKING,
           reps: s.reps ?? 0,
           weight: s.weight ?? 0,
-          rir: s.rir ?? 0,
+          rir: planRir(s),
           repsLeft: s.repsLeft ?? undefined,
           repsRight: s.repsRight ?? undefined,
           weightLeft: s.weightLeft ?? undefined,
@@ -161,13 +176,34 @@ export default function BlueprintEditorStep({
         setType: s.setType,
         reps: s.reps ?? 0,
         weight: s.weight ?? 0,
-        rir: s.rir ?? 0,
+        rir: planRir(s),
         // Per-side targets for unilateral exercises (issue #103); dropped for bilateral sets.
         ...plannedSideFields(s, ex.isUnilateral),
         rest: s.rest ?? 90,
       })),
     })));
   }, []);
+
+  // Every planned working set of every day needs an RIR (#227). Go to the first day that lacks
+  // one, so the card showing the field error is the one on screen.
+  const handleNext = () => {
+    for (const [dayIndex, day] of formData.workoutDays.entries()) {
+      const missingRir = findFirstSetNeedingRir(day.blueprint.exercises);
+      const overLimit = findFirstSetOverLimit(day.blueprint.exercises);
+      const hit = missingRir ?? overLimit;
+      if (!hit) continue;
+      const ex = day.blueprint.exercises[hit.exerciseIndex];
+      setCurrentDayIndex(dayIndex);
+      notify.warning(
+        tCard(missingRir ? 'planRirMissing' : 'planSetTooHigh', {
+          exercise: ex.exerciseName || exercises.find((e) => e.id === ex.exerciseId)?.name || '',
+          number: hit.setIndex + 1,
+        }),
+      );
+      return;
+    }
+    onNext();
+  };
 
   // Sync helper: after local changes to currentExercises, push back to formData
   const syncCurrentExercisesToFormData = (exLogs: ExerciseLog[]) => {
@@ -220,8 +256,7 @@ export default function BlueprintEditorStep({
   };
 
   const handleSaveAsTemplate = async () => {
-    if (!templateName.trim()) {
-      alert(t('alerts.templateNameRequired'));
+    if (!templateForm.setConstraints({ templateName: checkBaseText(templateName, NAME_MAX) })) {
       return;
     }
 
@@ -230,7 +265,7 @@ export default function BlueprintEditorStep({
     }
 
     if (currentDay.blueprint.exercises.length === 0) {
-      alert(t('alerts.atLeastOneExercise'));
+      notify.warning(t('alerts.atLeastOneExercise'));
       return;
     }
 
@@ -246,7 +281,7 @@ export default function BlueprintEditorStep({
             setType: set.setType,
             reps: set.reps,
             weight: set.weight,
-            rir: set.rir,
+            rir: planRir(set),
             // Carry per-side targets when saving a unilateral blueprint as a template (issue #103).
             ...plannedSideFields(set, ex.isUnilateral),
             rest: set.rest,
@@ -255,17 +290,12 @@ export default function BlueprintEditorStep({
       };
 
       await apiClient.createWorkoutTemplate(templateData);
-      alert(t('alerts.templateCreated'));
+      notify.success(t('alerts.templateCreated'));
       setShowSaveTemplateModal(false);
       setTemplateName('');
     } catch (error: unknown) {
       console.error('Failed to save template:', error);
-      const err = error as { response?: { status?: number } };
-      if (err.response?.status === 409) {
-        alert(t('alerts.templateNameExists'));
-      } else {
-        alert(t('alerts.templateSaveFailed'));
-      }
+      templateForm.showApiError(error);
     } finally {
       setSavingTemplate(false);
     }
@@ -280,7 +310,7 @@ export default function BlueprintEditorStep({
 
       // Check if template has exercises
       if (!template.exercises || template.exercises.length === 0) {
-        alert(t('alerts.templateEmpty'));
+        notify.warning(t('alerts.templateEmpty'));
         return;
       }
 
@@ -295,7 +325,7 @@ export default function BlueprintEditorStep({
           setType: set.setType,
           reps: set.reps,
           weight: set.weight,
-          rir: set.rir ?? 0,
+          rir: planRir(set),
           // Carry a unilateral template's per-side targets into the blueprint (issue #103).
           ...plannedSideFields(set, ex.isUnilateral),
           rest: set.rest ?? 90,
@@ -315,7 +345,7 @@ export default function BlueprintEditorStep({
       setShowTemplateSelectionModal(false);
     } catch (error) {
       console.error('Failed to load template:', error);
-      alert(t('alerts.templateLoadFailed'));
+      notify.error(apiError(error, t('alerts.templateLoadFailed')));
     }
   };
 
@@ -349,6 +379,10 @@ export default function BlueprintEditorStep({
 
   const addExerciseToBlueprint = (exerciseId: string, exercise?: Exercise) => {
     if (currentDayIndex === null) return;
+    if (currentExercises.length >= EXERCISES_PER_WORKOUT_MAX) {
+      notify.warning(tActive('exerciseLimitReached', { max: EXERCISES_PER_WORKOUT_MAX }));
+      return; // Keep the modal open, like the active workout
+    }
 
     // If exercise object provided (e.g., newly created custom exercise), add to local list
     if (exercise && !exercises.find(ex => ex.id === exercise.id)) {
@@ -594,7 +628,7 @@ export default function BlueprintEditorStep({
           </Button>
           <Button
             type="button"
-            onClick={onNext}
+            onClick={handleNext}
             disabled={!allDaysHaveExercises}
             className="flex-1"
           >
@@ -617,6 +651,7 @@ export default function BlueprintEditorStep({
           setShowSaveTemplateModal(open);
           if (!open) {
             setTemplateName('');
+            templateForm.clear('templateName');
           }
         }}
       >
@@ -624,21 +659,30 @@ export default function BlueprintEditorStep({
           <DialogHeader>
             <DialogTitle>{t('saveTemplateDialog.title')}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <div ref={templateFormRef} className="space-y-4 py-2">
             <p className="text-sm text-muted-foreground">
               {t('saveTemplateDialog.description')}
             </p>
-            <Input
-              value={templateName}
-              onChange={(e) => setTemplateName(e.target.value)}
-              placeholder={t('saveTemplateDialog.namePlaceholder')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !savingTemplate) {
-                  handleSaveAsTemplate();
-                }
-              }}
-              autoFocus
-            />
+            <div>
+              <Input
+                value={templateName}
+                onChange={(e) => {
+                  setTemplateName(e.target.value);
+                  templateForm.clear('templateName');
+                }}
+                placeholder={t('saveTemplateDialog.namePlaceholder')}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !savingTemplate) {
+                    handleSaveAsTemplate();
+                  }
+                }}
+                autoFocus
+                {...templateForm.fieldProps('templateName')}
+              />
+              <FieldError id={templateForm.errorId('templateName')} className="mt-1">
+                {templateForm.errors.templateName}
+              </FieldError>
+            </div>
           </div>
           <DialogFooter className="flex gap-3">
             <Button
@@ -646,6 +690,7 @@ export default function BlueprintEditorStep({
               onClick={() => {
                 setShowSaveTemplateModal(false);
                 setTemplateName('');
+                templateForm.clear('templateName');
               }}
               disabled={savingTemplate}
             >
@@ -653,7 +698,7 @@ export default function BlueprintEditorStep({
             </Button>
             <Button
               onClick={handleSaveAsTemplate}
-              disabled={savingTemplate || !templateName.trim()}
+              disabled={savingTemplate}
             >
               {savingTemplate ? t('saveTemplateDialog.saving') : t('saveTemplateDialog.save')}
             </Button>

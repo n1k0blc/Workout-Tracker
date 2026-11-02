@@ -1,4 +1,4 @@
-import { registerDecorator } from 'class-validator';
+import { registerDecorator, ValidationOptions } from 'class-validator';
 
 const LOCAL_DATE_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -24,10 +24,11 @@ export function isLocalDate(value: unknown): boolean {
   );
 }
 
-export function IsLocalDate() {
+export function IsLocalDate(validationOptions?: ValidationOptions) {
   return function (object: object, propertyName: string) {
     registerDecorator({
       name: 'isLocalDate',
+      options: validationOptions,
       target: object.constructor,
       propertyName,
       validator: {

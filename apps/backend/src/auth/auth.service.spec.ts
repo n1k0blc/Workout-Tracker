@@ -198,3 +198,34 @@ describe('AuthService locale and unitSystem (#179)', () => {
     });
   });
 });
+
+/**
+ * Login timing (#225): an unknown address must cost as much as a wrong password, so the response
+ * time does not reveal which addresses have an account.
+ */
+describe('AuthService login for an unknown address', () => {
+  it('still runs a password hash verification, then answers like a wrong password', async () => {
+    const { service, prisma, passwordService } = makeService({ breached: false });
+    prisma.user.findUnique.mockResolvedValue(null);
+
+    const result = service.login({ email: 'nobody@example.com', password: 'whatever-it-is' });
+
+    await expect(result).rejects.toMatchObject({ code: 'INVALID_CREDENTIALS' });
+    expect(passwordService.verify).toHaveBeenCalledTimes(1);
+    expect(passwordService.verify).toHaveBeenCalledWith(
+      'whatever-it-is',
+      expect.stringMatching(/^\$argon2id\$/),
+    );
+  });
+
+  it('gives a wrong password for a known address the same error', async () => {
+    const { service, prisma, passwordService } = makeService({ breached: false });
+    prisma.user.findUnique.mockResolvedValue({ id: 'user-1', passwordHash: 'stored-hash' });
+    passwordService.verify.mockResolvedValue(false);
+
+    await expect(
+      service.login({ email: 'known@example.com', password: 'wrong-password' }),
+    ).rejects.toMatchObject({ code: 'INVALID_CREDENTIALS' });
+    expect(passwordService.verify).toHaveBeenCalledWith('wrong-password', 'stored-hash');
+  });
+});

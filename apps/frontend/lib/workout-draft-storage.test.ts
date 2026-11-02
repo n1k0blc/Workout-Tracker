@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { draftStorageKeys, claimDraftForUser } from '@/lib/workout-draft-storage';
+import {
+  draftStorageKeys,
+  claimDraftForUser,
+  readSkippedSets,
+  readAskAgainAt,
+  forgottenOutcomeKey,
+  forgottenClaimKey,
+} from '@/lib/workout-draft-storage';
 
 function fakeStorage(initial: Record<string, string> = {}) {
   const map = new Map(Object.entries(initial));
@@ -101,5 +108,51 @@ describe('claimDraftForUser', () => {
     const store = fakeStorage();
     expect(claimDraftForUser(store, 'u1')).toEqual({ draft: null, meta: null });
     expect(store.snapshot()).toEqual({});
+  });
+});
+
+describe('readAskAgainAt', () => {
+  it('reads the re-ask time saved with the draft', () => {
+    expect(readAskAgainAt({ askAgainAt: 1_700_000_000_000 })).toBe(1_700_000_000_000);
+  });
+
+  it('is null for a draft that was never snoozed, or holds something else', () => {
+    expect(readAskAgainAt({})).toBeNull();
+    expect(readAskAgainAt({ askAgainAt: 'soon' } as never)).toBeNull();
+    expect(readAskAgainAt({ askAgainAt: Number.NaN })).toBeNull();
+  });
+});
+
+describe('forgotten-workout keys', () => {
+  it('namespaces the outcome notice and the single-run claim by account', () => {
+    expect(forgottenOutcomeKey('u1')).toBe('forgottenWorkoutOutcome::u1');
+    expect(forgottenOutcomeKey('u2')).not.toBe(forgottenOutcomeKey('u1'));
+    expect(forgottenClaimKey('u1')).toBe('forgottenWorkoutClaim::u1');
+  });
+});
+
+describe('readSkippedSets', () => {
+  it('reads the swiped-away set numbers a draft was saved with', () => {
+    expect(readSkippedSets({ skippedSets: { 'local-ex-1': [2, 3], 'local-ex-2': [1] } })).toEqual({
+      'local-ex-1': [2, 3],
+      'local-ex-2': [1],
+    });
+  });
+
+  it('is empty for a draft saved before skip state was persisted', () => {
+    expect(readSkippedSets({})).toEqual({});
+  });
+
+  it('keeps only well-formed entries of a damaged draft', () => {
+    expect(
+      readSkippedSets({
+        skippedSets: { good: [1, 2], notAList: 'x', mixed: [1, 'a', -2, 1.5, 0, 3] },
+      } as never),
+    ).toEqual({ good: [1, 2], mixed: [1, 3] });
+  });
+
+  it('is empty when the field is not an object at all', () => {
+    expect(readSkippedSets({ skippedSets: [1, 2] } as never)).toEqual({});
+    expect(readSkippedSets({ skippedSets: null } as never)).toEqual({});
   });
 });

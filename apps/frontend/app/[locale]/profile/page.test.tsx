@@ -35,11 +35,17 @@ const baseUser = {
   unitSystem: 'METRIC' as 'METRIC' | 'IMPERIAL',
 };
 
-const { push, logout, updateProfile } = vi.hoisted(() => ({
+const { push, logout, updateProfile, getHomeGyms, deleteHomeGym, changePassword } = vi.hoisted(() => ({
   push: vi.fn(),
   logout: vi.fn(),
   updateProfile: vi.fn(),
+  getHomeGyms: vi.fn(),
+  deleteHomeGym: vi.fn(),
+  changePassword: vi.fn(),
 }));
+
+const notify = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn(), info: vi.fn(), success: vi.fn() }));
+vi.mock('@/lib/toast', () => ({ notify }));
 
 vi.mock('@/i18n/navigation', () => ({
   useRouter: () => ({ push }),
@@ -57,16 +63,17 @@ vi.mock('@/lib/workout-context', () => ({
 
 vi.mock('@/lib/api/client', () => ({
   apiClient: {
-    getHomeGyms: vi.fn().mockResolvedValue([]),
+    getHomeGyms,
     updateProfile,
     createHomeGym: vi.fn(),
     updateHomeGym: vi.fn(),
-    deleteHomeGym: vi.fn(),
-    changePassword: vi.fn(),
+    deleteHomeGym,
+    changePassword,
   },
 }));
 
 updateProfile.mockResolvedValue({ ...baseUser, locale: 'en' });
+getHomeGyms.mockResolvedValue([]);
 
 import ProfilePage from './page';
 
@@ -122,9 +129,9 @@ describe('ProfilePage language select', () => {
     const englishOption = await screen.findByText('English');
     fireEvent.click(englishOption);
 
-    // The context message, never the raw error text (#190).
-    await waitFor(() => expect(screen.getByText('Fehler beim Ändern der Sprache')).toBeTruthy());
-    expect(screen.queryByText('network down')).toBeNull();
+    // The context message as a toast, never the raw error text (#190).
+    await waitFor(() => expect(notify.error).toHaveBeenCalledWith('Fehler beim Ändern der Sprache'));
+    expect(notify.error).not.toHaveBeenCalledWith(expect.stringContaining('network down'));
     expect(window.location.href).toBe('');
     expect(push).not.toHaveBeenCalled();
   });
@@ -139,9 +146,9 @@ describe('ProfilePage language select', () => {
     fireEvent.click(await screen.findByText('English'));
 
     await waitFor(() =>
-      expect(screen.getByText('Diese E-Mail-Adresse wird bereits verwendet.')).toBeTruthy(),
+      expect(notify.error).toHaveBeenCalledWith('Diese E-Mail-Adresse wird bereits verwendet.'),
     );
-    expect(screen.queryByText('EMAIL_ALREADY_IN_USE')).toBeNull();
+    expect(notify.error).not.toHaveBeenCalledWith('EMAIL_ALREADY_IN_USE');
   });
 });
 
@@ -180,7 +187,7 @@ describe('ProfilePage unit system', () => {
     currentUser = { ...baseUser, unitSystem: 'IMPERIAL', weight: 100, height: 180 } as typeof baseUser;
     renderProfilePage();
 
-    await waitFor(() => expect(screen.getByText('220 lb')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('220.5 lb')).toBeTruthy());
     expect(screen.getByText('71 in')).toBeTruthy();
   });
 
@@ -200,5 +207,118 @@ describe('ProfilePage unit system', () => {
     await waitFor(() =>
       expect(updateProfile).toHaveBeenCalledWith(expect.objectContaining({ weight: 100, height: 180 })),
     );
+  });
+});
+
+/** Deleting a gym is destructive: an app dialog asks first (#231), and No means nothing is sent. */
+describe('ProfilePage gym deletion', () => {
+  beforeEach(() => {
+    getHomeGyms.mockResolvedValue([{ id: 'g1', name: 'Downtown Gym' }]);
+    deleteHomeGym.mockResolvedValue(undefined);
+  });
+  afterEach(() => {
+    cleanup();
+    deleteHomeGym.mockReset();
+    getHomeGyms.mockReset();
+    getHomeGyms.mockResolvedValue([]);
+  });
+
+  async function openDeleteDialog() {
+    await screen.findByText('Downtown Gym');
+    const row = screen.getByText('Downtown Gym').closest('div.flex.items-center') as HTMLElement;
+    const buttons = row.querySelectorAll('button');
+    fireEvent.click(buttons[buttons.length - 1]);
+    return screen.findByRole('alertdialog');
+  }
+
+  it('asks in a dialog and deletes only after confirmation', async () => {
+    renderProfilePage();
+
+    const dialog = await openDeleteDialog();
+    expect(dialog.textContent).toContain(messages.Profile.gyms.deleteConfirm);
+    expect(deleteHomeGym).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Löschen' }));
+
+    await waitFor(() => expect(deleteHomeGym).toHaveBeenCalledWith('g1'));
+    await waitFor(() => expect(screen.queryByText('Downtown Gym')).toBeNull());
+  });
+
+  it('deletes nothing when the dialog is cancelled', async () => {
+    renderProfilePage();
+
+    await openDeleteDialog();
+    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(deleteHomeGym).not.toHaveBeenCalled();
+    expect(screen.getByText('Downtown Gym')).toBeTruthy();
+  });
+});
+
+/**
+ * Sign-in hardening (#225): the change-password dialog and the e-mail field mirror the server's
+ * rules, so a limit breach is caught before the request and read the same either way.
+ */
+describe('ProfilePage password and e-mail rules', () => {
+  afterEach(() => {
+    cleanup();
+    changePassword.mockReset();
+    updateProfile.mockClear();
+    logout.mockReset();
+    currentUser = baseUser;
+  });
+
+  async function fillPasswordDialog(current: string, next: string, confirm = next) {
+    renderProfilePage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Passwort ändern' }));
+    fireEvent.change(await screen.findByLabelText('Aktuelles Passwort'), { target: { value: current } });
+    fireEvent.change(screen.getByLabelText('Neues Passwort'), { target: { value: next } });
+    fireEvent.change(screen.getByLabelText('Neues Passwort bestätigen'), { target: { value: confirm } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Passwort ändern' }).at(-1)!);
+  }
+
+  it('sends both passwords when each is 8 to 100 characters', async () => {
+    changePassword.mockResolvedValue(undefined);
+    await fillPasswordDialog('a'.repeat(100), 'b'.repeat(100));
+
+    await waitFor(() =>
+      expect(changePassword).toHaveBeenCalledWith({
+        currentPassword: 'a'.repeat(100),
+        newPassword: 'b'.repeat(100),
+      }),
+    );
+  });
+
+  it.each([
+    ['a'.repeat(7), 'valid-new-password', 'Aktuelles Passwort', 'Das aktuelle Passwort muss mindestens 8 Zeichen lang sein.'],
+    ['a'.repeat(101), 'valid-new-password', 'Aktuelles Passwort', 'Das aktuelle Passwort darf höchstens 100 Zeichen lang sein.'],
+    ['valid-old-password', 'b'.repeat(7), 'Neues Passwort', 'Das neue Passwort muss mindestens 8 Zeichen lang sein.'],
+    ['valid-old-password', 'b'.repeat(101), 'Neues Passwort', 'Das neue Passwort darf höchstens 100 Zeichen lang sein.'],
+  ])('refuses case %#: nothing is sent and the field says why', async (current, next, label, message) => {
+    await fillPasswordDialog(current, next);
+
+    expect(await screen.findByText(message)).toBeTruthy();
+    expect(screen.getByLabelText(label).getAttribute('aria-invalid')).toBe('true');
+    expect(changePassword).not.toHaveBeenCalled();
+  });
+
+  it('refuses an e-mail address that is not valid', async () => {
+    currentUser = {
+      ...baseUser,
+      weight: 100,
+      height: 180,
+      dateOfBirth: '1990-01-01T00:00:00.000Z',
+    } as typeof baseUser;
+    renderProfilePage();
+
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Bearbeiten' }))[1]);
+    fireEvent.change(await screen.findByDisplayValue('sam@example.com'), {
+      target: { value: 'not-an-address' },
+    });
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Speichern' }))[0]);
+
+    expect(await screen.findByText('Bitte gib eine gültige E-Mail-Adresse ein.')).toBeTruthy();
+    expect(updateProfile).not.toHaveBeenCalled();
   });
 });
