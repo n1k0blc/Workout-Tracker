@@ -164,16 +164,16 @@
       },
       "height": {
         "isNotEmpty": "Bitte gib deine Größe ein.",
-        "isInt": "Bitte gib deine Größe in ganzen Zentimetern ein.",
-        "min": "Die Größe muss mindestens 100 cm betragen.",
-        "max": "Die Größe darf höchstens 250 cm betragen."
+        "isInt": "Bitte gib deine Größe als ganze Zahl ein.",
+        "min": "Die Größe muss mindestens {min} {unit} betragen.",
+        "max": "Die Größe darf höchstens {max} {unit} betragen."
       },
       "weight": {
         "isNotEmpty": "Bitte gib dein Gewicht ein.",
         "isNumber": "Bitte gib dein Gewicht als Zahl ein.",
-        "min": "Das Gewicht muss mindestens 30 kg betragen.",
-        "max": "Das Gewicht darf höchstens 400 kg betragen.",
-        "maxDecimals": "Verwende höchstens eine Nachkommastelle."
+        "maxDecimals": "Verwende höchstens eine Nachkommastelle.",
+        "min": "Das Gewicht muss mindestens {min} {unit} betragen.",
+        "max": "Das Gewicht darf höchstens {max} {unit} betragen."
       },
       "homeGyms": {
         "arrayMinSize": "Bitte füge mindestens ein Home Gym hinzu.",

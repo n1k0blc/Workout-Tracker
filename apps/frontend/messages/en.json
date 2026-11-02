@@ -164,16 +164,16 @@
       },
       "height": {
         "isNotEmpty": "Please enter your height.",
-        "isInt": "Please enter your height in whole centimetres.",
-        "min": "The height must be at least 100 cm.",
-        "max": "The height must be at most 250 cm."
+        "isInt": "Please enter your height as a whole number.",
+        "min": "The height must be at least {min} {unit}.",
+        "max": "The height must be at most {max} {unit}."
       },
       "weight": {
         "isNotEmpty": "Please enter your weight.",
         "isNumber": "Please enter your weight as a number.",
-        "min": "The weight must be at least 30 kg.",
-        "max": "The weight must be at most 400 kg.",
-        "maxDecimals": "Use at most one decimal place."
+        "maxDecimals": "Use at most one decimal place.",
+        "min": "The weight must be at least {min} {unit}.",
+        "max": "The weight must be at most {max} {unit}."
       },
       "homeGyms": {
         "arrayMinSize": "Please add at least one home gym.",

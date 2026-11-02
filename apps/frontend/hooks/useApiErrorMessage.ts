@@ -16,12 +16,22 @@ export function useValidationMessage() {
   const t = useTranslations('ApiErrors');
 
   return useCallback(
-    (property: string, constraint: string): string | undefined => {
+    (
+      property: string,
+      constraint: string,
+      values: Record<string, string | number> = {},
+    ): string | undefined => {
       const field = property.split('.').pop() ?? property;
-      const key = [`validation.${field}.${constraint}`, `validation.${constraint}`].find((k) =>
-        t.has(k),
+      const params = { property: field, ...values };
+      // A message that names a limit (`{min}`, `{max}`, `{unit}`) is used only when the caller
+      // supplied those numbers; without them the next, generic entry is the better text than a
+      // sentence with a hole in it.
+      const key = [`validation.${field}.${constraint}`, `validation.${constraint}`].find(
+        (k) =>
+          t.has(k) &&
+          [...String(t.raw(k)).matchAll(/\{\s*(\w+)\s*[,}]/g)].every((m) => m[1] in params),
       );
-      return key ? t(key, { property: field }) : undefined;
+      return key ? t(key, params) : undefined;
     },
     [t],
   );

@@ -23,6 +23,17 @@ export function fromLocalDateString(localDate: string): Date {
   return new Date(year, month - 1, day);
 }
 
+/**
+ * The same calendar day `years` later; a leap day falls back to 28 February in a non-leap year.
+ * Mirror of `addLocalYears` in `apps/backend/src/common/utils/today.util.ts`.
+ */
+export function addLocalYears(localDate: string, years: number): string {
+  const [year, month, day] = localDate.split('-').map(Number);
+  const target = new Date(Date.UTC(year + years, month - 1, day));
+  if (target.getUTCMonth() !== month - 1) target.setUTCDate(0);
+  return target.toISOString().slice(0, 10);
+}
+
 /** The user's IANA timezone, sent with every request so the server can answer "what day is it?". */
 export function clientTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;

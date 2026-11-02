@@ -17,6 +17,7 @@ import {
   HEIGHT_CM_MAX,
   HEIGHT_CM_MIN,
   NAME_MAX,
+  bodyLimits,
   checkBaseText,
   checkBirthDate,
   checkDecimal,
@@ -59,6 +60,8 @@ export default function RegisterPage() {
       'homeGyms', ...homeGyms.map((_, i) => gymKey(i)),
     ],
     codeFields: { EMAIL_ALREADY_REGISTERED: 'email', PASSWORD_BREACHED: 'password' },
+    // Nobody is signed in yet, so the limits are named in metric.
+    messageValues: bodyLimits('METRIC'),
   });
 
   const handleStep1Next = () => {

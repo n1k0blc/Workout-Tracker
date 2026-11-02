@@ -14,6 +14,12 @@ interface Options {
   fields: string[];
   /** API error codes that belong to one field instead of a toast (`EMAIL_ALREADY_REGISTERED` -> `email`). */
   codeFields?: Record<string, string>;
+  /**
+   * The numbers a field's limit messages name (`{min}`, `{max}`, `{unit}`), by field key or by the
+   * last segment of a nested key. The caller derives them from the same constants the check uses,
+   * in the user's unit, so a client check and a server rejection read the same.
+   */
+  messageValues?: Record<string, Record<string, string | number>>;
 }
 
 /**
@@ -33,8 +39,17 @@ interface Options {
  *
  * `errors` maps a field key to its message in the user's language.
  */
-export function useFormErrors({ fields, codeFields = {} }: Options) {
-  const validationMessage = useValidationMessage();
+export function useFormErrors({ fields, codeFields = {}, messageValues = {} }: Options) {
+  const validationMessageFor = useValidationMessage();
+  const validationMessage = useCallback(
+    (property: string, constraint: string) =>
+      validationMessageFor(
+        property,
+        constraint,
+        messageValues[property] ?? messageValues[property.split('.').pop() ?? property],
+      ),
+    [validationMessageFor, messageValues],
+  );
   const apiError = useApiErrorMessage();
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [focusRequest, setFocusRequest] = useState(0);
