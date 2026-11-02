@@ -11,8 +11,10 @@ import { replaceExerciseInList } from '@/lib/exercise-replace';
 import { toLocalDateString } from '@/lib/local-date';
 import { blankPlanValues, buildPrefillToast, mapLastPerformanceOntoPlan } from '@/lib/last-performance';
 import { usePrefillToast } from '@/hooks/usePrefillToast';
-import { draftStorageKeys, claimDraftForUser, readSkippedSets, DraftMeta } from '@/lib/workout-draft-storage';
+import { draftStorageKeys, claimDraftForUser, readSkippedSets, readAskAgainAt, DraftMeta } from '@/lib/workout-draft-storage';
 import { EMPTY_SET_ROW_STATE, type SetRowState } from '@/lib/workout-completeness';
+import { resolveStartedAt } from '@/lib/forgotten-workout';
+import { useForgottenWorkout, type ForgottenWorkoutSession } from '@/hooks/useForgottenWorkout';
 
 /** One entry per set actually logged during a *live* session, in completion order. Drives
  *  rest-attribution (§3.5): when a new set completes, the previous entry's set gets its `rest`
@@ -126,6 +128,17 @@ interface WorkoutContextType {
   addSetRow: (exerciseLogId: string, setNumber: number) => void;
   /** Discard an added set row without logging it. */
   removeSetRow: (exerciseLogId: string, setNumber: number) => void;
+  /**
+   * The "still training?" question for a live workout that has run 5 hours (#229), with the seconds
+   * left before it answers itself; null when it is not being asked.
+   */
+  forgottenPrompt: { secondsLeft: number } | null;
+  /** "Weiter trainieren": ask again in an hour. */
+  keepTraining: () => void;
+  /** "Workout beenden": open the workout and have the screen run its usual finish flow. */
+  endFromPrompt: () => void;
+  /** Bumped by `endFromPrompt`; the active-workout screen runs "Beenden" when it changes. */
+  finishRequest: number;
   workoutDuration: number;
   restTimer: number;
   restTimerTarget: number;
@@ -209,10 +222,20 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
   // together with the state so a draft write in the same tick already carries the new value.
   const [setRowState, setSetRowState] = useState<SetRowState>(EMPTY_SET_ROW_STATE);
   const setRowStateRef = useRef<SetRowState>(EMPTY_SET_ROW_STATE);
+  // The 5-hour prompt's two draft fields (#229). `startedAt` is its own timestamp because pausing
+  // shifts `workoutStartTime`; `askAgainAt` is the "Weiter trainieren" answer. Both live sessions only.
+  const startedAtRef = useRef<number | null>(null);
+  const askAgainAtRef = useRef<number | null>(null);
+  const isPastWorkoutRef = useRef(false);
+  const [finishRequest, setFinishRequest] = useState(0);
 
   useEffect(() => {
     workoutStartTimeRef.current = workoutStartTime;
   }, [workoutStartTime]);
+
+  useEffect(() => {
+    isPastWorkoutRef.current = isPastWorkout;
+  }, [isPastWorkout]);
 
   useEffect(() => {
     isMinimizedRef.current = isMinimized;
@@ -236,6 +259,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       pastWorkoutDuration: pastDuration,
       isMinimized: minimized,
       ...(hasSkips ? { skippedSets: skipped as Record<string, number[]> } : {}),
+      ...(!isPast && startedAtRef.current !== null ? { startedAt: startedAtRef.current } : {}),
+      ...(!isPast && askAgainAtRef.current !== null ? { askAgainAt: askAgainAtRef.current } : {}),
     };
   }, []);
 
@@ -438,6 +463,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
       setPastWorkoutDuration(0);
       completionLogRef.current = [];
       writeSetRowState(EMPTY_SET_ROW_STATE);
+      startedAtRef.current = null;
+      askAgainAtRef.current = null;
       clearAllTimerState();
       persistDraft(null, null);
       return;
@@ -471,6 +498,11 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
     const isLiveSession = !isPast;
     if (isLiveSession) {
+      // A new session starts its 5-hour clock; a patch of the running one leaves it alone.
+      if (!isPatchOfSameSession || startedAtRef.current === null) {
+        startedAtRef.current = Date.now();
+        askAgainAtRef.current = null;
+      }
       if (workoutStartTimeRef.current === null) {
         const now = Date.now();
         setWorkoutStartTime(now);
@@ -481,6 +513,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (isPast) {
+      startedAtRef.current = null;
+      askAgainAtRef.current = null;
       setRestTimerStartedAt(null);
       setRestTimerTarget(0);
       setRestTimer(0);
@@ -677,7 +711,14 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const completeWorkout = async (options: CompleteWorkoutOptions = {}): Promise<Workout | null> => {
+  /**
+   * Saves the live or past workout. `end` is set only by the 5-hour prompt's automatic save: the
+   * workout ends at its last logged set (see `autoSaveEnd`) instead of at the moment of saving.
+   */
+  const saveWorkout = async (
+    options: CompleteWorkoutOptions = {},
+    end?: { totalDuration: number; localDate: string },
+  ): Promise<Workout | null> => {
     if (!activeWorkout) return null;
 
     setLoading(true);
@@ -705,13 +746,14 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
       const exerciseInputs: WorkoutExerciseInput[] = toExercisePayload(exercises);
 
-      const totalDuration = isPastWorkout ? pastWorkoutDuration : workoutDuration;
+      const totalDuration = end?.totalDuration ?? (isPastWorkout ? pastWorkoutDuration : workoutDuration);
 
       // A live session is stamped with the day it is *finished* on -- a session started at
-      // 23:50 belongs to the day it ended. A past entry keeps the day the user picked.
-      const localDate = isLive
+      // 23:50 belongs to the day it ended. A past entry keeps the day the user picked. An
+      // automatic save has no such moment: it takes the day of the last logged set.
+      const localDate = end?.localDate ?? (isLive
         ? toLocalDateString(new Date())
-        : activeWorkout.localDate;
+        : activeWorkout.localDate);
 
       const payload = {
         date: activeWorkout.date,
@@ -733,6 +775,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
 
       completionLogRef.current = [];
       writeSetRowState(EMPTY_SET_ROW_STATE);
+      startedAtRef.current = null;
+      askAgainAtRef.current = null;
       setActiveWorkout(null);
       isMinimizedRef.current = false;
       setIsMinimized(false);
@@ -748,9 +792,13 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const completeWorkout = (options: CompleteWorkoutOptions = {}) => saveWorkout(options);
+
   const discardWorkout = () => {
     completionLogRef.current = [];
     writeSetRowState(EMPTY_SET_ROW_STATE);
+    startedAtRef.current = null;
+    askAgainAtRef.current = null;
     setActiveWorkout(null);
     isMinimizedRef.current = false;
     setIsMinimized(false);
@@ -1064,6 +1112,8 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     setIsMinimized(false);
     completionLogRef.current = [];
     writeSetRowState(EMPTY_SET_ROW_STATE);
+    startedAtRef.current = null;
+    askAgainAtRef.current = null;
     resetTimerState();
 
     if (!uid) return;
@@ -1092,6 +1142,9 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
           setIsPastWorkout(meta.isPastWorkout);
           setPastWorkoutDuration(meta.pastWorkoutDuration);
           writeSetRowState({ skipped: readSkippedSets(meta), added: {} });
+          // A draft from before the 5-hour prompt has no start of its own -- see resolveStartedAt.
+          startedAtRef.current = meta.isPastWorkout ? null : resolveStartedAt(meta, workout, Date.now());
+          askAgainAtRef.current = meta.isPastWorkout ? null : readAskAgainAt(meta);
           // Absent on a draft written before this feature -- resume expanded (issue #129).
           const restoredMinimized = !meta.isPastWorkout && meta.isMinimized === true;
           isMinimizedRef.current = restoredMinimized;
@@ -1125,6 +1178,38 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, user]);
 
+  // The 5-hour prompt reads the session through this ref, so its once-a-second tick always sees
+  // the latest save/discard closures without being rebuilt on every render.
+  const forgottenSession = useRef<ForgottenWorkoutSession | null>(null);
+  useEffect(() => {
+    forgottenSession.current = {
+      snapshot: () => ({
+        workout: activeWorkoutRef.current,
+        isPast: isPastWorkoutRef.current,
+        rows: setRowStateRef.current,
+        startedAt: startedAtRef.current,
+      }),
+      syncAskAgainAt: (at) => {
+        askAgainAtRef.current = at;
+      },
+      setAskAgainAt: (at) => {
+        askAgainAtRef.current = at;
+        const workout = activeWorkoutRef.current;
+        if (workout && !isPastWorkoutRef.current) {
+          persistDraft(workout, draftMeta(false, pastWorkoutDuration, isMinimizedRef.current));
+        }
+      },
+      save: (end) => saveWorkout({}, end),
+      discard: discardWorkout,
+    };
+  });
+  const { prompt: forgottenPrompt, keepTraining } = useForgottenWorkout(user?.id ?? null, keys, forgottenSession);
+  const endFromPrompt = () => {
+    keepTraining();
+    setMinimized(false);
+    setFinishRequest((n) => n + 1);
+  };
+
   return (
     <WorkoutContext.Provider
       value={{
@@ -1156,6 +1241,10 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         skipPlannedSet,
         addSetRow,
         removeSetRow,
+        forgottenPrompt,
+        keepTraining,
+        endFromPrompt,
+        finishRequest,
         workoutDuration,
         restTimer,
         restTimerTarget,

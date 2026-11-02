@@ -1410,6 +1410,18 @@
     "fallbackAnyGym": "No gym entry – used the last workout.",
     "setCountMismatch": "Different number of sets than planned – adjust the sets if needed."
   },
+  "ForgottenWorkout": {
+    "title": "Still training?",
+    "description": "Your workout has been running for over 5 hours.",
+    "willSave": "If you don't answer, it will be saved automatically in {time}, ending at your last logged set.",
+    "willDiscard": "If you don't answer, it will be discarded in {time} because it is incomplete. This can't be undone.",
+    "keepTraining": "Keep training",
+    "finish": "Finish workout",
+    "discard": "Discard",
+    "saved": "Your forgotten workout was saved automatically.",
+    "discarded": "Your forgotten workout was incomplete and has been discarded.",
+    "saveFailed": "The workout could not be saved automatically. It has been kept."
+  },
   "LoginPage": {
     "title": "Sign in",
     "or": "Or",

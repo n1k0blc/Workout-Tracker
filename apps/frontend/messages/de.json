@@ -1410,6 +1410,18 @@
     "fallbackAnyGym": "Kein Gym-Eintrag – letztes Training verwendet.",
     "setCountMismatch": "Andere Satzanzahl als geplant – Sätze ggf. anpassen."
   },
+  "ForgottenWorkout": {
+    "title": "Trainierst du noch?",
+    "description": "Dein Workout läuft seit über 5 Stunden.",
+    "willSave": "Ohne Antwort wird es in {time} automatisch gespeichert, bis zum letzten geloggten Satz.",
+    "willDiscard": "Ohne Antwort wird es in {time} verworfen, weil es unvollständig ist. Das lässt sich nicht rückgängig machen.",
+    "keepTraining": "Weiter trainieren",
+    "finish": "Workout beenden",
+    "discard": "Verwerfen",
+    "saved": "Dein vergessenes Workout wurde automatisch gespeichert.",
+    "discarded": "Dein vergessenes Workout war unvollständig und wurde verworfen.",
+    "saveFailed": "Das Workout konnte nicht automatisch gespeichert werden. Es bleibt erhalten."
+  },
   "LoginPage": {
     "title": "Anmelden",
     "or": "Oder",
