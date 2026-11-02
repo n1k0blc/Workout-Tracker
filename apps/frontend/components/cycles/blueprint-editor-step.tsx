@@ -22,7 +22,7 @@ import { notify } from '@/lib/toast';
 import { findFirstSetNeedingRir, findFirstSetOverLimit } from '@/lib/log-set-guards';
 import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
 import { useFormErrors } from '@/hooks/useFormErrors';
-import { NAME_MAX, checkBaseText } from '@/lib/field-rules';
+import { EXERCISES_PER_WORKOUT_MAX, NAME_MAX, checkBaseText } from '@/lib/field-rules';
 import type { ExerciseLog } from '@/types';
 import { replacePlanExerciseInList } from '@/lib/exercise-replace';
 import { usePlanExercisePrefill } from '@/lib/plan-exercise-prefill';
@@ -66,6 +66,7 @@ export default function BlueprintEditorStep({
 }: BlueprintEditorStepProps) {
   const t = useTranslations('BlueprintEditorStep');
   const tCard = useTranslations('ExerciseCard');
+  const tActive = useTranslations('ActiveWorkout');
   const apiError = useApiErrorMessage();
   // The template name in the save-as-template dialog; a taken name belongs under that field.
   const [templateForm, templateFormRef] = useFormErrors({
@@ -378,6 +379,10 @@ export default function BlueprintEditorStep({
 
   const addExerciseToBlueprint = (exerciseId: string, exercise?: Exercise) => {
     if (currentDayIndex === null) return;
+    if (currentExercises.length >= EXERCISES_PER_WORKOUT_MAX) {
+      notify.warning(tActive('exerciseLimitReached', { max: EXERCISES_PER_WORKOUT_MAX }));
+      return; // Keep the modal open, like the active workout
+    }
 
     // If exercise object provided (e.g., newly created custom exercise), add to local list
     if (exercise && !exercises.find(ex => ex.id === exercise.id)) {

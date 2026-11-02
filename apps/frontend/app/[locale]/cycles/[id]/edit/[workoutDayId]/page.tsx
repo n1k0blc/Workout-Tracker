@@ -59,7 +59,7 @@ import { notify } from '@/lib/toast';
 import { findFirstSetNeedingRir, findFirstSetOverLimit } from '@/lib/log-set-guards';
 import { useFormErrors } from '@/hooks/useFormErrors';
 import { FieldError } from '@/components/ui/field';
-import { NAME_MAX, TRAINING_DAY_NAME_MAX, checkBaseText } from '@/lib/field-rules';
+import { EXERCISES_PER_WORKOUT_MAX, NAME_MAX, TRAINING_DAY_NAME_MAX, checkBaseText } from '@/lib/field-rules';
 
 export default function EditBlueprintPage() {
   const params = useParams();
@@ -67,6 +67,7 @@ export default function EditBlueprintPage() {
   const { user } = useAuth();
   const t = useTranslations('EditBlueprintPage');
   const tCard = useTranslations('ExerciseCard');
+  const tActive = useTranslations('ActiveWorkout');
   const format = useFormatter();
   // Two small forms, each with its own errors: the day's name on the page, and the template
   // name in the save-as-template dialog (a taken name belongs under that field).
@@ -164,6 +165,10 @@ export default function EditBlueprintPage() {
 
   const handleAddExercise = (exerciseId: string, exercise?: Exercise) => {
     if (!exercise) return;
+    if (exercises.length >= EXERCISES_PER_WORKOUT_MAX) {
+      notify.warning(tActive('exerciseLimitReached', { max: EXERCISES_PER_WORKOUT_MAX }));
+      return; // Keep the modal open, like the active workout
+    }
 
     const baseSets = [
       { id: `set-new-${Date.now()}`, order: 1, setType: SetType.WARMUP, reps: 10, weight: 20, rest: 90 },

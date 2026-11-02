@@ -22,7 +22,7 @@ vi.mock('@/lib/toast', () => ({ notify }));
 vi.mock('@/lib/api', () => ({
   apiClient: {
     getHomeGyms: vi.fn().mockResolvedValue([]),
-    getExercises: vi.fn().mockResolvedValue([]),
+    getExercises: vi.fn().mockResolvedValue([{ id: 'e-new', name: 'Neue Übung' }]),
     getWorkoutTemplate,
     updateWorkoutTemplate,
   },
@@ -32,7 +32,10 @@ vi.mock('@/components/protected-route', () => ({
 }));
 // The exercise cards are not what is under test: the name field and the save feedback are.
 vi.mock('@/components/workout/exercise-card', () => ({ default: () => <div data-testid="card" /> }));
-vi.mock('@/components/workout/exercise-selection-modal', () => ({ default: () => null }));
+vi.mock('@/components/workout/exercise-selection-modal', () => ({
+  default: ({ open, onSelect }: { open: boolean; onSelect: (id: string) => void }) =>
+    open ? <button onClick={() => onSelect('e-new')}>pick</button> : null,
+}));
 
 import TemplateEditorScreen from './template-editor-screen';
 
@@ -168,6 +171,44 @@ describe('TemplateEditorScreen saving', () => {
       ),
     );
     expect(updateWorkoutTemplate).not.toHaveBeenCalled();
+  });
+
+  describe('at most 30 Übungen', () => {
+    const withExercises = (count: number) =>
+      template({
+        name: 'Push',
+        exercises: Array.from({ length: count }, (_, i) => ({
+          id: `ex${i}`,
+          exerciseId: `e${i}`,
+          exerciseName: `Übung ${i}`,
+          order: i + 1,
+          sets: [{ id: `s${i}`, order: 1, setType: 'WORKING', reps: 5, weight: 100, rir: 2, rest: 90 }],
+        })),
+      });
+    const addOne = () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Übung hinzufügen' }));
+      fireEvent.click(screen.getByRole('button', { name: 'pick' }));
+    };
+
+    it('adds the 30th Übung', async () => {
+      getWorkoutTemplate.mockResolvedValue(withExercises(29));
+      await renderEditor();
+
+      addOne();
+
+      expect(screen.getAllByTestId('card')).toHaveLength(30);
+      expect(notify.warning).not.toHaveBeenCalled();
+    });
+
+    it('refuses the 31st with the toast the active workout shows', async () => {
+      getWorkoutTemplate.mockResolvedValue(withExercises(30));
+      await renderEditor();
+
+      addOne();
+
+      expect(screen.getAllByTestId('card')).toHaveLength(30);
+      expect(notify.warning).toHaveBeenCalledWith('Ein Workout kann höchstens 30 Übungen enthalten.');
+    });
   });
 
   it('saves a warm-up without RIR and keeps a stored RIR 0 on a working set', async () => {

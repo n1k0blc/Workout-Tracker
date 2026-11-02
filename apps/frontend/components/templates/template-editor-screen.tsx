@@ -14,7 +14,7 @@ import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { notify } from '@/lib/toast';
 import { findFirstSetNeedingRir, findFirstSetOverLimit } from '@/lib/log-set-guards';
 import { useFormErrors } from '@/hooks/useFormErrors';
-import { NAME_MAX, checkBaseText } from '@/lib/field-rules';
+import { EXERCISES_PER_WORKOUT_MAX, NAME_MAX, checkBaseText } from '@/lib/field-rules';
 import ExerciseCard from '@/components/workout/exercise-card';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import { IconChevronLeft, IconPlus } from '@tabler/icons-react';
@@ -46,6 +46,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
   const router = useRouter();
   const t = useTranslations('TemplateEditorScreen');
   const tCard = useTranslations('ExerciseCard');
+  const tActive = useTranslations('ActiveWorkout');
   const [form, formRef] = useFormErrors({
     fields: ['name'],
     codeFields: { TEMPLATE_NAME_TAKEN: 'name' },
@@ -114,6 +115,10 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
   };
 
   const handleAddExercise = (exerciseId: string) => {
+    if (exercises.length >= EXERCISES_PER_WORKOUT_MAX) {
+      notify.warning(tActive('exerciseLimitReached', { max: EXERCISES_PER_WORKOUT_MAX }));
+      return; // Keep the modal open, like the active workout
+    }
     const exDetails = availableExercises.find((e) => e.id === exerciseId);
     if (!exDetails) return;
 
