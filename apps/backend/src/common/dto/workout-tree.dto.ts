@@ -10,9 +10,20 @@ import {
   Min,
   Max,
   ArrayMinSize,
+  ArrayMaxSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { SetType, Equipment } from '../types';
+import {
+  EXERCISES_PER_WORKOUT_MAX,
+  INT_COLUMN_MAX,
+  REPS_MAX,
+  REPS_MIN,
+  RIR_MAX,
+  RIR_MIN,
+  SETS_PER_EXERCISE_MAX,
+  WEIGHT_KG_MAX,
+} from '../validation/field-rules';
 
 /**
  * Shared exercise/set tree vocabulary (§4.1): one shape for blueprints, templates, and
@@ -31,17 +42,19 @@ export class WorkoutSetInputDto {
   setType: SetType;
 
   @IsInt()
-  @Min(1)
+  @Min(REPS_MIN)
+  @Max(REPS_MAX)
   reps: number;
 
   @IsNumber()
   @Min(0)
+  @Max(WEIGHT_KG_MAX)
   weight: number;
 
   @IsOptional()
   @IsInt()
-  @Min(0)
-  @Max(10)
+  @Min(RIR_MIN)
+  @Max(RIR_MAX)
   rir?: number;
 
   // Per-side values for unilateral sets (§4.1, issue #65). Optional here because a bilateral
@@ -50,34 +63,38 @@ export class WorkoutSetInputDto {
   // sides -- see `deriveSetAggregates` in the workout-tree service (issue #100).
   @IsOptional()
   @IsInt()
-  @Min(1)
+  @Min(REPS_MIN)
+  @Max(REPS_MAX)
   repsLeft?: number;
 
   @IsOptional()
   @IsInt()
-  @Min(1)
+  @Min(REPS_MIN)
+  @Max(REPS_MAX)
   repsRight?: number;
 
   @IsOptional()
   @IsNumber()
   @Min(0)
+  @Max(WEIGHT_KG_MAX)
   weightLeft?: number;
 
   @IsOptional()
   @IsNumber()
   @Min(0)
+  @Max(WEIGHT_KG_MAX)
   weightRight?: number;
 
   @IsOptional()
   @IsInt()
-  @Min(0)
-  @Max(10)
+  @Min(RIR_MIN)
+  @Max(RIR_MAX)
   rirLeft?: number;
 
   @IsOptional()
   @IsInt()
-  @Min(0)
-  @Max(10)
+  @Min(RIR_MIN)
+  @Max(RIR_MAX)
   rirRight?: number;
 
   // Seconds rested after completing this set. Optional -- defaults to 90 when omitted
@@ -85,6 +102,7 @@ export class WorkoutSetInputDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(INT_COLUMN_MAX)
   rest?: number;
 
   // Meaningful only when saving a performed workout; ignored for blueprint/template kinds.
@@ -106,6 +124,7 @@ export class WorkoutExerciseInputDto {
   @ValidateNested({ each: true })
   @Type(() => WorkoutSetInputDto)
   @ArrayMinSize(1)
+  @ArrayMaxSize(SETS_PER_EXERCISE_MAX)
   sets: WorkoutSetInputDto[];
 }
 

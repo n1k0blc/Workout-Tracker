@@ -1,14 +1,13 @@
 import {
-  IsString,
   IsEnum,
   IsOptional,
-  MaxLength,
   IsBoolean,
   IsInt,
   Min,
   Max,
 } from 'class-validator';
 import { MuscleGroup } from '../../common/muscle.util';
+import { BaseText, NAME_MAX } from '../../common/validation/field-rules';
 
 export { MuscleGroup };
 
@@ -23,8 +22,7 @@ export enum Equipment {
 }
 
 export class CreateExerciseDto {
-  @IsString()
-  @MaxLength(100)
+  @BaseText(NAME_MAX)
   name: string;
 
   // Used only as a convenience: if no percentages are provided, this muscle is set to 100%.
@@ -43,11 +41,6 @@ export class CreateExerciseDto {
   @IsOptional()
   @IsBoolean()
   isDoubleWeight?: boolean;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  description?: string;
 
   // Muscle group distribution percentages (must sum to 100)
   @IsOptional()

@@ -8,11 +8,20 @@ import {
   IsEnum,
   ValidateNested,
   Min,
+  Max,
   ArrayMinSize,
+  ArrayMaxSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { WorkoutExerciseInputDto } from '../../common/dto/workout-tree.dto';
 import { IsLocalDate } from '../../common/utils/local-date.util';
+import {
+  BaseText,
+  EXERCISES_PER_WORKOUT_MAX,
+  INT_COLUMN_MAX,
+  NAME_MAX,
+  WorkoutDate,
+} from '../../common/validation/field-rules';
 
 export enum SaveAsTemplateMode {
   NONE = 'none',
@@ -28,6 +37,7 @@ export enum SaveAsTemplateMode {
  */
 export class CreateWorkoutDto {
   @IsDateString()
+  @WorkoutDate()
   date: string;
 
   // The calendar day the workout happened on, in the user's own timezone -- supplied by the
@@ -39,6 +49,7 @@ export class CreateWorkoutDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(INT_COLUMN_MAX)
   totalDuration?: number;
 
   @IsOptional()
@@ -66,6 +77,7 @@ export class CreateWorkoutDto {
   @ValidateNested({ each: true })
   @Type(() => WorkoutExerciseInputDto)
   @ArrayMinSize(1)
+  @ArrayMaxSize(EXERCISES_PER_WORKOUT_MAX)
   exercises: WorkoutExerciseInputDto[];
 
   // Side effects -- see §3.4 availability matrix.
@@ -78,7 +90,7 @@ export class CreateWorkoutDto {
   saveAsTemplateMode?: SaveAsTemplateMode;
 
   @IsOptional()
-  @IsString()
+  @BaseText(NAME_MAX)
   saveAsTemplateName?: string;
 
   @IsOptional()

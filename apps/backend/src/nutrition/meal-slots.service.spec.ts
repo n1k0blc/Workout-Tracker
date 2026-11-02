@@ -246,6 +246,41 @@ describe('MealSlotsService.create — appends after the active Abschnitte', () =
   });
 });
 
+describe('MealSlotsService — at most 10 active Abschnitte', () => {
+  const slots = (active: number, archived = 0) => [
+    ...Array.from({ length: active }, (_, i) => ({ id: `a${i}`, name: `Slot ${i}`, order: i + 1 })),
+    ...Array.from({ length: archived }, (_, i) => ({
+      id: `z${i}`,
+      name: `Old ${i}`,
+      order: active + i + 1,
+      archivedAt: new Date('2026-01-01'),
+    })),
+  ];
+
+  it('creates the tenth Abschnitt and refuses the eleventh', async () => {
+    const nine = makeStore(slots(9));
+    await expect(nine.service.create('user-1', 'Zehnter')).resolves.toMatchObject({ order: 10 });
+
+    const ten = makeStore(slots(10));
+    const refused = ten.service.create('user-1', 'Elfter');
+    await expect(refused).rejects.toBeInstanceOf(BadRequestException);
+    await expect(refused).rejects.toMatchObject({ code: 'MEAL_SLOT_LIMIT_REACHED', details: { max: 10 } });
+    expect(ten.rows).toHaveLength(10);
+  });
+
+  it('does not count archived Abschnitte', async () => {
+    const { service } = makeStore(slots(10 - 1, 5));
+    await expect(service.create('user-1', 'Zehnter')).resolves.toBeDefined();
+  });
+
+  it('refuses to unarchive into an eleventh active Abschnitt', async () => {
+    const { service } = makeStore(slots(10, 1));
+    await expect(service.setArchived('user-1', 'z0', false)).rejects.toMatchObject({
+      code: 'MEAL_SLOT_LIMIT_REACHED',
+    });
+  });
+});
+
 describe('MealSlotsService.setArchived — archive semantics', () => {
   it('closing the gap: archiving a middle slot renumbers the rest 1..n-1', async () => {
     const { service, rows } = makeStore(FOUR());

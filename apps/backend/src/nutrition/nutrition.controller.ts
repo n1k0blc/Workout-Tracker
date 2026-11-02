@@ -39,6 +39,7 @@ import {
   MealSlotDto,
   MealSlotListDto,
   PickerListDto,
+  PickerScopeQueryDto,
   NutritionTrendDto,
 } from './dto';
 
@@ -100,7 +101,7 @@ export class NutritionController {
   async pickerFavorites(
     @CurrentUser() user: { id: string },
     @ClientLocale() locale: ApiLocale,
-    @Query('scope') scope?: string,
+    @Query() { scope }: PickerScopeQueryDto,
   ): Promise<PickerListDto> {
     return this.picker.getFavorites(user.id, toPickerScope(scope), locale);
   }
@@ -109,7 +110,7 @@ export class NutritionController {
   async pickerRecent(
     @CurrentUser() user: { id: string },
     @ClientLocale() locale: ApiLocale,
-    @Query('scope') scope?: string,
+    @Query() { scope }: PickerScopeQueryDto,
   ): Promise<PickerListDto> {
     return this.picker.getRecent(user.id, toPickerScope(scope), locale);
   }

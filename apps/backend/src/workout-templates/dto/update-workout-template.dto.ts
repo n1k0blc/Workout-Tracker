@@ -3,18 +3,16 @@ import {
   IsOptional,
   IsArray,
   ValidateNested,
-  MinLength,
-  MaxLength,
   ArrayMinSize,
+  ArrayMaxSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { WorkoutExerciseInputDto } from '../../common/dto/workout-tree.dto';
+import { BaseText, EXERCISES_PER_WORKOUT_MAX, NAME_MAX } from '../../common/validation/field-rules';
 
 export class UpdateWorkoutTemplateDto {
   @IsOptional()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(100)
+  @BaseText(NAME_MAX)
   name?: string;
 
   @IsOptional()
@@ -26,5 +24,6 @@ export class UpdateWorkoutTemplateDto {
   @ValidateNested({ each: true })
   @Type(() => WorkoutExerciseInputDto)
   @ArrayMinSize(1)
+  @ArrayMaxSize(EXERCISES_PER_WORKOUT_MAX)
   exercises?: WorkoutExerciseInputDto[];
 }

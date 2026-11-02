@@ -8,17 +8,27 @@ import {
   IsEnum,
   ValidateNested,
   Min,
+  Max,
   ArrayMinSize,
+  ArrayMaxSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { WorkoutExerciseInputDto } from '../../common/dto/workout-tree.dto';
 import { SaveAsTemplateMode } from './create-workout.dto';
 import { IsLocalDate } from '../../common/utils/local-date.util';
+import {
+  BaseText,
+  EXERCISES_PER_WORKOUT_MAX,
+  INT_COLUMN_MAX,
+  NAME_MAX,
+  WorkoutDate,
+} from '../../common/validation/field-rules';
 
 /** Editing a saved workout (history correction). Same side-effect flags as create (§3.4). */
 export class UpdateWorkoutDto {
   @IsOptional()
   @IsDateString()
+  @WorkoutDate()
   date?: string;
 
   // Optional here: a history correction that does not touch the day leaves the stored
@@ -30,6 +40,7 @@ export class UpdateWorkoutDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(INT_COLUMN_MAX)
   totalDuration?: number;
 
   @IsOptional()
@@ -57,6 +68,7 @@ export class UpdateWorkoutDto {
   @ValidateNested({ each: true })
   @Type(() => WorkoutExerciseInputDto)
   @ArrayMinSize(1)
+  @ArrayMaxSize(EXERCISES_PER_WORKOUT_MAX)
   exercises?: WorkoutExerciseInputDto[];
 
   @IsOptional()
@@ -68,7 +80,7 @@ export class UpdateWorkoutDto {
   saveAsTemplateMode?: SaveAsTemplateMode;
 
   @IsOptional()
-  @IsString()
+  @BaseText(NAME_MAX)
   saveAsTemplateName?: string;
 
   @IsOptional()
