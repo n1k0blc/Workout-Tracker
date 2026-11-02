@@ -146,6 +146,15 @@ The client enforces the rest, through one guard (`apps/frontend/lib/log-set-guar
 - **"Beenden" always looks enabled.** An incomplete workout answers with a toast naming the first problem and scrolls to it (the card opens on the way); the confirm dialog opens only for a complete workout. In past-workout tracking a refused "Beenden" also marks every row that could not be logged with its field errors.
 - **The Übung-order lock applies in the live workout only**: no set is logged until the Übung directly above, in the current order, is complete, and the toast suggests dragging the Übung up. Past-workout tracking has no such order — its rows commit on their own — and the server enforces none of this.
 
+### A forgotten live workout is settled by timestamps, once
+
+**After 5 hours the app asks whether the user is still training; with no answer a complete workout is saved at its last logged set and an incomplete one is discarded ([ADR-0010](docs/adr/0010-only-complete-workouts-are-saved.md)).**
+
+- **The 5 hours run from `DraftMeta.startedAt`, never from `workoutStartTime`** — pausing shifts the timer start forward, and paused time must count. A draft without `startedAt` resolves through `resolveStartedAt`. `askAgainAt` ("Weiter trainieren", +1 hour) is stored in the same meta. Live workouts only; past-workout tracking never asks.
+- **The countdown only runs while the app is on screen** and restarts at a full 5 minutes whenever it returns (`useForgottenWorkout`). Do not persist a deadline.
+- **An automatic save ends at the last logged set** (`autoSaveEnd`): `totalDuration` is measured to it and `localDate` is its day. Stamping it with the day it is saved on would mark today as done in the workout recommendation above. It passes no `overwriteBlueprint` or `saveAsTemplate*`. A failed save keeps the draft.
+- **Two tabs share the draft, so the outcome runs behind `runExclusively`** (Web Locks, `localStorage` claim as fallback) and re-checks that the draft still exists once inside; a tab that finds its draft gone drops its session.
+
 ### Tracked values have no user-facing limit
 
 **`Set.rest` and a tracked `totalDuration` accept any non-negative whole number up to the column maximum, and never produce a user-facing error.**
