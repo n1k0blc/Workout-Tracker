@@ -16,7 +16,7 @@ export async function throughPipe<T>(
   value: unknown,
   type: ArgumentMetadata['type'] = 'body',
   data?: string,
-): Promise<{ ok: T | null; errors: PipeErrors[] }> {
+): Promise<{ ok: T | null; errors: PipeErrors[]; code?: string }> {
   try {
     return {
       ok: (await createValidationPipe().transform(value, { type, metatype, data })) as T,
@@ -24,8 +24,9 @@ export async function throughPipe<T>(
     };
   } catch (e) {
     if (!(e instanceof BadRequestException)) throw e;
-    const response = e.getResponse() as { errors: PipeErrors[] };
-    return { ok: null, errors: response.errors };
+    // A constraint that carries an API error code answers `{ code }` alone, no field list.
+    const response = e.getResponse() as { code?: string; errors?: PipeErrors[] };
+    return { ok: null, errors: response.errors ?? [], code: response.code };
   }
 }
 

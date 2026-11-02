@@ -5,6 +5,11 @@ import { CreateDiaryEntriesFromMealDto } from './create-diary-entries-from-meal.
 import { UpdateDiaryEntryDto } from './update-diary-entry.dto';
 import { CreateMealSlotDto, UpdateMealSlotDto } from './meal-slot.dto';
 import { PickerScopeQueryDto } from './picker.dto';
+import {
+  CopySourceDatesQueryDto,
+  NutritionAnalyticsQueryDto,
+  NutritionDayQueryDto,
+} from './nutrition-query.dto';
 import { CreateFoodDto } from '../../foods/dto/create-food.dto';
 import { CreateMealDto } from '../../meals/dto/create-meal.dto';
 import { MealsQueryDto } from '../../meals/dto/meals-query.dto';
@@ -189,5 +194,70 @@ describe('query parameters', () => {
     expect(
       constraintsOf((await query(PickerScopeQueryDto, { scope: 'x' })).errors, 'scope'),
     ).toEqual(['isIn']);
+  });
+});
+
+describe('nutrition query parameters', () => {
+  const query = <T>(dto: new () => T, q: Record<string, unknown>) =>
+    throughPipe(dto, q, 'query', '');
+
+  describe('GET /nutrition/day', () => {
+    it('takes no date, or a real calendar day', async () => {
+      expect((await query(NutritionDayQueryDto, {})).errors).toEqual([]);
+      expect((await query(NutritionDayQueryDto, { date: '2026-02-28' })).code).toBeUndefined();
+      expect((await query(NutritionDayQueryDto, { date: '2024-02-29' })).ok).not.toBeNull();
+    });
+
+    it.each(['2026-02-30', '2026-2-3', '2026-11-01T10:00:00Z', '', 'abc', ['2026-11-01', '2026-11-02']])(
+      'answers NUTRITION_DAY_DATE_INVALID for %j',
+      async (date) => {
+        const result = await query(NutritionDayQueryDto, { date });
+        expect(result.ok).toBeNull();
+        expect(result.code).toBe('NUTRITION_DAY_DATE_INVALID');
+      },
+    );
+
+    it('refuses a parameter it does not know', async () => {
+      const result = await query(NutritionDayQueryDto, { date: '2026-11-01', extra: '1' });
+      expect(result.code).toBe('VALIDATION_FAILED');
+      expect(constraintsOf(result.errors, 'extra')).toEqual(['whitelistValidation']);
+    });
+  });
+
+  describe('GET /nutrition/analytics', () => {
+    it('needs both ends as real calendar days', async () => {
+      expect(
+        (await query(NutritionAnalyticsQueryDto, { start: '2026-11-01', end: '2026-11-30' })).ok,
+      ).not.toBeNull();
+    });
+
+    it.each([
+      [{}],
+      [{ start: '2026-11-01' }],
+      [{ end: '2026-11-30' }],
+      [{ start: '2026-11-31', end: '2026-12-01' }],
+      [{ start: '2026-11-01', end: 'tomorrow' }],
+    ])('answers NUTRITION_ANALYTICS_RANGE_INVALID for %j', async (q) => {
+      const result = await query(NutritionAnalyticsQueryDto, q);
+      expect(result.ok).toBeNull();
+      expect(result.code).toBe('NUTRITION_ANALYTICS_RANGE_INVALID');
+    });
+  });
+
+  describe('GET /nutrition/copy/source-dates', () => {
+    it('takes no exclude, or a real calendar day', async () => {
+      expect((await query(CopySourceDatesQueryDto, {})).errors).toEqual([]);
+      expect((await query(CopySourceDatesQueryDto, { exclude: '2026-11-01' })).ok).not.toBeNull();
+    });
+
+    it.each(['2026-02-30', 'abc', '', '2026-11-01T10:00:00Z'])(
+      'answers 400 for exclude=%j instead of ignoring it',
+      async (exclude) => {
+        const result = await query(CopySourceDatesQueryDto, { exclude });
+        expect(result.ok).toBeNull();
+        expect(result.code).toBe('VALIDATION_FAILED');
+        expect(constraintsOf(result.errors, 'exclude')).toEqual(['isLocalDate']);
+      },
+    );
   });
 });

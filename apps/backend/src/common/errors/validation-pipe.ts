@@ -5,6 +5,8 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { IdPipe } from '../validation/id.pipe';
+import { AppBadRequestException } from './app-exceptions';
+import type { ErrorCode } from './error-codes';
 
 /** One failing property and the class-validator constraint names it broke (`isEmail`, `min`, ...). */
 export interface FieldError {
@@ -23,6 +25,22 @@ function toFieldErrors(errors: ValidationError[], parent = ''): FieldError[] {
 }
 
 /**
+ * A constraint can carry an API error code in its validation `context` (`{ context: { code } }`),
+ * for a parameter whose clients already key a message off that code. The first one found wins.
+ */
+function contextCode(errors: ValidationError[]): ErrorCode | undefined {
+  for (const error of errors) {
+    for (const name of Object.keys(error.constraints ?? {})) {
+      const code = (error.contexts?.[name] as { code?: ErrorCode } | undefined)?.code;
+      if (code) return code;
+    }
+    const nested = contextCode(error.children ?? []);
+    if (nested) return nested;
+  }
+  return undefined;
+}
+
+/**
  * The app-wide ValidationPipe (#190, #191). Nest's default turns a failure into `message: string[]`
  * of generated English text, which never reaches a user and is no longer sent at all. The body is
  * `code` plus `errors: [{ property, constraints }]`, so the frontend keys a catalogue message off
@@ -36,8 +54,12 @@ export function createValidationPipe(): ValidationPipe {
     whitelist: true,
     forbidNonWhitelisted: true,
     transform: true,
-    exceptionFactory: (errors: ValidationError[] = []) =>
-      new BadRequestException({ code: 'VALIDATION_FAILED', errors: toFieldErrors(errors) }),
+    exceptionFactory: (errors: ValidationError[] = []) => {
+      const code = contextCode(errors);
+      return code
+        ? new AppBadRequestException(code)
+        : new BadRequestException({ code: 'VALIDATION_FAILED', errors: toFieldErrors(errors) });
+    },
   });
 }
 
