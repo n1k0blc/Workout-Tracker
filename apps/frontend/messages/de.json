@@ -220,6 +220,61 @@
       },
       "workoutDate": {
         "isNotEmpty": "Bitte wähle ein Datum."
+      },
+      "kcal": {
+        "isNotEmpty": "Bitte gib die Kalorien ein.",
+        "isNumber": "Bitte gib eine Zahl ein.",
+        "min": "Die Kalorien dürfen nicht negativ sein.",
+        "max": "Die Kalorien dürfen höchstens {max} kcal betragen.",
+        "maxDecimals": "Verwende höchstens eine Nachkommastelle."
+      },
+      "carbs": {
+        "isNotEmpty": "Bitte gib die Kohlenhydrate ein.",
+        "isNumber": "Bitte gib eine Zahl ein.",
+        "min": "Die Kohlenhydrate dürfen nicht negativ sein.",
+        "max": "Die Kohlenhydrate dürfen höchstens {max} g betragen."
+      },
+      "protein": {
+        "isNotEmpty": "Bitte gib das Protein ein.",
+        "isNumber": "Bitte gib eine Zahl ein.",
+        "min": "Das Protein darf nicht negativ sein.",
+        "max": "Das Protein darf höchstens {max} g betragen."
+      },
+      "fat": {
+        "isNotEmpty": "Bitte gib das Fett ein.",
+        "isNumber": "Bitte gib eine Zahl ein.",
+        "min": "Das Fett darf nicht negativ sein.",
+        "max": "Das Fett darf höchstens {max} g betragen.",
+        "macroSum": "Kohlenhydrate, Protein und Fett zusammen dürfen höchstens 100 g je 100 g betragen."
+      },
+      "portions": {
+        "arrayMaxSize": "Du kannst höchstens {max} Portionsgrößen anlegen.",
+        "portionDefault": "Markiere genau eine Portionsgröße als Standard."
+      },
+      "label": {
+        "isNotEmpty": "Bitte gib der Portionsgröße eine Bezeichnung.",
+        "maxLength": "Die Bezeichnung darf höchstens {max} Zeichen lang sein."
+      },
+      "grams": {
+        "isNotEmpty": "Bitte gib eine Menge an.",
+        "isNumber": "Bitte gib eine Zahl ein.",
+        "min": "Die Menge muss mindestens {min} {unit} betragen.",
+        "max": "Die Menge darf höchstens {max} {unit} betragen."
+      },
+      "quantity": {
+        "isNotEmpty": "Bitte gib eine Menge an.",
+        "isNumber": "Bitte gib eine Zahl ein.",
+        "min": "Die Menge muss mindestens {min} betragen.",
+        "max": "Die Menge darf höchstens {max} betragen."
+      },
+      "factor": {
+        "isNotEmpty": "Bitte gib einen Faktor an.",
+        "isNumber": "Bitte gib eine Zahl ein.",
+        "min": "Der Faktor muss mindestens {min} betragen.",
+        "max": "Der Faktor darf höchstens {max} betragen."
+      },
+      "saveAsFood": {
+        "notAFood": "Als Lebensmittel lässt sich das nur speichern, wenn die Werte zu 100 g passen: höchstens 900 kcal, je Makro höchstens 100 g und zusammen höchstens 100 g."
       }
     }
   },

@@ -205,7 +205,7 @@ describe('Tagesziele', () => {
 
   it.each([
     ['499', 'The calorie target must be at least 500 kcal.'],
-    ['10001', 'The calorie target must be at most 10000 kcal.'],
+    ['10001', 'The calorie target must be at most 10,000 kcal.'],
     ['2400.5', 'The calorie target must be a whole number.'],
   ])('refuses kcal %s', async (value, message) => {
     renderPage('en');
@@ -226,7 +226,7 @@ describe('Tagesziele', () => {
 
   it.each([
     ['0', 'The carbs target must be at least 1 g.'],
-    ['1001', 'The carbs target must be at most 1000 g.'],
+    ['1001', 'The carbs target must be at most 1,000 g.'],
   ])('refuses carbs %s', async (value, message) => {
     renderPage('en');
     await editTargets();

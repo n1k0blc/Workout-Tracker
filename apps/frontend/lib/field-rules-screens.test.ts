@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   bodyLimits,
+  checkAmountText,
   checkBodyWeight,
   checkDateRange,
   checkEan,
@@ -97,6 +98,30 @@ describe('date rules', () => {
     expect(checkDateRange('2026-10-01', '2026-10-02')).toBeNull();
     expect(checkDateRange('2026-10-02', '2026-10-01')).toBe('endBeforeStart');
     expect(checkDateRange('', '2026-10-01')).toBeNull(); // an unfinished range is not wrong yet
+  });
+});
+
+describe('nutrition amounts typed as text', () => {
+  it('reads a decimal comma like a period', () => {
+    expect(checkAmountText('371,5', 0, 900, 1)).toBeNull();
+    expect(checkAmountText('371,55', 0, 900, 1)).toBe('maxDecimals');
+  });
+
+  it('judges the range at its edges', () => {
+    expect(checkAmountText('0', 0, 900, 1)).toBeNull();
+    expect(checkAmountText('-0,1', 0, 900, 1)).toBe('min');
+    expect(checkAmountText('900', 0, 900, 1)).toBeNull();
+    expect(checkAmountText('900,1', 0, 900, 1)).toBe('max');
+    expect(checkAmountText('0,09', 0.1, 5000)).toBe('min');
+    expect(checkAmountText('0,1', 0.1, 5000)).toBeNull();
+    expect(checkAmountText('5000', 0.1, 5000)).toBeNull();
+    expect(checkAmountText('5000,1', 0.1, 5000)).toBe('max');
+  });
+
+  it('names a blank and a non-number', () => {
+    expect(checkAmountText('  ', 0, 900)).toBe('isNotEmpty');
+    expect(checkAmountText('abc', 0, 900)).toBe('isNumber');
+    expect(checkAmountText('1.2.3', 0, 900)).toBe('isNumber');
   });
 });
 

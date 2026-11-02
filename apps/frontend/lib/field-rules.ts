@@ -149,6 +149,14 @@ export function checkDecimal(raw: string, min: number, max: number, maxDecimals 
   return decimals > maxDecimals ? 'maxDecimals' : null;
 }
 
+/**
+ * A nutrition amount typed into a text input (ADR-0005 keeps those as text): a German decimal
+ * comma is read as a period, then judged like `checkDecimal`.
+ */
+export function checkAmountText(raw: string, min: number, max: number, maxDecimals = Infinity): Constraint {
+  return checkDecimal(raw.trim().replace(',', '.'), min, max, maxDecimals);
+}
+
 /** Height and body weight are typed in the user's unit and judged as the centimetres / kilograms the server stores. */
 export function checkHeight(raw: string, system: UnitSystem, originalCm?: number | null): Constraint {
   if (raw.trim() === '') return 'isNotEmpty';

@@ -22,10 +22,27 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { apiClient } from '@/lib/api';
-import { parseAmount } from '@/lib/nutrition';
 import { Food, FoodInput, SimilarFood } from '@/types';
 import { BarcodeCapture } from '@/components/nutrition/barcode-capture';
-import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
+import { useApiErrorMessage, useValidationMessage } from '@/hooks/useApiErrorMessage';
+import { FieldError } from '@/components/ui/field';
+import { useFormErrors } from '@/hooks/useFormErrors';
+import { notify } from '@/lib/toast';
+import { normalizeBarcode } from '@/lib/barcode';
+import {
+  AMOUNT_MAX,
+  AMOUNT_MIN,
+  FOOD_NAME_MAX,
+  KCAL_MAX_DECIMALS,
+  KCAL_PER_100_MAX,
+  MACRO_PER_100_MAX,
+  PORTIONS_PER_FOOD_MAX,
+  PORTION_LABEL_MAX,
+  checkAmountText,
+  checkBaseText,
+  checkEan,
+  checkMacroSum,
+} from '@/lib/field-rules';
 
 interface PortionRow {
   key: string;
@@ -76,6 +93,7 @@ export function FoodEditorDialog({
 }) {
   const t = useTranslations('FoodEditorDialog');
   const apiError = useApiErrorMessage();
+  const validationMessage = useValidationMessage();
   const [forceForm, setForceForm] = useState(false); // "Eigene Kopie anlegen" from read-only
   const [name, setName] = useState('');
   const [barcode, setBarcode] = useState('');
@@ -85,11 +103,31 @@ export function FoodEditorDialog({
   const [protein, setProtein] = useState('');
   const [fat, setFat] = useState('');
   const [portions, setPortions] = useState<PortionRow[]>([]);
-  const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [similar, setSimilar] = useState<SimilarFood[]>([]);
   const [scannerOpen, setScannerOpen] = useState(false);
+
+  const unit = isLiquid ? 'ml' : 'g';
+  // Server rejections of a portion arrive as `portions.<row>.label|grams`, so those are the keys.
+  const portionKeys = portions.flatMap((_, i) => [`portions.${i}.label`, `portions.${i}.grams`]);
+  const [form, formRef] = useFormErrors({
+    fields: ['name', 'barcode', 'kcal', 'carbs', 'protein', 'fat', 'portions', ...portionKeys],
+    codeFields: {
+      FOOD_BARCODE_TAKEN: 'barcode',
+      FOOD_PORTION_DEFAULT_COUNT_INVALID: 'portions',
+    },
+    messageValues: {
+      name: { max: FOOD_NAME_MAX },
+      kcal: { max: KCAL_PER_100_MAX },
+      carbs: { max: MACRO_PER_100_MAX },
+      protein: { max: MACRO_PER_100_MAX },
+      fat: { max: MACRO_PER_100_MAX },
+      portions: { max: PORTIONS_PER_FOOD_MAX },
+      label: { max: PORTION_LABEL_MAX },
+      grams: { min: AMOUNT_MIN, max: AMOUNT_MAX, unit },
+    },
+  });
 
   const isReadOnly = !!food && !food.editable && !forceForm;
   const isEdit = !!food && food.editable && !forceForm;
@@ -97,7 +135,7 @@ export function FoodEditorDialog({
   useEffect(() => {
     if (!open) return;
     setForceForm(false);
-    setError('');
+    form.setConstraints({});
     setSaving(false);
     setConfirmDelete(false);
     setSimilar([]);
@@ -110,6 +148,7 @@ export function FoodEditorDialog({
     setProtein(food ? String(food.protein) : '');
     setFat(food ? String(food.fat) : '');
     setPortions(toRows(food));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, food, initialBarcode]);
 
   // Duplicate-avoidance hint: the current user's own foods matching what they're typing.
@@ -143,13 +182,17 @@ export function FoodEditorDialog({
     };
   }, [open, isReadOnly, food]);
 
-  const unit = isLiquid ? 'ml' : 'g';
-
   function setDefaultPortion(key: string) {
     setPortions((prev) => prev.map((p) => ({ ...p, isDefault: p.key === key })));
   }
 
   function addPortion() {
+    if (portions.length >= PORTIONS_PER_FOOD_MAX) {
+      notify.warning(
+        validationMessage('portions', 'arrayMaxSize', { max: PORTIONS_PER_FOOD_MAX }) ?? apiError(undefined),
+      );
+      return;
+    }
     setPortions((prev) => [
       ...prev,
       // Label left blank so the combobox suggestions drop down on focus -- a prefilled
@@ -159,6 +202,9 @@ export function FoodEditorDialog({
   }
 
   function removePortion(key: string) {
+    // The rows after the removed one shift up, so their errors would sit under the wrong row.
+    portionKeys.forEach((k) => form.clear(k));
+    form.clear('portions');
     setPortions((prev) => {
       const next = prev.filter((p) => p.key !== key);
       if (next.length > 0 && !next.some((p) => p.isDefault)) next[0].isDefault = true;
@@ -169,53 +215,51 @@ export function FoodEditorDialog({
   function startCopy() {
     setForceForm(true);
     setBarcode(''); // a copy must not claim the original's barcode
-    setError('');
+    form.setConstraints({});
   }
 
   async function handleSave() {
-    setError('');
-    if (!name.trim()) {
-      setError(t('nameRequired'));
-      return;
-    }
-    const nutrients = {
-      kcal: parseAmount(kcal),
-      carbs: parseAmount(carbs),
-      protein: parseAmount(protein),
-      fat: parseAmount(fat),
-    };
-    if (Object.values(nutrients).some((v) => v === null)) {
-      setError(t('nutrientsInvalid'));
-      return;
-    }
-    if (barcode.trim() && !/^\d{8,14}$/.test(barcode.trim())) {
-      setError(t('barcodeInvalid'));
-      return;
-    }
-    const parsedPortions = portions.map((p) => ({
-      label: p.label.trim(),
-      grams: parseAmount(p.grams),
-      isDefault: p.isDefault,
-    }));
-    if (parsedPortions.some((p) => !p.label || p.grams === null || p.grams <= 0)) {
-      setError(t('portionInvalid'));
-      return;
-    }
-    if (parsedPortions.length > 0 && parsedPortions.filter((p) => p.isDefault).length !== 1) {
-      setError(t('portionDefault'));
-      return;
-    }
+    const decimal = (raw: string) => raw.trim().replace(',', '.');
+    const defaults = portions.filter((p) => p.isDefault).length;
+    const valid = form.setConstraints({
+      name: checkBaseText(name, FOOD_NAME_MAX),
+      barcode: barcode.trim() ? checkEan(barcode) : null,
+      kcal: checkAmountText(kcal, 0, KCAL_PER_100_MAX, KCAL_MAX_DECIMALS),
+      carbs: checkAmountText(carbs, 0, MACRO_PER_100_MAX),
+      protein: checkAmountText(protein, 0, MACRO_PER_100_MAX),
+      // The sum rule rides on the last macro, where the server reports it.
+      fat:
+        checkAmountText(fat, 0, MACRO_PER_100_MAX) ??
+        checkMacroSum([carbs, protein, fat].map(decimal)),
+      portions:
+        portions.length > PORTIONS_PER_FOOD_MAX
+          ? 'arrayMaxSize'
+          : portions.length > 0 && defaults !== 1
+            ? 'portionDefault'
+            : null,
+      ...Object.fromEntries(
+        portions.flatMap((p, i) => [
+          [`portions.${i}.label`, checkBaseText(p.label, PORTION_LABEL_MAX)],
+          [`portions.${i}.grams`, checkAmountText(p.grams, AMOUNT_MIN, AMOUNT_MAX)],
+        ]),
+      ),
+    });
+    if (!valid) return;
 
     const input: FoodInput = {
       name: name.trim(),
-      barcode: barcode.trim() || undefined,
+      barcode: (barcode.trim() && normalizeBarcode(barcode)) || undefined,
       isLiquid,
-      kcal: nutrients.kcal!,
-      carbs: nutrients.carbs!,
-      protein: nutrients.protein!,
-      fat: nutrients.fat!,
-      portions: parsedPortions.length
-        ? parsedPortions.map((p) => ({ label: p.label, grams: p.grams!, isDefault: p.isDefault }))
+      kcal: Number(decimal(kcal)),
+      carbs: Number(decimal(carbs)),
+      protein: Number(decimal(protein)),
+      fat: Number(decimal(fat)),
+      portions: portions.length
+        ? portions.map((p) => ({
+            label: p.label.trim(),
+            grams: Number(decimal(p.grams)),
+            isDefault: p.isDefault,
+          }))
         : undefined,
     };
 
@@ -227,7 +271,7 @@ export function FoodEditorDialog({
       onChanged(saved);
       onOpenChange(false);
     } catch (err) {
-      setError(apiError(err));
+      form.showApiError(err);
       setSaving(false);
     }
   }
@@ -239,7 +283,7 @@ export function FoodEditorDialog({
       onChanged();
       onOpenChange(false);
     } catch (err) {
-      setError(apiError(err));
+      notify.error(apiError(err));
     }
   }
 
@@ -278,21 +322,28 @@ export function FoodEditorDialog({
           )}
         </DialogHeader>
 
-        {error && (
-          <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-            {error}
-          </div>
-        )}
-
         {isReadOnly && food ? (
           <ReadOnlyView food={food} similar={similar} />
         ) : (
-          <div className="space-y-5">
-            <label className="block">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+          <div ref={formRef} className="space-y-5">
+            <div className="block">
+              <label
+                htmlFor="food-name"
+                className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground"
+              >
                 {t('name')}
-              </span>
-              <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+              </label>
+              <Input
+                id="food-name"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  form.clear('name');
+                }}
+                autoFocus
+                {...form.fieldProps('name')}
+              />
+              <FieldError id={form.errorId('name')}>{form.errors.name}</FieldError>
               {similar.length > 0 && (
                 <div className="mt-2">
                   <SimilarList items={similar} />
@@ -301,18 +352,26 @@ export function FoodEditorDialog({
                   </p>
                 </div>
               )}
-            </label>
+            </div>
 
-            <label className="block">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+            <div className="block">
+              <label
+                htmlFor="food-barcode"
+                className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground"
+              >
                 {t('ean')} <span className="font-normal normal-case tracking-normal">{t('optional')}</span>
-              </span>
+              </label>
               <div className="flex items-center gap-2 border-b border-b-input">
                 <Input
+                  id="food-barcode"
                   value={barcode}
-                  onChange={(e) => setBarcode(e.target.value)}
+                  onChange={(e) => {
+                    setBarcode(e.target.value);
+                    form.clear('barcode');
+                  }}
                   inputMode="numeric"
                   className="border-b-0 font-mono"
+                  {...form.fieldProps('barcode')}
                 />
                 <Button
                   type="button"
@@ -324,7 +383,8 @@ export function FoodEditorDialog({
                   <IconBarcode />
                 </Button>
               </div>
-            </label>
+              <FieldError id={form.errorId('barcode')}>{form.errors.barcode}</FieldError>
+            </div>
 
             <label className="flex items-center gap-2">
               <input
@@ -342,24 +402,32 @@ export function FoodEditorDialog({
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-3.5">
                 {[
-                  { label: t('kcal'), value: kcal, set: setKcal, suffix: 'kcal' },
-                  { label: t('carbs'), value: carbs, set: setCarbs, suffix: 'g' },
-                  { label: t('protein'), value: protein, set: setProtein, suffix: 'g' },
-                  { label: t('fat'), value: fat, set: setFat, suffix: 'g' },
+                  { key: 'kcal', label: t('kcal'), value: kcal, set: setKcal, suffix: 'kcal' },
+                  { key: 'carbs', label: t('carbs'), value: carbs, set: setCarbs, suffix: 'g' },
+                  { key: 'protein', label: t('protein'), value: protein, set: setProtein, suffix: 'g' },
+                  { key: 'fat', label: t('fat'), value: fat, set: setFat, suffix: 'g' },
                 ].map((f) => (
-                  <label key={f.label} className="block">
-                    <span className="text-xs text-muted-foreground">{f.label}</span>
+                  <div key={f.key} className="block">
+                    <label htmlFor={`food-${f.key}`} className="text-xs text-muted-foreground">
+                      {f.label}
+                    </label>
                     <div className="flex items-baseline gap-1 border-b border-b-input">
                       <Input
+                        id={`food-${f.key}`}
                         inputMode="decimal"
                         value={f.value}
-                        onChange={(e) => f.set(e.target.value)}
+                        onChange={(e) => {
+                          f.set(e.target.value);
+                          form.clear(f.key);
+                        }}
                         className="border-b-0"
                         placeholder="0"
+                        {...form.fieldProps(f.key)}
                       />
                       <span className="text-xs text-muted-foreground">{f.suffix}</span>
                     </div>
-                  </label>
+                    <FieldError id={form.errorId(f.key)}>{form.errors[f.key]}</FieldError>
+                  </div>
                 ))}
               </div>
             </div>
@@ -385,34 +453,39 @@ export function FoodEditorDialog({
                 </p>
               ) : (
                 <div className="divide-y rounded-md border">
-                  {portions.map((p) => (
-                    <div key={p.key} className="flex items-center gap-2 p-2">
+                  {portions.map((p, i) => (
+                    <div key={p.key} className="p-2">
+                    <div className="flex items-center gap-2">
                       <Input
                         list="food-portion-labels"
                         value={p.label}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setPortions((prev) =>
                             prev.map((x) =>
                               x.key === p.key ? { ...x, label: e.target.value } : x,
                             ),
-                          )
-                        }
+                          );
+                          form.clear(`portions.${i}.label`);
+                        }}
                         placeholder={t('portionPlaceholder')}
                         className="h-9 flex-1"
+                        {...form.fieldProps(`portions.${i}.label`)}
                       />
                       <div className="flex w-24 items-baseline gap-1 border-b border-b-input">
                         <Input
                           inputMode="decimal"
                           value={p.grams}
-                          onChange={(e) =>
+                          onChange={(e) => {
                             setPortions((prev) =>
                               prev.map((x) =>
                                 x.key === p.key ? { ...x, grams: e.target.value } : x,
                               ),
-                            )
-                          }
+                            );
+                            form.clear(`portions.${i}.grams`);
+                          }}
                           className="h-9 border-b-0"
                           placeholder="0"
+                          {...form.fieldProps(`portions.${i}.grams`)}
                         />
                         <span className="text-xs text-muted-foreground">{unit}</span>
                       </div>
@@ -420,7 +493,10 @@ export function FoodEditorDialog({
                         type="button"
                         variant={p.isDefault ? 'default' : 'outline'}
                         size="xs"
-                        onClick={() => setDefaultPortion(p.key)}
+                        onClick={() => {
+                          setDefaultPortion(p.key);
+                          form.clear('portions');
+                        }}
                         aria-pressed={p.isDefault}
                       >
                         {t('portionDefaultButton')}
@@ -435,9 +511,17 @@ export function FoodEditorDialog({
                         <IconX />
                       </Button>
                     </div>
+                    <FieldError id={form.errorId(`portions.${i}.label`)}>
+                      {form.errors[`portions.${i}.label`]}
+                    </FieldError>
+                    <FieldError id={form.errorId(`portions.${i}.grams`)}>
+                      {form.errors[`portions.${i}.grams`]}
+                    </FieldError>
+                    </div>
                   ))}
                 </div>
               )}
+              <FieldError id={form.errorId('portions')}>{form.errors.portions}</FieldError>
             </div>
           </div>
         )}

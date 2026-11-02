@@ -14,6 +14,7 @@ import { weekdayReferenceDate } from '@/lib/weekday';
  */
 export function useValidationMessage() {
   const t = useTranslations('ApiErrors');
+  const format = useFormatter();
 
   return useCallback(
     (
@@ -22,7 +23,12 @@ export function useValidationMessage() {
       values: Record<string, string | number> = {},
     ): string | undefined => {
       const field = property.split('.').pop() ?? property;
-      const params = { property: field, ...values };
+      // Limits are numbers; they are written the way the user's locale writes them (0,1 / 5.000).
+      const params: Record<string, string | number> = { property: field };
+      for (const [name, value] of Object.entries(values)) {
+        params[name] =
+          typeof value === 'number' ? format.number(value, { maximumFractionDigits: 3 }) : value;
+      }
       // A message that names a limit (`{min}`, `{max}`, `{unit}`) is used only when the caller
       // supplied those numbers; without them the next, generic entry is the better text than a
       // sentence with a hole in it.
@@ -33,7 +39,7 @@ export function useValidationMessage() {
       );
       return key ? t(key, params) : undefined;
     },
-    [t],
+    [t, format],
   );
 }
 
