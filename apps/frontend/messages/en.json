@@ -275,6 +275,15 @@
       },
       "saveAsFood": {
         "notAFood": "This can only be saved as a food if the values fit 100 g: at most 900 kcal, at most 100 g per macro and 100 g together."
+      },
+      "newName": {
+        "isNotEmpty": "Please enter a name.",
+        "maxLength": "The name can be at most {max} characters.",
+        "arrayMaxSize": "You can have at most {count} active sections."
+      },
+      "editName": {
+        "isNotEmpty": "Please enter a name.",
+        "maxLength": "The name can be at most {max} characters."
       }
     }
   },
@@ -736,7 +745,6 @@
   "MealEditorScreen": {
     "loadError": "Meal could not be loaded.",
     "addedFood": "{name} added",
-    "nameRequired": "Please enter a name.",
     "ingredientRequired": "A meal needs at least one ingredient.",
     "ingredientAmountInvalid": "Check the amount of an ingredient: the value you typed is not applied.",
     "saved": "Meal saved",
@@ -1349,11 +1357,6 @@
     "cancel": "Cancel"
   },
   "FoodEditorDialog": {
-    "nameRequired": "Please enter a name.",
-    "nutrientsInvalid": "Calories and macros must be numbers ≥ 0.",
-    "barcodeInvalid": "Barcode must have 8 to 14 digits.",
-    "portionInvalid": "Every portion needs a label and an amount greater than 0.",
-    "portionDefault": "Mark exactly one portion as the default.",
     "titleReadOnly": "Food",
     "titleEdit": "Edit food",
     "titleCreate": "New food",

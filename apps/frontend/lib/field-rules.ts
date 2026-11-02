@@ -232,6 +232,22 @@ export function checkMacroSum(raws: string[]): Constraint {
   return sum > MACRO_PER_100_MAX + 1e-9 ? 'macroSum' : null;
 }
 
+/**
+ * Whether a Schnelleintrag saved "as Lebensmittel" would be a legal food: its numbers become the
+ * food's per-100 values, so they need the Lebensmittel limits, not the wider Schnelleintrag ones.
+ * Mirror of `fitsFoodLimits` on the server.
+ */
+export function checkFitsFood(values: { kcal: number; carbs: number; protein: number; fat: number }): Constraint {
+  const { kcal, carbs, protein, fat } = values;
+  const decimals = String(kcal).split('.')[1]?.length ?? 0;
+  const fits =
+    kcal <= KCAL_PER_100_MAX &&
+    decimals <= KCAL_MAX_DECIMALS &&
+    [carbs, protein, fat].every((macro) => macro <= MACRO_PER_100_MAX) &&
+    carbs + protein + fat <= MACRO_PER_100_MAX + 1e-9;
+  return fits ? null : 'notAFood';
+}
+
 /** An EAN-8, UPC-A or EAN-13 with a valid check digit: the scanner's rule (`lib/barcode.ts`) in the editor. */
 export function checkEan(raw: string): Constraint {
   return normalizeBarcode(raw) === null ? 'isBarcode' : null;

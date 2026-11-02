@@ -275,6 +275,15 @@
       },
       "saveAsFood": {
         "notAFood": "Als Lebensmittel lässt sich das nur speichern, wenn die Werte zu 100 g passen: höchstens 900 kcal, je Makro höchstens 100 g und zusammen höchstens 100 g."
+      },
+      "newName": {
+        "isNotEmpty": "Bitte gib einen Namen ein.",
+        "maxLength": "Der Name darf höchstens {max} Zeichen lang sein.",
+        "arrayMaxSize": "Du kannst höchstens {count} aktive Abschnitte haben."
+      },
+      "editName": {
+        "isNotEmpty": "Bitte gib einen Namen ein.",
+        "maxLength": "Der Name darf höchstens {max} Zeichen lang sein."
       }
     }
   },
@@ -736,7 +745,6 @@
   "MealEditorScreen": {
     "loadError": "Mahlzeit konnte nicht geladen werden.",
     "addedFood": "{name} hinzugefügt",
-    "nameRequired": "Bitte gib einen Namen ein.",
     "ingredientRequired": "Eine Mahlzeit braucht mindestens eine Zutat.",
     "ingredientAmountInvalid": "Prüfe die Menge einer Zutat: Der eingegebene Wert wird nicht übernommen.",
     "saved": "Mahlzeit gespeichert",
@@ -1349,11 +1357,6 @@
     "cancel": "Abbrechen"
   },
   "FoodEditorDialog": {
-    "nameRequired": "Bitte gib einen Namen ein.",
-    "nutrientsInvalid": "Kalorien und Makros müssen Zahlen ≥ 0 sein.",
-    "barcodeInvalid": "Barcode muss 8 bis 14 Ziffern haben.",
-    "portionInvalid": "Jede Portionsgröße braucht eine Bezeichnung und eine Menge größer als 0.",
-    "portionDefault": "Markiere genau eine Portionsgröße als Standard.",
     "titleReadOnly": "Lebensmittel",
     "titleEdit": "Lebensmittel bearbeiten",
     "titleCreate": "Neues Lebensmittel",
