@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { draftStorageKeys, claimDraftForUser, readSkippedSets } from '@/lib/workout-draft-storage';
+import {
+  draftStorageKeys,
+  claimDraftForUser,
+  readSkippedSets,
+  readAskAgainAt,
+  forgottenOutcomeKey,
+  forgottenClaimKey,
+} from '@/lib/workout-draft-storage';
 
 function fakeStorage(initial: Record<string, string> = {}) {
   const map = new Map(Object.entries(initial));
@@ -101,6 +108,26 @@ describe('claimDraftForUser', () => {
     const store = fakeStorage();
     expect(claimDraftForUser(store, 'u1')).toEqual({ draft: null, meta: null });
     expect(store.snapshot()).toEqual({});
+  });
+});
+
+describe('readAskAgainAt', () => {
+  it('reads the re-ask time saved with the draft', () => {
+    expect(readAskAgainAt({ askAgainAt: 1_700_000_000_000 })).toBe(1_700_000_000_000);
+  });
+
+  it('is null for a draft that was never snoozed, or holds something else', () => {
+    expect(readAskAgainAt({})).toBeNull();
+    expect(readAskAgainAt({ askAgainAt: 'soon' } as never)).toBeNull();
+    expect(readAskAgainAt({ askAgainAt: Number.NaN })).toBeNull();
+  });
+});
+
+describe('forgotten-workout keys', () => {
+  it('namespaces the outcome notice and the single-run claim by account', () => {
+    expect(forgottenOutcomeKey('u1')).toBe('forgottenWorkoutOutcome::u1');
+    expect(forgottenOutcomeKey('u2')).not.toBe(forgottenOutcomeKey('u1'));
+    expect(forgottenClaimKey('u1')).toBe('forgottenWorkoutClaim::u1');
   });
 });
 
