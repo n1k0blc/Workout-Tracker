@@ -43,7 +43,10 @@ import {
 import { ProtectedRoute } from '@/components/protected-route';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { SEARCH_MAX } from '@/lib/field-rules';
+import { FOOD_NAME_MAX, SEARCH_MAX, checkBaseText } from '@/lib/field-rules';
+import { FieldError } from '@/components/ui/field';
+import { useFormErrors } from '@/hooks/useFormErrors';
+import { notify } from '@/lib/toast';
 import { apiClient } from '@/lib/api';
 import { Food, FoodPortion, MealItem, PickerItem } from '@/types';
 import {
@@ -158,7 +161,12 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
   const [name, setName] = useState('');
   const [items, setItems] = useState<EditorItem[]>([]);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
-  const [error, setError] = useState('');
+  // Ingredients whose free amount field holds a value the stepper did not apply.
+  const [invalidAmountKeys, setInvalidAmountKeys] = useState<Set<string>>(new Set());
+  const [form, formRef] = useFormErrors({
+    fields: ['name'],
+    messageValues: { name: { max: FOOD_NAME_MAX } },
+  });
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -195,7 +203,7 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
         setBaseline(signature(meal.name, loaded));
       })
       .catch(() => {
-        if (!cancelled) setError(t('loadError'));
+        if (!cancelled) notify.error(t('loadError'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -286,13 +294,13 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
   }
 
   async function handleSave() {
-    setError('');
-    if (!name.trim()) {
-      setError(t('nameRequired'));
+    if (!form.setConstraints({ name: checkBaseText(name, FOOD_NAME_MAX) })) return;
+    if (items.length === 0) {
+      notify.error(t('ingredientRequired'));
       return;
     }
-    if (items.length === 0) {
-      setError(t('ingredientRequired'));
+    if (invalidAmountKeys.size > 0) {
+      notify.error(t('ingredientAmountInvalid'));
       return;
     }
     const input = {
@@ -311,7 +319,7 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
       toast.success(isEdit ? t('saved') : t('created'));
       router.push(MEALS_TAB);
     } catch (err) {
-      setError(apiError(err, t('saveError')));
+      form.showApiError(err);
       setSaving(false);
     }
   }
@@ -324,7 +332,7 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
       toast.success(t('deleted'));
       router.push(MEALS_TAB);
     } catch (err) {
-      setError(apiError(err, t('deleteError')));
+      notify.error(apiError(err, t('deleteError')));
     }
   }
 
@@ -383,27 +391,30 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
         ) : (
           <>
             <div className="flex-1 px-4 pb-2">
-              {error && (
-                <div className="mt-4 rounded-md border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
-                  {error}
-                </div>
-              )}
-
               {loading ? (
                 <p className="py-10 text-center text-sm text-muted-foreground">{t('loading')}</p>
               ) : (
-                <div className="space-y-5 pt-5">
-                  <label className="block">
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+                <div ref={formRef} className="space-y-5 pt-5">
+                  <div className="block">
+                    <label
+                      htmlFor="meal-name"
+                      className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground"
+                    >
                       {t('name')}
-                    </span>
+                    </label>
                     <Input
+                      id="meal-name"
                       value={name}
-                      onChange={(e) => setName(e.target.value)}
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        form.clear('name');
+                      }}
                       disabled={readOnly}
                       autoFocus={!isEdit}
+                      {...form.fieldProps('name')}
                     />
-                  </label>
+                    <FieldError id={form.errorId('name')}>{form.errors.name}</FieldError>
+                  </div>
 
                   <div>
                     <div className="mb-2.5 flex items-center justify-between">
@@ -442,6 +453,15 @@ export default function MealEditorScreen({ mealId }: { mealId?: string }) {
                                 }
                                 onRemove={() => removeItem(item.key)}
                                 onAmountChange={(g, label) => setItemAmount(item.key, g, label)}
+                                onAmountValidity={(valid) =>
+                                  setInvalidAmountKeys((prev) => {
+                                    if (prev.has(item.key) === !valid) return prev;
+                                    const next = new Set(prev);
+                                    if (valid) next.delete(item.key);
+                                    else next.add(item.key);
+                                    return next;
+                                  })
+                                }
                               />
                             ))}
                           </div>
@@ -702,6 +722,7 @@ function IngredientRow({
   onToggle,
   onRemove,
   onAmountChange,
+  onAmountValidity,
 }: {
   item: EditorItem;
   readOnly: boolean;
@@ -709,6 +730,7 @@ function IngredientRow({
   onToggle: () => void;
   onRemove: () => void;
   onAmountChange: (grams: number, portionLabel: string | null) => void;
+  onAmountValidity: (valid: boolean) => void;
 }) {
   const t = useTranslations('MealEditorScreen');
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -770,6 +792,7 @@ function IngredientRow({
             grams={item.quantity}
             portionLabel={item.portionLabel}
             onChange={onAmountChange}
+            onValidityChange={onAmountValidity}
           />
         </div>
       )}

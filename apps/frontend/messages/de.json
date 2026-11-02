@@ -738,6 +738,7 @@
     "addedFood": "{name} hinzugefügt",
     "nameRequired": "Bitte gib einen Namen ein.",
     "ingredientRequired": "Eine Mahlzeit braucht mindestens eine Zutat.",
+    "ingredientAmountInvalid": "Prüfe die Menge einer Zutat: Der eingegebene Wert wird nicht übernommen.",
     "saved": "Mahlzeit gespeichert",
     "created": "Mahlzeit angelegt",
     "saveError": "Speichern fehlgeschlagen.",

@@ -231,6 +231,8 @@ function FoodResult({
     return { grams: stops[index]?.grams ?? 100, portionLabel: stops[index]?.label ?? null };
   });
   const [saving, setSaving] = useState(false);
+  // The stepper's free field holds an amount it did not apply: logging would use the old one.
+  const [amountInvalid, setAmountInvalid] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { effectiveFavorite, toggleFavorite } = useFavoriteToggle();
 
@@ -331,9 +333,10 @@ function FoodResult({
             grams={amount.grams}
             portionLabel={amount.portionLabel}
             onChange={(grams, portionLabel) => setAmount({ grams, portionLabel })}
+            onValidityChange={(valid) => setAmountInvalid(!valid)}
           />
           <div className="flex gap-2">
-            <Button className="flex-1" onClick={log} disabled={saving}>
+            <Button className="flex-1" onClick={log} disabled={saving || amountInvalid}>
               {saving ? t('saving') : t('addTo', { slot: mode.slotName })}
             </Button>
             {onOpenFood && (

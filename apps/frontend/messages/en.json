@@ -738,6 +738,7 @@
     "addedFood": "{name} added",
     "nameRequired": "Please enter a name.",
     "ingredientRequired": "A meal needs at least one ingredient.",
+    "ingredientAmountInvalid": "Check the amount of an ingredient: the value you typed is not applied.",
     "saved": "Meal saved",
     "created": "Meal created",
     "saveError": "Save failed.",
