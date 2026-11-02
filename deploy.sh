@@ -79,7 +79,9 @@ git pull origin main
 
 # Build and start containers
 echo -e "${YELLOW}🐳 Building Docker images...${NC}"
-docker compose -f docker-compose.prod.yml build
+# --pull re-checks the node:22-alpine base on every build. Without it the Pi keeps whatever
+# Node it first pulled, so a Node security release never reaches the containers.
+docker compose -f docker-compose.prod.yml build --pull
 
 echo -e "${YELLOW}🔄 Starting containers...${NC}"
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d
