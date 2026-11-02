@@ -67,3 +67,14 @@ export function addLocalDays(localDate: string, days: number): string {
   shifted.setUTCDate(shifted.getUTCDate() + days);
   return instantToLocalDate(shifted);
 }
+
+/**
+ * The same calendar day `years` later. A leap day falls back to 28 February in a non-leap year, so
+ * "one year ahead" never skips past the day the user means.
+ */
+export function addLocalYears(localDate: string, years: number): string {
+  const [year, month, day] = localDate.split('-').map(Number);
+  const target = new Date(Date.UTC(year + years, month - 1, day));
+  if (target.getUTCMonth() !== month - 1) target.setUTCDate(0);
+  return instantToLocalDate(target);
+}

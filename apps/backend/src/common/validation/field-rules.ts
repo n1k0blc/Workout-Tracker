@@ -9,6 +9,7 @@ import {
   ValidationArguments,
   registerDecorator,
 } from 'class-validator';
+import { normalizeBarcode } from '../../foods/barcode';
 import { resolveToday } from '../utils/today.util';
 
 /**
@@ -281,4 +282,39 @@ export function MinAge(years: number) {
 /** Birth date at most `years` old today (server zone). Constraint: `maxAge`. */
 export function MaxAge(years: number) {
   return ageRule('maxAge', (age) => age <= years);
+}
+
+/**
+ * A barcode as typed, scanned or stored: 8, 12 or 13 digits with a valid check digit (EAN-8,
+ * UPC-A, EAN-13). The scanner, the manual EAN field, the Lebensmittel editor and this DTO all ask
+ * the same question (`normalizeBarcode`); only digits qualify, so a padded or hyphenated value is
+ * rejected rather than quietly reshaped. Constraint: `isBarcode`.
+ */
+export function Barcode() {
+  return constraint(
+    'isBarcode',
+    (value) => typeof value === 'string' && /^\d+$/.test(value) && normalizeBarcode(value) !== null,
+  );
+}
+
+/**
+ * Whether these numbers can be a Lebensmittel's per-100 values: kcal at most `KCAL_PER_100_MAX`
+ * with `KCAL_MAX_DECIMALS` decimals, each macro at most `MACRO_PER_100_MAX`, and the three
+ * together at most `MACRO_PER_100_MAX`. The Schnelleintrag limits are far wider, so "save as
+ * Lebensmittel" has to ask before it creates a food the editor would refuse.
+ */
+export function fitsFoodLimits(values: {
+  kcal: number;
+  carbs: number;
+  protein: number;
+  fat: number;
+}): boolean {
+  const { kcal, carbs, protein, fat } = values;
+  const decimals = String(kcal).split('.')[1]?.length ?? 0;
+  return (
+    kcal <= KCAL_PER_100_MAX &&
+    decimals <= KCAL_MAX_DECIMALS &&
+    [carbs, protein, fat].every((macro) => macro <= MACRO_PER_100_MAX) &&
+    carbs + protein + fat <= MACRO_PER_100_MAX + 1e-9
+  );
 }

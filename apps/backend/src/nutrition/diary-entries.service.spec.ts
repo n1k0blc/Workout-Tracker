@@ -721,6 +721,46 @@ describe('DiaryEntriesService.createEntry — saveAsFood', () => {
     expect(prisma.food.create).not.toHaveBeenCalled();
     expect(result.foodId).toBeNull();
   });
+
+  // The entered numbers become a Lebensmittel's per-100 values, so a Schnelleintrag that is saved
+  // as one has to obey the Lebensmittel limits (900 kcal, 100 g a macro, 100 g together) -- the
+  // Schnelleintrag limits alone (10000 kcal, 1000 g) would produce a food the editor refuses.
+  describe('with values that cannot be a Lebensmittel', () => {
+    const fits = { kcal: 900, carbs: 40, protein: 30, fat: 30 };
+
+    it('saves exactly at the Lebensmittel limits', async () => {
+      const { service, prisma } = makeService();
+      await service.createEntry('user-1', baseCreateDto({ ...fits, saveAsFood: true }));
+      expect(prisma.food.create).toHaveBeenCalled();
+    });
+
+    it.each([
+      ['kcal', { kcal: 900.1 }],
+      ['kcal decimals', { kcal: 540.55 }],
+      ['a single macro', { carbs: 100.1, protein: 0, fat: 0 }],
+      ['the macro sum', { carbs: 40, protein: 30, fat: 30.1 }],
+    ])('rejects %s one step over, writing neither food nor entry', async (_name, over) => {
+      const { service, prisma } = makeService();
+
+      const result = service.createEntry(
+        'user-1',
+        baseCreateDto({ ...fits, ...over, saveAsFood: true }),
+      );
+
+      await expect(result).rejects.toMatchObject({ code: 'QUICK_ENTRY_NOT_A_FOOD' });
+      expect(prisma.food.create).not.toHaveBeenCalled();
+      expect(prisma.diaryEntry.create).not.toHaveBeenCalled();
+    });
+
+    it('still logs the same large values when they are not saved as a Lebensmittel', async () => {
+      const { service, prisma } = makeService();
+      await service.createEntry(
+        'user-1',
+        baseCreateDto({ kcal: 2400, carbs: 300, protein: 120, fat: 80 }),
+      );
+      expect(prisma.diaryEntry.create).toHaveBeenCalled();
+    });
+  });
 });
 
 // "Von einem anderen Tag kopieren" (#151): a previous day's entries are re-snapshotted onto

@@ -6,6 +6,9 @@ import { resolveToday } from '../common/utils/today.util';
 
 const exercises = [{ exerciseId: 'exercise-1', order: 1, sets: [{ order: 1, reps: 8 }] }];
 
+/** The fixtures below start in August 2026; the start-date rule is judged on this day. */
+const TODAY = resolveToday(undefined, new Date('2026-08-01T10:00:00.000Z'));
+
 /**
  * A cycle whose Monday and Wednesday are already taken. Moving the Wednesday day onto
  * Monday would make "what am I doing on Monday?" ambiguous, which the unique index on
@@ -265,7 +268,7 @@ describe('WorkoutCyclesService weekday uniqueness', () => {
       ],
     } as CreateCycleDto;
 
-    const result = service.create(dto, 'user-1');
+    const result = service.create(dto, 'user-1', undefined, TODAY);
     await expect(result).rejects.toBeInstanceOf(BadRequestException);
     await expect(result).rejects.toMatchObject({ code: 'DUPLICATE_WEEKDAY_IN_CYCLE' });
 
@@ -290,7 +293,7 @@ describe('WorkoutCyclesService day ordering (#74)', () => {
       ],
     } as CreateCycleDto;
 
-    await service.create(dto, 'user-1');
+    await service.create(dto, 'user-1', undefined, TODAY);
 
     const orderByWeekday = new Map(
       tx.workoutDay.create.mock.calls.map(
@@ -319,7 +322,7 @@ describe('WorkoutCyclesService day ordering (#74)', () => {
       ],
     } as CreateCycleDto;
 
-    await service.create(dto, 'user-1');
+    await service.create(dto, 'user-1', undefined, TODAY);
 
     const orderByWeekday = new Map(
       tx.workoutDay.create.mock.calls.map(
@@ -355,7 +358,7 @@ describe('WorkoutCyclesService day ordering (#74)', () => {
     // Fixture cycle starts Monday (weekday 1) with Monday (day-1) and Wednesday (day-2)
     // workouts. Moving startDate to a Wednesday re-anchors: Wednesday becomes day 0, Monday
     // becomes day 5.
-    await service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1');
+    await service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1', undefined, TODAY);
 
     const updateCalls = tx.workoutDay.update.mock.calls;
     const finalUpdateForDay1 = updateCalls
@@ -374,7 +377,7 @@ describe('WorkoutCyclesService day ordering (#74)', () => {
 
     // 2026-08-10 is also a Monday, same as the fixture cycle's original start date -- no day
     // changes its distance from the start weekday, so no order write is needed.
-    await service.update('cycle-1', { startDate: '2026-08-10' }, 'user-1');
+    await service.update('cycle-1', { startDate: '2026-08-10' }, 'user-1', undefined, TODAY);
 
     expect(tx.workoutDay.update).not.toHaveBeenCalled();
   });
@@ -397,7 +400,7 @@ describe('WorkoutCyclesService start-date re-anchor conflicts (#88)', () => {
 
     // The re-anchor has no single weekday to blame, so it reports the generic race.
     await expect(
-      service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1'),
+      service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1', undefined, TODAY),
     ).rejects.toMatchObject({
       code: 'CYCLE_CONCURRENT_MODIFICATION',
     });
@@ -417,7 +420,7 @@ describe('WorkoutCyclesService start-date re-anchor conflicts (#88)', () => {
     // Same code as the order race: the re-anchor never names a weekday itself, so it
     // can't blame one.
     await expect(
-      service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1'),
+      service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1', undefined, TODAY),
     ).rejects.toMatchObject({
       code: 'CYCLE_CONCURRENT_MODIFICATION',
     });
@@ -429,7 +432,7 @@ describe('WorkoutCyclesService start-date re-anchor conflicts (#88)', () => {
     const unrelated = new Error('connection lost');
     tx.workoutDay.update.mockRejectedValueOnce(unrelated);
 
-    await expect(service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1')).rejects.toBe(
+    await expect(service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1', undefined, TODAY)).rejects.toBe(
       unrelated,
     );
   });
@@ -633,7 +636,7 @@ describe('WorkoutCyclesService one active cycle per user (#226)', () => {
     const { service, prisma } = makeService();
     prisma.workoutCycle.findFirst.mockResolvedValueOnce({ id: 'cycle-0', status: 'ACTIVE' });
 
-    const result = service.create(dto, 'user-1');
+    const result = service.create(dto, 'user-1', undefined, TODAY);
     await expect(result).rejects.toBeInstanceOf(BadRequestException);
     await expect(result).rejects.toMatchObject({ code: 'ACTIVE_CYCLE_ALREADY_EXISTS' });
 
@@ -649,7 +652,7 @@ describe('WorkoutCyclesService one active cycle per user (#226)', () => {
       driverAdapterConflict('WorkoutCycle', 'WorkoutCycle_userId_active_key'),
     );
 
-    const result = service.create(dto, 'user-1');
+    const result = service.create(dto, 'user-1', undefined, TODAY);
     await expect(result).rejects.toBeInstanceOf(BadRequestException);
     await expect(result).rejects.toMatchObject({ code: 'ACTIVE_CYCLE_ALREADY_EXISTS' });
   });
@@ -663,6 +666,89 @@ describe('WorkoutCyclesService one active cycle per user (#226)', () => {
     });
     tx.workoutDay.create.mockRejectedValueOnce(failure);
 
-    await expect(service.create(dto, 'user-1')).rejects.toBe(failure);
+    await expect(service.create(dto, 'user-1', undefined, TODAY)).rejects.toBe(failure);
+  });
+});
+
+/**
+ * The start date is a calendar day judged in the user's zone (#221 / #230): today through one year
+ * ahead. On update it is checked only when it changed, so a running Zyklus keeps saving.
+ */
+describe('WorkoutCyclesService start date', () => {
+  const create = (startDate: string, today = TODAY) => {
+    const { service, prisma } = makeService();
+    const dto = {
+      name: 'Push/Pull',
+      duration: 8,
+      startDate,
+      workoutDays: [{ weekday: 1, name: 'Push', exercises }],
+    } as CreateCycleDto;
+    return { result: service.create(dto, 'user-1', undefined, today), prisma };
+  };
+
+  it('accepts today and rejects yesterday', async () => {
+    await expect(create('2026-08-01').result).resolves.toBeDefined();
+
+    const { result, prisma } = create('2026-07-31');
+    await expect(result).rejects.toBeInstanceOf(BadRequestException);
+    await expect(result).rejects.toMatchObject({ code: 'CYCLE_START_DATE_PAST' });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('accepts exactly one year ahead and rejects the day after', async () => {
+    await expect(create('2027-08-01').result).resolves.toBeDefined();
+
+    const { result } = create('2027-08-02');
+    await expect(result).rejects.toMatchObject({ code: 'CYCLE_START_DATE_TOO_FAR' });
+  });
+
+  it("judges 'today' in the user's zone, not the server's", async () => {
+    // 23:30 UTC on 31 July is already 1 August in Auckland and still 31 July in Honolulu.
+    const instant = new Date('2026-07-31T23:30:00.000Z');
+    const auckland = resolveToday('Pacific/Auckland', instant);
+    const honolulu = resolveToday('Pacific/Honolulu', instant);
+
+    await expect(create('2026-07-31', auckland).result).rejects.toMatchObject({
+      code: 'CYCLE_START_DATE_PAST',
+    });
+    await expect(create('2026-07-31', honolulu).result).resolves.toBeDefined();
+  });
+
+  it('measures a leap-day year to the same day next year', async () => {
+    const leap = resolveToday(undefined, new Date('2028-02-29T10:00:00.000Z'));
+    await expect(create('2029-02-28', leap).result).resolves.toBeDefined();
+    await expect(create('2029-03-01', leap).result).rejects.toMatchObject({
+      code: 'CYCLE_START_DATE_TOO_FAR',
+    });
+  });
+
+  describe('on update', () => {
+    // The fixture cycle started 2026-08-03; today is far past that in these cases.
+    const later = resolveToday(undefined, new Date('2026-09-15T10:00:00.000Z'));
+
+    it('lets an unchanged start date through even though it is in the past', async () => {
+      const { service } = makeService();
+      await expect(
+        service.update('cycle-1', { startDate: '2026-08-03', name: 'Renamed' }, 'user-1', undefined, later),
+      ).resolves.toBeDefined();
+    });
+
+    it('rejects a changed start date that lies in the past', async () => {
+      const { service, tx } = makeService();
+      await expect(
+        service.update('cycle-1', { startDate: '2026-08-10' }, 'user-1', undefined, later),
+      ).rejects.toMatchObject({ code: 'CYCLE_START_DATE_PAST' });
+      expect(tx.workoutCycle.update).not.toHaveBeenCalled();
+    });
+
+    it('accepts a changed start date of today and rejects one beyond a year', async () => {
+      const { service } = makeService();
+      await expect(
+        service.update('cycle-1', { startDate: '2026-09-15' }, 'user-1', undefined, later),
+      ).resolves.toBeDefined();
+      await expect(
+        service.update('cycle-1', { startDate: '2027-09-16' }, 'user-1', undefined, later),
+      ).rejects.toMatchObject({ code: 'CYCLE_START_DATE_TOO_FAR' });
+    });
   });
 });

@@ -11,7 +11,13 @@ import {
 } from '../workout-tree/workout-tree.service';
 import { setWorkingVolume } from '../common/utils/volume.util';
 import { calculateCycleWeek, getCurrentDate } from '../common/utils/date.util';
-import { Today, localDateToInstant } from '../common/utils/today.util';
+import {
+  Today,
+  addLocalYears,
+  instantToLocalDate,
+  localDateToInstant,
+  resolveToday,
+} from '../common/utils/today.util';
 import { cycleStartWeekday, getWeekdayDistanceFromCycleStart } from '../common/utils/weekday.util';
 import { ExercisesService } from '../exercises/exercises.service';
 import {
@@ -149,6 +155,7 @@ export class WorkoutCyclesService {
     createCycleDto: CreateCycleDto,
     userId: string,
     locale: ApiLocale = DEFAULT_LOCALE,
+    today: Today = resolveToday(),
   ): Promise<CycleResponseDto> {
     const existingActiveCycle = await this.prisma.workoutCycle.findFirst({
       where: { userId, status: 'ACTIVE' },
@@ -159,6 +166,7 @@ export class WorkoutCyclesService {
     }
 
     const { name, duration, startDate, workoutDays } = createCycleDto;
+    this.assertStartDate(startDate, today);
 
     const weekdays = workoutDays.map((day) => day.weekday);
     const duplicateWeekday = weekdays.find((weekday, i) => weekdays.indexOf(weekday) !== i);
@@ -216,13 +224,31 @@ export class WorkoutCyclesService {
     return this.findById(cycleId, userId, locale);
   }
 
+  /** Today in the user's zone through one year ahead, compared as calendar days. */
+  private assertStartDate(startDate: string, today: Today): void {
+    const day = startDate.slice(0, 10);
+    if (day < today.localDate) throw new AppBadRequestException('CYCLE_START_DATE_PAST');
+    if (day > addLocalYears(today.localDate, 1)) {
+      throw new AppBadRequestException('CYCLE_START_DATE_TOO_FAR');
+    }
+  }
+
   async update(
     id: string,
     updateCycleDto: UpdateCycleDto,
     userId: string,
     locale: ApiLocale = DEFAULT_LOCALE,
+    today: Today = resolveToday(),
   ): Promise<CycleResponseDto> {
     const cycle = await this.findById(id, userId);
+
+    // Only a start date the user is changing is judged; a running Zyklus restates its own past one.
+    if (
+      updateCycleDto.startDate &&
+      updateCycleDto.startDate.slice(0, 10) !== instantToLocalDate(cycle.startDate)
+    ) {
+      this.assertStartDate(updateCycleDto.startDate, today);
+    }
 
     // The re-anchor below writes WorkoutDay rows, so this shares the move and swap paths'
     // conflict handling: a concurrent write winning either unique index has to answer 400,

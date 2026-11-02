@@ -421,6 +421,18 @@ describe('FoodsService.create', () => {
     );
   });
 
+  it('stores a UPC-A in the EAN-13 shape a scan of it would look up', async () => {
+    const { service, prisma } = makeService();
+
+    await service.create('user-1', baseCreateDto({ barcode: '036000291452' }));
+
+    expect(prisma.food.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ barcode: '0036000291452' }),
+      }),
+    );
+  });
+
   it('rejects a duplicate barcode with a 409', async () => {
     const { service } = makeService({
       createImpl: async () => {
