@@ -180,10 +180,31 @@
         "arrayMaxSize": "Du kannst höchstens 10 Studios hinzufügen."
       },
       "name": {
-        "isNotEmpty": "Bitte gib einen Namen ein."
+        "isNotEmpty": "Bitte gib einen Namen ein.",
+        "maxLength": "Der Name darf höchstens {max} Zeichen lang sein."
       },
       "templateName": {
         "isNotEmpty": "Bitte gib einen Namen für die Vorlage ein."
+      },
+      "targetKcal": {
+        "isInt": "Das Kalorienziel muss eine ganze Zahl sein.",
+        "min": "Das Kalorienziel muss mindestens {min} kcal betragen.",
+        "max": "Das Kalorienziel darf höchstens {max} kcal betragen."
+      },
+      "targetCarbs": {
+        "isInt": "Das Kohlenhydrate-Ziel muss eine ganze Zahl sein.",
+        "min": "Das Kohlenhydrate-Ziel muss mindestens {min} g betragen.",
+        "max": "Das Kohlenhydrate-Ziel darf höchstens {max} g betragen."
+      },
+      "targetProtein": {
+        "isInt": "Das Protein-Ziel muss eine ganze Zahl sein.",
+        "min": "Das Protein-Ziel muss mindestens {min} g betragen.",
+        "max": "Das Protein-Ziel darf höchstens {max} g betragen."
+      },
+      "targetFat": {
+        "isInt": "Das Fett-Ziel muss eine ganze Zahl sein.",
+        "min": "Das Fett-Ziel muss mindestens {min} g betragen.",
+        "max": "Das Fett-Ziel darf höchstens {max} g betragen."
       }
     }
   },
@@ -207,10 +228,6 @@
       "gramsUnit": "g",
       "macrosResult": "Makros ergeben",
       "kcalUnit": "kcal",
-      "kcalRangeError": "Kalorienziel muss eine ganze Zahl zwischen 1 und {max} sein",
-      "carbsRangeError": "Kohlenhydrate-Ziel muss eine ganze Zahl zwischen 1 und {max} sein",
-      "proteinRangeError": "Protein-Ziel muss eine ganze Zahl zwischen 1 und {max} sein",
-      "fatRangeError": "Fett-Ziel muss eine ganze Zahl zwischen 1 und {max} sein",
       "saved": "Tagesziele gespeichert",
       "saveError": "Fehler beim Speichern der Tagesziele",
       "hintMatch": "Makros und Kalorienziel stimmen überein.",
@@ -231,10 +248,6 @@
       "heightValue": "{height} {unit}",
       "weightValue": "{weight} {unit}",
       "empty": "-",
-      "validationAllFields": "Bitte alle Felder ausfüllen",
-      "validationHeightRange": "Größe muss zwischen {min} und {max} {unit} liegen",
-      "validationWeightRange": "Gewicht muss zwischen {min} und {max} {unit} liegen",
-      "validationAgeRange": "Alter muss zwischen 13 und 120 Jahren liegen",
       "updated": "Profil erfolgreich aktualisiert",
       "updateError": "Fehler beim Aktualisieren des Profils"
     },
@@ -1500,5 +1513,8 @@
     "tagline": "Deine persönliche Workout-Tracking-App für maximalen Trainingserfolg",
     "signIn": "Anmelden",
     "register": "Registrieren"
+  },
+  "DatePicker": {
+    "placeholder": "TT.MM.JJJJ"
   }
 }

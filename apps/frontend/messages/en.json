@@ -180,10 +180,31 @@
         "arrayMaxSize": "You can add at most 10 gyms."
       },
       "name": {
-        "isNotEmpty": "Please enter a name."
+        "isNotEmpty": "Please enter a name.",
+        "maxLength": "The name can be at most {max} characters."
       },
       "templateName": {
         "isNotEmpty": "Please enter a template name."
+      },
+      "targetKcal": {
+        "isInt": "The calorie target must be a whole number.",
+        "min": "The calorie target must be at least {min} kcal.",
+        "max": "The calorie target must be at most {max} kcal."
+      },
+      "targetCarbs": {
+        "isInt": "The carbs target must be a whole number.",
+        "min": "The carbs target must be at least {min} g.",
+        "max": "The carbs target must be at most {max} g."
+      },
+      "targetProtein": {
+        "isInt": "The protein target must be a whole number.",
+        "min": "The protein target must be at least {min} g.",
+        "max": "The protein target must be at most {max} g."
+      },
+      "targetFat": {
+        "isInt": "The fat target must be a whole number.",
+        "min": "The fat target must be at least {min} g.",
+        "max": "The fat target must be at most {max} g."
       }
     }
   },
@@ -207,10 +228,6 @@
       "gramsUnit": "g",
       "macrosResult": "Macros add up to",
       "kcalUnit": "kcal",
-      "kcalRangeError": "Calorie target must be a whole number between 1 and {max}",
-      "carbsRangeError": "Carbs target must be a whole number between 1 and {max}",
-      "proteinRangeError": "Protein target must be a whole number between 1 and {max}",
-      "fatRangeError": "Fat target must be a whole number between 1 and {max}",
       "saved": "Daily targets saved",
       "saveError": "Failed to save daily targets",
       "hintMatch": "Macros and calorie target match.",
@@ -231,10 +248,6 @@
       "heightValue": "{height} {unit}",
       "weightValue": "{weight} {unit}",
       "empty": "-",
-      "validationAllFields": "Please fill in all fields",
-      "validationHeightRange": "Height must be between {min} and {max} {unit}",
-      "validationWeightRange": "Weight must be between {min} and {max} {unit}",
-      "validationAgeRange": "Age must be between 13 and 120 years",
       "updated": "Profile updated successfully",
       "updateError": "Failed to update profile"
     },
@@ -1500,5 +1513,8 @@
     "tagline": "Your personal workout tracking app for maximum training success",
     "signIn": "Sign in",
     "register": "Register"
+  },
+  "DatePicker": {
+    "placeholder": "MM/DD/YYYY"
   }
 }
