@@ -76,6 +76,21 @@ function deriveSetAggregates(
   exercise: { name: string; position: number },
   setNumber: number,
 ): SetInput {
+  // RIR means "reps left in reserve" at the end of a working set; a warm-up has none. Checked
+  // before the shape rules so a warm-up never reaches them with an RIR it must not carry. A
+  // working set is never required to carry one: history holds working sets without RIR, and
+  // editing resends the whole tree through `replaceTree`.
+  if (
+    set.setType === SetType.WARMUP &&
+    (set.rir != null || set.rirLeft != null || set.rirRight != null)
+  ) {
+    throw new AppBadRequestException('WORKOUT_SET_WARMUP_RIR', {
+      exerciseName: exercise.name,
+      exercisePosition: exercise.position,
+      setNumber,
+    });
+  }
+
   const carriesSideData = SIDE_KEYS.some((key) => set[key] != null);
 
   if (!shape.isUnilateral) {
