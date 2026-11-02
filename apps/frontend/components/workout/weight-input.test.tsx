@@ -39,7 +39,7 @@ describe('WeightInput', () => {
     const onKg = vi.fn();
     render(<Harness initialKg="100" onKg={onKg} />);
 
-    expect(field().value).toBe('220');
+    expect(field().value).toBe('220.462');
     expect(onKg).not.toHaveBeenCalled();
   });
 
@@ -51,6 +51,19 @@ describe('WeightInput', () => {
 
     expect(Number(onKg.mock.calls.at(-1)![0])).toBeCloseTo(225 * KG_PER_LB, 10);
     expect(field().value).toBe('225');
+  });
+
+  it.each([
+    ['METRIC', '27.25'],
+    ['IMPERIAL', '60.5'],
+  ] as const)('keeps a typed %s weight %s after leaving the field', (system, typed) => {
+    unitSystem = system;
+    render(<Harness initialKg="" onKg={vi.fn()} />);
+
+    fireEvent.change(field(), { target: { value: typed } });
+    fireEvent.blur(field());
+
+    expect(field().value).toBe(typed);
   });
 
   it('re-reads a logged 225 lb as exactly 225', () => {

@@ -23,6 +23,7 @@ import {
   heightInputString,
   heightToCm,
   weightInputString,
+  BODY_WEIGHT_DECIMALS,
   weightToKg,
   type UnitSystem,
 } from './units';
@@ -172,12 +173,12 @@ export function checkHeight(raw: string, system: UnitSystem, originalCm?: number
 /** As `checkHeight`; the one-decimal limit applies to the value as typed, so an untouched one is exempt. */
 export function checkBodyWeight(raw: string, system: UnitSystem, originalKg?: number | null): Constraint {
   if (raw.trim() === '') return 'isNotEmpty';
-  const kg = weightToKg(raw, system, originalKg);
+  const kg = weightToKg(raw, system, originalKg, BODY_WEIGHT_DECIMALS);
   if (kg == null || Number.isNaN(Number(raw))) return 'isNumber';
   if (kg < BODY_WEIGHT_KG_MIN) return 'min';
   if (kg > BODY_WEIGHT_KG_MAX) return 'max';
-  const untouched = originalKg != null && raw === weightInputString(originalKg, system);
-  return !untouched && (raw.split('.')[1]?.length ?? 0) > 1 ? 'maxDecimals' : null;
+  const untouched = originalKg != null && raw === weightInputString(originalKg, system, BODY_WEIGHT_DECIMALS);
+  return !untouched && (raw.split('.')[1]?.length ?? 0) > BODY_WEIGHT_DECIMALS ? 'maxDecimals' : null;
 }
 
 /**

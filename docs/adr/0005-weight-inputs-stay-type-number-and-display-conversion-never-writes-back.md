@@ -30,7 +30,8 @@ re-reads as exactly 225 lb).
 the input type.
 
 **Never write back a value the user did not type.** Form state keeps canonical kg. `WeightInput`
-renders that state converted to the user's unit (rounded to 0.5 kg or 1 lb) and calls `onChange`
+renders that state converted to the user's unit (to the three decimals a weight can be typed
+with; body weight to one) and calls `onChange`
 only when the user types, with the typed number — treated as exact in their own unit — converted
 once to kg. Where a form submits a whole record (Profil), `weightToKg` / `heightToCm` take the
 stored value as `originalKg` / `originalCm` and return it untouched when the input still shows
@@ -43,8 +44,11 @@ and pounds at the same time.
 
 ## Consequences
 
-- Display rounds: a stored 22.25 kg shows as 22.5 kg until edited, but stays 22.25 kg in the
-  database. Typed values are kept exactly, so an edited field can show a rounded number after blur.
+- Display keeps what was typed: 27,25 kg stays 27.25 kg and 60.5 lb stays 60.5 lb after blur.
+  Display used to round to 0.5 kg or 1 lb, which showed a typed 27.25 kg as 27.5 and a typed
+  60.5 lb as 61; that was dropped (amended 2026-11-02) because the field then disagreed with
+  what the user entered. The cost is a value entered in the other unit: a 100 kg set shows as
+  220.462 lb to an imperial user. The stored kg is untouched either way.
 - Any new weight field must go through `WeightInput` (or `weightToKg` with the stored original),
   never `parseFloat` on a displayed value.
 - Registration still asks for weight in kg; the unit system applies from the first login.

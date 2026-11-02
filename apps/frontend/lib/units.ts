@@ -13,15 +13,25 @@ export function weightUnitLabel(system: UnitSystem): 'kg' | 'lb' {
   return system === 'IMPERIAL' ? 'lb' : 'kg';
 }
 
-/** Rounds to 0.5 kg or 1 lb. */
-export function displayWeight(kg: number, system: UnitSystem): number {
-  if (system === 'IMPERIAL') return Math.round(kg / KG_PER_LB);
-  return Math.round(kg * 2) / 2;
+/** Decimals a tracked weight can be typed with, in the user's own unit. */
+export const WEIGHT_DECIMALS = 3;
+/** Body weight (Profil) is typed with one decimal at most. */
+export const BODY_WEIGHT_DECIMALS = 1;
+
+/**
+ * A weight in the user's unit, to the decimals it can be typed with. The rounding only removes
+ * floating-point noise (and the lb/kg conversion's tail), so whatever was typed in kg or lb
+ * reads back exactly as typed.
+ */
+export function displayWeight(kg: number, system: UnitSystem, decimals: number = WEIGHT_DECIMALS): number {
+  const shown = system === 'IMPERIAL' ? kg / KG_PER_LB : kg;
+  const factor = 10 ** decimals;
+  return Math.round(shown * factor) / factor;
 }
 
 /** The string a weight `<input type="number">` is prefilled with. */
-export function weightInputString(kg: number, system: UnitSystem): string {
-  return String(displayWeight(kg, system));
+export function weightInputString(kg: number, system: UnitSystem, decimals: number = WEIGHT_DECIMALS): string {
+  return String(displayWeight(kg, system, decimals));
 }
 
 /**
@@ -29,8 +39,13 @@ export function weightInputString(kg: number, system: UnitSystem): string {
  * string is exactly what `weightInputString(originalKg)` would have shown (the user did not
  * edit it). Null for empty/unparseable input.
  */
-export function weightToKg(input: string, system: UnitSystem, originalKg?: number | null): number | null {
-  if (originalKg != null && input === weightInputString(originalKg, system)) return originalKg;
+export function weightToKg(
+  input: string,
+  system: UnitSystem,
+  originalKg?: number | null,
+  decimals: number = WEIGHT_DECIMALS,
+): number | null {
+  if (originalKg != null && input === weightInputString(originalKg, system, decimals)) return originalKg;
   if (input.trim() === '') return null;
   const typed = parseFloat(input);
   if (Number.isNaN(typed)) return null;

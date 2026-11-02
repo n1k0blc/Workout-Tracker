@@ -187,7 +187,7 @@ describe('ProfilePage unit system', () => {
     currentUser = { ...baseUser, unitSystem: 'IMPERIAL', weight: 100, height: 180 } as typeof baseUser;
     renderProfilePage();
 
-    await waitFor(() => expect(screen.getByText('220 lb')).toBeTruthy());
+    await waitFor(() => expect(screen.getByText('220.5 lb')).toBeTruthy());
     expect(screen.getByText('71 in')).toBeTruthy();
   });
 
