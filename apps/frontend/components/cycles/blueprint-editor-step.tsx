@@ -21,6 +21,7 @@ import { FieldError } from '@/components/ui/field';
 import { notify } from '@/lib/toast';
 import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
 import { useFormErrors } from '@/hooks/useFormErrors';
+import { NAME_MAX, checkBaseText } from '@/lib/field-rules';
 import type { ExerciseLog } from '@/types';
 import { replacePlanExerciseInList } from '@/lib/exercise-replace';
 import { usePlanExercisePrefill } from '@/lib/plan-exercise-prefill';
@@ -68,6 +69,7 @@ export default function BlueprintEditorStep({
   const [templateForm, templateFormRef] = useFormErrors({
     fields: ['templateName'],
     codeFields: { TEMPLATE_NAME_TAKEN: 'templateName' },
+    messageValues: { templateName: { max: NAME_MAX } },
   });
   const format = useFormatter();
   const [showExerciseModal, setShowExerciseModal] = useState(false);
@@ -230,7 +232,7 @@ export default function BlueprintEditorStep({
   };
 
   const handleSaveAsTemplate = async () => {
-    if (!templateForm.setConstraints({ templateName: templateName.trim() ? null : 'isNotEmpty' })) {
+    if (!templateForm.setConstraints({ templateName: checkBaseText(templateName, NAME_MAX) })) {
       return;
     }
 
@@ -668,7 +670,7 @@ export default function BlueprintEditorStep({
             </Button>
             <Button
               onClick={handleSaveAsTemplate}
-              disabled={savingTemplate || !templateName.trim()}
+              disabled={savingTemplate}
             >
               {savingTemplate ? t('saveTemplateDialog.saving') : t('saveTemplateDialog.save')}
             </Button>

@@ -184,7 +184,8 @@
         "maxLength": "The name can be at most {max} characters."
       },
       "templateName": {
-        "isNotEmpty": "Please enter a template name."
+        "isNotEmpty": "Please enter a template name.",
+        "maxLength": "The template name can be at most {max} characters."
       },
       "targetKcal": {
         "isInt": "The calorie target must be a whole number.",
@@ -205,6 +206,20 @@
         "isInt": "The fat target must be a whole number.",
         "min": "The fat target must be at least {min} g.",
         "max": "The fat target must be at most {max} g."
+      },
+      "startDate": {
+        "isNotEmpty": "Please choose a start date.",
+        "minDate": "A cycle cannot start in the past.",
+        "maxDate": "A cycle can start at most one year ahead."
+      },
+      "durationMinutes": {
+        "isNotEmpty": "Please enter the duration in minutes.",
+        "isInt": "Please enter the duration in whole minutes.",
+        "min": "The duration must be at least {min} minute.",
+        "max": "The duration can be at most {max} minutes."
+      },
+      "workoutDate": {
+        "isNotEmpty": "Please choose a date."
       }
     }
   },

@@ -184,7 +184,8 @@
         "maxLength": "Der Name darf höchstens {max} Zeichen lang sein."
       },
       "templateName": {
-        "isNotEmpty": "Bitte gib einen Namen für die Vorlage ein."
+        "isNotEmpty": "Bitte gib einen Namen für die Vorlage ein.",
+        "maxLength": "Der Name der Vorlage darf höchstens {max} Zeichen lang sein."
       },
       "targetKcal": {
         "isInt": "Das Kalorienziel muss eine ganze Zahl sein.",
@@ -205,6 +206,20 @@
         "isInt": "Das Fett-Ziel muss eine ganze Zahl sein.",
         "min": "Das Fett-Ziel muss mindestens {min} g betragen.",
         "max": "Das Fett-Ziel darf höchstens {max} g betragen."
+      },
+      "startDate": {
+        "isNotEmpty": "Bitte wähle ein Startdatum.",
+        "minDate": "Ein Zyklus kann nicht in der Vergangenheit starten.",
+        "maxDate": "Ein Zyklus kann höchstens ein Jahr im Voraus starten."
+      },
+      "durationMinutes": {
+        "isNotEmpty": "Bitte gib die Dauer in Minuten ein.",
+        "isInt": "Bitte gib die Dauer in ganzen Minuten ein.",
+        "min": "Die Dauer muss mindestens {min} Minute betragen.",
+        "max": "Die Dauer darf höchstens {max} Minuten betragen."
+      },
+      "workoutDate": {
+        "isNotEmpty": "Bitte wähle ein Datum."
       }
     }
   },
