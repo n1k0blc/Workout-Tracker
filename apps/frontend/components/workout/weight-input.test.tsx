@@ -78,4 +78,47 @@ describe('WeightInput', () => {
     fireEvent.change(field(), { target: { value: '85' } });
     expect(onKg).toHaveBeenLastCalledWith('85');
   });
+
+  describe("up to three decimals, as typed in the user's unit (#227)", () => {
+    it('accepts three decimals in kg', () => {
+      unitSystem = 'METRIC';
+      const onKg = vi.fn();
+      render(<Harness initialKg="" onKg={onKg} />);
+
+      fireEvent.change(field(), { target: { value: '21.125' } });
+
+      expect(onKg).toHaveBeenLastCalledWith('21.125');
+      expect(field().value).toBe('21.125');
+    });
+
+    it('accepts three decimals in lb and converts the typed number once', () => {
+      const onKg = vi.fn();
+      render(<Harness initialKg="" onKg={onKg} />);
+
+      fireEvent.change(field(), { target: { value: '225.125' } });
+
+      expect(Number(onKg.mock.calls.at(-1)![0])).toBeCloseTo(225.125 * KG_PER_LB, 10);
+      expect(field().value).toBe('225.125');
+    });
+
+    it('refuses a fourth decimal and keeps what was there', () => {
+      unitSystem = 'METRIC';
+      const onKg = vi.fn();
+      render(<Harness initialKg="" onKg={onKg} />);
+
+      fireEvent.change(field(), { target: { value: '21.125' } });
+      onKg.mockClear();
+      fireEvent.change(field(), { target: { value: '21.1255' } });
+
+      expect(onKg).not.toHaveBeenCalled();
+      expect(field().value).toBe('21.125');
+    });
+
+    it('does not limit the decimals of a value it only displays', () => {
+      unitSystem = 'METRIC';
+      render(<Harness initialKg="82.5" onKg={vi.fn()} />);
+
+      expect(field().value).toBe('82.5');
+    });
+  });
 });

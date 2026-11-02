@@ -6,7 +6,15 @@ import { ExerciseLog, SetLog, SetType, Exercise } from '@/types';
 import { useWorkout } from '@/lib/workout-context';
 import { getSetIndicatorSlots, resolveSetRows } from '@/lib/set-slots';
 import { setPerSide, deriveSidesFromDrafts, type PerSideBreakdown } from '@/lib/set-sides';
-import { canLogAdditionalSet } from '@/lib/log-set-guards';
+import {
+  checkSetForLogging,
+  rirNeedsHint,
+  firstEarlierUnresolvedSet,
+  type SetFieldKey,
+  type SetFieldValues,
+  type SetProblem,
+} from '@/lib/log-set-guards';
+import { notify } from '@/lib/toast';
 import { seedAddedSetValues } from '@/lib/add-set-seed';
 import type { LogSetData } from '@/lib/workout-context';
 import { useSortable } from '@dnd-kit/sortable';
@@ -16,6 +24,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { FieldError, FieldWarning } from '@/components/ui/field';
 import { WeightInput } from './weight-input';
 import { useUnits } from '@/lib/use-units';
 import {
@@ -237,6 +246,14 @@ export default function ExerciseCard({
 
   const initialEditCommitDone = useRef(false);
 
+  // Fields of an unlogged row the user has been told about (#227): after a refused log attempt,
+  // or after the row switched back to working. A marked field shows its error exactly as long as
+  // it stays invalid, so fixing it clears the error with no bookkeeping in the change handlers.
+  const [markedFields, setMarkedFields] = useState<{ [setNumber: number]: SetFieldKey[] }>({});
+  // Logged sets the user changed in the history editor. Old sets may lack RIR (the server never
+  // required it), so only a set the user touches is held to the rules.
+  const [touchedLoggedIds, setTouchedLoggedIds] = useState<Set<string>>(new Set());
+
   // A caller that writes planned sets back itself (the plan editors: template, blueprint,
   // cycle-day) rather than materializing them into logged sets.
   const ownsPlan = !!onUpdatePlannedSet;
@@ -342,18 +359,20 @@ export default function ExerciseCard({
       reps: planned?.reps ?? 0,
       weight: planned?.weight ?? 0,
     });
+    // A planned working set needs an RIR on both sides; with either side cleared the plan holds
+    // none (a field error shows, and the editor's save is blocked) rather than a silently filled
+    // or zeroed value.
+    const hasPlanRir = d.hasRir && draft.left.rir.trim() !== '' && draft.right.rir.trim() !== '';
     onUpdatePlannedSet(exercise.id, setNumber, {
       repsLeft: d.repsLeft,
       repsRight: d.repsRight,
       weightLeft: d.weightLeft,
       weightRight: d.weightRight,
-      rirLeft: d.hasRir ? (d.rirLeft as number) : undefined,
-      rirRight: d.hasRir ? (d.rirRight as number) : undefined,
+      rirLeft: hasPlanRir ? (d.rirLeft as number) : undefined,
+      rirRight: hasPlanRir ? (d.rirRight as number) : undefined,
       reps: d.reps,
       weight: d.weight,
-      // RIR on a plan is a required single target: when both sides are cleared, keep the set's
-      // existing RIR rather than dropping to 0 (train-to-failure) and wiping a visible value.
-      rir: d.hasRir ? (d.rir as number) : (planned?.rir ?? 0),
+      rir: hasPlanRir ? (d.rir as number) : undefined,
     });
   };
 
@@ -391,34 +410,199 @@ export default function ExerciseCard({
     const base = getLoggedSideDraft(set);
     const next: SetSideDraft = { ...base, [side]: { ...base[side], [field]: value }, trailingTouched: true };
     setLoggedSideEdits((prev) => ({ ...prev, [set.id]: next }));
+    setTouchedLoggedIds((prev) => new Set(prev).add(set.id));
 
     const d = deriveSidesFromDrafts(next.left, next.right, { reps: set.reps, weight: set.weight });
+    // RIR is on both sides or neither (the server rejects it on one side alone). With either
+    // side cleared the set has none, and the field error says so.
+    const hasRir = d.hasRir && next.left.rir.trim() !== '' && next.right.rir.trim() !== '';
     const data = {
       repsLeft: d.repsLeft,
       repsRight: d.repsRight,
       weightLeft: d.weightLeft,
       weightRight: d.weightRight,
-      rirLeft: d.hasRir ? (d.rirLeft as number) : undefined,
-      rirRight: d.hasRir ? (d.rirRight as number) : undefined,
+      rirLeft: hasRir ? (d.rirLeft as number) : undefined,
+      rirRight: hasRir ? (d.rirRight as number) : undefined,
       reps: d.reps,
       weight: d.weight,
-      // A logged set's RIR is optional: when both sides are cleared it becomes absent, and the
-      // save path emits neither side (the server rejects RIR on one side alone).
-      rir: d.hasRir ? (d.rir as number) : undefined,
+      rir: hasRir ? (d.rir as number) : undefined,
     };
     if (onUpdateSet) onUpdateSet(exercise.id, set.id, data);
     else contextUpdateSet(set.id, data);
   };
 
-  // A side has values once reps is entered and weight is a number -- weight 0 is a real
-  // load for a bodyweight movement, so it must not gate the log control.
-  const sideFilled = (d: SideDraft) => {
-    const w = parseFloat(d.weight);
-    return d.weight.trim() !== '' && !Number.isNaN(w) && w >= 0 && (parseInt(d.reps) || 0) > 0;
+  // The live workout (not past tracking, not the plan editors) logs sets in order (#227).
+  const enforceSetOrder = mode === 'active' && effectiveAllowLogging && !isPastWorkout;
+
+  // --- Field feedback (#227) -------------------------------------------------------------
+  // Errors come from the same guard that blocks logging; this only decides which of them a row
+  // shows. The card never keeps an error of its own, it recomputes from the row's values.
+  type RowFeedback = { errors: SetProblem[]; warnings: Set<SetFieldKey> };
+
+  const markFields = (setNumber: number, fields: SetFieldKey[]) =>
+    setMarkedFields((prev) => ({ ...prev, [setNumber]: [...new Set([...(prev[setNumber] ?? []), ...fields])] }));
+
+  /** What an unlogged row currently holds: the three inputs, or both sides of a unilateral row. */
+  const unloggedValues = (setNumber: number): SetFieldValues | { left: SetFieldValues; right: SetFieldValues } => {
+    if (perSideEntry || perSidePlanEntry) {
+      const d = getSideDraft(setNumber);
+      return { left: d.left, right: d.right };
+    }
+    return {
+      weight: getEditValue(setNumber, 'weight'),
+      reps: getEditValue(setNumber, 'reps'),
+      rir: getEditValue(setNumber, 'rir'),
+    };
   };
-  const bothSidesReady = (setNumber: number) => {
-    const d = getSideDraft(setNumber);
-    return sideFilled(d.left) && sideFilled(d.right);
+
+  /** What a logged row currently shows, including a half-typed edit. */
+  const loggedValues = (set: SetLog): SetFieldValues | { left: SetFieldValues; right: SetFieldValues } => {
+    if (perSideLoggedEdit) {
+      const d = getLoggedSideDraft(set);
+      return { left: d.left, right: d.right };
+    }
+    if (editingSetId === set.id) return editingValues;
+    return {
+      weight: set.weight.toString(),
+      reps: set.reps.toString(),
+      rir: set.rir != null ? set.rir.toString() : '',
+    };
+  };
+
+  const buildFeedback = (
+    setType: SetType,
+    values: SetFieldValues | { left: SetFieldValues; right: SetFieldValues },
+    show: (problem: SetProblem) => boolean,
+  ): RowFeedback => {
+    const errors = isReadonly
+      ? []
+      : checkSetForLogging({ setType, equipment: exercise.equipment, values }).filter(show);
+    const warnings = new Set<SetFieldKey>();
+    if (!isReadonly) {
+      if ('left' in values) {
+        if (rirNeedsHint(setType, values.left.rir)) warnings.add('left.rir');
+        if (rirNeedsHint(setType, values.right.rir)) warnings.add('right.rir');
+      } else if (rirNeedsHint(setType, values.rir)) {
+        warnings.add('rir');
+      }
+    }
+    return { errors, warnings };
+  };
+
+  /**
+   * Which problems an unlogged row shows. The plan editors show a missing RIR at all times, since
+   * a planned working set needs one and nothing else makes the editor's save fail visibly; a
+   * logging row shows the fields the user was already told about.
+   */
+  const unloggedFeedback = (setNumber: number, setType: SetType): RowFeedback =>
+    buildFeedback(setType, unloggedValues(setNumber), (p) =>
+      ownsPlan ? p.field.endsWith('rir') : (markedFields[setNumber] ?? []).includes(p.field),
+    );
+
+  /**
+   * A logged row shows a missing RIR (reachable by switching a warm-up to working) in the live
+   * flows. In the history editor an old set may lack RIR, so a set is only held to the rules
+   * once the user has changed it.
+   */
+  const loggedFeedback = (set: SetLog): RowFeedback =>
+    buildFeedback(set.setType ?? SetType.WORKING, loggedValues(set), (p) =>
+      editsLoggedSets ? touchedLoggedIds.has(set.id) : p.field.endsWith('rir'),
+    );
+
+  /** Spread on an input: the red error state, or the amber warning. */
+  const feedbackProps = (fb: RowFeedback, rowKey: string, field: SetFieldKey) =>
+    fb.errors.some((p) => p.field === field)
+      ? ({ 'aria-invalid': true, 'aria-describedby': feedbackId(rowKey, field) } as const)
+      : fb.warnings.has(field)
+        ? ({ 'data-warning': true } as const)
+        : ({} as const);
+
+  const feedbackId = (rowKey: string, field: SetFieldKey) => `${exercise.id}-${rowKey}-${field}-error`;
+
+  const fieldLabel = (p: SetProblem) => {
+    const base = p.field.split('.').pop();
+    const label = base === 'weight' ? t('columnWeight') : base === 'reps' ? t('columnReps') : t('columnRir');
+    return p.field.startsWith('left.')
+      ? `${label} (${t('sideLeft')})`
+      : p.field.startsWith('right.')
+        ? `${label} (${t('sideRight')})`
+        : label;
+  };
+
+  const problemText = (p: SetProblem) => {
+    const base = p.field.split('.').pop() as 'weight' | 'reps' | 'rir';
+    const key = p.kind === 'zeroWeight' ? 'weightZero' : `${base}${p.kind === 'missing' ? 'Missing' : 'Invalid'}`;
+    const text = t(`errors.${key}` as 'errors.weightZero', { unit: units.unit });
+    return p.field.startsWith('left.')
+      ? `${t('sideLeft')}: ${text}`
+      : p.field.startsWith('right.')
+        ? `${t('sideRight')}: ${text}`
+        : text;
+  };
+
+  const renderRowFeedback = (rowKey: string, fb: RowFeedback) =>
+    fb.errors.length === 0 && fb.warnings.size === 0 ? null : (
+      <div className="px-1 pb-1.5 space-y-0.5">
+        {fb.errors.map((p) => (
+          <FieldError key={p.field} id={feedbackId(rowKey, p.field)} className="text-xs">
+            {problemText(p)}
+          </FieldError>
+        ))}
+        {fb.warnings.size > 0 && <FieldWarning className="text-xs">{t('rirHint')}</FieldWarning>}
+      </div>
+    );
+
+  /**
+   * Switching a set between warm-up and working (#227). A warm-up has no RIR, so switching to it
+   * clears the RIR everywhere it lives; switching back leaves RIR empty, and the empty field is an
+   * error (marked on an unlogged row, derived on a logged one) until the user enters one.
+   */
+  const switchSetType = (setNumber: number, loggedSet: SetLog | undefined, next: SetType) => {
+    if (isReadonly) return;
+    const toWarmup = next === SetType.WARMUP;
+    const noRir = { rir: undefined, rirLeft: undefined, rirRight: undefined };
+
+    if (loggedSet) {
+      setTouchedLoggedIds((prev) => new Set(prev).add(loggedSet.id));
+      if (toWarmup) {
+        setLoggedSideEdits((prev) => {
+          if (!(loggedSet.id in prev)) return prev;
+          const rest = { ...prev };
+          delete rest[loggedSet.id];
+          return rest;
+        });
+        if (editingSetId === loggedSet.id) setEditingValues((prev) => ({ ...prev, rir: '' }));
+      }
+      if (onUpdateSet) {
+        onUpdateSet(exercise.id, loggedSet.id, toWarmup ? { setType: next, ...noRir } : { setType: next });
+      } else {
+        // contextUpdateSet requires the current reps/weight (backend validation),
+        // so we send the full current values + the setType change
+        contextUpdateSet(loggedSet.id, {
+          reps: loggedSet.reps,
+          weight: loggedSet.weight,
+          rir: toWarmup ? undefined : loggedSet.rir,
+          ...(toWarmup ? { rirLeft: undefined, rirRight: undefined } : {}),
+          setType: next,
+        });
+      }
+      return;
+    }
+
+    updateEditValue(setNumber, 'setType', next);
+    if (toWarmup) {
+      updateEditValue(setNumber, 'rir', '');
+      if (perSideEntry || perSidePlanEntry) {
+        const base = getSideDraft(setNumber);
+        setSideEdits((prev) => ({
+          ...prev,
+          [setNumber]: { ...base, left: { ...base.left, rir: '' }, right: { ...base.right, rir: '' } },
+        }));
+      }
+    } else {
+      markFields(setNumber, ['rir', 'left.rir', 'right.rir']);
+    }
+    onUpdatePlannedSet?.(exercise.id, setNumber, toWarmup ? { setType: next, ...noRir } : { setType: next });
   };
 
   // Centralized detection via the clean flag set by the caller (template editor, future cycle wizard etc.).
@@ -475,7 +659,13 @@ export default function ExerciseCard({
     }
   };
 
-  const handleLogSet = async (setNumber: number) => {
+  /**
+   * Logs one set. The tick, the swipe and the auto-commit when tracking a past workout all end
+   * here, so they cannot disagree (#227). `silent` is the auto-commit: it fires on blur and on
+   * mount, where a toast per half-filled row would only nag, so a set that fails the guard is
+   * simply left unlogged.
+   */
+  const handleLogSet = async (setNumber: number, opts: { silent?: boolean } = {}) => {
     // Defensive: if this planned slot was explicitly skipped (via RTL), do not log it
     // even if a deferred handle (e.g. from edit-mode auto on past tracking) is still firing.
     if (skippedPlannedSetNumbers.has(setNumber)) {
@@ -494,70 +684,73 @@ export default function ExerciseCard({
 
     // Both setNumber and order are 1-based
     const plannedSet = exercise.plannedSets?.find((ps) => ps.order === setNumber);
+    // Additional / free set: must come from seeded editValues (from addAdditionalSet)
+    if (!plannedSet && !editValues[setNumber]) return;
 
-    let setType: SetType = SetType.WORKING;
-    let plannedRestAfterSet: number | undefined;
-    if (plannedSet) {
-      setType = editValues[setNumber]?.setType ?? plannedSet.setType;
-      plannedRestAfterSet = plannedSet.rest;
-    } else {
-      setType = editValues[setNumber]?.setType ?? SetType.WORKING;
-      plannedRestAfterSet = 90; // sensible default for extra sets
+    // In the live workout the sets of an Uebung are logged in order. A swiped-away set is no
+    // longer among the slots, so it never blocks. Past tracking has no such order.
+    if (enforceSetOrder) {
+      const slots = getSetIndicatorSlots({
+        plannedSets: exercise.plannedSets,
+        sets: exercise.sets,
+        additionalSetNumbers,
+        skippedSetNumbers: skippedPlannedSetNumbers,
+      });
+      const blocking = firstEarlierUnresolvedSet(
+        setNumber,
+        slots,
+        new Set(exercise.sets.map((s) => s.setNumber)),
+      );
+      if (blocking !== null) {
+        if (!opts.silent) notify.warning(t('logOutOfOrder', { number: blocking }));
+        return;
+      }
+    }
+
+    const setType: SetType = editValues[setNumber]?.setType ?? plannedSet?.setType ?? SetType.WORKING;
+    // Sensible default rest for extra sets
+    const plannedRestAfterSet = plannedSet ? plannedSet.rest : 90;
+    const isWarmup = setType === SetType.WARMUP;
+
+    const values = unloggedValues(setNumber);
+    const problems = checkSetForLogging({ setType, equipment: exercise.equipment, values });
+    if (problems.length > 0) {
+      if (!opts.silent) {
+        markFields(setNumber, problems.map((p) => p.field));
+        const missing = problems.filter((p) => p.kind === 'missing').map(fieldLabel);
+        notify.warning(
+          missing.length > 0
+            ? t('logMissing', { fields: [...new Set(missing)].join(', ') })
+            : t('logInvalid'),
+        );
+      }
+      return;
     }
 
     let payload: LogSetData;
-    if (perSideEntry) {
+    if ('left' in values) {
       // One tick logs the whole set: both sides together, one completion time, one rest.
-      if (!bothSidesReady(setNumber)) {
-        console.warn('Cannot log a unilateral set until both sides have weight and reps');
-        return;
-      }
-      const d = getSideDraft(setNumber);
-      const rirOf = (s: SideDraft) => (s.rir.trim() === '' ? undefined : parseInt(s.rir));
-      const rirLeft = rirOf(d.left);
-      const rirRight = rirOf(d.right);
-      const bothRir = rirLeft !== undefined && !Number.isNaN(rirLeft) && rirRight !== undefined && !Number.isNaN(rirRight);
       payload = {
         setNumber,
         // Aggregates are re-derived from the sides by logSet (and again by the server).
         reps: 0,
         weight: 0,
-        repsLeft: parseInt(d.left.reps) || 0,
-        repsRight: parseInt(d.right.reps) || 0,
-        weightLeft: parseFloat(d.left.weight) || 0,
-        weightRight: parseFloat(d.right.weight) || 0,
-        rirLeft: bothRir ? rirLeft : undefined,
-        rirRight: bothRir ? rirRight : undefined,
+        repsLeft: parseInt(values.left.reps),
+        repsRight: parseInt(values.right.reps),
+        weightLeft: parseFloat(values.left.weight),
+        weightRight: parseFloat(values.right.weight),
+        // A warm-up has no RIR, whatever a stale draft still holds.
+        rirLeft: isWarmup ? undefined : parseInt(values.left.rir),
+        rirRight: isWarmup ? undefined : parseInt(values.right.rir),
         setType,
         plannedRestAfterSet,
       };
     } else {
-      let values: { weight: string; reps: string; rir: string };
-      if (plannedSet) {
-        values = {
-          weight: editValues[setNumber]?.weight ?? plannedSet.weight.toString(),
-          reps: editValues[setNumber]?.reps ?? plannedSet.reps.toString(),
-          rir: editValues[setNumber]?.rir ?? plannedSet.rir.toString(),
-        };
-      } else {
-        // Additional / free set: must come from seeded editValues (from addAdditionalSet)
-        const ev = editValues[setNumber];
-        if (!ev) return;
-        const w = parseFloat(ev.weight || '0');
-        const r = parseInt(ev.reps || '0');
-        // 0 kg is a real load on a bodyweight movement (dips, pull-ups); reps must still be
-        // non-zero, and every other exercise keeps the strict guard.
-        if (!canLogAdditionalSet({ weight: w, reps: r, equipment: exercise.equipment })) {
-          console.warn('Cannot log additional set with empty weight or reps');
-          return;
-        }
-        values = { weight: ev.weight, reps: ev.reps, rir: ev.rir };
-      }
       payload = {
         setNumber,
-        weight: parseFloat(values.weight) || 0,
-        reps: parseInt(values.reps) || 0,
-        rir: values.rir ? parseInt(values.rir) : undefined,
+        weight: parseFloat(values.weight),
+        reps: parseInt(values.reps),
+        rir: isWarmup ? undefined : parseInt(values.rir),
         setType,
         plannedRestAfterSet,
       };
@@ -576,6 +769,12 @@ export default function ExerciseCard({
         return newVals;
       });
       clearSideEdits(setNumber);
+      setMarkedFields((prev) => {
+        if (!(setNumber in prev)) return prev;
+        const next = { ...prev };
+        delete next[setNumber];
+        return next;
+      });
       setSkippedPlannedSetNumbers((prev) => {
         const next = new Set(prev);
         next.delete(setNumber);
@@ -682,12 +881,9 @@ export default function ExerciseCard({
         const sn = ps.order;
         if (skippedPlannedSetNumbers.has(sn)) return;
         if (!getLoggedSet(sn)) {
-          const w = parseFloat(getEditValue(sn, 'weight') || ps.weight?.toString() || '0');
-          const r = parseInt(getEditValue(sn, 'reps') || ps.reps?.toString() || '0');
-          if (w > 0 && r > 0) {
-            // schedule to not run during render
-            setTimeout(() => handleLogSet(sn), 0);
-          }
+          // schedule to not run during render; the shared guard decides whether the row is
+          // complete enough to log (0 kg included for Bodyweight), silently if it is not
+          setTimeout(() => handleLogSet(sn, { silent: true }), 0);
         }
       });
     }
@@ -860,44 +1056,47 @@ export default function ExerciseCard({
   // Helper for changing values in a row (live update for logged sets)
   const handleRowValueChange = (setNumber: number, loggedSet: { id: string; weight: number; reps: number; rir?: number; setNumber?: number } | null, field: 'weight' | 'reps' | 'rir', newValStr: string) => {
     if (loggedSet) {
-      if (editingSetId !== loggedSet.id) {
-        setEditingSetId(loggedSet.id);
-        setEditingValues({
-          weight: loggedSet.weight.toString(),
-          reps: loggedSet.reps.toString(),
-          rir: loggedSet.rir != null ? loggedSet.rir.toString() : '',
-        });
-      }
-      setEditingValues(prev => ({ ...prev, [field]: newValStr }));
+      // The buffer this edit builds on: the one already open for this set, else the stored values.
+      const base = editingSetId === loggedSet.id
+        ? editingValues
+        : {
+            weight: loggedSet.weight.toString(),
+            reps: loggedSet.reps.toString(),
+            rir: loggedSet.rir != null ? loggedSet.rir.toString() : '',
+          };
+      const next = { ...base, [field]: newValStr };
+      setEditingSetId(loggedSet.id);
+      setEditingValues(next);
+      setTouchedLoggedIds((prev) => new Set(prev).add(loggedSet.id));
 
-      // Build payload from current editing buffer or logged + this change
-      const w = field === 'weight'
-        ? (parseFloat(newValStr) || 0)
-        : (editingValues.weight ? parseFloat(editingValues.weight) : loggedSet.weight);
-      const r = field === 'reps'
-        ? (parseInt(newValStr) || 0)
-        : (editingValues.reps ? parseInt(editingValues.reps) : loggedSet.reps);
-      const ri = field === 'rir'
-        ? (parseInt(newValStr) || undefined)
-        : (editingValues.rir ? parseInt(editingValues.rir) : loggedSet.rir);
+      // A cleared RIR is absent (not 0, which means "to failure"); a cleared weight or reps is
+      // 0, which the rules then flag as missing or invalid.
+      const rirNumber = parseInt(next.rir);
+      const data = {
+        weight: parseFloat(next.weight) || 0,
+        reps: parseInt(next.reps) || 0,
+        rir: next.rir.trim() === '' || Number.isNaN(rirNumber) ? undefined : rirNumber,
+      };
       if (onUpdateSet) {
-        onUpdateSet(exercise.id, loggedSet.id, { weight: w, reps: r, rir: ri });
+        onUpdateSet(exercise.id, loggedSet.id, data);
       } else {
-        contextUpdateSet(loggedSet.id, { weight: w, reps: r, rir: ri });
+        contextUpdateSet(loggedSet.id, data);
       }
     } else {
       // Keep the raw string locally so the field shows what was typed (a half-entered "1"
       // of "10" must not render as 1), and push the parsed value to the owner of the plan.
       updateEditValue(setNumber, field, newValStr);
       if (onUpdatePlannedSet) {
-        // A cleared field is 0 in the model, never `undefined`: the plan's fields are all
-        // required numbers, and an `undefined` RIR would be copied as the *previous* set's
-        // value by `addPlannedSet` while the row it came from still rendered blank.
-        // The blank display is preserved by the local buffer above.
+        // A cleared reps or weight is 0 in the model. A cleared RIR is *absent*, never 0: 0 is
+        // "to failure" and would be planned without the user choosing it (#227). The row shows a
+        // field error until an RIR is entered, and the editor will not save without one.
+        const rirNumber = parseInt(newValStr);
         const parsed =
-          field === 'reps' || field === 'rir'
-            ? (parseInt(newValStr) || 0)
-            : (parseFloat(newValStr) || 0);
+          field === 'rir'
+            ? (newValStr.trim() === '' || Number.isNaN(rirNumber) ? undefined : rirNumber)
+            : field === 'reps'
+              ? (parseInt(newValStr) || 0)
+              : (parseFloat(newValStr) || 0);
         onUpdatePlannedSet(exercise.id, setNumber, { [field]: parsed });
       }
     }
@@ -907,10 +1106,11 @@ export default function ExerciseCard({
   // columns rather than six inputs on one line (issue #102). Spans the three value columns; the
   // type icon and the ✓ stay in the outer grid's gutter/check columns. Shared by every per-side
   // entry surface: active logging (#102), the plan editors (#103) and the history editor (#105).
+  // A warm-up has no RIR, so its third column stays empty (#227).
   const renderSideEntryCells = (
     draft: SetSideDraft,
     onChange: (side: 'left' | 'right', field: keyof SideDraft, value: string) => void,
-    opts: { disabled: boolean; footer?: ReactNode },
+    opts: { disabled: boolean; showRir: boolean; feedback: RowFeedback; rowKey: string },
   ) => (
     <div className="col-span-3 flex flex-col gap-1">
       {sideRows.map(([label, side]) => (
@@ -926,6 +1126,7 @@ export default function ExerciseCard({
             placeholder="0"
             className="h-7 text-base md:text-sm tabular-nums"
             disabled={opts.disabled}
+            {...feedbackProps(opts.feedback, opts.rowKey, `${side}.weight`)}
           />
           <Input
             type="number"
@@ -935,43 +1136,46 @@ export default function ExerciseCard({
             placeholder="0"
             className="h-7 text-base md:text-sm tabular-nums"
             disabled={opts.disabled}
+            {...feedbackProps(opts.feedback, opts.rowKey, `${side}.reps`)}
           />
-          <Input
-            type="number"
-            inputMode="numeric"
-            value={draft[side].rir}
-            onChange={(e) => onChange(side, 'rir', e.target.value)}
-            placeholder=""
-            className="h-7 text-base md:text-sm tabular-nums"
-            disabled={opts.disabled}
-          />
+          {opts.showRir ? (
+            <Input
+              type="number"
+              inputMode="numeric"
+              value={draft[side].rir}
+              onChange={(e) => onChange(side, 'rir', e.target.value)}
+              placeholder=""
+              className="h-7 text-base md:text-sm tabular-nums"
+              disabled={opts.disabled}
+              {...feedbackProps(opts.feedback, opts.rowKey, `${side}.rir`)}
+            />
+          ) : (
+            <span />
+          )}
         </div>
       ))}
-      {opts.footer}
     </div>
   );
 
-  const renderPerSideEntryCells = (setNumber: number) =>
+  const renderPerSideEntryCells = (setNumber: number, fb: RowFeedback, showRir: boolean) =>
     renderSideEntryCells(
       getSideDraft(setNumber),
       (side, field, value) => handleSideChange(setNumber, side, field, value),
-      {
-        disabled: loading || isReadonly,
-        footer: showCheckColumn && !bothSidesReady(setNumber) && (
-          <p className="text-[10px] text-muted-foreground">
-            {t('sidesIncompleteHint')}
-          </p>
-        ),
-      },
+      { disabled: loading || isReadonly, showRir, feedback: fb, rowKey: String(setNumber) },
     );
 
   // Editable L/R inputs for an already-logged unilateral set, each side written straight back
   // through `updateSet` (issue #105, and the active card).
-  const renderLoggedSideEntryCells = (set: SetLog) =>
+  const renderLoggedSideEntryCells = (set: SetLog, fb: RowFeedback) =>
     renderSideEntryCells(
       getLoggedSideDraft(set),
       (side, field, value) => handleLoggedSideChange(set, side, field, value),
-      { disabled: loading },
+      {
+        disabled: loading,
+        showRir: (set.setType ?? SetType.WORKING) !== SetType.WARMUP,
+        feedback: fb,
+        rowKey: set.id,
+      },
     );
 
   // A read-only L/R breakdown for surfaces that never edit (issue #101): a rounded aggregate
@@ -998,26 +1202,26 @@ export default function ExerciseCard({
     right: { reps: s.reps, weight: s.weight, rir: s.rir ?? null },
   });
 
-  // The ✓ for an unlogged set. For a unilateral set it stays disabled -- with the reason
-  // shown in the row and on hover -- until both sides carry values (issue #102).
-  const renderLogCheckButton = (setNumber: number) => {
-    const waitingForSides = perSideEntry && !bothSidesReady(setNumber);
-    return (
-      <button
-        onClick={() => handleLogSet(setNumber)}
-        disabled={loading || waitingForSides}
-        className="p-0.5 disabled:opacity-40"
-        title={waitingForSides ? t('logSetWaitingForSides') : t('logSet')}
-      >
-        <IconCheck className="size-4 text-muted-foreground/60 hover:text-primary" />
-      </button>
-    );
-  };
+  // The ✓ for an unlogged set. Always active: an incomplete set answers with a toast and field
+  // errors (the same guard as the swipe) instead of a dead button that cannot say why.
+  const renderLogCheckButton = (setNumber: number) => (
+    <button
+      onClick={() => handleLogSet(setNumber)}
+      disabled={loading}
+      className="p-0.5 disabled:opacity-40"
+      title={t('logSet')}
+    >
+      <IconCheck className="size-4 text-muted-foreground/60 hover:text-primary" />
+    </button>
+  );
 
   // Render helpers for extra rows (used to render logged extras + unlogged drafts in a single sorted-by-setNumber list)
   const renderDraftRow = (setNumber: number) => {
     const gridClass = `grid ${colTemplate} items-center gap-x-2 py-1.5 border-b border-border last:border-b-0`;
-    const isWarmup = getEditSetType(setNumber) === SetType.WARMUP;
+    const setType = getEditSetType(setNumber);
+    const isWarmup = setType === SetType.WARMUP;
+    const rowKey = String(setNumber);
+    const fb = unloggedFeedback(setNumber, setType);
 
     const swipeKey = `add-${setNumber}`;
     const swipeOffset = activeSwipe && activeSwipe.key === swipeKey ? activeSwipe.offset : 0;
@@ -1025,11 +1229,7 @@ export default function ExerciseCard({
 
     const commitIfNeeded = () => {
       if (mode === 'edit' && !ownsPlan && !isReadonly && !getLoggedSet(setNumber) && !editsLoggedSets) {
-        const w = parseFloat(getEditValue(setNumber, 'weight') || '0');
-        const r = parseInt(getEditValue(setNumber, 'reps') || '0');
-        if (w > 0 && r > 0) {
-          handleLogSet(setNumber);
-        }
+        handleLogSet(setNumber, { silent: true });
       }
     };
 
@@ -1048,12 +1248,7 @@ export default function ExerciseCard({
           {/* Type: tappable icon for unlogged drafts */}
           <button
             type="button"
-            onClick={() => {
-              if (!isReadonly) {
-                const next = isWarmup ? SetType.WORKING : SetType.WARMUP;
-                updateEditValue(setNumber, 'setType', next);
-              }
-            }}
+            onClick={() => switchSetType(setNumber, undefined, isWarmup ? SetType.WORKING : SetType.WARMUP)}
             disabled={loading || isReadonly}
             className="flex items-center justify-center"
             title={isWarmup ? t('setTypeWarmup') : t('setTypeWorking')}
@@ -1064,12 +1259,16 @@ export default function ExerciseCard({
           </button>
 
           {perSideEntry ? (
-            renderPerSideEntryCells(setNumber)
+            renderPerSideEntryCells(setNumber, fb, !isWarmup)
           ) : (
             <>
-              <WeightInput inputMode="decimal" valueKg={getEditValue(setNumber, 'weight')} onChangeKg={(kg) => handleRowValueChange(setNumber, null, 'weight', kg)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-base md:text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} />
-              <Input type="number" inputMode="numeric" value={getEditValue(setNumber, 'reps')} onChange={(e) => handleRowValueChange(setNumber, null, 'reps', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-base md:text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} />
-              <Input type="number" inputMode="numeric" value={getEditValue(setNumber, 'rir')} onChange={(e) => handleRowValueChange(setNumber, null, 'rir', e.target.value)} onBlur={commitIfNeeded} placeholder="" className="h-7 text-base md:text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} />
+              <WeightInput inputMode="decimal" valueKg={getEditValue(setNumber, 'weight')} onChangeKg={(kg) => handleRowValueChange(setNumber, null, 'weight', kg)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-base md:text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} {...feedbackProps(fb, rowKey, 'weight')} />
+              <Input type="number" inputMode="numeric" value={getEditValue(setNumber, 'reps')} onChange={(e) => handleRowValueChange(setNumber, null, 'reps', e.target.value)} onBlur={commitIfNeeded} placeholder="0" className="h-7 text-base md:text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} {...feedbackProps(fb, rowKey, 'reps')} />
+              {isWarmup ? (
+                <span />
+              ) : (
+                <Input type="number" inputMode="numeric" value={getEditValue(setNumber, 'rir')} onChange={(e) => handleRowValueChange(setNumber, null, 'rir', e.target.value)} onBlur={commitIfNeeded} placeholder="" className="h-7 text-base md:text-sm tabular-nums" disabled={loading || isReadonly} readOnly={isReadonly} {...feedbackProps(fb, rowKey, 'rir')} />
+              )}
             </>
           )}
 
@@ -1077,6 +1276,7 @@ export default function ExerciseCard({
             <div className="flex justify-end">{renderLogCheckButton(setNumber)}</div>
           )}
         </div>
+        {renderRowFeedback(rowKey, fb)}
       </div>
     );
   };
@@ -1085,6 +1285,7 @@ export default function ExerciseCard({
     const gridClass = `grid ${colTemplate} items-center gap-x-2 py-1.5 border-b border-border last:border-b-0`;
     const isWarmup = set.setType === SetType.WARMUP;
     const isEditingThis = editingSetId === set.id;
+    const fb = loggedFeedback(set);
     // A unilateral set shows both sides: `reps` is a rounded average, so a 10/9 set
     // would otherwise render as "× 10" and hide the imbalance. Read-only surfaces render a
     // static breakdown (#101); everywhere the set is editable it gets per-side inputs
@@ -1113,23 +1314,7 @@ export default function ExerciseCard({
           <div className="flex items-center justify-center">
             <button
               type="button"
-              onClick={() => {
-                if (!isReadonly) {
-                  const next = isWarmup ? SetType.WORKING : SetType.WARMUP;
-                  if (onUpdateSet) {
-                    onUpdateSet(exercise.id, set.id, { setType: next });
-                  } else {
-                    // contextUpdateSet requires the current reps/weight (backend validation),
-                    // so we send the full current values + the setType change
-                    contextUpdateSet(set.id, {
-                      reps: set.reps,
-                      weight: set.weight,
-                      rir: set.rir,
-                      setType: next,
-                    });
-                  }
-                }
-              }}
+              onClick={() => switchSetType(set.setNumber, set, isWarmup ? SetType.WORKING : SetType.WARMUP)}
               disabled={loading || isReadonly}
               className="flex items-center justify-center"
               title={isWarmup ? t('setTypeWarmup') : t('setTypeWorking')}
@@ -1144,7 +1329,7 @@ export default function ExerciseCard({
               Read-only unilateral sets replace the trio with an L/R breakdown (issue #101);
               editable ones replace it with per-side L/R inputs (issue #105). */}
           {perSideLoggedEdit ? (
-            renderLoggedSideEntryCells(set)
+            renderLoggedSideEntryCells(set, fb)
           ) : perSide ? (
             renderLoggedSideCells(perSide)
           ) : (
@@ -1157,6 +1342,7 @@ export default function ExerciseCard({
                 className="h-7 text-base md:text-sm tabular-nums"
                 disabled={loading || isReadonly}
                 readOnly={isReadonly}
+                {...feedbackProps(fb, set.id, 'weight')}
               />
               <Input
                 type="number"
@@ -1167,17 +1353,23 @@ export default function ExerciseCard({
                 className="h-7 text-base md:text-sm tabular-nums"
                 disabled={loading || isReadonly}
                 readOnly={isReadonly}
+                {...feedbackProps(fb, set.id, 'reps')}
               />
-              <Input
-                type="number"
-                inputMode="numeric"
-                value={isEditingThis ? editingValues.rir : (set.rir != null ? set.rir.toString() : '')}
-                onChange={(e) => handleRowValueChange(set.setNumber, set, 'rir', e.target.value)}
-                placeholder=""
-                className="h-7 text-base md:text-sm tabular-nums"
-                disabled={loading || isReadonly}
-                readOnly={isReadonly}
-              />
+              {isWarmup ? (
+                <span />
+              ) : (
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  value={isEditingThis ? editingValues.rir : (set.rir != null ? set.rir.toString() : '')}
+                  onChange={(e) => handleRowValueChange(set.setNumber, set, 'rir', e.target.value)}
+                  placeholder=""
+                  className="h-7 text-base md:text-sm tabular-nums"
+                  disabled={loading || isReadonly}
+                  readOnly={isReadonly}
+                  {...feedbackProps(fb, set.id, 'rir')}
+                />
+              )}
             </>
           )}
 
@@ -1190,6 +1382,7 @@ export default function ExerciseCard({
             </div>
           )}
         </div>
+        {renderRowFeedback(set.id, fb)}
       </div>
     );
   };
@@ -1322,6 +1515,8 @@ export default function ExerciseCard({
                 ? setRows[rowIdx].setType
                 : (editValues[setNumber]?.setType ?? setRows[rowIdx].setType);
               const isWarmup = currentType === SetType.WARMUP;
+              const rowKey = String(setNumber);
+              const fb = loggedSet ? loggedFeedback(loggedSet) : unloggedFeedback(setNumber, currentType);
 
               const gridClass = `grid ${colTemplate} items-center gap-x-2 py-1.5 border-b border-border last:border-b-0`;
 
@@ -1331,11 +1526,7 @@ export default function ExerciseCard({
 
               const commitIfNeeded = () => {
                 if (!isReadonly && mode === 'edit' && !ownsPlan && !loggedSet && !editsLoggedSets) {
-                  const w = parseFloat(getEditValue(setNumber, 'weight') || plannedSet.weight?.toString() || '0');
-                  const r = parseInt(getEditValue(setNumber, 'reps') || plannedSet.reps?.toString() || '0');
-                  if (w > 0 && r > 0) {
-                    handleLogSet(setNumber);
-                  }
+                  handleLogSet(setNumber, { silent: true });
                 }
               };
 
@@ -1354,29 +1545,7 @@ export default function ExerciseCard({
                     {/* Type cell: tappable icon for unlogged/editing to switch type */}
                     <button
                       type="button"
-                      onClick={() => {
-                        if (!isReadonly) {
-                          const next = isWarmup ? SetType.WORKING : SetType.WARMUP;
-                          if (loggedSet) {
-                            // Update already logged set (works for active after log, past tracking, template edit)
-                            if (onUpdateSet) {
-                              onUpdateSet(exercise.id, loggedSet.id, { setType: next });
-                            } else {
-                              // contextUpdateSet requires the current reps/weight (backend validation),
-                              // so we send the full current values + the setType change
-                              contextUpdateSet(loggedSet.id, {
-                                reps: loggedSet.reps,
-                                weight: loggedSet.weight,
-                                rir: loggedSet.rir,
-                                setType: next,
-                              });
-                            }
-                          } else {
-                            updateEditValue(setNumber, 'setType', next);
-                            onUpdatePlannedSet?.(exercise.id, setNumber, { setType: next });
-                          }
-                        }
-                      }}
+                      onClick={() => switchSetType(setNumber, loggedSet, isWarmup ? SetType.WORKING : SetType.WARMUP)}
                       disabled={loading || isReadonly}
                       className="flex items-center justify-center"
                       title={isWarmup ? t('setTypeWarmup') : t('setTypeWorking')}
@@ -1390,11 +1559,11 @@ export default function ExerciseCard({
                         per-side inputs once logged -- a logged row must stay correctable here
                         exactly as it is on the extra-set rows below. */}
                     {perSideLoggedEdit && loggedSet ? (
-                      renderLoggedSideEntryCells(loggedSet)
+                      renderLoggedSideEntryCells(loggedSet, fb)
                     ) : isReadonly && exercise.isUnilateral && !loggedSet ? (
                       renderLoggedSideCells(setPerSide(plannedSet) ?? symmetricBreakdown(plannedSet))
                     ) : perSideCells && !loggedSet ? (
-                      renderPerSideEntryCells(setNumber)
+                      renderPerSideEntryCells(setNumber, fb, !isWarmup)
                     ) : (
                       <>
                         {/* Weight cell - always input style; for logged: live editable via updateSet */}
@@ -1407,6 +1576,7 @@ export default function ExerciseCard({
                           className="h-7 text-base md:text-sm tabular-nums"
                           disabled={loading || isReadonly}
                           readOnly={isReadonly}
+                          {...feedbackProps(fb, rowKey, 'weight')}
                         />
 
                         {/* Reps cell - always input style; for logged: live editable via updateSet */}
@@ -1420,20 +1590,27 @@ export default function ExerciseCard({
                           className="h-7 text-base md:text-sm tabular-nums"
                           disabled={loading || isReadonly}
                           readOnly={isReadonly}
+                          {...feedbackProps(fb, rowKey, 'reps')}
                         />
 
-                        {/* RIR cell - always input style; for logged: live editable via updateSet */}
-                        <Input
-                          type="number"
-                          inputMode="numeric"
-                          value={isEditingThis ? editingValues.rir : (loggedSet ? (loggedSet.rir != null ? loggedSet.rir.toString() : '') : getEditValue(setNumber, 'rir'))}
-                          onChange={(e) => handleRowValueChange(setNumber, loggedSet ?? null, 'rir', e.target.value)}
-                          onBlur={commitIfNeeded}
-                          placeholder=""
-                          className="h-7 text-base md:text-sm tabular-nums"
-                          disabled={loading || isReadonly}
-                          readOnly={isReadonly}
-                        />
+                        {/* RIR cell - always input style; for logged: live editable via updateSet.
+                            A warm-up has no RIR, so it has no field. */}
+                        {isWarmup ? (
+                          <span />
+                        ) : (
+                          <Input
+                            type="number"
+                            inputMode="numeric"
+                            value={isEditingThis ? editingValues.rir : (loggedSet ? (loggedSet.rir != null ? loggedSet.rir.toString() : '') : getEditValue(setNumber, 'rir'))}
+                            onChange={(e) => handleRowValueChange(setNumber, loggedSet ?? null, 'rir', e.target.value)}
+                            onBlur={commitIfNeeded}
+                            placeholder=""
+                            className="h-7 text-base md:text-sm tabular-nums"
+                            disabled={loading || isReadonly}
+                            readOnly={isReadonly}
+                            {...feedbackProps(fb, rowKey, 'rir')}
+                          />
+                        )}
                       </>
                     )}
 
@@ -1451,6 +1628,7 @@ export default function ExerciseCard({
                       </div>
                     )}
                   </div>
+                  {renderRowFeedback(rowKey, fb)}
                 </div>
               );
             })}
