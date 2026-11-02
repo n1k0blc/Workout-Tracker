@@ -133,7 +133,7 @@ Before running the migration against any populated database, run `npm run check:
 
 The server only knows the first half: `deriveSetAggregates` (`apps/backend/src/workout-tree/workout-tree.service.ts`) answers `WORKOUT_SET_WARMUP_RIR` (400) for a warm-up with `rir`, `rirLeft` or `rirRight`. It cannot require RIR on working sets because history holds working sets without one and editing resends the whole tree through `replaceTree`. The data migration of `check:input-rules` nulled the existing warm-up RIR.
 
-The client enforces the rest, through one guard (`apps/frontend/lib/log-set-guards.ts`): `checkSetForLogging` is the single check behind the tick, the swipe and the past-tracking auto-commit; `setNeedsRir` / `findFirstSetNeedingRir` answer "does a working set still lack its RIR" for the plan editors' save, the live workout's "Beenden" and the workout-completeness check. Save payloads never trust the draft to have cleared a warm-up's RIR: `toExercisePayload`, `plannedSideFields` and `planRir` drop it. In Verlauf the rules apply only to sets the user changed.
+The client enforces the rest, through one guard (`apps/frontend/lib/log-set-guards.ts`): `checkSetForLogging` is the single check behind the tick, the swipe and the past-tracking auto-commit; `setNeedsRir` / `findFirstSetNeedingRir` answer "does a working set still lack its RIR" for the plan editors' save and the workout-completeness check. Save payloads never trust the draft to have cleared a warm-up's RIR: `toExercisePayload`, `plannedSideFields` and `planRir` drop it. In Verlauf the rules apply only to sets the user changed.
 
 ### A workout is finished only when it is complete
 
