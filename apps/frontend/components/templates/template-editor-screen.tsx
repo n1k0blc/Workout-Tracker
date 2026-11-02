@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { notify } from '@/lib/toast';
+import { findFirstSetNeedingRir } from '@/lib/log-set-guards';
 import { useFormErrors } from '@/hooks/useFormErrors';
 import ExerciseCard from '@/components/workout/exercise-card';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
@@ -20,7 +21,7 @@ import { replacePlanExerciseInList } from '@/lib/exercise-replace';
 import { usePlanExercisePrefill } from '@/lib/plan-exercise-prefill';
 import { withArrayPositionOrder } from '@/lib/workout-order';
 import { plannedSideFields } from '@/lib/set-sides';
-import { addPlannedSet, removePlannedSet, updatePlannedSet } from '@/lib/planned-sets';
+import { addPlannedSet, planRir, removePlannedSet, updatePlannedSet } from '@/lib/planned-sets';
 import {
   DndContext,
   closestCenter,
@@ -43,6 +44,7 @@ interface TemplateEditorScreenProps {
 export default function TemplateEditorScreen({ templateId }: TemplateEditorScreenProps) {
   const router = useRouter();
   const t = useTranslations('TemplateEditorScreen');
+  const tCard = useTranslations('ExerciseCard');
   const [form, formRef] = useFormErrors({
     fields: ['name'],
     codeFields: { TEMPLATE_NAME_TAKEN: 'name' },
@@ -172,7 +174,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
             setType: s.setType ?? SetType.WORKING,
             reps: s.reps ?? 0,
             weight: s.weight ?? 0,
-            rir: s.rir ?? 0,
+            rir: planRir(s),
             // Per-side targets survive from an overwrite-from-workout (issue #103); absent on
             // legacy symmetric plans, where the editor seeds both sides from the aggregate.
             repsLeft: s.repsLeft ?? undefined,
@@ -224,6 +226,18 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
       return;
     }
 
+    // A planned working set needs an RIR (#227); the card marks the empty field, this names it.
+    const missingRir = findFirstSetNeedingRir(exercises.map((ex) => ({ sets: ex.plannedSets ?? [] })));
+    if (missingRir) {
+      notify.warning(
+        tCard('planRirMissing', {
+          exercise: exercises[missingRir.exerciseIndex].exerciseName,
+          number: missingRir.setIndex + 1,
+        }),
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       // `order` comes from array position at both levels, not from `ex.order`/`s.setNumber`:
@@ -236,7 +250,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
           setType: s.setType ?? SetType.WORKING,
           reps: s.reps ?? 0,
           weight: s.weight ?? 0,
-          rir: s.rir ?? 0,
+          rir: planRir(s),
           // Per-side targets for unilateral exercises (issue #103); dropped for bilateral
           // sets, which the write path requires.
           ...plannedSideFields(s, ex.isUnilateral),

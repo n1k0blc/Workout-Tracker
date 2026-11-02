@@ -16,6 +16,7 @@ import { Field, FieldLabel } from '@/components/ui/field';
 import { DatePicker } from '@/components/date-picker';
 import ExerciseCard from '@/components/workout/exercise-card';
 import { notify } from '@/lib/toast';
+import { checkLoggedSet } from '@/lib/log-set-guards';
 import {
   IconChevronLeft,
 } from '@tabler/icons-react';
@@ -57,6 +58,9 @@ export default function EditWorkoutPage() {
   const [workoutDate, setWorkoutDate] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // Sets the user changed. Only these are held to the logging rules: an older workout may hold
+  // working sets without RIR, and an untouched one must not block saving (#227).
+  const [touchedSetIds, setTouchedSetIds] = useState<Set<string>>(new Set());
 
   const navigateBack = () => {
     if (fromCycle && cycleId) {
@@ -94,6 +98,7 @@ export default function EditWorkoutPage() {
   }, [loadWorkout]);
 
   const handleUpdateSet = (exerciseId: string, setId: string, data: SetEditData) => {
+    setTouchedSetIds((prev) => new Set(prev).add(setId));
     setExercises((prev) =>
       prev.map((ex) =>
         ex.id === exerciseId
@@ -105,6 +110,18 @@ export default function EditWorkoutPage() {
 
   const handleSave = async () => {
     if (!workout) return;
+
+    const hasInvalidChangedSet = exercises.some((ex) =>
+      ex.sets.some(
+        (s) =>
+          touchedSetIds.has(s.id) &&
+          checkLoggedSet(s, { equipment: ex.equipment, isUnilateral: ex.isUnilateral }).length > 0,
+      ),
+    );
+    if (hasInvalidChangedSet) {
+      notify.warning(t('setsIncomplete'));
+      return;
+    }
 
     setSaving(true);
     try {

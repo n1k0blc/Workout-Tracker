@@ -52,10 +52,11 @@ import { replacePlanExerciseInList } from '@/lib/exercise-replace';
 import { usePlanExercisePrefill } from '@/lib/plan-exercise-prefill';
 import { withArrayPositionOrder } from '@/lib/workout-order';
 import { plannedSideFields } from '@/lib/set-sides';
-import { addPlannedSet } from '@/lib/planned-sets';
+import { addPlannedSet, planRir } from '@/lib/planned-sets';
 import type { PlannedSet } from '@/types';
 import { weekdayReferenceDate } from '@/lib/weekday';
 import { notify } from '@/lib/toast';
+import { findFirstSetNeedingRir } from '@/lib/log-set-guards';
 import { useFormErrors } from '@/hooks/useFormErrors';
 import { FieldError } from '@/components/ui/field';
 
@@ -64,6 +65,7 @@ export default function EditBlueprintPage() {
   const router = useRouter();
   const { user } = useAuth();
   const t = useTranslations('EditBlueprintPage');
+  const tCard = useTranslations('ExerciseCard');
   const format = useFormatter();
   // Two small forms, each with its own errors: the day's name on the page, and the template
   // name in the save-as-template dialog (a taken name belongs under that field).
@@ -159,7 +161,7 @@ export default function EditBlueprintPage() {
     if (!exercise) return;
 
     const baseSets = [
-      { id: `set-new-${Date.now()}`, order: 1, setType: SetType.WARMUP, reps: 10, weight: 20, rir: 3, rest: 90 },
+      { id: `set-new-${Date.now()}`, order: 1, setType: SetType.WARMUP, reps: 10, weight: 20, rest: 90 },
       { id: `set-new-${Date.now()}-1`, order: 2, setType: SetType.WORKING, reps: 10, weight: 40, rir: 2, rest: 90 },
       { id: `set-new-${Date.now()}-2`, order: 3, setType: SetType.WORKING, reps: 10, weight: 40, rir: 2, rest: 90 },
     ];
@@ -229,10 +231,23 @@ export default function EditBlueprintPage() {
     }
   };
 
+  // A planned working set needs an RIR (#227): the card marks the empty field, this names it.
+  // True when something is missing and the save must stop.
+  const reportMissingRir = () => {
+    const hit = findFirstSetNeedingRir(exercises);
+    if (!hit) return false;
+    notify.warning(
+      tCard('planRirMissing', { exercise: exercises[hit.exerciseIndex].exerciseName, number: hit.setIndex + 1 }),
+    );
+    return true;
+  };
+
   const handleSave = async () => {
     if (!dayForm.setConstraints({ name: workoutDayName.trim() ? null : 'isNotEmpty' })) {
       return;
     }
+
+    if (reportMissingRir()) return;
 
     // Every weekday in the cycle is unique to one day (#71), so a match here can only be
     // another day -- this one already owns `plannedWeekday` if it's unchanged. Ask before
@@ -267,7 +282,7 @@ export default function EditBlueprintPage() {
             setType: set.setType,
             reps: set.reps,
             weight: set.weight,
-            rir: set.rir,
+            rir: planRir(set),
             ...plannedSideFields(set, ex.isUnilateral),
             rest: set.rest,
           })),
@@ -301,6 +316,8 @@ export default function EditBlueprintPage() {
       return;
     }
 
+    if (reportMissingRir()) return;
+
     if (exercises.length === 0) {
       notify.warning(t('alerts.atLeastOneExercise'));
       return;
@@ -318,7 +335,7 @@ export default function EditBlueprintPage() {
             setType: set.setType,
             reps: set.reps,
             weight: set.weight,
-            rir: set.rir,
+            rir: planRir(set),
             ...plannedSideFields(set, ex.isUnilateral),
             rest: set.rest,
           })),
@@ -351,7 +368,7 @@ export default function EditBlueprintPage() {
       setType: s.setType,
       reps: s.reps,
       weight: s.weight,
-      rir: s.rir ?? 0,
+      rir: planRir(s),
       repsLeft: s.repsLeft ?? undefined,
       repsRight: s.repsRight ?? undefined,
       weightLeft: s.weightLeft ?? undefined,

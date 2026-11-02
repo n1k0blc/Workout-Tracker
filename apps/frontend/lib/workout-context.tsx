@@ -5,6 +5,7 @@ import { Workout, ExerciseLog, SetLog, PlannedSet, SetType, SaveAsTemplateMode, 
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
 import { reorderExerciseLogs, toExercisePayload } from '@/lib/workout-order';
+import { planRir } from '@/lib/planned-sets';
 import { aggregateSetSides } from '@/lib/set-sides';
 import { replaceExerciseInList } from '@/lib/exercise-replace';
 import { toLocalDateString } from '@/lib/local-date';
@@ -496,7 +497,7 @@ export function WorkoutProvider({ children }: { children: React.ReactNode }) {
         setType: s.setType,
         reps: s.reps,
         weight: s.weight,
-        rir: s.rir ?? 0,
+        rir: planRir(s),
         // Per-side targets so a workout started from an asymmetric plan prefills both sides,
         // and a left-to-right swipe logs both (issue #103).
         repsLeft: s.repsLeft ?? undefined,

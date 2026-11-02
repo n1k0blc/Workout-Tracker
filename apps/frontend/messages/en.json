@@ -1477,6 +1477,7 @@
   "HistoryEditPage": {
     "loadError": "Could not load the workout",
     "saveError": "Could not save the workout",
+    "setsIncomplete": "Please fill in the marked fields before saving.",
     "loading": "Loading workout …",
     "backToCycle": "Back to cycle details",
     "backToHistory": "Back to history",

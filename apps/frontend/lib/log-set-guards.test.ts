@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   checkSetForLogging,
+  checkLoggedSet,
   rirNeedsHint,
   firstEarlierUnresolvedSet,
   setNeedsRir,
@@ -118,6 +119,44 @@ describe('checkSetForLogging: a unilateral set needs every per-side field', () =
 
   it('asks for no RIR on a warm-up', () => {
     expect(check(sides({ rir: '' }, { rir: '' }), { setType: SetType.WARMUP })).toEqual([]);
+  });
+});
+
+describe('checkLoggedSet: the same rules for a stored set', () => {
+  const stored = (over: Record<string, unknown> = {}) => ({
+    setType: SetType.WORKING,
+    weight: 60,
+    reps: 10,
+    rir: 2 as number | undefined,
+    ...over,
+  });
+
+  it('passes a complete stored set and flags a missing RIR', () => {
+    expect(checkLoggedSet(stored(), { equipment: Equipment.BARBELL })).toEqual([]);
+    expect(checkLoggedSet(stored({ rir: undefined }), { equipment: Equipment.BARBELL })).toEqual([
+      { field: 'rir', kind: 'missing' },
+    ]);
+  });
+
+  it('applies the 0 kg rule from the exercise equipment', () => {
+    expect(checkLoggedSet(stored({ weight: 0 }), { equipment: Equipment.BARBELL })).toEqual([
+      { field: 'weight', kind: 'zeroWeight' },
+    ]);
+    expect(checkLoggedSet(stored({ weight: 0 }), { equipment: Equipment.BODYWEIGHT })).toEqual([]);
+  });
+
+  it('reads the sides of a unilateral set', () => {
+    const uni = stored({
+      repsLeft: 10,
+      repsRight: 10,
+      weightLeft: 20,
+      weightRight: 20,
+      rirLeft: 2,
+      rirRight: undefined,
+    });
+    expect(checkLoggedSet(uni, { equipment: Equipment.DUMBBELL, isUnilateral: true })).toEqual([
+      { field: 'right.rir', kind: 'missing' },
+    ]);
   });
 });
 

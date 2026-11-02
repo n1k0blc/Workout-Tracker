@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useWorkout } from '@/lib/workout-context';
 import { apiClient } from '@/lib/api';
+import { findFirstSetNeedingRir } from '@/lib/log-set-guards';
 import { Workout, PersonalRecord, SaveAsTemplateMode } from '@/types';
 import ExerciseCard from '@/components/workout/exercise-card';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
@@ -128,6 +129,9 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
   };
 
   const canFinishWorkout = (): boolean => {
+    // A logged working set without RIR (a warm-up switched to working) is incomplete; the card
+    // marks the field, and the workout cannot be finished until it is filled in (#227).
+    if (findFirstSetNeedingRir(activeWorkout.exercises)) return false;
     if (mode === 'edit' || isPastWorkout) {
       // In edit mode (e.g. past workout tracking), allow finishing as long as there are exercises.
       // The values in the input fields (edit state or planned) will be used on save.

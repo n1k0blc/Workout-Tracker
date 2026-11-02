@@ -92,6 +92,50 @@ export function checkSetForLogging(input: LogGuardInput): SetProblem[] {
   return problems;
 }
 
+/** A stored set (numbers, sides optional), as the history editor holds it. */
+export interface StoredSetValues {
+  setType?: SetType;
+  weight: number;
+  reps: number;
+  rir?: number | null;
+  weightLeft?: number | null;
+  weightRight?: number | null;
+  repsLeft?: number | null;
+  repsRight?: number | null;
+  rirLeft?: number | null;
+  rirRight?: number | null;
+}
+
+/**
+ * `checkSetForLogging` for a set that is already stored. The history editor applies it only to
+ * the sets the user changed: older workouts hold working sets without RIR, and an untouched one
+ * must not block saving.
+ */
+export function checkLoggedSet(
+  set: StoredSetValues,
+  ctx: { equipment?: Equipment | null; isUnilateral?: boolean },
+): SetProblem[] {
+  const str = (n: number | null | undefined) => (n == null ? '' : String(n));
+  // A set predating per-side data reads both sides from the aggregate; once either side carries
+  // an RIR, a side without one is genuinely missing it.
+  const hasSideRir = set.rirLeft != null || set.rirRight != null;
+  const side = (weight?: number | null, reps?: number | null, rir?: number | null): SetFieldValues => ({
+    weight: str(weight ?? set.weight),
+    reps: str(reps ?? set.reps),
+    rir: str(hasSideRir ? rir : set.rir),
+  });
+  return checkSetForLogging({
+    setType: set.setType ?? SetType.WORKING,
+    equipment: ctx.equipment,
+    values: ctx.isUnilateral
+      ? {
+          left: side(set.weightLeft, set.repsLeft, set.rirLeft),
+          right: side(set.weightRight, set.repsRight, set.rirRight),
+        }
+      : { weight: str(set.weight), reps: str(set.reps), rir: str(set.rir) },
+  });
+}
+
 /** The amber hint: a working set planned or logged at RIR 3 or more. Never blocks anything. */
 export function rirNeedsHint(setType: SetType, raw: string): boolean {
   if (setType !== SetType.WORKING || raw.trim() === '') return false;

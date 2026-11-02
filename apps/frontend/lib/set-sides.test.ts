@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { aggregateSetSides, deriveSidesFromDrafts, plannedSideFields, setPerSide } from './set-sides';
+import { SetType } from '@/types';
 
 /**
  * Coverage for the per-side breakdown helper (issue #101). It gates whether a
@@ -122,6 +123,16 @@ describe('plannedSideFields', () => {
       rirLeft: 1,
       rirRight: 3,
     });
+  });
+
+  it('sends no rir on either side for a warm-up, even from an old plan that stored one (#227)', () => {
+    const out = plannedSideFields(
+      { setType: SetType.WARMUP, reps: 10, weight: 50, rir: 3, repsLeft: 10, repsRight: 10, weightLeft: 50, weightRight: 50, rirLeft: 3, rirRight: 3 },
+      true,
+    );
+    expect(out).toMatchObject({ repsLeft: 10, weightRight: 50 });
+    expect(out).not.toHaveProperty('rirLeft');
+    expect(out).not.toHaveProperty('rirRight');
   });
 
   it('omits rir on both sides when the set carries none anywhere', () => {

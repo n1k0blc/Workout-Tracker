@@ -1477,6 +1477,7 @@
   "HistoryEditPage": {
     "loadError": "Fehler beim Laden des Workouts",
     "saveError": "Fehler beim Speichern des Workouts",
+    "setsIncomplete": "Bitte ergänze die markierten Felder, bevor du speicherst.",
     "loading": "Lädt Workout …",
     "backToCycle": "Zurück zu Zyklusdetails",
     "backToHistory": "Zurück zum Verlauf",

@@ -93,19 +93,24 @@ export function toExercisePayload(exercises: ExerciseLog[]): WorkoutExerciseInpu
     .filter((ex) => ex.sets.length > 0)
     .map((ex) => ({
       exerciseId: ex.exerciseId,
-      sets: ex.sets.map((s) => ({
-        setType: s.setType ?? SetType.WORKING,
-        reps: s.reps,
-        weight: s.weight,
-        rir: s.rir,
-        // Per-side values for unilateral sets (issue #102). Emitted only when the set
-        // carries them; the server derives reps/weight/rir from these and rejects a
-        // unilateral set that has none. Bilateral sets leave every field undefined and
-        // the key is dropped from the payload, which the server also requires.
-        ...perSideFields(s),
-        rest: s.rest ?? 90,
-        completedAt: s.completedAt,
-      })),
+      sets: ex.sets.map((s) => {
+        // A warm-up has no RIR and the server rejects one (#227): drop whatever a draft or an
+        // old workout still holds rather than trusting every writer to have cleared it.
+        const isWarmup = s.setType === SetType.WARMUP;
+        return {
+          setType: s.setType ?? SetType.WORKING,
+          reps: s.reps,
+          weight: s.weight,
+          rir: isWarmup ? undefined : s.rir,
+          // Per-side values for unilateral sets (issue #102). Emitted only when the set
+          // carries them; the server derives reps/weight/rir from these and rejects a
+          // unilateral set that has none. Bilateral sets leave every field undefined and
+          // the key is dropped from the payload, which the server also requires.
+          ...perSideFields(isWarmup ? { ...s, rirLeft: undefined, rirRight: undefined } : s),
+          rest: s.rest ?? 90,
+          completedAt: s.completedAt,
+        };
+      }),
     }));
 
   return withArrayPositionOrder(unordered);
