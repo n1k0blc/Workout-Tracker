@@ -28,7 +28,9 @@ describe('Uebung name', () => {
 describe('CreateExerciseDto', () => {
   it('no longer accepts a description: it had no column behind it', async () => {
     const result = await throughPipe(CreateExerciseDto, created({ description: 'x' }));
-    expect(result.errors).toEqual([{ property: 'description', constraints: ['whitelistValidation'] }]);
+    expect(result.errors).toEqual([
+      { property: 'description', constraints: ['whitelistValidation'] },
+    ]);
   });
 });
 
@@ -36,7 +38,7 @@ describe('exercise list query', () => {
   const query = (q: Record<string, unknown>) => throughPipe(FilterExerciseDto, q, 'query', '');
 
   it('takes any characters in a search term, trimmed and capped at 100', async () => {
-    for (const search of ["T-Bar Row", '7UP', "M&M's", 'a'.repeat(100)]) {
+    for (const search of ['T-Bar Row', '7UP', "M&M's", 'a'.repeat(100)]) {
       expect((await query({ search })).errors).toEqual([]);
     }
     expect((await query({ search: '  Row ' })).ok?.search).toBe('Row');

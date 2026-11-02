@@ -86,10 +86,11 @@ describe.each([
   });
 
   it('allows 10 Portionsgroessen and refuses 11', async () => {
-    const portions = (n: number) => Array.from({ length: n }, (_, i) => portion({ label: `P${i}` }));
+    const portions = (n: number) =>
+      Array.from({ length: n }, (_, i) => portion({ label: `P${i}` }));
     expect((await run(food({ portions: portions(10) }))).errors).toEqual([]);
-    expect(constraintsOf((await run(food({ portions: portions(11) }))).errors, 'portions')).toEqual([
-      'arrayMaxSize',
-    ]);
+    expect(constraintsOf((await run(food({ portions: portions(11) }))).errors, 'portions')).toEqual(
+      ['arrayMaxSize'],
+    );
   });
 });

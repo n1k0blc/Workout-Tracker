@@ -58,15 +58,18 @@ describe('set values', () => {
     expect(await propertiesFailing(workoutWithSet({ weight: 102.05828325 }))).toEqual([]);
   });
 
-  it.each(['reps', 'repsLeft', 'repsRight'])('%s is a whole number from 1 to 100', async (field) => {
-    expect(await propertiesFailing(workoutWithSet({ [field]: 1 }))).toEqual([]);
-    expect(await propertiesFailing(workoutWithSet({ [field]: 100 }))).toEqual([]);
-    for (const bad of [0, 101, 8.5]) {
-      expect(await propertiesFailing(workoutWithSet({ [field]: bad }))).toEqual([
-        `exercises.0.sets.0.${field}`,
-      ]);
-    }
-  });
+  it.each(['reps', 'repsLeft', 'repsRight'])(
+    '%s is a whole number from 1 to 100',
+    async (field) => {
+      expect(await propertiesFailing(workoutWithSet({ [field]: 1 }))).toEqual([]);
+      expect(await propertiesFailing(workoutWithSet({ [field]: 100 }))).toEqual([]);
+      for (const bad of [0, 101, 8.5]) {
+        expect(await propertiesFailing(workoutWithSet({ [field]: bad }))).toEqual([
+          `exercises.0.sets.0.${field}`,
+        ]);
+      }
+    },
+  );
 
   it.each(['rir', 'rirLeft', 'rirRight'])('%s is a whole number from 0 to 10', async (field) => {
     expect(await propertiesFailing(workoutWithSet({ [field]: 0 }))).toEqual([]);
@@ -169,10 +172,16 @@ describe('"save as Vorlage" name', () => {
   it('is 1-100 characters, like a Vorlage name', async () => {
     expect(await propertiesFailing(named('a'.repeat(100)))).toEqual([]);
     expect(
-      constraintsOf((await throughPipe(CreateWorkoutDto, named('a'.repeat(101)))).errors, 'saveAsTemplateName'),
+      constraintsOf(
+        (await throughPipe(CreateWorkoutDto, named('a'.repeat(101)))).errors,
+        'saveAsTemplateName',
+      ),
     ).toEqual(['maxLength']);
     expect(
-      constraintsOf((await throughPipe(CreateWorkoutDto, named('   '))).errors, 'saveAsTemplateName'),
+      constraintsOf(
+        (await throughPipe(CreateWorkoutDto, named('   '))).errors,
+        'saveAsTemplateName',
+      ),
     ).toContain('isNotEmpty');
   });
 

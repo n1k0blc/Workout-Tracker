@@ -32,9 +32,9 @@ describe('Zyklus name', () => {
       expect(
         constraintsOf((await throughPipe(dto as never, body('a'.repeat(101)))).errors, 'name'),
       ).toEqual(['maxLength']);
-      expect(
-        constraintsOf((await throughPipe(dto as never, body('  '))).errors, 'name'),
-      ).toContain('isNotEmpty');
+      expect(constraintsOf((await throughPipe(dto as never, body('  '))).errors, 'name')).toContain(
+        'isNotEmpty',
+      );
     }
   });
 });
@@ -58,7 +58,8 @@ describe('Zyklus duration', () => {
 
 describe('Trainingstag', () => {
   it('name is 1-50 characters when creating a Zyklus and when editing a day', async () => {
-    const create = (name: string) => throughPipe(CreateCycleDto, cycle({ workoutDays: [day(1, name)] }));
+    const create = (name: string) =>
+      throughPipe(CreateCycleDto, cycle({ workoutDays: [day(1, name)] }));
     expect((await create('a'.repeat(50))).errors).toEqual([]);
     expect(constraintsOf((await create('a'.repeat(51))).errors, 'workoutDays.0.name')).toEqual([
       'maxLength',

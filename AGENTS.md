@@ -127,6 +127,15 @@ Before, the server rejected a second active Zyklus only after the user had fille
 
 Before running the migration against any populated database, run `npm run check:input-rules` (in `apps/backend`, `DATABASE_URL` pointed at the target). It is read-only and reports every user with more than one active Zyklus as `multiple-active-cycles`; those need a manual decision (complete or delete all but one), since the migration fails on them.
 
+### Tracked values have no user-facing limit
+
+**`Set.rest` and a tracked `totalDuration` accept any non-negative whole number up to the column maximum, and never produce a user-facing error.**
+
+Both are measured, not chosen: a forgotten workout, a long break or a paused timer simply yields a big number, and refusing to save it would lose the training session over a value the user never typed. A cap would also make the 5-hour auto-save fail on exactly the workouts it exists for. Typed values (weight, reps, RIR, a hand-entered duration) are the user's input and do have limits; tracked ones do not.
+
+- **The API** bounds them by the `Int` column and nothing else: `@Min(0)` and `@Max(INT_COLUMN_MAX)` in `workout-tree.dto.ts` (`rest`) and the workout DTOs (`totalDuration`). `INT_COLUMN_MAX` is tagged `// server-only` in `apps/backend/src/common/validation/field-rules.ts`, which exempts it from the frontend drift test; the client has no mirror constant and no message for it.
+- **The client** must not clamp, reject or warn on a measured rest or duration. The one typed duration (1-480 minutes, past-workout tracking) is a separate, client-only field.
+
 ## Agent skills
 
 ### Issue tracker

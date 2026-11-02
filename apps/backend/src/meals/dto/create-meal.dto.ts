@@ -10,7 +10,12 @@ import {
   ArrayMaxSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { AMOUNT_MAX, AMOUNT_MIN, BaseText, FOOD_NAME_MAX } from '../../common/validation/field-rules';
+import {
+  AMOUNT_MAX,
+  AMOUNT_MIN,
+  BaseText,
+  FOOD_NAME_MAX,
+} from '../../common/validation/field-rules';
 
 /** One ingredient line: a Food and how much of it, in grams or millilitres. */
 export class MealItemInputDto {

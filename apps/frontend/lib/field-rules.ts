@@ -9,7 +9,8 @@
  *   caught the error. Client-only names (`maxDecimals`, `passwordsDiffer`) are in the catalogue too.
  * - The limits and patterns below must keep the backend's names and values. `field-rules.test.ts`
  *   reads the backend file as text and fails on any difference, and on a numeric limit with no
- *   backend counterpart. Keep each as a plain `export const NAME = <literal>;` line.
+ *   backend counterpart. Keep each as a plain `export const NAME = <literal>;` line. A backend
+ *   limit tagged `// server-only` (Rest and duration column maximum) is exempt and not mirrored.
  * - Limits that only a message or a `<input min max step>` needs are consumed directly; no field
  *   writes its own regex.
  */
@@ -26,9 +27,49 @@ export const HEIGHT_CM_MAX = 250;
 export const BODY_WEIGHT_KG_MIN = 30;
 export const BODY_WEIGHT_KG_MAX = 400;
 export const HOME_GYMS_MAX = 10;
+export const TRAINING_DAY_NAME_MAX = 50;
+/** Lebensmittel name and brand, Mahlzeit name, Schnelleintrag name (so "save as Lebensmittel" cannot fail on length). */
+export const FOOD_NAME_MAX = 120;
+/** Abschnitt name and Portionsgroesse label. */
+export const SECTION_NAME_MAX = 60;
+export const PORTION_LABEL_MAX = 60;
+/** Search terms, everywhere: trimmed, any characters. */
+export const SEARCH_MAX = 100;
+/** A path or query identifier: long enough for a UUID, short enough to refuse junk. */
+export const ID_MAX = 100;
+export const CYCLE_DURATION_MIN = 1;
+export const CYCLE_DURATION_MAX = 52;
+export const WEIGHT_KG_MAX = 1000;
+export const REPS_MIN = 1;
+export const REPS_MAX = 100;
+export const RIR_MIN = 0;
+export const RIR_MAX = 10;
+export const SETS_PER_EXERCISE_MAX = 20;
+export const EXERCISES_PER_WORKOUT_MAX = 30;
+export const TRAINING_DAYS_PER_CYCLE_MAX = 7;
+export const PORTIONS_PER_FOOD_MAX = 10;
+export const SECTIONS_PER_USER_MAX = 10;
+/** The earliest year a performed workout may carry (`2000-01-01`). */
+export const WORKOUT_DATE_MIN_YEAR = 2000;
+export const KCAL_PER_100_MAX = 900;
+export const KCAL_MAX_DECIMALS = 1;
+export const MACRO_PER_100_MAX = 100;
+export const QUICK_ENTRY_KCAL_MAX = 10000;
+export const QUICK_ENTRY_MACRO_MAX = 1000;
+/** Portionsgroesse grams, diary grams and quantity. */
+export const AMOUNT_MIN = 0.1;
+export const AMOUNT_MAX = 5000;
+/** Meal factor and portion multiplier. */
+export const FACTOR_MIN = 0.5;
+export const FACTOR_MAX = 20;
+export const TARGET_KCAL_MIN = 500;
+export const TARGET_KCAL_MAX = 10000;
+export const TARGET_MACRO_MIN = 1;
+export const TARGET_MACRO_MAX = 1000;
 
 export const FORBIDDEN_TEXT_PATTERN = /[\p{Cc}​-‍⁠﻿]/u;
 export const PERSON_NAME_PATTERN = /^\p{L}[\p{L}\p{M} '’.-]*$/u;
+export const ID_PATTERN = /^[A-Za-z0-9_-]+$/;
 
 /** A rule's constraint name, or null when the value passes. */
 export type Constraint = string | null;

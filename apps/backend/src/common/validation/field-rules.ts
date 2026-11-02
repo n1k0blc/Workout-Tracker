@@ -145,7 +145,12 @@ export function SearchTerm() {
 
 /** Whether `value` is an identifier: 1-`ID_MAX` characters of `ID_PATTERN`. Seeded `seed-...` ids qualify. */
 export function isId(value: unknown): boolean {
-  return typeof value === 'string' && value.length > 0 && value.length <= ID_MAX && ID_PATTERN.test(value);
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= ID_MAX &&
+    ID_PATTERN.test(value)
+  );
 }
 
 /** An identifier in a query or body. Constraint: `isId`. Path parameters use the same rule through `IdPipe`. */
@@ -173,7 +178,10 @@ export function MacroSum(others: [string, string]) {
       propertyName: String(propertyKey),
       validator: {
         validate: (value: unknown, args: ValidationArguments) => {
-          const parts = [value, ...others.map((key) => (args.object as Record<string, unknown>)[key])];
+          const parts = [
+            value,
+            ...others.map((key) => (args.object as Record<string, unknown>)[key]),
+          ];
           if (!parts.every((n) => typeof n === 'number' && Number.isFinite(n))) return true; // IsNumber reports that
           // Tolerance: 33.3 + 33.3 + 33.4 is 100 to the user but not to a float.
           return (parts as number[]).reduce((a, b) => a + b, 0) <= MACRO_PER_100_MAX + 1e-9;

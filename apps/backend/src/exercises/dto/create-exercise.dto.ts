@@ -1,11 +1,4 @@
-import {
-  IsEnum,
-  IsOptional,
-  IsBoolean,
-  IsInt,
-  Min,
-  Max,
-} from 'class-validator';
+import { IsEnum, IsOptional, IsBoolean, IsInt, Min, Max } from 'class-validator';
 import { MuscleGroup } from '../../common/muscle.util';
 import { BaseText, NAME_MAX } from '../../common/validation/field-rules';
 

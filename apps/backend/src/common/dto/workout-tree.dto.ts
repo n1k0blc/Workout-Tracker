@@ -15,7 +15,6 @@ import {
 import { Type } from 'class-transformer';
 import { SetType, Equipment } from '../types';
 import {
-  EXERCISES_PER_WORKOUT_MAX,
   INT_COLUMN_MAX,
   REPS_MAX,
   REPS_MIN,

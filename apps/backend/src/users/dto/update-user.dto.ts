@@ -1,12 +1,4 @@
-import {
-  IsOptional,
-  IsDateString,
-  IsInt,
-  IsIn,
-  IsNumber,
-  Min,
-  Max,
-} from 'class-validator';
+import { IsOptional, IsDateString, IsInt, IsIn, IsNumber, Min, Max } from 'class-validator';
 import { ApiLocale, SUPPORTED_LOCALES } from '../../common/utils/locale.util';
 import {
   AGE_MAX,

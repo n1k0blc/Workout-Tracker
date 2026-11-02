@@ -264,7 +264,10 @@ describe('MealSlotsService — at most 10 active Abschnitte', () => {
     const ten = makeStore(slots(10));
     const refused = ten.service.create('user-1', 'Elfter');
     await expect(refused).rejects.toBeInstanceOf(BadRequestException);
-    await expect(refused).rejects.toMatchObject({ code: 'MEAL_SLOT_LIMIT_REACHED', details: { max: 10 } });
+    await expect(refused).rejects.toMatchObject({
+      code: 'MEAL_SLOT_LIMIT_REACHED',
+      details: { max: 10 },
+    });
     expect(ten.rows).toHaveLength(10);
   });
 

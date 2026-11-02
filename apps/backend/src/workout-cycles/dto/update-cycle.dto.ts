@@ -1,5 +1,10 @@
 import { IsInt, IsDateString, IsOptional, Min, Max } from 'class-validator';
-import { BaseText, CYCLE_DURATION_MAX, CYCLE_DURATION_MIN, NAME_MAX } from '../../common/validation/field-rules';
+import {
+  BaseText,
+  CYCLE_DURATION_MAX,
+  CYCLE_DURATION_MIN,
+  NAME_MAX,
+} from '../../common/validation/field-rules';
 
 export class UpdateCycleDto {
   @IsOptional()

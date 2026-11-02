@@ -29,15 +29,21 @@ describe('Schnelleintrag', () => {
   it('has the same name rule as a Lebensmittel, so "save as Lebensmittel" cannot fail on it', async () => {
     const asFood = (name: string) =>
       throughPipe(CreateFoodDto, { name, kcal: 1, carbs: 0, protein: 0, fat: 0 });
-    for (const name of ['a'.repeat(FOOD_NAME_MAX), 'a'.repeat(FOOD_NAME_MAX + 1), '  ', 'a\nb', 'M&M\'s']) {
+    for (const name of [
+      'a'.repeat(FOOD_NAME_MAX),
+      'a'.repeat(FOOD_NAME_MAX + 1),
+      '  ',
+      'a\nb',
+      "M&M's",
+    ]) {
       expect((await run(quickEntry({ name }))).errors.map((e) => e.property)).toEqual(
         (await asFood(name)).errors.map((e) => e.property),
       );
     }
     expect((await run(quickEntry({ name: 'a'.repeat(120) }))).errors).toEqual([]);
-    expect(constraintsOf((await run(quickEntry({ name: 'a'.repeat(121) }))).errors, 'name')).toEqual(
-      ['maxLength'],
-    );
+    expect(
+      constraintsOf((await run(quickEntry({ name: 'a'.repeat(121) }))).errors, 'name'),
+    ).toEqual(['maxLength']);
   });
 
   it('keeps kcal to 0-10000 and each macro to 0-1000 g', async () => {
@@ -45,12 +51,16 @@ describe('Schnelleintrag', () => {
     expect(
       (await run(quickEntry({ kcal: 10000, carbs: 1000, protein: 1000, fat: 1000 }))).errors,
     ).toEqual([]);
-    expect(constraintsOf((await run(quickEntry({ kcal: 10000.1 }))).errors, 'kcal')).toEqual(['max']);
+    expect(constraintsOf((await run(quickEntry({ kcal: 10000.1 }))).errors, 'kcal')).toEqual([
+      'max',
+    ]);
     for (const macro of ['carbs', 'protein', 'fat']) {
       expect(constraintsOf((await run(quickEntry({ [macro]: 1000.1 }))).errors, macro)).toEqual([
         'max',
       ]);
-      expect(constraintsOf((await run(quickEntry({ [macro]: -1 }))).errors, macro)).toEqual(['min']);
+      expect(constraintsOf((await run(quickEntry({ [macro]: -1 }))).errors, macro)).toEqual([
+        'min',
+      ]);
     }
   });
 
@@ -60,12 +70,15 @@ describe('Schnelleintrag', () => {
     expect(constraintsOf((await run(quickEntry({ quantity: 0.09 }))).errors, 'quantity')).toEqual([
       'min',
     ]);
-    expect(constraintsOf((await run(quickEntry({ quantity: 5000.1 }))).errors, 'quantity')).toEqual([
-      'max',
-    ]);
+    expect(constraintsOf((await run(quickEntry({ quantity: 5000.1 }))).errors, 'quantity')).toEqual(
+      ['max'],
+    );
     expect((await run(quickEntry({ quantityLabel: 'a'.repeat(60) }))).errors).toEqual([]);
     expect(
-      constraintsOf((await run(quickEntry({ quantityLabel: 'a'.repeat(61) }))).errors, 'quantityLabel'),
+      constraintsOf(
+        (await run(quickEntry({ quantityLabel: 'a'.repeat(61) }))).errors,
+        'quantityLabel',
+      ),
     ).toEqual(['maxLength']);
   });
 });
@@ -115,7 +128,10 @@ describe('Mahlzeit', () => {
   it('limits its name to 120 characters', async () => {
     expect((await throughPipe(CreateMealDto, meal({ name: 'a'.repeat(120) }))).errors).toEqual([]);
     expect(
-      constraintsOf((await throughPipe(CreateMealDto, meal({ name: 'a'.repeat(121) }))).errors, 'name'),
+      constraintsOf(
+        (await throughPipe(CreateMealDto, meal({ name: 'a'.repeat(121) }))).errors,
+        'name',
+      ),
     ).toEqual(['maxLength']);
   });
 
@@ -157,9 +173,9 @@ describe('query parameters', () => {
     for (const dto of [FoodsQueryDto]) {
       expect((await query(dto, { search: "7UP & M&M's" })).errors).toEqual([]);
       expect((await query(dto, { search: 'a'.repeat(100) })).errors).toEqual([]);
-      expect(constraintsOf((await query(dto, { search: 'a'.repeat(101) })).errors, 'search')).toEqual([
-        'maxLength',
-      ]);
+      expect(
+        constraintsOf((await query(dto, { search: 'a'.repeat(101) })).errors, 'search'),
+      ).toEqual(['maxLength']);
     }
     expect((await query(SimilarFoodsQueryDto, { name: 'a'.repeat(100) })).errors).toEqual([]);
     expect(
@@ -170,8 +186,8 @@ describe('query parameters', () => {
   it('the picker scope is food or all', async () => {
     expect((await query(PickerScopeQueryDto, { scope: 'food' })).errors).toEqual([]);
     expect((await query(PickerScopeQueryDto, {})).errors).toEqual([]);
-    expect(constraintsOf((await query(PickerScopeQueryDto, { scope: 'x' })).errors, 'scope')).toEqual([
-      'isIn',
-    ]);
+    expect(
+      constraintsOf((await query(PickerScopeQueryDto, { scope: 'x' })).errors, 'scope'),
+    ).toEqual(['isIn']);
   });
 });

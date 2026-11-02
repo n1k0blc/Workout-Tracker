@@ -277,14 +277,14 @@ class ApiClient {
   }
 
   async updateHomeGym(id: string, data: { name: string }): Promise<HomeGym> {
-    return this.request<HomeGym>(`/users/me/home-gyms/${id}`, {
+    return this.request<HomeGym>(`/users/me/home-gyms/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
   }
 
   async deleteHomeGym(id: string): Promise<void> {
-    await this.request(`/users/me/home-gyms/${id}`, {
+    await this.request(`/users/me/home-gyms/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     });
   }
@@ -308,7 +308,7 @@ class ApiClient {
   }
 
   async getExercise(id: string): Promise<Exercise> {
-    return this.request<Exercise>(`/exercises/${id}`);
+    return this.request<Exercise>(`/exercises/${encodeURIComponent(id)}`);
   }
 
   async createExercise(data: {
@@ -337,13 +337,13 @@ class ApiClient {
   }
 
   async deleteExercise(id: string): Promise<void> {
-    await this.request(`/exercises/${id}`, {
+    await this.request(`/exercises/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     });
   }
 
   async updateExercise(id: string, data: UpdateExerciseDto): Promise<Exercise> {
-    return this.request<Exercise>(`/exercises/${id}`, {
+    return this.request<Exercise>(`/exercises/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
@@ -362,7 +362,7 @@ class ApiClient {
   // `setNumber`/`plannedSets`) -- callers must map into ExerciseLog/SetLog themselves
   // (see `buildExerciseLogsForEdit` in lib/workout-order) before handing this to ExerciseCard.
   async getWorkout(id: string): Promise<Workout> {
-    return this.request<Workout>(`/workouts/${id}`);
+    return this.request<Workout>(`/workouts/${encodeURIComponent(id)}`);
   }
 
   // The single transactional save (§3.3/§3.4): the client builds the whole workout locally
@@ -375,14 +375,14 @@ class ApiClient {
   }
 
   async updateWorkout(id: string, data: Partial<SaveWorkoutDto>): Promise<Workout> {
-    return this.request<Workout>(`/workouts/${id}`, {
+    return this.request<Workout>(`/workouts/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
   }
 
   async deleteWorkout(id: string): Promise<void> {
-    await this.request(`/workouts/${id}`, {
+    await this.request(`/workouts/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     });
   }
@@ -421,11 +421,11 @@ class ApiClient {
   }
 
   async getCycle(id: string): Promise<WorkoutCycle> {
-    return this.request<WorkoutCycle>(`/cycles/${id}`);
+    return this.request<WorkoutCycle>(`/cycles/${encodeURIComponent(id)}`);
   }
 
   async getCycleDetails(id: string): Promise<CycleDetails> {
-    return this.request<CycleDetails>(`/cycles/${id}/details`);
+    return this.request<CycleDetails>(`/cycles/${encodeURIComponent(id)}/details`);
   }
 
   async createCycle(data: {
@@ -446,13 +446,13 @@ class ApiClient {
   }
 
   async deleteCycle(id: string): Promise<void> {
-    await this.request(`/cycles/${id}`, {
+    await this.request(`/cycles/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     });
   }
 
   async completeCycle(id: string): Promise<WorkoutCycle> {
-    return this.request<WorkoutCycle>(`/cycles/${id}/complete`, {
+    return this.request<WorkoutCycle>(`/cycles/${encodeURIComponent(id)}/complete`, {
       method: 'POST',
     });
   }
@@ -463,7 +463,7 @@ class ApiClient {
     data: { exercises: WorkoutExerciseInput[] }
   ): Promise<WorkoutCycle> {
     return this.request<WorkoutCycle>(
-      `/cycles/${cycleId}/workout-days/${workoutDayId}/blueprint`,
+      `/cycles/${encodeURIComponent(cycleId)}/workout-days/${encodeURIComponent(workoutDayId)}/blueprint`,
       {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -482,7 +482,7 @@ class ApiClient {
     }
   ): Promise<WorkoutCycle> {
     return this.request<WorkoutCycle>(
-      `/cycles/${cycleId}/workout-days/${workoutDayId}`,
+      `/cycles/${encodeURIComponent(cycleId)}/workout-days/${encodeURIComponent(workoutDayId)}`,
       {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -574,7 +574,7 @@ class ApiClient {
   }
 
   async getWorkoutTemplate(id: string): Promise<WorkoutTemplate> {
-    return this.request<WorkoutTemplate>(`/workout-templates/${id}`);
+    return this.request<WorkoutTemplate>(`/workout-templates/${encodeURIComponent(id)}`);
   }
 
   async createWorkoutTemplate(data: CreateWorkoutTemplate): Promise<WorkoutTemplate> {
@@ -585,14 +585,14 @@ class ApiClient {
   }
 
   async updateWorkoutTemplate(id: string, data: UpdateWorkoutTemplate): Promise<WorkoutTemplate> {
-    return this.request<WorkoutTemplate>(`/workout-templates/${id}`, {
+    return this.request<WorkoutTemplate>(`/workout-templates/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
   }
 
   async deleteWorkoutTemplate(id: string): Promise<void> {
-    await this.request(`/workout-templates/${id}`, {
+    await this.request(`/workout-templates/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     });
   }
@@ -648,7 +648,7 @@ class ApiClient {
     quantity: number,
     quantityLabel?: string,
   ): Promise<DiaryEntry> {
-    return this.request<DiaryEntry>(`/nutrition/entries/${id}`, {
+    return this.request<DiaryEntry>(`/nutrition/entries/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify(
         quantityLabel !== undefined ? { quantity, quantityLabel } : { quantity },
@@ -657,7 +657,7 @@ class ApiClient {
   }
 
   async deleteDiaryEntry(id: string): Promise<void> {
-    await this.request(`/nutrition/entries/${id}`, { method: 'DELETE' });
+    await this.request(`/nutrition/entries/${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
 
   // Von einem anderen Tag kopieren (#151)
@@ -703,14 +703,14 @@ class ApiClient {
   }
 
   async renameMealSlot(id: string, name: string): Promise<MealSlot> {
-    return this.request<MealSlot>(`/nutrition/slots/${id}`, {
+    return this.request<MealSlot>(`/nutrition/slots/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify({ name }),
     });
   }
 
   async setMealSlotArchived(id: string, archived: boolean): Promise<MealSlot> {
-    return this.request<MealSlot>(`/nutrition/slots/${id}`, {
+    return this.request<MealSlot>(`/nutrition/slots/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify({ archived }),
     });
@@ -740,7 +740,7 @@ class ApiClient {
 
   // Resolves even a soft-deleted food.
   async getFood(id: string): Promise<Food> {
-    return this.request<Food>(`/foods/${id}`);
+    return this.request<Food>(`/foods/${encodeURIComponent(id)}`);
   }
 
   async createFood(data: FoodInput): Promise<Food> {
@@ -748,14 +748,14 @@ class ApiClient {
   }
 
   async updateFood(id: string, data: FoodInput): Promise<Food> {
-    return this.request<Food>(`/foods/${id}`, {
+    return this.request<Food>(`/foods/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
   }
 
   async deleteFood(id: string): Promise<void> {
-    await this.request(`/foods/${id}`, { method: 'DELETE' });
+    await this.request(`/foods/${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
 
   // The scanner's miss chain (#149): the shared library, then a live Open Food Facts lookup
@@ -773,7 +773,7 @@ class ApiClient {
 
   // Ingredients resolved, totals computed live from the current food nutrients.
   async getMeal(id: string): Promise<MealDetail> {
-    return this.request<MealDetail>(`/meals/${id}`);
+    return this.request<MealDetail>(`/meals/${encodeURIComponent(id)}`);
   }
 
   async createMeal(data: MealInput): Promise<MealDetail> {
@@ -784,14 +784,14 @@ class ApiClient {
   }
 
   async updateMeal(id: string, data: MealInput): Promise<MealDetail> {
-    return this.request<MealDetail>(`/meals/${id}`, {
+    return this.request<MealDetail>(`/meals/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
   }
 
   async deleteMeal(id: string): Promise<void> {
-    await this.request(`/meals/${id}`, { method: 'DELETE' });
+    await this.request(`/meals/${encodeURIComponent(id)}`, { method: 'DELETE' });
   }
 
   // Favoriten & Zuletzt (#148)
@@ -799,22 +799,22 @@ class ApiClient {
   // Star / unstar a Lebensmittel or Mahlzeit. Both verbs are idempotent server-side, so the
   // optimistic caller never has to reconcile a conflict.
   async setFoodFavorite(id: string, favorite: boolean): Promise<void> {
-    await this.request(`/favorites/foods/${id}`, { method: favorite ? 'POST' : 'DELETE' });
+    await this.request(`/favorites/foods/${encodeURIComponent(id)}`, { method: favorite ? 'POST' : 'DELETE' });
   }
 
   async setMealFavorite(id: string, favorite: boolean): Promise<void> {
-    await this.request(`/favorites/meals/${id}`, { method: favorite ? 'POST' : 'DELETE' });
+    await this.request(`/favorites/meals/${encodeURIComponent(id)}`, { method: favorite ? 'POST' : 'DELETE' });
   }
 
   // The picker's Favoriten tab: starred foods and meals ordered by last use. `scope='food'`
   // narrows to foods only -- the Zutat search inside the Mahlzeit editor.
   async getPickerFavorites(scope?: 'food'): Promise<PickerList> {
-    return this.request<PickerList>(`/nutrition/picker/favorites${scope ? `?scope=${scope}` : ''}`);
+    return this.request<PickerList>(`/nutrition/picker/favorites${scope ? `?scope=${encodeURIComponent(scope)}` : ''}`);
   }
 
   // The picker's Zuletzt tab: the last 20 distinct foods and meals from the diary.
   async getPickerRecent(scope?: 'food'): Promise<PickerList> {
-    return this.request<PickerList>(`/nutrition/picker/recent${scope ? `?scope=${scope}` : ''}`);
+    return this.request<PickerList>(`/nutrition/picker/recent${scope ? `?scope=${encodeURIComponent(scope)}` : ''}`);
   }
 }
 
