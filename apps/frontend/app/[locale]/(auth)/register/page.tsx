@@ -16,6 +16,7 @@ import {
   BODY_WEIGHT_KG_MIN,
   HEIGHT_CM_MAX,
   HEIGHT_CM_MIN,
+  HOME_GYMS_MAX,
   NAME_MAX,
   bodyLimits,
   checkBaseText,
@@ -61,7 +62,7 @@ export default function RegisterPage() {
     ],
     codeFields: { EMAIL_ALREADY_REGISTERED: 'email', PASSWORD_BREACHED: 'password' },
     // Nobody is signed in yet, so the limits are named in metric.
-    messageValues: bodyLimits('METRIC'),
+    messageValues: { ...bodyLimits('METRIC'), name: { max: NAME_MAX } },
   });
 
   const handleStep1Next = () => {
@@ -336,6 +337,7 @@ export default function RegisterPage() {
                   className={homeGyms.length === 0 
                     ? "h-16 w-16 rounded-lg p-0 flex items-center justify-center" 
                     : "h-14 w-14 rounded-lg p-0 flex items-center justify-center"}
+                  disabled={homeGyms.length >= HOME_GYMS_MAX}
                   aria-label={homeGyms.length === 0 ? t('addGym') : t('addAnotherGym')}
                 >
                   <IconPlus className={homeGyms.length === 0 ? "size-8" : "size-7"} />

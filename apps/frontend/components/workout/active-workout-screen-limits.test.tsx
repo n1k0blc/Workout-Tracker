@@ -13,12 +13,16 @@ const notify = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn(), info: vi.fn
 vi.mock('@/lib/toast', () => ({ notify }));
 vi.mock('sonner', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/workout/exercise-card', () => ({ default: () => null }));
-vi.mock('@/components/workout/exercise-selection-modal', () => ({ default: () => null }));
+vi.mock('@/components/workout/exercise-selection-modal', () => ({
+  default: ({ open, onSelect }: { open: boolean; onSelect: (id: string) => void }) =>
+    open ? <button onClick={() => onSelect('new-exercise')}>pick</button> : null,
+}));
 vi.mock('@/components/workout/workout-timer', () => ({ default: () => null }));
 vi.mock('@/components/workout/rest-timer-display', () => ({ RestTimerDisplay: () => null }));
 vi.mock('@/lib/api', () => ({ apiClient: { getPersonalRecords: vi.fn().mockResolvedValue({ recentPRs: [] }) } }));
 
 const completeWorkout = vi.fn();
+const addExercise = vi.fn();
 const setPastWorkoutDuration = vi.fn();
 let context: Record<string, unknown>;
 vi.mock('@/lib/workout-context', () => ({ useWorkout: () => context }));
@@ -43,7 +47,7 @@ function setContext(overrides: Record<string, unknown> = {}) {
     },
     completeWorkout,
     discardWorkout: vi.fn(),
-    addExercise: vi.fn(),
+    addExercise,
     reorderExercises: vi.fn(),
     loading: false,
     workoutDuration: 0,
@@ -135,5 +139,36 @@ describe('name of the Vorlage a workout is saved as', () => {
     confirm();
     expect(screen.getByText('Bitte gib einen Namen für die Vorlage ein.')).toBeTruthy();
     expect(completeWorkout).not.toHaveBeenCalled();
+  });
+});
+
+describe('number of Übungen in a workout', () => {
+  const exercises = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      id: `e${i}`,
+      exerciseId: `x${i}`,
+      exerciseName: `Übung ${i}`,
+      plannedSets: [],
+      sets: [{ id: `s${i}`, setNumber: 1, setType: 'WORKING', reps: 8, weight: 80, rir: 2 }],
+    }));
+
+  function pickAnother(count: number) {
+    setContext({ activeWorkout: { id: 'w1', isFreeWorkout: true, originTemplateName: 'Push', exercises: exercises(count) } });
+    addExercise.mockResolvedValue('new-id');
+    renderScreen();
+    fireEvent.click(screen.getByRole('button', { name: deMessages.ActiveWorkout.addExerciseAria }));
+    fireEvent.click(screen.getByRole('button', { name: 'pick' }));
+  }
+
+  it('adds the thirtieth', async () => {
+    pickAnother(29);
+    await waitFor(() => expect(addExercise).toHaveBeenCalledWith('new-exercise'));
+  });
+
+  it('refuses a thirty-first with a toast and keeps the picker open', () => {
+    pickAnother(30);
+    expect(addExercise).not.toHaveBeenCalled();
+    expect(notify.warning).toHaveBeenCalledWith('Ein Workout kann höchstens 30 Übungen enthalten.');
+    expect(screen.getByRole('button', { name: 'pick' })).toBeTruthy();
   });
 });

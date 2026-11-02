@@ -222,6 +222,18 @@ describe('RegisterPage — step 2 and the server', () => {
     expect(register).not.toHaveBeenCalled();
   });
 
+  it('offers ten gyms and no eleventh', () => {
+    renderPage();
+    fillStep1();
+    next();
+    fireEvent.click(screen.getByRole('button', { name: 'Add home gym' }));
+    for (let i = 1; i < 10; i++) {
+      fireEvent.click(screen.getByRole('button', { name: 'Add another home gym' }));
+    }
+    expect(screen.getAllByPlaceholderText('Gym name')).toHaveLength(10);
+    expect((screen.getByRole('button', { name: 'Add another home gym' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it('shows an invalid gym name under that gym', () => {
     renderPage();
     fillStep1();
@@ -233,7 +245,7 @@ describe('RegisterPage — step 2 and the server', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
 
-    expect(alerts()).toEqual(['The text is too long.']);
+    expect(alerts()).toEqual(['The name can be at most 100 characters.']);
     expect(screen.getByPlaceholderText('Gym name').getAttribute('aria-invalid')).toBe('true');
     expect(register).not.toHaveBeenCalled();
   });

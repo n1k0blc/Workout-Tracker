@@ -505,6 +505,7 @@
     "addFirstExerciseAria": "Erste Übung hinzufügen",
     "addExerciseAria": "Übung hinzufügen",
     "duplicateExerciseError": "Diese Übung ist bereits im Workout. Füge stattdessen Sätze zur bestehenden Übung hinzu.",
+    "exerciseLimitReached": "Ein Workout kann höchstens {max} Übungen enthalten.",
     "addExerciseError": "Fehler beim Hinzufügen der Übung",
     "saveError": "Fehler beim Speichern des Workouts",
     "incomplete": {

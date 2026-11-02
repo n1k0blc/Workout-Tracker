@@ -47,7 +47,7 @@ import { cn } from '@/lib/utils';
 import { FieldError } from '@/components/ui/field';
 import { useFormErrors } from '@/hooks/useFormErrors';
 import { useValidationMessage } from '@/hooks/useApiErrorMessage';
-import { NAME_MAX, checkBaseText } from '@/lib/field-rules';
+import { EXERCISES_PER_WORKOUT_MAX, NAME_MAX, checkBaseText } from '@/lib/field-rules';
 import {
   TYPED_DURATION_MAX_MINUTES,
   TYPED_DURATION_MIN_MINUTES,
@@ -187,6 +187,11 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
     const isDuplicate = activeWorkout.exercises.some(
       (ex) => ex.exerciseId === exerciseId
     );
+
+    if (activeWorkout.exercises.length >= EXERCISES_PER_WORKOUT_MAX) {
+      notify.warning(t('exerciseLimitReached', { max: EXERCISES_PER_WORKOUT_MAX }));
+      return; // Don't add, keep modal open
+    }
 
     if (isDuplicate) {
       toast.error(t('duplicateExerciseError'), {

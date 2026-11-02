@@ -432,9 +432,9 @@ describe('WorkoutCyclesService start-date re-anchor conflicts (#88)', () => {
     const unrelated = new Error('connection lost');
     tx.workoutDay.update.mockRejectedValueOnce(unrelated);
 
-    await expect(service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1', undefined, TODAY)).rejects.toBe(
-      unrelated,
-    );
+    await expect(
+      service.update('cycle-1', { startDate: '2026-08-05' }, 'user-1', undefined, TODAY),
+    ).rejects.toBe(unrelated);
   });
 });
 
@@ -729,7 +729,13 @@ describe('WorkoutCyclesService start date', () => {
     it('lets an unchanged start date through even though it is in the past', async () => {
       const { service } = makeService();
       await expect(
-        service.update('cycle-1', { startDate: '2026-08-03', name: 'Renamed' }, 'user-1', undefined, later),
+        service.update(
+          'cycle-1',
+          { startDate: '2026-08-03', name: 'Renamed' },
+          'user-1',
+          undefined,
+          later,
+        ),
       ).resolves.toBeDefined();
     });
 

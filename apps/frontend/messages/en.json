@@ -505,6 +505,7 @@
     "addFirstExerciseAria": "Add first exercise",
     "addExerciseAria": "Add exercise",
     "duplicateExerciseError": "This exercise is already in the workout. Add sets to the existing exercise instead.",
+    "exerciseLimitReached": "A workout can have at most {max} exercises.",
     "addExerciseError": "Failed to add exercise",
     "saveError": "Failed to save workout",
     "incomplete": {
