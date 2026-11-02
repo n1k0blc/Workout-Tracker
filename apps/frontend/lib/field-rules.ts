@@ -15,6 +15,18 @@
  *   writes its own regex.
  */
 
+import { addLocalYears } from './local-date';
+import { normalizeBarcode } from './barcode';
+import {
+  CM_PER_INCH,
+  KG_PER_LB,
+  heightInputString,
+  heightToCm,
+  weightInputString,
+  weightToKg,
+  type UnitSystem,
+} from './units';
+
 export const EMAIL_MAX = 254;
 export const PASSWORD_MIN = 8;
 export const PASSWORD_MAX = 100;
@@ -126,8 +138,8 @@ export function checkInteger(raw: string, min: number, max: number): Constraint 
   return null;
 }
 
-/** As `checkInteger`, plus at most `maxDecimals` decimals in the value as typed. */
-export function checkDecimal(raw: string, min: number, max: number, maxDecimals: number): Constraint {
+/** As `checkInteger`, plus at most `maxDecimals` decimals in the value as typed (unlimited by default). */
+export function checkDecimal(raw: string, min: number, max: number, maxDecimals = Infinity): Constraint {
   if (raw.trim() === '') return 'isNotEmpty';
   const n = Number(raw);
   if (Number.isNaN(n)) return 'isNumber';
@@ -135,4 +147,108 @@ export function checkDecimal(raw: string, min: number, max: number, maxDecimals:
   if (n > max) return 'max';
   const decimals = raw.split('.')[1]?.length ?? 0;
   return decimals > maxDecimals ? 'maxDecimals' : null;
+}
+
+/**
+ * A nutrition amount typed into a text input (ADR-0005 keeps those as text): a German decimal
+ * comma is read as a period, then judged like `checkDecimal`.
+ */
+export function checkAmountText(raw: string, min: number, max: number, maxDecimals = Infinity): Constraint {
+  return checkDecimal(raw.trim().replace(',', '.'), min, max, maxDecimals);
+}
+
+/** Height and body weight are typed in the user's unit and judged as the centimetres / kilograms the server stores. */
+export function checkHeight(raw: string, system: UnitSystem, originalCm?: number | null): Constraint {
+  if (raw.trim() === '') return 'isNotEmpty';
+  const cm = heightToCm(raw, system, originalCm);
+  if (cm == null) return 'isNumber';
+  const untouched = originalCm != null && raw === heightInputString(originalCm, system);
+  if (!untouched && !Number.isInteger(Number(raw))) return 'isInt';
+  if (cm < HEIGHT_CM_MIN) return 'min';
+  if (cm > HEIGHT_CM_MAX) return 'max';
+  return null;
+}
+
+/** As `checkHeight`; the one-decimal limit applies to the value as typed, so an untouched one is exempt. */
+export function checkBodyWeight(raw: string, system: UnitSystem, originalKg?: number | null): Constraint {
+  if (raw.trim() === '') return 'isNotEmpty';
+  const kg = weightToKg(raw, system, originalKg);
+  if (kg == null || Number.isNaN(Number(raw))) return 'isNumber';
+  if (kg < BODY_WEIGHT_KG_MIN) return 'min';
+  if (kg > BODY_WEIGHT_KG_MAX) return 'max';
+  const untouched = originalKg != null && raw === weightInputString(originalKg, system);
+  return !untouched && (raw.split('.')[1]?.length ?? 0) > 1 ? 'maxDecimals' : null;
+}
+
+/**
+ * The smallest and largest value the user can type in their own unit, for the limit messages and
+ * the `<input min max>`. Inches round inward and pounds to one decimal inward, so the edge a
+ * message names is one `checkHeight` / `checkBodyWeight` accepts.
+ */
+export function bodyLimits(system: UnitSystem) {
+  if (system === 'METRIC') {
+    return {
+      height: { min: HEIGHT_CM_MIN, max: HEIGHT_CM_MAX, unit: 'cm' },
+      weight: { min: BODY_WEIGHT_KG_MIN, max: BODY_WEIGHT_KG_MAX, unit: 'kg' },
+    };
+  }
+  return {
+    height: {
+      min: Math.ceil(HEIGHT_CM_MIN / CM_PER_INCH),
+      max: Math.floor(HEIGHT_CM_MAX / CM_PER_INCH),
+      unit: 'in',
+    },
+    weight: {
+      min: Math.ceil((BODY_WEIGHT_KG_MIN / KG_PER_LB) * 10) / 10,
+      max: Math.floor((BODY_WEIGHT_KG_MAX / KG_PER_LB) * 10) / 10,
+      unit: 'lb',
+    },
+  };
+}
+
+/** A Zyklus starts today (the user's day) or later, at most a year ahead. Days are `YYYY-MM-DD`. */
+export function checkStartDate(day: string, today: string): Constraint {
+  if (day === '') return 'isNotEmpty';
+  if (day < today) return 'minDate';
+  return day > addLocalYears(today, 1) ? 'maxDate' : null;
+}
+
+/** A past workout is dated from `WORKOUT_DATE_MIN_YEAR` through today. Days are `YYYY-MM-DD`. */
+export function checkWorkoutDate(day: string, today: string): Constraint {
+  if (day === '') return 'isNotEmpty';
+  if (day < `${WORKOUT_DATE_MIN_YEAR}-01-01`) return 'minDate';
+  return day > today ? 'maxDate' : null;
+}
+
+/** A range ends on or after its start. An unfinished range (a blank end) is not wrong yet. */
+export function checkDateRange(start: string, end: string): Constraint {
+  return start !== '' && end !== '' && start > end ? 'endBeforeStart' : null;
+}
+
+/** Carbs, protein and fat together fit in 100 g per 100 g; judged once all three are numbers. */
+export function checkMacroSum(raws: string[]): Constraint {
+  if (raws.some((raw) => raw.trim() === '' || Number.isNaN(Number(raw)))) return null;
+  const sum = raws.reduce((total, raw) => total + Number(raw), 0);
+  return sum > MACRO_PER_100_MAX + 1e-9 ? 'macroSum' : null;
+}
+
+/**
+ * Whether a Schnelleintrag saved "as Lebensmittel" would be a legal food: its numbers become the
+ * food's per-100 values, so they need the Lebensmittel limits, not the wider Schnelleintrag ones.
+ * Mirror of `fitsFoodLimits` on the server.
+ */
+export function checkFitsFood(values: { kcal: number; carbs: number; protein: number; fat: number }): Constraint {
+  const { kcal, carbs, protein, fat } = values;
+  const decimals = String(kcal).split('.')[1]?.length ?? 0;
+  const fits =
+    kcal <= KCAL_PER_100_MAX &&
+    decimals <= KCAL_MAX_DECIMALS &&
+    [carbs, protein, fat].every((macro) => macro <= MACRO_PER_100_MAX) &&
+    carbs + protein + fat <= MACRO_PER_100_MAX + 1e-9;
+  return fits ? null : 'notAFood';
+}
+
+/** An EAN-8, UPC-A or EAN-13 with a valid check digit: the scanner's rule (`lib/barcode.ts`) in the editor. */
+export function checkEan(raw: string): Constraint {
+  return normalizeBarcode(raw) === null ? 'isBarcode' : null;
 }

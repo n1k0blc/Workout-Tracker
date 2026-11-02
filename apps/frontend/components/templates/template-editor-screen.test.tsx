@@ -84,6 +84,23 @@ describe('TemplateEditorScreen saving', () => {
     expect(updateWorkoutTemplate).not.toHaveBeenCalled();
   });
 
+  it('saves a name of 100 characters and refuses 101, naming the limit', async () => {
+    getWorkoutTemplate.mockResolvedValue(template());
+    await renderEditor();
+    const field = screen.getByPlaceholderText(messages.TemplateEditorScreen.namePlaceholder);
+
+    fireEvent.change(field, { target: { value: 'v'.repeat(101) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      'Der Name darf höchstens 100 Zeichen lang sein.',
+    );
+    expect(updateWorkoutTemplate).not.toHaveBeenCalled();
+
+    fireEvent.change(field, { target: { value: 'v'.repeat(100) } });
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    await waitFor(() => expect(updateWorkoutTemplate).toHaveBeenCalled());
+  });
+
   it('shows a taken name under the name field', async () => {
     getWorkoutTemplate.mockResolvedValue(template({ name: 'Push' }));
     updateWorkoutTemplate.mockRejectedValue(new ApiError(409, 'TEMPLATE_NAME_TAKEN'));

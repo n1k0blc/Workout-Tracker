@@ -44,6 +44,15 @@ import {
   IconPlus,
 } from '@tabler/icons-react';
 import { cn } from '@/lib/utils';
+import { FieldError } from '@/components/ui/field';
+import { useFormErrors } from '@/hooks/useFormErrors';
+import { useValidationMessage } from '@/hooks/useApiErrorMessage';
+import { EXERCISES_PER_WORKOUT_MAX, NAME_MAX, checkBaseText } from '@/lib/field-rules';
+import {
+  TYPED_DURATION_MAX_MINUTES,
+  TYPED_DURATION_MIN_MINUTES,
+  checkTypedDuration,
+} from '@/lib/workout-duration';
 
 interface ActiveWorkoutScreenProps {
   onWorkoutComplete?: (workout: Workout, prs: PersonalRecord[]) => void;
@@ -102,6 +111,12 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
   const [updateBlueprint, setUpdateBlueprint] = useState(false);
   const [templateAction, setTemplateAction] = useState<TemplateAction>('none');
   const [newTemplateName, setNewTemplateName] = useState('');
+  const [templateForm, templateFormRef] = useFormErrors({
+    fields: ['templateName'],
+    codeFields: { TEMPLATE_NAME_TAKEN: 'templateName' },
+    messageValues: { templateName: { max: NAME_MAX } },
+  });
+  const validationMessage = useValidationMessage();
 
   // Minimizing has to close any open workout dialog, or a portalled picker sits at a
   // higher z-index floating over the app once the overlay has collapsed (issue #129).
@@ -137,10 +152,25 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
   // templates are locked); auto-detected from where this workout was started, no selector.
   const canOverwriteTemplate = !!activeWorkout.originTemplateId && activeWorkout.originTemplateIsCustom === true;
 
+  // The typed duration of a workout tracked afterwards: shown live under its field, and it
+  // keeps "Beenden" from opening the confirmation until it is a real number of minutes.
+  const typedMinutes = Math.floor(pastWorkoutDuration / 60);
+  const durationProblem = isPastWorkout ? checkTypedDuration(String(typedMinutes)) : null;
+  const durationMessage = durationProblem
+    ? validationMessage('durationMinutes', durationProblem, {
+        min: TYPED_DURATION_MIN_MINUTES,
+        max: TYPED_DURATION_MAX_MINUTES,
+      })
+    : undefined;
+
   // "Beenden" always looks enabled. A complete workout opens the confirm dialog; an incomplete one
   // answers with a toast naming the first problem and takes the user there (#228). Live
   // workouts and past-workout tracking share the one rule.
   const handleFinish = () => {
+    if (durationMessage) {
+      notify.error(durationMessage);
+      return;
+    }
     const result = checkWorkoutCompleteness(activeWorkout, setRowState);
     if (result.complete) {
       setShowCompleteConfirm(true);
@@ -170,6 +200,11 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
     const isDuplicate = activeWorkout.exercises.some(
       (ex) => ex.exerciseId === exerciseId
     );
+
+    if (activeWorkout.exercises.length >= EXERCISES_PER_WORKOUT_MAX) {
+      notify.warning(t('exerciseLimitReached', { max: EXERCISES_PER_WORKOUT_MAX }));
+      return; // Don't add, keep modal open
+    }
 
     if (isDuplicate) {
       toast.error(t('duplicateExerciseError'), {
@@ -214,6 +249,13 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
   };
 
   const handleComplete = async () => {
+    if (
+      templateAction === 'new' &&
+      !templateForm.setConstraints({ templateName: checkBaseText(newTemplateName, NAME_MAX) })
+    ) {
+      return;
+    }
+
     try {
       const workout = await completeWorkout({
         overwriteBlueprint: updateBlueprint,
@@ -315,19 +357,29 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
                       </Button>
                     </>
                   ) : isPastWorkout ? (
-                    <div className="flex items-center gap-2">
-                      <Label className="text-sm">{t('durationMinutesLabel')}</Label>
-                      <Input
-                        type="number"
-                        inputMode="numeric"
-                        min="0"
-                        value={Math.floor(pastWorkoutDuration / 60)}
-                        onChange={(e) => {
-                          const minutes = parseInt(e.target.value) || 0;
-                          setPastWorkoutDuration(minutes * 60);
-                        }}
-                        className="w-20 text-base"
-                      />
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="pastWorkoutMinutes" className="text-sm">{t('durationMinutesLabel')}</Label>
+                        <Input
+                          id="pastWorkoutMinutes"
+                          type="number"
+                          inputMode="numeric"
+                          min={TYPED_DURATION_MIN_MINUTES}
+                          max={TYPED_DURATION_MAX_MINUTES}
+                          step={1}
+                          value={typedMinutes}
+                          onChange={(e) => {
+                            const minutes = parseInt(e.target.value) || 0;
+                            setPastWorkoutDuration(minutes * 60);
+                          }}
+                          className="w-20 text-base"
+                          aria-invalid={durationMessage ? true : undefined}
+                          aria-describedby={durationMessage ? 'pastWorkoutMinutes-error' : undefined}
+                        />
+                      </div>
+                      <FieldError id="pastWorkoutMinutes-error" className="max-w-56 text-right">
+                        {durationMessage}
+                      </FieldError>
                     </div>
                   ) : null}
                 </div>
@@ -518,18 +570,27 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
                   onChange={() => setTemplateAction('new')}
                   className="mt-1 size-4 accent-primary"
                 />
-                <div className="flex-1">
+                <div className="flex-1" ref={templateFormRef}>
                   <div className="text-sm text-foreground font-medium">
                     {t('finishDialog.templateSection.saveNew')}
                   </div>
                   {templateAction === 'new' && (
-                    <Input
-                      value={newTemplateName}
-                      onChange={(e) => setNewTemplateName(e.target.value)}
-                      placeholder={t('finishDialog.templateSection.namePlaceholder')}
-                      className="mt-2"
-                      autoFocus
-                    />
+                    <>
+                      <Input
+                        value={newTemplateName}
+                        onChange={(e) => {
+                          setNewTemplateName(e.target.value);
+                          templateForm.clear('templateName');
+                        }}
+                        placeholder={t('finishDialog.templateSection.namePlaceholder')}
+                        className="mt-2"
+                        autoFocus
+                        {...templateForm.fieldProps('templateName')}
+                      />
+                      <FieldError id={templateForm.errorId('templateName')} className="mt-1">
+                        {templateForm.errors.templateName}
+                      </FieldError>
+                    </>
                   )}
                 </div>
               </label>
@@ -551,7 +612,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
             </Button>
             <Button
               onClick={handleComplete}
-              disabled={loading || (templateAction === 'new' && !newTemplateName.trim())}
+              disabled={loading}
               className="flex-1 h-14 text-base py-2"
             >
               {loading ? t('finishing') : t('finishDialog.confirm')}

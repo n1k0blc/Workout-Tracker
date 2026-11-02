@@ -106,6 +106,19 @@ Rotation through `WorkoutDay.order` is gone: it advanced from the last performed
 
 `WorkoutDay.order` still orders the modal's list. It must never decide *which* workout is recommended again.
 
+### A Zyklus starts today or later, at most a year ahead
+
+**`WorkoutCycle.startDate` is a calendar day in the user's time zone: today through one year ahead. On update it is judged only when it changed.**
+
+- **The API** checks it in `create` and `update` (`apps/backend/src/workout-cycles/workout-cycles.service.ts`) against `@ClientToday()`, never against the server's clock, and answers `CYCLE_START_DATE_PAST` / `CYCLE_START_DATE_TOO_FAR` (400). A leap day counts to 28 February in a non-leap year (`addLocalYears`). The update skips the check when the day equals the stored one, so a running Zyklus can still be renamed.
+- **The client** mirrors it with `checkStartDate` (`apps/frontend/lib/field-rules.ts`), and the wizard's default start date is the user's local today (`toLocalDateString`): the UTC day is yesterday for a while after local midnight and would be refused.
+
+### A barcode is an EAN-8, UPC-A or EAN-13 with a valid check digit
+
+**The scanner, the manual EAN field, the Lebensmittel editor and the API ask the same question, and a UPC-A is stored as the EAN-13 a scan of it looks up.**
+
+`normalizeBarcode` (`apps/backend/src/foods/barcode.ts`, mirrored in `apps/frontend/lib/barcode.ts`) is the rule. The `Barcode()` decorator (`field-rules.ts`) puts it on `CreateFoodDto`, so a 14-digit GTIN or a wrong check digit is a 400 `isBarcode`; the service stores `normalizeBarcode(dto.barcode)`. The editor uses `checkEan` and sends the normalized value.
+
 ### An in-use exercise cannot change its `isUnilateral` flag
 
 **Once any `WorkoutSet` references an exercise, its `isUnilateral` flag is frozen. Every other field stays editable.**

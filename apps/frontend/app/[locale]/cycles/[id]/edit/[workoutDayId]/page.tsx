@@ -59,6 +59,7 @@ import { notify } from '@/lib/toast';
 import { findFirstSetNeedingRir } from '@/lib/log-set-guards';
 import { useFormErrors } from '@/hooks/useFormErrors';
 import { FieldError } from '@/components/ui/field';
+import { NAME_MAX, TRAINING_DAY_NAME_MAX, checkBaseText } from '@/lib/field-rules';
 
 export default function EditBlueprintPage() {
   const params = useParams();
@@ -69,10 +70,14 @@ export default function EditBlueprintPage() {
   const format = useFormatter();
   // Two small forms, each with its own errors: the day's name on the page, and the template
   // name in the save-as-template dialog (a taken name belongs under that field).
-  const [dayForm, dayFormRef] = useFormErrors({ fields: ['name'] });
+  const [dayForm, dayFormRef] = useFormErrors({
+    fields: ['name'],
+    messageValues: { name: { max: TRAINING_DAY_NAME_MAX } },
+  });
   const [templateForm, templateFormRef] = useFormErrors({
     fields: ['templateName'],
     codeFields: { TEMPLATE_NAME_TAKEN: 'templateName' },
+    messageValues: { templateName: { max: NAME_MAX } },
   });
   const cycleId = params.id as string;
   const workoutDayId = params.workoutDayId as string;
@@ -243,7 +248,7 @@ export default function EditBlueprintPage() {
   };
 
   const handleSave = async () => {
-    if (!dayForm.setConstraints({ name: workoutDayName.trim() ? null : 'isNotEmpty' })) {
+    if (!dayForm.setConstraints({ name: checkBaseText(workoutDayName, TRAINING_DAY_NAME_MAX) })) {
       return;
     }
 
@@ -312,7 +317,7 @@ export default function EditBlueprintPage() {
   };
 
   const handleSaveAsTemplate = async () => {
-    if (!templateForm.setConstraints({ templateName: templateName.trim() ? null : 'isNotEmpty' })) {
+    if (!templateForm.setConstraints({ templateName: checkBaseText(templateName, NAME_MAX) })) {
       return;
     }
 
@@ -676,7 +681,7 @@ export default function EditBlueprintPage() {
             </Button>
             <Button
               onClick={handleSaveAsTemplate}
-              disabled={savingTemplate || !templateName.trim()}
+              disabled={savingTemplate}
             >
               {savingTemplate ? t('saveTemplateDialog.saving') : t('saveTemplateDialog.save')}
             </Button>

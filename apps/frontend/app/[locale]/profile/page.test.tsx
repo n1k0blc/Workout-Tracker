@@ -44,6 +44,9 @@ const { push, logout, updateProfile, getHomeGyms, deleteHomeGym, changePassword 
   changePassword: vi.fn(),
 }));
 
+const notify = vi.hoisted(() => ({ error: vi.fn(), warning: vi.fn(), info: vi.fn(), success: vi.fn() }));
+vi.mock('@/lib/toast', () => ({ notify }));
+
 vi.mock('@/i18n/navigation', () => ({
   useRouter: () => ({ push }),
 }));
@@ -126,9 +129,9 @@ describe('ProfilePage language select', () => {
     const englishOption = await screen.findByText('English');
     fireEvent.click(englishOption);
 
-    // The context message, never the raw error text (#190).
-    await waitFor(() => expect(screen.getByText('Fehler beim Ändern der Sprache')).toBeTruthy());
-    expect(screen.queryByText('network down')).toBeNull();
+    // The context message as a toast, never the raw error text (#190).
+    await waitFor(() => expect(notify.error).toHaveBeenCalledWith('Fehler beim Ändern der Sprache'));
+    expect(notify.error).not.toHaveBeenCalledWith(expect.stringContaining('network down'));
     expect(window.location.href).toBe('');
     expect(push).not.toHaveBeenCalled();
   });
@@ -143,9 +146,9 @@ describe('ProfilePage language select', () => {
     fireEvent.click(await screen.findByText('English'));
 
     await waitFor(() =>
-      expect(screen.getByText('Diese E-Mail-Adresse wird bereits verwendet.')).toBeTruthy(),
+      expect(notify.error).toHaveBeenCalledWith('Diese E-Mail-Adresse wird bereits verwendet.'),
     );
-    expect(screen.queryByText('EMAIL_ALREADY_IN_USE')).toBeNull();
+    expect(notify.error).not.toHaveBeenCalledWith('EMAIL_ALREADY_IN_USE');
   });
 });
 

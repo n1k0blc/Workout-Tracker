@@ -11,27 +11,18 @@ import { Button } from '@/components/ui/button';
 import ExerciseCard from '@/components/workout/exercise-card';
 import { planRir } from '@/lib/planned-sets';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
   IconCalendar,
   IconDumbbell,
   IconTemplate,
   IconHistory,
   IconX,
-  IconAlertTriangle,
   IconTarget,
 } from '@tabler/icons-react';
 import CycleWorkoutSelectionModal from './cycle-workout-selection-modal';
 import GymLocationModal from './gym-location-modal';
 import PastWorkoutSetupModal from './past-workout-setup-modal';
+import PastWorkoutDetailsDialog from './past-workout-details-dialog';
+import { notify } from '@/lib/toast';
 import TemplateSelectionModal from './template-selection-modal';
 
 export default function WorkoutStartScreen() {
@@ -42,15 +33,12 @@ export default function WorkoutStartScreen() {
     null
   );
   const [loadingSuggestion, setLoadingSuggestion] = useState(true);
-  const [error, setError] = useState('');
   const [showCycleWorkoutModal, setShowCycleWorkoutModal] = useState(false);
   const [showGymLocationModal, setShowGymLocationModal] = useState(false);
   const [showPastWorkoutModal, setShowPastWorkoutModal] = useState(false);
   const [showPastWorkoutDetails, setShowPastWorkoutDetails] = useState(false);
 
   // State for the common past workout details step
-  const [pastDetailsDate, setPastDetailsDate] = useState('');
-  const [pastDetailsDuration, setPastDetailsDuration] = useState(60);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [templateRecommendedGymId, setTemplateRecommendedGymId] = useState<string | undefined>();
@@ -71,7 +59,7 @@ export default function WorkoutStartScreen() {
         setSuggestedWorkout(workout);
       } catch (err) {
         console.error('Failed to load suggested workout:', err);
-        setError(t('suggestionError'));
+        notify.error(t('suggestionError'));
       } finally {
         setLoadingSuggestion(false);
       }
@@ -148,7 +136,7 @@ export default function WorkoutStartScreen() {
       });
       setPendingWorkoutData(null);
     } catch (err) {
-      setError(t('startError'));
+      notify.error(t('startError'));
       console.error('Failed to start workout:', err);
     }
   };
@@ -187,16 +175,20 @@ export default function WorkoutStartScreen() {
 
   // Handlers for the common Workout Details step (used by Free, Cycle, and Template past flows)
   const openPastWorkoutDetails = () => {
-    setPastDetailsDate(new Date().toISOString().split('T')[0]);
-    setPastDetailsDuration(60);
     setShowPastWorkoutDetails(true);
   };
 
-  const handlePastWorkoutDetailsConfirm = () => {
+  const handlePastWorkoutDetailsConfirm = ({
+    date,
+    durationSeconds,
+  }: {
+    date: string;
+    durationSeconds: number;
+  }) => {
     setPendingWorkoutData((prev) => ({
       ...prev,
-      pastWorkoutDate: pastDetailsDate,
-      pastWorkoutDuration: pastDetailsDuration * 60,
+      pastWorkoutDate: date,
+      pastWorkoutDuration: durationSeconds,
     }));
     setShowPastWorkoutDetails(false);
     setShowGymLocationModal(true);
@@ -244,7 +236,7 @@ export default function WorkoutStartScreen() {
       setTemplateRecommendedGymId(undefined);
       setPendingWorkoutData(null);
     } catch (err) {
-      setError(t('templateStartError'));
+      notify.error(t('templateStartError'));
       console.error('Failed to start template workout:', err);
     }
   };
@@ -280,13 +272,6 @@ export default function WorkoutStartScreen() {
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        {error && (
-          <div className="flex items-start gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-900 dark:bg-yellow-950">
-            <IconAlertTriangle className="mt-0.5 size-5 text-yellow-600 dark:text-yellow-400" />
-            <p className="text-sm text-yellow-800 dark:text-yellow-200">{error}</p>
-          </div>
-        )}
-
         {/* Suggested Workout — today's cycle day, absent once the day is done or nothing is planned */}
         {suggestedWorkout && (
           <Card>
@@ -530,53 +515,12 @@ export default function WorkoutStartScreen() {
       />
 
       {/* Common Workout Details step for past workouts (Date + Duration) */}
-      <Dialog open={showPastWorkoutDetails} onOpenChange={(open) => !open && handlePastWorkoutDetailsBack()}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t('pastDetails.title')}</DialogTitle>
-            <DialogDescription>
-              {t('pastDetails.description')}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div>
-              <Label>{t('pastDetails.dateLabel')}</Label>
-              <Input
-                type="date"
-                value={pastDetailsDate}
-                max={new Date().toISOString().split('T')[0]}
-                onChange={(e) => setPastDetailsDate(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <Label>{t('pastDetails.durationLabel')}</Label>
-              <Input
-                type="number"
-                inputMode="numeric"
-                min="1"
-                value={pastDetailsDuration}
-                onChange={(e) => setPastDetailsDuration(parseInt(e.target.value) || 0)}
-                className="text-base"
-              />
-            </div>
-          </div>
-
-          <DialogFooter className="flex gap-3">
-            <Button variant="outline" onClick={handlePastWorkoutDetailsBack} className="flex-1">
-              {t('common.back')}
-            </Button>
-            <Button
-              onClick={handlePastWorkoutDetailsConfirm}
-              disabled={!pastDetailsDate || pastDetailsDuration < 1}
-              className="flex-1"
-            >
-              {t('pastDetails.next')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {showPastWorkoutDetails && (
+        <PastWorkoutDetailsDialog
+          onBack={handlePastWorkoutDetailsBack}
+          onConfirm={handlePastWorkoutDetailsConfirm}
+        />
+      )}
     </div>
   );
 }

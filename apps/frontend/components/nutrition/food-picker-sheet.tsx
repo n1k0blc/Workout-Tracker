@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SEARCH_MAX } from '@/lib/field-rules';
 import { apiClient } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { Food, MealListItem, PickerItem } from '@/types';
@@ -359,6 +360,7 @@ export function FoodPickerSheet({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={t('searchPlaceholder')}
+              maxLength={SEARCH_MAX}
               className="border-b-0"
             />
             <Button
@@ -493,6 +495,9 @@ function ExpandedFoodRow({
     return { grams: stops[i]?.grams ?? 100, portionLabel: stops[i]?.label ?? null };
   });
 
+  // The stepper's free field holds an amount it did not apply: adding would use the old one.
+  const [amountInvalid, setAmountInvalid] = useState(false);
+
   const totals = scalePer100(food, amount.grams);
   const label = formatQuantityLabel(amount.portionLabel, amount.grams, food.isLiquid);
 
@@ -504,6 +509,7 @@ function ExpandedFoodRow({
         grams={amount.grams}
         portionLabel={amount.portionLabel}
         onChange={(grams, portionLabel) => setAmount({ grams, portionLabel })}
+        onValidityChange={(valid) => setAmountInvalid(!valid)}
       />
 
       <div className="flex items-center justify-between">
@@ -515,7 +521,7 @@ function ExpandedFoodRow({
             fat: Math.round(totals.fat),
           })}
         </span>
-        <Button size="sm" onClick={() => onAdd(amount.grams, label)}>
+        <Button size="sm" onClick={() => onAdd(amount.grams, label)} disabled={amountInvalid}>
           {t('apply')}
         </Button>
       </div>

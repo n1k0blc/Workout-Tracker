@@ -1,5 +1,4 @@
 import {
-  IsString,
   IsOptional,
   IsBoolean,
   IsNumber,
@@ -8,13 +7,13 @@ import {
   IsArray,
   ArrayMaxSize,
   ValidateNested,
-  Matches,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
   AMOUNT_MAX,
   AMOUNT_MIN,
   BaseText,
+  Barcode,
   FOOD_NAME_MAX,
   KCAL_MAX_DECIMALS,
   KCAL_PER_100_MAX,
@@ -54,10 +53,9 @@ export class CreateFoodDto {
   @BaseText(FOOD_NAME_MAX, { allowEmpty: true })
   brand?: string;
 
-  // EAN-8, EAN-13, UPC-A, GTIN-14 -- 8 to 14 digits.
+  // EAN-8, UPC-A or EAN-13 with a valid check digit -- the scanner's rule.
   @IsOptional()
-  @IsString()
-  @Matches(/^\d{8,14}$/)
+  @Barcode()
   barcode?: string;
 
   @IsOptional()

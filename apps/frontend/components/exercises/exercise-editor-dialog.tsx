@@ -17,7 +17,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { IconLoader2 } from '@tabler/icons-react';
-import { useApiErrorMessage } from '@/hooks/useApiErrorMessage';
+import { FieldError } from '@/components/ui/field';
+import { useFormErrors } from '@/hooks/useFormErrors';
+import { NAME_MAX, checkBaseText } from '@/lib/field-rules';
 
 interface ExerciseEditorDialogProps {
   open: boolean;
@@ -84,7 +86,10 @@ export function ExerciseEditorDialog({
   const unilateralLocked = !!exercise?.inUse;
   const { translateMuscleGroup, translateEquipment } = useExerciseLabels();
   const t = useTranslations('ExerciseEditorDialog');
-  const apiError = useApiErrorMessage();
+  const [form, formRef] = useFormErrors({
+    fields: ['name'],
+    messageValues: { name: { max: NAME_MAX } },
+  });
 
   const [name, setName] = useState('');
   const [muscleGroup, setMuscleGroup] = useState<MuscleGroup>(MuscleGroup.CHEST);
@@ -93,7 +98,6 @@ export function ExerciseEditorDialog({
   const [isDoubleWeight, setIsDoubleWeight] = useState(false);
   const [percentages, setPercentages] = useState<PercentageState>(defaultPercentages);
 
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const validation = validateMusclePercentages(percentages as unknown as Record<string, number>);
@@ -131,8 +135,9 @@ export function ExerciseEditorDialog({
         setIsDoubleWeight(false);
         setPercentages(defaultPercentages);
       }
-      setError('');
+      form.clear('name');
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, exercise]);
 
   const updatePercentage = (field: keyof PercentageState, value: number) => {
@@ -149,17 +154,10 @@ export function ExerciseEditorDialog({
     e.preventDefault();
     if (isViewMode) return;
 
-    setError('');
+    if (!form.setConstraints({ name: checkBaseText(name, NAME_MAX) })) return;
 
-    if (!name.trim()) {
-      setError(t('nameRequired'));
-      return;
-    }
-
-    if (!validation.valid) {
-      setError(t('percentagesInvalid', { sum: validation.sum }));
-      return;
-    }
+    // The save button is disabled while the distribution is off 100%, and the bar below is red.
+    if (!validation.valid) return;
 
     setLoading(true);
 
@@ -184,7 +182,7 @@ export function ExerciseEditorDialog({
       onSuccess?.(result);
       onOpenChange(false);
     } catch (err) {
-      setError(apiError(err));
+      form.showApiError(err);
     } finally {
       setLoading(false);
     }
@@ -207,13 +205,7 @@ export function ExerciseEditorDialog({
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
 
-        {error && (
-          <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} noValidate className="space-y-6">
+        <form ref={formRef} onSubmit={handleSubmit} noValidate className="space-y-6">
           {/* Basic Info */}
           <div className="space-y-4">
             <div>
@@ -221,12 +213,17 @@ export function ExerciseEditorDialog({
               <Input
                 id="name"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  form.clear('name');
+                }}
                 placeholder={t('namePlaceholder')}
                 autoFocus
                 disabled={isViewMode}
                 readOnly={isViewMode}
+                {...form.fieldProps('name')}
               />
+              <FieldError id={form.errorId('name')}>{form.errors.name}</FieldError>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -412,7 +409,7 @@ export function ExerciseEditorDialog({
                 </Button>
                 <Button
                   type="submit"
-                  disabled={loading || !name.trim() || !validation.valid}
+                  disabled={loading || !validation.valid}
                 >
                   {loading && <IconLoader2 className="mr-2 size-4 animate-spin" />}
                   {submitLabel}

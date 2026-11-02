@@ -14,6 +14,7 @@ import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { notify } from '@/lib/toast';
 import { findFirstSetNeedingRir } from '@/lib/log-set-guards';
 import { useFormErrors } from '@/hooks/useFormErrors';
+import { NAME_MAX, checkBaseText } from '@/lib/field-rules';
 import ExerciseCard from '@/components/workout/exercise-card';
 import ExerciseSelectionModal from '@/components/workout/exercise-selection-modal';
 import { IconChevronLeft, IconPlus } from '@tabler/icons-react';
@@ -48,6 +49,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
   const [form, formRef] = useFormErrors({
     fields: ['name'],
     codeFields: { TEMPLATE_NAME_TAKEN: 'name' },
+    messageValues: { name: { max: NAME_MAX } },
   });
 
   const [name, setName] = useState('');
@@ -210,7 +212,7 @@ export default function TemplateEditorScreen({ templateId }: TemplateEditorScree
   // add/remove/replace/reorder/add-set/edit-set surface.
 
   const handleSave = async () => {
-    if (!form.setConstraints({ name: name.trim() ? null : 'isNotEmpty' })) {
+    if (!form.setConstraints({ name: checkBaseText(name, NAME_MAX) })) {
       return;
     }
 

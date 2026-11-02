@@ -10,6 +10,7 @@ import { ExerciseEditorDialog } from '@/components/exercises/exercise-editor-dia
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SEARCH_MAX } from '@/lib/field-rules';
 import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
@@ -110,6 +111,7 @@ export default function ExercisesTab() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={t('searchPlaceholder')}
+          maxLength={SEARCH_MAX}
         />
       </div>
 

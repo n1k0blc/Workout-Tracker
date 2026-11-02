@@ -14,16 +14,32 @@ import { weekdayReferenceDate } from '@/lib/weekday';
  */
 export function useValidationMessage() {
   const t = useTranslations('ApiErrors');
+  const format = useFormatter();
 
   return useCallback(
-    (property: string, constraint: string): string | undefined => {
+    (
+      property: string,
+      constraint: string,
+      values: Record<string, string | number> = {},
+    ): string | undefined => {
       const field = property.split('.').pop() ?? property;
-      const key = [`validation.${field}.${constraint}`, `validation.${constraint}`].find((k) =>
-        t.has(k),
+      // Limits are numbers; they are written the way the user's locale writes them (0,1 / 5.000).
+      const params: Record<string, string | number> = { property: field };
+      for (const [name, value] of Object.entries(values)) {
+        params[name] =
+          typeof value === 'number' ? format.number(value, { maximumFractionDigits: 3 }) : value;
+      }
+      // A message that names a limit (`{min}`, `{max}`, `{unit}`) is used only when the caller
+      // supplied those numbers; without them the next, generic entry is the better text than a
+      // sentence with a hole in it.
+      const key = [`validation.${field}.${constraint}`, `validation.${constraint}`].find(
+        (k) =>
+          t.has(k) &&
+          [...String(t.raw(k)).matchAll(/\{\s*(\w+)\s*[,}]/g)].every((m) => m[1] in params),
       );
-      return key ? t(key, { property: field }) : undefined;
+      return key ? t(key, params) : undefined;
     },
-    [t],
+    [t, format],
   );
 }
 

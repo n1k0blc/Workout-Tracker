@@ -85,6 +85,29 @@ describe.each([
     ).toEqual(['max']);
   });
 
+  it('takes an EAN-8, UPC-A or EAN-13 with a valid check digit and nothing else', async () => {
+    for (const ok of ['73513537', '036000291452', '4006381333931']) {
+      expect((await run(food({ barcode: ok }))).errors).toEqual([]);
+    }
+    expect((await run(food())).errors).toEqual([]); // optional
+    for (const bad of [
+      '4006381333932', // last valid length, check digit off by one
+      '73513538',
+      '036000291453',
+      '7351353', // 7 digits
+      '735135370', // 9 digits
+      '40063813339310', // 14 digits: a GTIN-14 was accepted before
+      'abcdefgh',
+      '4006 381 333 931',
+      '',
+    ]) {
+      expect([bad, constraintsOf((await run(food({ barcode: bad }))).errors, 'barcode')]).toEqual([
+        bad,
+        ['isBarcode'],
+      ]);
+    }
+  });
+
   it('allows 10 Portionsgroessen and refuses 11', async () => {
     const portions = (n: number) =>
       Array.from({ length: n }, (_, i) => portion({ label: `P${i}` }));

@@ -62,8 +62,9 @@ export class WorkoutCyclesController {
     @Body() createCycleDto: CreateCycleDto,
     @CurrentUser() user: { id: string },
     @ClientLocale() locale: ApiLocale,
+    @ClientToday() today: Today,
   ): Promise<CycleResponseDto> {
-    return this.workoutCyclesService.create(createCycleDto, user.id, locale);
+    return this.workoutCyclesService.create(createCycleDto, user.id, locale, today);
   }
 
   @Patch(':id')
@@ -72,8 +73,9 @@ export class WorkoutCyclesController {
     @Body() updateCycleDto: UpdateCycleDto,
     @CurrentUser() user: { id: string },
     @ClientLocale() locale: ApiLocale,
+    @ClientToday() today: Today,
   ): Promise<CycleResponseDto> {
-    return this.workoutCyclesService.update(id, updateCycleDto, user.id, locale);
+    return this.workoutCyclesService.update(id, updateCycleDto, user.id, locale, today);
   }
 
   @Post(':id/complete')

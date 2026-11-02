@@ -38,6 +38,7 @@
       "MEAL_SLOT_ORDER_INVALID": "The order of the sections is invalid.",
       "MEAL_SLOT_LIMIT_REACHED": "You can have at most {max} active sections.",
       "MEAL_SLOT_LAST_ACTIVE": "At least one section must stay active.",
+      "QUICK_ENTRY_NOT_A_FOOD": "This can only be saved as a food if the values fit 100 g: at most 900 kcal, at most 100 g per macro and 100 g together.",
       "MEAL_SLOT_REORDER_SET_MISMATCH": "The sections have changed. Please reload the page.",
       "MEAL_SLOT_UPDATE_EMPTY": "There is nothing to change.",
       "NUTRITION_TREND_RANGE_INVERTED": "The end date cannot be before the start date.",
@@ -58,6 +59,8 @@
       "CYCLE_ALREADY_COMPLETED": "This cycle has already ended.",
       "CYCLE_CONCURRENT_MODIFICATION": "Another change to this cycle got in the way. Please try again.",
       "ACTIVE_CYCLE_ALREADY_EXISTS": "An active cycle already exists. Please end it first.",
+      "CYCLE_START_DATE_PAST": "A cycle cannot start in the past.",
+      "CYCLE_START_DATE_TOO_FAR": "A cycle can start at most one year ahead.",
       "DUPLICATE_WEEKDAY_IN_CYCLE": "Two training days fall on {weekday}. Each weekday can be used only once per cycle.",
       "WORKOUT_DAY_NOT_FOUND": "Workout day not found.",
       "WORKOUT_DAY_CYCLE_MISMATCH": "This workout day does not belong to this cycle.",
@@ -111,6 +114,7 @@
       "isLocalDate": "Please enter a valid date.",
       "matches": "The format is invalid.",
       "isId": "Invalid identifier.",
+      "isBarcode": "Please enter a valid EAN or UPC code (8, 12 or 13 digits with a correct check digit).",
       "macroSum": "Carbs, protein and fat together can be at most 100 g per 100 g.",
       "minDate": "The date is too far in the past.",
       "maxDate": "The date cannot be in the future.",
@@ -161,26 +165,126 @@
       },
       "height": {
         "isNotEmpty": "Please enter your height.",
-        "isInt": "Please enter your height in whole centimetres.",
-        "min": "The height must be at least 100 cm.",
-        "max": "The height must be at most 250 cm."
+        "isInt": "Please enter your height as a whole number.",
+        "min": "The height must be at least {min} {unit}.",
+        "max": "The height must be at most {max} {unit}."
       },
       "weight": {
         "isNotEmpty": "Please enter your weight.",
         "isNumber": "Please enter your weight as a number.",
-        "min": "The weight must be at least 30 kg.",
-        "max": "The weight must be at most 400 kg.",
-        "maxDecimals": "Use at most one decimal place."
+        "maxDecimals": "Use at most one decimal place.",
+        "min": "The weight must be at least {min} {unit}.",
+        "max": "The weight must be at most {max} {unit}."
       },
       "homeGyms": {
         "arrayMinSize": "Please add at least one home gym.",
         "arrayMaxSize": "You can add at most 10 gyms."
       },
       "name": {
-        "isNotEmpty": "Please enter a name."
+        "isNotEmpty": "Please enter a name.",
+        "maxLength": "The name can be at most {max} characters."
       },
       "templateName": {
-        "isNotEmpty": "Please enter a template name."
+        "isNotEmpty": "Please enter a template name.",
+        "maxLength": "The template name can be at most {max} characters."
+      },
+      "targetKcal": {
+        "isInt": "The calorie target must be a whole number.",
+        "min": "The calorie target must be at least {min} kcal.",
+        "max": "The calorie target must be at most {max} kcal."
+      },
+      "targetCarbs": {
+        "isInt": "The carbs target must be a whole number.",
+        "min": "The carbs target must be at least {min} g.",
+        "max": "The carbs target must be at most {max} g."
+      },
+      "targetProtein": {
+        "isInt": "The protein target must be a whole number.",
+        "min": "The protein target must be at least {min} g.",
+        "max": "The protein target must be at most {max} g."
+      },
+      "targetFat": {
+        "isInt": "The fat target must be a whole number.",
+        "min": "The fat target must be at least {min} g.",
+        "max": "The fat target must be at most {max} g."
+      },
+      "startDate": {
+        "isNotEmpty": "Please choose a start date.",
+        "minDate": "A cycle cannot start in the past.",
+        "maxDate": "A cycle can start at most one year ahead."
+      },
+      "durationMinutes": {
+        "isNotEmpty": "Please enter the duration in minutes.",
+        "isInt": "Please enter the duration in whole minutes.",
+        "min": "The duration must be at least {min} minute.",
+        "max": "The duration can be at most {max} minutes."
+      },
+      "workoutDate": {
+        "isNotEmpty": "Please choose a date."
+      },
+      "kcal": {
+        "isNotEmpty": "Please enter the calories.",
+        "isNumber": "Please enter a number.",
+        "min": "The calories cannot be negative.",
+        "max": "The calories can be at most {max} kcal.",
+        "maxDecimals": "Use at most one decimal place."
+      },
+      "carbs": {
+        "isNotEmpty": "Please enter the carbs.",
+        "isNumber": "Please enter a number.",
+        "min": "The carbs cannot be negative.",
+        "max": "The carbs can be at most {max} g."
+      },
+      "protein": {
+        "isNotEmpty": "Please enter the protein.",
+        "isNumber": "Please enter a number.",
+        "min": "The protein cannot be negative.",
+        "max": "The protein can be at most {max} g."
+      },
+      "fat": {
+        "isNotEmpty": "Please enter the fat.",
+        "isNumber": "Please enter a number.",
+        "min": "The fat cannot be negative.",
+        "max": "The fat can be at most {max} g.",
+        "macroSum": "Carbs, protein and fat together can be at most 100 g per 100 g."
+      },
+      "portions": {
+        "arrayMaxSize": "You can add at most {max} portion sizes.",
+        "portionDefault": "Mark exactly one portion size as the default."
+      },
+      "label": {
+        "isNotEmpty": "Please give the portion size a name.",
+        "maxLength": "The name can be at most {max} characters."
+      },
+      "grams": {
+        "isNotEmpty": "Please enter an amount.",
+        "isNumber": "Please enter a number.",
+        "min": "The amount must be at least {min} {unit}.",
+        "max": "The amount can be at most {max} {unit}."
+      },
+      "quantity": {
+        "isNotEmpty": "Please enter an amount.",
+        "isNumber": "Please enter a number.",
+        "min": "The amount must be at least {min}.",
+        "max": "The amount can be at most {max}."
+      },
+      "factor": {
+        "isNotEmpty": "Please enter a factor.",
+        "isNumber": "Please enter a number.",
+        "min": "The factor must be at least {min}.",
+        "max": "The factor can be at most {max}."
+      },
+      "saveAsFood": {
+        "notAFood": "This can only be saved as a food if the values fit 100 g: at most 900 kcal, at most 100 g per macro and 100 g together."
+      },
+      "newName": {
+        "isNotEmpty": "Please enter a name.",
+        "maxLength": "The name can be at most {max} characters.",
+        "arrayMaxSize": "You can have at most {count} active sections."
+      },
+      "editName": {
+        "isNotEmpty": "Please enter a name.",
+        "maxLength": "The name can be at most {max} characters."
       }
     }
   },
@@ -204,10 +308,6 @@
       "gramsUnit": "g",
       "macrosResult": "Macros add up to",
       "kcalUnit": "kcal",
-      "kcalRangeError": "Calorie target must be a whole number between 1 and {max}",
-      "carbsRangeError": "Carbs target must be a whole number between 1 and {max}",
-      "proteinRangeError": "Protein target must be a whole number between 1 and {max}",
-      "fatRangeError": "Fat target must be a whole number between 1 and {max}",
       "saved": "Daily targets saved",
       "saveError": "Failed to save daily targets",
       "hintMatch": "Macros and calorie target match.",
@@ -228,10 +328,6 @@
       "heightValue": "{height} {unit}",
       "weightValue": "{weight} {unit}",
       "empty": "-",
-      "validationAllFields": "Please fill in all fields",
-      "validationHeightRange": "Height must be between {min} and {max} {unit}",
-      "validationWeightRange": "Weight must be between {min} and {max} {unit}",
-      "validationAgeRange": "Age must be between 13 and 120 years",
       "updated": "Profile updated successfully",
       "updateError": "Failed to update profile"
     },
@@ -409,6 +505,7 @@
     "addFirstExerciseAria": "Add first exercise",
     "addExerciseAria": "Add exercise",
     "duplicateExerciseError": "This exercise is already in the workout. Add sets to the existing exercise instead.",
+    "exerciseLimitReached": "A workout can have at most {max} exercises.",
     "addExerciseError": "Failed to add exercise",
     "saveError": "Failed to save workout",
     "incomplete": {
@@ -669,8 +766,8 @@
   "MealEditorScreen": {
     "loadError": "Meal could not be loaded.",
     "addedFood": "{name} added",
-    "nameRequired": "Please enter a name.",
     "ingredientRequired": "A meal needs at least one ingredient.",
+    "ingredientAmountInvalid": "Check the amount of an ingredient: the value you typed is not applied.",
     "saved": "Meal saved",
     "created": "Meal created",
     "saveError": "Save failed.",
@@ -1260,8 +1357,6 @@
     "profile": "Profile"
   },
   "ExerciseEditorDialog": {
-    "nameRequired": "Please enter a name",
-    "percentagesInvalid": "Muscle group percentages must add up to 100% (currently {sum}%)",
     "titleView": "View exercise",
     "titleEdit": "Edit exercise",
     "titleCreate": "Create custom exercise",
@@ -1283,11 +1378,6 @@
     "cancel": "Cancel"
   },
   "FoodEditorDialog": {
-    "nameRequired": "Please enter a name.",
-    "nutrientsInvalid": "Calories and macros must be numbers ≥ 0.",
-    "barcodeInvalid": "Barcode must have 8 to 14 digits.",
-    "portionInvalid": "Every portion needs a label and an amount greater than 0.",
-    "portionDefault": "Mark exactly one portion as the default.",
     "titleReadOnly": "Food",
     "titleEdit": "Edit food",
     "titleCreate": "New food",
@@ -1529,5 +1619,8 @@
     "tagline": "Your personal workout tracking app for maximum training success",
     "signIn": "Sign in",
     "register": "Register"
+  },
+  "DatePicker": {
+    "placeholder": "MM/DD/YYYY"
   }
 }

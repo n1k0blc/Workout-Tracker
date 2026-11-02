@@ -38,6 +38,7 @@
       "MEAL_SLOT_ORDER_INVALID": "Die Reihenfolge der Abschnitte ist ungültig.",
       "MEAL_SLOT_LIMIT_REACHED": "Du kannst höchstens {max} aktive Abschnitte haben.",
       "MEAL_SLOT_LAST_ACTIVE": "Mindestens ein Abschnitt muss aktiv bleiben.",
+      "QUICK_ENTRY_NOT_A_FOOD": "Als Lebensmittel lässt sich das nur speichern, wenn die Werte zu 100 g passen: höchstens 900 kcal, je Makro höchstens 100 g und zusammen höchstens 100 g.",
       "MEAL_SLOT_REORDER_SET_MISMATCH": "Die Abschnitte haben sich geändert. Bitte lade die Seite neu.",
       "MEAL_SLOT_UPDATE_EMPTY": "Es gibt nichts zu ändern.",
       "NUTRITION_TREND_RANGE_INVERTED": "Das Enddatum darf nicht vor dem Startdatum liegen.",
@@ -58,6 +59,8 @@
       "CYCLE_ALREADY_COMPLETED": "Dieser Zyklus wurde bereits beendet.",
       "CYCLE_CONCURRENT_MODIFICATION": "Eine andere Änderung an diesem Zyklus ist dazwischengekommen. Bitte versuche es erneut.",
       "ACTIVE_CYCLE_ALREADY_EXISTS": "Es existiert bereits ein aktiver Zyklus. Bitte beende diesen zuerst.",
+      "CYCLE_START_DATE_PAST": "Ein Zyklus kann nicht in der Vergangenheit starten.",
+      "CYCLE_START_DATE_TOO_FAR": "Ein Zyklus kann höchstens ein Jahr im Voraus starten.",
       "DUPLICATE_WEEKDAY_IN_CYCLE": "Zwei Trainingstage liegen auf {weekday}. Pro Zyklus ist jeder Wochentag nur einmal erlaubt.",
       "WORKOUT_DAY_NOT_FOUND": "Trainingstag nicht gefunden.",
       "WORKOUT_DAY_CYCLE_MISMATCH": "Dieser Trainingstag gehört nicht zu diesem Zyklus.",
@@ -111,6 +114,7 @@
       "isLocalDate": "Bitte gib ein gültiges Datum ein.",
       "matches": "Das Format ist ungültig.",
       "isId": "Ungültige Kennung.",
+      "isBarcode": "Bitte gib einen gültigen EAN- oder UPC-Code ein (8, 12 oder 13 Ziffern mit korrekter Prüfziffer).",
       "macroSum": "Kohlenhydrate, Protein und Fett zusammen dürfen höchstens 100 g pro 100 g ergeben.",
       "minDate": "Das Datum liegt zu weit in der Vergangenheit.",
       "maxDate": "Das Datum darf nicht in der Zukunft liegen.",
@@ -161,26 +165,126 @@
       },
       "height": {
         "isNotEmpty": "Bitte gib deine Größe ein.",
-        "isInt": "Bitte gib deine Größe in ganzen Zentimetern ein.",
-        "min": "Die Größe muss mindestens 100 cm betragen.",
-        "max": "Die Größe darf höchstens 250 cm betragen."
+        "isInt": "Bitte gib deine Größe als ganze Zahl ein.",
+        "min": "Die Größe muss mindestens {min} {unit} betragen.",
+        "max": "Die Größe darf höchstens {max} {unit} betragen."
       },
       "weight": {
         "isNotEmpty": "Bitte gib dein Gewicht ein.",
         "isNumber": "Bitte gib dein Gewicht als Zahl ein.",
-        "min": "Das Gewicht muss mindestens 30 kg betragen.",
-        "max": "Das Gewicht darf höchstens 400 kg betragen.",
-        "maxDecimals": "Verwende höchstens eine Nachkommastelle."
+        "maxDecimals": "Verwende höchstens eine Nachkommastelle.",
+        "min": "Das Gewicht muss mindestens {min} {unit} betragen.",
+        "max": "Das Gewicht darf höchstens {max} {unit} betragen."
       },
       "homeGyms": {
         "arrayMinSize": "Bitte füge mindestens ein Home Gym hinzu.",
         "arrayMaxSize": "Du kannst höchstens 10 Studios hinzufügen."
       },
       "name": {
-        "isNotEmpty": "Bitte gib einen Namen ein."
+        "isNotEmpty": "Bitte gib einen Namen ein.",
+        "maxLength": "Der Name darf höchstens {max} Zeichen lang sein."
       },
       "templateName": {
-        "isNotEmpty": "Bitte gib einen Namen für die Vorlage ein."
+        "isNotEmpty": "Bitte gib einen Namen für die Vorlage ein.",
+        "maxLength": "Der Name der Vorlage darf höchstens {max} Zeichen lang sein."
+      },
+      "targetKcal": {
+        "isInt": "Das Kalorienziel muss eine ganze Zahl sein.",
+        "min": "Das Kalorienziel muss mindestens {min} kcal betragen.",
+        "max": "Das Kalorienziel darf höchstens {max} kcal betragen."
+      },
+      "targetCarbs": {
+        "isInt": "Das Kohlenhydrate-Ziel muss eine ganze Zahl sein.",
+        "min": "Das Kohlenhydrate-Ziel muss mindestens {min} g betragen.",
+        "max": "Das Kohlenhydrate-Ziel darf höchstens {max} g betragen."
+      },
+      "targetProtein": {
+        "isInt": "Das Protein-Ziel muss eine ganze Zahl sein.",
+        "min": "Das Protein-Ziel muss mindestens {min} g betragen.",
+        "max": "Das Protein-Ziel darf höchstens {max} g betragen."
+      },
+      "targetFat": {
+        "isInt": "Das Fett-Ziel muss eine ganze Zahl sein.",
+        "min": "Das Fett-Ziel muss mindestens {min} g betragen.",
+        "max": "Das Fett-Ziel darf höchstens {max} g betragen."
+      },
+      "startDate": {
+        "isNotEmpty": "Bitte wähle ein Startdatum.",
+        "minDate": "Ein Zyklus kann nicht in der Vergangenheit starten.",
+        "maxDate": "Ein Zyklus kann höchstens ein Jahr im Voraus starten."
+      },
+      "durationMinutes": {
+        "isNotEmpty": "Bitte gib die Dauer in Minuten ein.",
+        "isInt": "Bitte gib die Dauer in ganzen Minuten ein.",
+        "min": "Die Dauer muss mindestens {min} Minute betragen.",
+        "max": "Die Dauer darf höchstens {max} Minuten betragen."
+      },
+      "workoutDate": {
+        "isNotEmpty": "Bitte wähle ein Datum."
+      },
+      "kcal": {
+        "isNotEmpty": "Bitte gib die Kalorien ein.",
+        "isNumber": "Bitte gib eine Zahl ein.",
+        "min": "Die Kalorien dürfen nicht negativ sein.",
+        "max": "Die Kalorien dürfen höchstens {max} kcal betragen.",
+        "maxDecimals": "Verwende höchstens eine Nachkommastelle."
+      },
+      "carbs": {
+        "isNotEmpty": "Bitte gib die Kohlenhydrate ein.",
+        "isNumber": "Bitte gib eine Zahl ein.",
+        "min": "Die Kohlenhydrate dürfen nicht negativ sein.",
+        "max": "Die Kohlenhydrate dürfen höchstens {max} g betragen."
+      },
+      "protein": {
+        "isNotEmpty": "Bitte gib das Protein ein.",
+        "isNumber": "Bitte gib eine Zahl ein.",
+        "min": "Das Protein darf nicht negativ sein.",
+        "max": "Das Protein darf höchstens {max} g betragen."
+      },
+      "fat": {
+        "isNotEmpty": "Bitte gib das Fett ein.",
+        "isNumber": "Bitte gib eine Zahl ein.",
+        "min": "Das Fett darf nicht negativ sein.",
+        "max": "Das Fett darf höchstens {max} g betragen.",
+        "macroSum": "Kohlenhydrate, Protein und Fett zusammen dürfen höchstens 100 g je 100 g betragen."
+      },
+      "portions": {
+        "arrayMaxSize": "Du kannst höchstens {max} Portionsgrößen anlegen.",
+        "portionDefault": "Markiere genau eine Portionsgröße als Standard."
+      },
+      "label": {
+        "isNotEmpty": "Bitte gib der Portionsgröße eine Bezeichnung.",
+        "maxLength": "Die Bezeichnung darf höchstens {max} Zeichen lang sein."
+      },
+      "grams": {
+        "isNotEmpty": "Bitte gib eine Menge an.",
+        "isNumber": "Bitte gib eine Zahl ein.",
+        "min": "Die Menge muss mindestens {min} {unit} betragen.",
+        "max": "Die Menge darf höchstens {max} {unit} betragen."
+      },
+      "quantity": {
+        "isNotEmpty": "Bitte gib eine Menge an.",
+        "isNumber": "Bitte gib eine Zahl ein.",
+        "min": "Die Menge muss mindestens {min} betragen.",
+        "max": "Die Menge darf höchstens {max} betragen."
+      },
+      "factor": {
+        "isNotEmpty": "Bitte gib einen Faktor an.",
+        "isNumber": "Bitte gib eine Zahl ein.",
+        "min": "Der Faktor muss mindestens {min} betragen.",
+        "max": "Der Faktor darf höchstens {max} betragen."
+      },
+      "saveAsFood": {
+        "notAFood": "Als Lebensmittel lässt sich das nur speichern, wenn die Werte zu 100 g passen: höchstens 900 kcal, je Makro höchstens 100 g und zusammen höchstens 100 g."
+      },
+      "newName": {
+        "isNotEmpty": "Bitte gib einen Namen ein.",
+        "maxLength": "Der Name darf höchstens {max} Zeichen lang sein.",
+        "arrayMaxSize": "Du kannst höchstens {count} aktive Abschnitte haben."
+      },
+      "editName": {
+        "isNotEmpty": "Bitte gib einen Namen ein.",
+        "maxLength": "Der Name darf höchstens {max} Zeichen lang sein."
       }
     }
   },
@@ -204,10 +308,6 @@
       "gramsUnit": "g",
       "macrosResult": "Makros ergeben",
       "kcalUnit": "kcal",
-      "kcalRangeError": "Kalorienziel muss eine ganze Zahl zwischen 1 und {max} sein",
-      "carbsRangeError": "Kohlenhydrate-Ziel muss eine ganze Zahl zwischen 1 und {max} sein",
-      "proteinRangeError": "Protein-Ziel muss eine ganze Zahl zwischen 1 und {max} sein",
-      "fatRangeError": "Fett-Ziel muss eine ganze Zahl zwischen 1 und {max} sein",
       "saved": "Tagesziele gespeichert",
       "saveError": "Fehler beim Speichern der Tagesziele",
       "hintMatch": "Makros und Kalorienziel stimmen überein.",
@@ -228,10 +328,6 @@
       "heightValue": "{height} {unit}",
       "weightValue": "{weight} {unit}",
       "empty": "-",
-      "validationAllFields": "Bitte alle Felder ausfüllen",
-      "validationHeightRange": "Größe muss zwischen {min} und {max} {unit} liegen",
-      "validationWeightRange": "Gewicht muss zwischen {min} und {max} {unit} liegen",
-      "validationAgeRange": "Alter muss zwischen 13 und 120 Jahren liegen",
       "updated": "Profil erfolgreich aktualisiert",
       "updateError": "Fehler beim Aktualisieren des Profils"
     },
@@ -409,6 +505,7 @@
     "addFirstExerciseAria": "Erste Übung hinzufügen",
     "addExerciseAria": "Übung hinzufügen",
     "duplicateExerciseError": "Diese Übung ist bereits im Workout. Füge stattdessen Sätze zur bestehenden Übung hinzu.",
+    "exerciseLimitReached": "Ein Workout kann höchstens {max} Übungen enthalten.",
     "addExerciseError": "Fehler beim Hinzufügen der Übung",
     "saveError": "Fehler beim Speichern des Workouts",
     "incomplete": {
@@ -669,8 +766,8 @@
   "MealEditorScreen": {
     "loadError": "Mahlzeit konnte nicht geladen werden.",
     "addedFood": "{name} hinzugefügt",
-    "nameRequired": "Bitte gib einen Namen ein.",
     "ingredientRequired": "Eine Mahlzeit braucht mindestens eine Zutat.",
+    "ingredientAmountInvalid": "Prüfe die Menge einer Zutat: Der eingegebene Wert wird nicht übernommen.",
     "saved": "Mahlzeit gespeichert",
     "created": "Mahlzeit angelegt",
     "saveError": "Speichern fehlgeschlagen.",
@@ -1260,8 +1357,6 @@
     "profile": "Profil"
   },
   "ExerciseEditorDialog": {
-    "nameRequired": "Bitte gib einen Namen ein",
-    "percentagesInvalid": "Muskelgruppen-Prozente müssen 100 % ergeben (aktuell: {sum} %)",
     "titleView": "Übung anzeigen",
     "titleEdit": "Übung bearbeiten",
     "titleCreate": "Benutzerdefinierte Übung erstellen",
@@ -1283,11 +1378,6 @@
     "cancel": "Abbrechen"
   },
   "FoodEditorDialog": {
-    "nameRequired": "Bitte gib einen Namen ein.",
-    "nutrientsInvalid": "Kalorien und Makros müssen Zahlen ≥ 0 sein.",
-    "barcodeInvalid": "Barcode muss 8 bis 14 Ziffern haben.",
-    "portionInvalid": "Jede Portionsgröße braucht eine Bezeichnung und eine Menge größer als 0.",
-    "portionDefault": "Markiere genau eine Portionsgröße als Standard.",
     "titleReadOnly": "Lebensmittel",
     "titleEdit": "Lebensmittel bearbeiten",
     "titleCreate": "Neues Lebensmittel",
@@ -1529,5 +1619,8 @@
     "tagline": "Deine persönliche Workout-Tracking-App für maximalen Trainingserfolg",
     "signIn": "Anmelden",
     "register": "Registrieren"
+  },
+  "DatePicker": {
+    "placeholder": "TT.MM.JJJJ"
   }
 }
