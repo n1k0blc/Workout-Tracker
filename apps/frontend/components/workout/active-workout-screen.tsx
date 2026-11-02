@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useWorkout } from '@/lib/workout-context';
 import { apiClient } from '@/lib/api';
@@ -56,6 +56,19 @@ interface ActiveWorkoutScreenProps {
 }
 
 type TemplateAction = 'none' | 'overwrite' | 'new';
+
+/** Runs "Beenden" when the 5-hour prompt's "Workout beenden" is pressed (#229): a complete workout
+ *  opens the confirm dialog, an incomplete one names its first problem, as for a tap on the button. */
+function FinishOnRequest({ onFinish }: { onFinish: () => void }) {
+  const { finishRequest } = useWorkout();
+  const seen = useRef(finishRequest);
+  useEffect(() => {
+    if (finishRequest === seen.current) return;
+    seen.current = finishRequest;
+    onFinish();
+  }, [finishRequest, onFinish]);
+  return null;
+}
 
 export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active', showBottomBar = true, showHeader = true, headerTop = 'top-0' }: ActiveWorkoutScreenProps) {
   const t = useTranslations('ActiveWorkout');
@@ -262,6 +275,7 @@ export default function ActiveWorkoutScreen({ onWorkoutComplete, mode = 'active'
 
   return (
     <>
+      {mode === 'active' && <FinishOnRequest onFinish={handleFinish} />}
       <div className="min-h-screen bg-background pb-32">
         {/* Header - hidden for pure edit usages (e.g. template editor, history edit of completed)
             where the parent provides its own chrome. For isPastWorkout (past tracking) the header

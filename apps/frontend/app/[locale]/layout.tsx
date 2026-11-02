@@ -7,6 +7,7 @@ import { AuthProvider } from "@/lib/auth-context";
 import { WorkoutProvider } from "@/lib/workout-context";
 import { MobileNav } from "@/components/mobile-nav";
 import { ActiveWorkoutOverlay } from "@/components/workout/active-workout-overlay";
+import { ForgottenWorkoutPrompt } from "@/components/workout/forgotten-workout-prompt";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "next-themes";
 import { cn } from "@/lib/utils";
@@ -81,6 +82,7 @@ export default async function RootLayout({
                 <MobileNav />
                 {children}
                 <ActiveWorkoutOverlay />
+                <ForgottenWorkoutPrompt />
               </WorkoutProvider>
             </AuthProvider>
           </ThemeProvider>
