@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { Button } from '@/components/ui/button';
@@ -49,10 +49,15 @@ export function QuantityStepper({
     ? validationMessage('grams', freeProblem, { min: AMOUNT_MIN, max: AMOUNT_MAX, unit })
     : undefined;
 
+  // The caller's callback is usually a fresh closure each render; it is read through a ref so the
+  // effect below reports only when the free field's validity changes.
+  const onValidityChangeRef = useRef(onValidityChange);
   useEffect(() => {
-    onValidityChange?.(!freeProblem);
-    return () => onValidityChange?.(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    onValidityChangeRef.current = onValidityChange;
+  });
+  useEffect(() => {
+    onValidityChangeRef.current?.(!freeProblem);
+    return () => onValidityChangeRef.current?.(true);
   }, [freeProblem]);
 
   const currentIndex =

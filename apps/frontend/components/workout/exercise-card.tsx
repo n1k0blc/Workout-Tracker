@@ -247,6 +247,8 @@ export default function ExerciseCard({
       behavior: 'smooth',
       block: 'center',
     });
+    // Only a new reveal request scrolls; `exercise.id` is fixed for a mounted card and `setRowId`
+    // is a new function every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reveal]);
   const [editingSetId, setEditingSetId] = useState<string | null>(null);

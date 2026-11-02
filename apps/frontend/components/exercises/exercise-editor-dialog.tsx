@@ -137,6 +137,8 @@ export function ExerciseEditorDialog({
       }
       form.clear('name');
     }
+    // Re-seeds only when the dialog opens or the edited exercise changes; `form` is a new object
+    // every render and would reset the fields on each keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, exercise]);
 

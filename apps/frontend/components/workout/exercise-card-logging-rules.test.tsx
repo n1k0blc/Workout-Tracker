@@ -16,7 +16,7 @@ vi.mock('@/lib/toast', () => ({ notify }));
 vi.mock('@/lib/api', () => ({ apiClient: { getExercises: vi.fn().mockResolvedValue([]) } }));
 vi.mock('@/lib/auth-context', () => ({ useAuth: () => ({ user: { unitSystem: units.system } }) }));
 vi.mock('@/lib/workout-context', async () => {
-  const { useFakeSetRowState } = await import('@/lib/test-set-row-state');
+  const { useFakeSetRowState } = await import('@/test-utils/set-row-state');
   return {
     useWorkout: () => ({
       ...useFakeSetRowState(),

@@ -15,7 +15,7 @@ vi.mock('@/lib/auth-context', () => ({
 const updateSet = vi.fn();
 
 vi.mock('@/lib/workout-context', async () => {
-  const { useFakeSetRowState } = await import('@/lib/test-set-row-state');
+  const { useFakeSetRowState } = await import('@/test-utils/set-row-state');
   return {
     useWorkout: () => ({
       ...useFakeSetRowState(),

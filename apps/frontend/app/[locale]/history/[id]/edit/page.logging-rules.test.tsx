@@ -28,7 +28,7 @@ vi.mock('@/components/protected-route', () => ({
 }));
 // The history editor never touches the live session; the card still reads the context.
 vi.mock('@/lib/workout-context', async () => {
-  const { useFakeSetRowState } = await import('@/lib/test-set-row-state');
+  const { useFakeSetRowState } = await import('@/test-utils/set-row-state');
   return {
     useWorkout: () => ({
       ...useFakeSetRowState(),

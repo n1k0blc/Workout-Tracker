@@ -148,6 +148,8 @@ export function FoodEditorDialog({
     setProtein(food ? String(food.protein) : '');
     setFat(food ? String(food.fat) : '');
     setPortions(toRows(food));
+    // Re-seeds only when the dialog opens or its food changes; `form` is a new object every render
+    // and would reset the fields on each keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, food, initialBarcode]);
 
