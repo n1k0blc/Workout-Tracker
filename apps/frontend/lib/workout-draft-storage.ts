@@ -24,6 +24,10 @@ export interface DraftMeta {
   /** Whether the live session is collapsed into the bottom bar (issue #129).
    *  Absent on drafts that predate the feature -- treated as expanded. */
   isMinimized?: boolean;
+  /** Planned set numbers the user swiped away, per exercise log id (#228). Without it a reload
+   *  would bring every swiped-away row back, and the workout could not be finished. Absent on
+   *  drafts that predate the feature -- read with `readSkippedSets`. */
+  skippedSets?: Record<string, number[]>;
 }
 
 export interface DraftStorageKeys {
@@ -91,4 +95,20 @@ export function claimDraftForUser(
   for (const [legacyKey] of TIMER_KEYS) storage.removeItem(legacyKey);
 
   return { draft, meta };
+}
+
+/**
+ * The swiped-away set numbers saved with a draft. Storage can hold anything (an old draft, a
+ * hand-edited value), so only well-formed entries -- a list of positive whole numbers per
+ * exercise -- are kept; the rest is dropped rather than failing the whole restore.
+ */
+export function readSkippedSets(meta: Pick<DraftMeta, 'skippedSets'>): Record<string, number[]> {
+  const raw: unknown = meta.skippedSets;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out: Record<string, number[]> = {};
+  for (const [exerciseLogId, numbers] of Object.entries(raw)) {
+    if (!Array.isArray(numbers)) continue;
+    out[exerciseLogId] = numbers.filter((n): n is number => Number.isInteger(n) && n > 0);
+  }
+  return out;
 }
