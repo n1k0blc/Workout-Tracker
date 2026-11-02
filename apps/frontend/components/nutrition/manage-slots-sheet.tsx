@@ -98,7 +98,6 @@ export function ManageSlotsSheet({
       setNewName('');
       refresh();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, refresh]);
 
   async function run(action: () => Promise<void>) {
