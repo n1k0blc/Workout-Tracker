@@ -127,6 +127,14 @@ Before, the server rejected a second active Zyklus only after the user had fille
 
 Before running the migration against any populated database, run `npm run check:input-rules` (in `apps/backend`, `DATABASE_URL` pointed at the target). It is read-only and reports every user with more than one active Zyklus as `multiple-active-cycles`; those need a manual decision (complete or delete all but one), since the migration fails on them.
 
+### Warm-up sets carry no RIR
+
+**A `WARMUP` set has no RIR, on any `WorkoutKind`. A `WORKING` set needs one when it is logged or planned, but the server never requires it.**
+
+The server only knows the first half: `deriveSetAggregates` (`apps/backend/src/workout-tree/workout-tree.service.ts`) answers `WORKOUT_SET_WARMUP_RIR` (400) for a warm-up with `rir`, `rirLeft` or `rirRight`. It cannot require RIR on working sets because history holds working sets without one and editing resends the whole tree through `replaceTree`. The data migration of `check:input-rules` nulled the existing warm-up RIR.
+
+The client enforces the rest, through one guard (`apps/frontend/lib/log-set-guards.ts`): `checkSetForLogging` is the single check behind the tick, the swipe and the past-tracking auto-commit; `setNeedsRir` / `findFirstSetNeedingRir` answer "does a working set still lack its RIR" for the plan editors' save, the live workout's "Beenden" and the workout-completeness check. Save payloads never trust the draft to have cleared a warm-up's RIR: `toExercisePayload`, `plannedSideFields` and `planRir` drop it. In Verlauf the rules apply only to sets the user changed.
+
 ## Agent skills
 
 ### Issue tracker
