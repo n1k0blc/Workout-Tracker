@@ -208,14 +208,18 @@ describe('nutrition query parameters', () => {
       expect((await query(NutritionDayQueryDto, { date: '2024-02-29' })).ok).not.toBeNull();
     });
 
-    it.each(['2026-02-30', '2026-2-3', '2026-11-01T10:00:00Z', '', 'abc', ['2026-11-01', '2026-11-02']])(
-      'answers NUTRITION_DAY_DATE_INVALID for %j',
-      async (date) => {
-        const result = await query(NutritionDayQueryDto, { date });
-        expect(result.ok).toBeNull();
-        expect(result.code).toBe('NUTRITION_DAY_DATE_INVALID');
-      },
-    );
+    it.each([
+      '2026-02-30',
+      '2026-2-3',
+      '2026-11-01T10:00:00Z',
+      '',
+      'abc',
+      ['2026-11-01', '2026-11-02'],
+    ])('answers NUTRITION_DAY_DATE_INVALID for %j', async (date) => {
+      const result = await query(NutritionDayQueryDto, { date });
+      expect(result.ok).toBeNull();
+      expect(result.code).toBe('NUTRITION_DAY_DATE_INVALID');
+    });
 
     it('refuses a parameter it does not know', async () => {
       const result = await query(NutritionDayQueryDto, { date: '2026-11-01', extra: '1' });
